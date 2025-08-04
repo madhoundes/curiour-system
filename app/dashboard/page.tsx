@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -89,6 +90,7 @@ const mockNotifications = [
 ];
 
 export default function MerchantDashboard() {
+  const router = useRouter();
   const [trackingNumber, setTrackingNumber] = useState("");
   const [isTracking, setIsTracking] = useState(false);
 
@@ -239,7 +241,11 @@ export default function MerchantDashboard() {
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Button className="h-16 flex flex-col space-y-2">
+              <Button 
+                className="h-16 flex flex-col space-y-2"
+                onClick={() => router.push('/create-shipment')}
+                id="ashraf-dashboard-create-shipment-btn"
+              >
                 <Plus className="h-6 w-6" />
                 <span>Create New Shipment</span>
               </Button>
