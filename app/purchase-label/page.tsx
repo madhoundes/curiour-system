@@ -12,7 +12,7 @@ import {
   Shield,
   CheckCircle,
   Download,
-  Print,
+  Printer,
   Package,
   MapPin,
   Clock
@@ -247,7 +247,7 @@ export default function PurchaseLabelPage() {
                     className="ashraf-action-btn ashraf-action-btn--print flex-1"
                     id="ashraf-print-label-btn"
                   >
-                    <Print className="h-4 w-4 mr-2" />
+                    <Printer className="h-4 w-4 mr-2" />
                     Print Label
                   </Button>
                 </div>
