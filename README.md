@@ -20,13 +20,13 @@ This platform enables merchants to create shipments, generate labels, and track 
   - Professional navigation with user profile dropdown
   - Responsive design with premium transitions
 
-### 🚧 **Phase 2: Core Features (IN PROGRESS)**
-- Create New Shipment form
-- Package details entry
-- Real-time shipping quotes
-- Label generation and PDF creation
-- Drop-off location finder
-- Tracking system implementation
+### ✅ **Phase 2: Core Shipping Features (COMPLETED)**
+- **Create New Shipment**: Complete 4-step shipment creation flow
+- **Package Details**: Dimensions, weight, and special handling options
+- **Real-time Quotes**: Mock quote calculations with service selection
+- **Label Purchase**: Mock Stripe payment integration with confirmation
+- **Drop-off Location Finder**: Search and select drop-off locations with maps UI
+- **Drop-off Confirmation**: Location confirmation with instructions
 
 ### 📋 **Phase 3: Advanced Features (PLANNED)**
 - Analytics and reporting dashboard
@@ -125,10 +125,18 @@ For testing the current implementation, use these sample credentials:
 
 ### 🎯 **Current Features Available**
 - **Landing Page**: Complete authentication UI with multiple login options
-- **Dashboard**: Fully functional merchant dashboard with mock data
-- **Navigation**: Seamless routing between pages
-- **Responsive Design**: Works on all device sizes
+- **Dashboard**: Fully functional merchant dashboard with mock data and quick actions
+- **Complete Shipment Flow**: End-to-end shipment creation (4 pages)
+  - Create shipment with sender/recipient details
+  - Package specifications with special handling
+  - Real-time quote preview with service selection
+  - Mock payment processing with order confirmation
+- **Drop-off Location Finder**: Search, filter, and select drop-off locations
+- **Drop-off Confirmation**: Confirm location with detailed instructions
+- **Navigation**: Seamless routing between all pages
+- **Responsive Design**: Works on all device sizes with mobile optimization
 - **Premium UI**: Modern design with subtle animations and transitions
+- **Accessibility**: Full keyboard navigation and screen reader support
 
 ### 🔧 **Environment Setup (Optional for Phase 1)**
 ```bash
@@ -267,15 +275,22 @@ For support, email support@ashrafproject.com or join our Slack channel.
 - [x] Premium transitions and animations
 - [x] Mock data integration
 
-### 🚧 **Phase 2: Core Shipping Features (NEXT)**
-- [ ] Create new shipment form
-- [ ] Package details and dimensions entry
-- [ ] Real-time shipping quote generation
-- [ ] PDF label generation and printing
-- [ ] Drop-off location finder with maps
-- [ ] Package tracking system
+### ✅ **Phase 2: Core Shipping Features (COMPLETED)**
+- [x] Create new shipment form with sender/recipient details
+- [x] Package details and dimensions entry with special handling
+- [x] Real-time shipping quote generation with service selection
+- [x] Mock PDF label generation and printing functionality
+- [x] Drop-off location finder with search, filters, and maps UI
+- [x] Drop-off confirmation with detailed instructions
 
-### 📋 **Phase 3: Advanced Features**
+### 🚧 **Phase 3: Tracking & Delivery (NEXT)**
+- [ ] Package tracking system with real-time updates
+- [ ] Courier barcode scanning interface
+- [ ] Photo proof of delivery capture
+- [ ] AI route optimization for couriers
+- [ ] SMS/Email notification system
+
+### 📋 **Phase 4: Advanced Features**
 - [ ] Enhanced analytics dashboard with charts
 - [ ] Admin panel and user management
 - [ ] Mobile courier app (React Native)
@@ -289,8 +304,18 @@ For support, email support@ashrafproject.com or join our Slack channel.
 - [ ] Integration with more e-commerce platforms
 - [ ] White-label solutions
 
-## 🎯 **Current Branch: `merchant-dashboard`**
-This branch contains the complete implementation of Phase 1, including the merchant dashboard and all frontend UI components.
+## 🎯 **Current Branch: `drop-off-system`**
+This branch contains the complete implementation of Phases 1 & 2, including:
+- Complete merchant authentication and dashboard
+- Full shipment creation workflow (4 pages)
+- Drop-off location finder with confirmation
+- All frontend UI components with premium design
+
+### 🌳 **Branch Structure:**
+- **`main`**: Production-ready releases
+- **`merchant-dashboard`**: Phase 1 - Dashboard and authentication
+- **`create-shipment`**: Phase 2a - Shipment creation flow
+- **`drop-off-system`**: Phase 2b - Drop-off location finder (current)
 
 ---
 

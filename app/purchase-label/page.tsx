@@ -257,9 +257,22 @@ export default function PurchaseLabelPage() {
                   <ol className="text-sm text-blue-800 space-y-1">
                     <li>1. Download and print the shipping label (4x6 inches recommended)</li>
                     <li>2. Securely attach the label to your package</li>
-                    <li>3. Drop off your package at any authorized location</li>
-                    <li>4. Track your shipment using the tracking number above</li>
+                    <li>3. Find a convenient drop-off location near you</li>
+                    <li>4. Drop off your package and get a receipt</li>
+                    <li>5. Track your shipment using the tracking number above</li>
                   </ol>
+                </div>
+                
+                <div className="mt-4">
+                  <Button
+                    onClick={() => router.push('/find-dropoff')}
+                    variant="outline"
+                    className="ashraf-action-btn ashraf-action-btn--find-dropoff w-full"
+                    id="ashraf-find-dropoff-from-success-btn"
+                  >
+                    <MapPin className="h-4 w-4 mr-2" />
+                    Find Drop-off Locations
+                  </Button>
                 </div>
               </CardContent>
             </Card>
