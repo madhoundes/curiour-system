@@ -55,7 +55,7 @@ export default function MerchantLandingPage() {
               <Truck className="h-8 w-8 text-white" />
             </div>
             <h1 className="text-4xl font-bold text-gray-900">
-              Ashraf Courier Platform
+              Parcego Courier Platform
             </h1>
           </div>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">

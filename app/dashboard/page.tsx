@@ -258,9 +258,14 @@ export default function MerchantDashboard() {
                 <MapPin className="h-6 w-6" />
                 <span>Find Drop-off</span>
               </Button>
-              <Button variant="outline" className="h-16 flex flex-col space-y-2">
-                <BarChart3 className="h-6 w-6" />
-                <span>View Analytics</span>
+              <Button 
+                variant="outline" 
+                className="h-16 flex flex-col space-y-2"
+                onClick={() => router.push('/courier')}
+                id="parcego-dashboard-courier-btn"
+              >
+                <Truck className="h-6 w-6" />
+                <span>Courier Dashboard</span>
               </Button>
             </div>
           </CardContent>

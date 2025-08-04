@@ -1,4 +1,4 @@
-# Ashraf Project – Courier Business Platform
+# Parcego – Courier Business Platform
 
 A modern, scalable courier service platform designed to provide an affordable, efficient, and transparent delivery solution for small businesses.
 
@@ -28,15 +28,31 @@ This platform enables merchants to create shipments, generate labels, and track 
 - **Drop-off Location Finder**: Search and select drop-off locations with maps UI
 - **Drop-off Confirmation**: Location confirmation with instructions
 
-### 📋 **Phase 3: Advanced Features (PLANNED)**
-- Analytics and reporting dashboard
-- Admin panel and user management
-- Mobile courier app
-- Payment integration
-- API development
+### ✅ **Phase 3: Courier Dashboard (COMPLETED)**
+- **Mobile-Optimized Courier Interface**: Responsive dashboard for delivery drivers
+- **Delivery Management**: View assigned deliveries with status tracking
+- **Package Scanner**: Barcode/QR scanning interface (mock implementation)
+- **Route Navigation**: GPS-enabled route planning with turn-by-turn directions
+- **Proof of Delivery**: Photo capture, digital signatures, and customer verification
+- **Performance Tracking**: Personal analytics, earnings, ratings, and achievements
+- **Bottom Navigation**: Mobile-first navigation optimized for courier workflow
+
+### 📋 **Phase 4: Super Admin Dashboard (PLANNED)**
+- Platform analytics and business intelligence
+- User management (merchants, couriers, admins)
+- Revenue tracking and financial reporting
+- Fleet management and optimization
+- System configuration and monitoring
 
 ### 🎯 Mission
 Deliver a scalable, affordable, and transparent courier platform for small businesses, with seamless merchant experience, robust tracking, and operational efficiency.
+
+### 🚚 **Current Implementation Status**
+**Platform Coverage:**
+- ✅ **Merchant Experience**: Complete shipment creation and management
+- ✅ **Courier Experience**: Full delivery workflow with mobile optimization
+- 📋 **Admin Experience**: Platform management (planned)
+- 🔄 **Real-time Integration**: Live updates between all user types
 
 ## 🛠 Technology Stack
 
@@ -133,7 +149,14 @@ For testing the current implementation, use these sample credentials:
   - Mock payment processing with order confirmation
 - **Drop-off Location Finder**: Search, filter, and select drop-off locations
 - **Drop-off Confirmation**: Confirm location with detailed instructions
-- **Navigation**: Seamless routing between all pages
+- **Courier Dashboard**: Mobile-optimized interface for delivery drivers
+  - Delivery assignment management with priority sorting
+  - Package scanning interface (barcode/QR mock)
+  - Route navigation with GPS integration placeholder
+  - Proof of delivery with photo capture and digital signatures
+  - Performance tracking with earnings, ratings, and achievements
+  - Bottom navigation optimized for mobile workflow
+- **Navigation**: Seamless routing between all pages and user roles
 - **Responsive Design**: Works on all device sizes with mobile optimization
 - **Premium UI**: Modern design with subtle animations and transitions
 - **Accessibility**: Full keyboard navigation and screen reader support
