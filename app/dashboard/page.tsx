@@ -1,30 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  Truck, 
-  Package, 
-  MapPin, 
-  BarChart3, 
-  Search, 
-  Plus, 
-  Bell, 
-  User,
-  Settings,
-  LogOut,
-  Eye,
-  Download,
-  Clock,
-  CheckCircle,
-  AlertCircle,
-  XCircle,
-  Shield
-} from "lucide-react";
+// Lucide icons now implemented as kebab-case spans with data-icon attributes
+// Following @lucide-kebab-case-icon-structure.mdc rule
 
 // Mock data for dashboard
 const mockStats = {
