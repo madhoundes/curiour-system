@@ -260,9 +260,9 @@ export default function CourierPerformance() {
                 <Star className="h-5 w-5 text-yellow-600" />
                 <div>
                   <p className="text-2xl font-bold">
-                    {selectedPeriod === "today" ? currentData.rating :
-                     selectedPeriod === "weekly" ? currentData.averageRating :
-                     currentData.customerRating}
+                    {selectedPeriod === "today" ? (currentData as any).rating :
+                     selectedPeriod === "weekly" ? (currentData as any).averageRating :
+                     (currentData as any).customerRating}
                   </p>
                   <p className="text-xs text-gray-500">Rating</p>
                 </div>

@@ -88,18 +88,21 @@ export default function MerchantDashboard() {
 
   const getStatusBadge = (status: string) => {
     const statusConfig = {
-      delivered: { color: "bg-green-100 text-green-800", icon: CheckCircle },
-      in_transit: { color: "bg-blue-100 text-blue-800", icon: Clock },
-      pending: { color: "bg-yellow-100 text-yellow-800", icon: AlertCircle },
-      failed: { color: "bg-red-100 text-red-800", icon: XCircle }
+      delivered: { color: "bg-green-100 text-green-800", iconData: "lucide:check-circle" },
+      in_transit: { color: "bg-blue-100 text-blue-800", iconData: "lucide:clock" },
+      pending: { color: "bg-yellow-100 text-yellow-800", iconData: "lucide:alert-circle" },
+      failed: { color: "bg-red-100 text-red-800", iconData: "lucide:x-circle" }
     };
 
     const config = statusConfig[status as keyof typeof statusConfig];
-    const IconComponent = config.icon;
 
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>
-        <IconComponent className="w-3 h-3 mr-1" />
+        {React.createElement('span', {
+          className: 'iconify lucide-icon',
+          'data-icon': config.iconData,
+          style: { width: '12px', height: '12px', marginRight: '4px', color: 'currentColor' }
+        })}
         {status.replace('_', ' ').toUpperCase()}
       </span>
     );
@@ -114,20 +117,32 @@ export default function MerchantDashboard() {
             <div className="flex items-center">
               <div className="flex items-center">
                 <div className="bg-blue-600 rounded-lg p-2 mr-3">
-                  <Truck className="h-6 w-6 text-white" />
+                  {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:truck',
+                  style: { width: '24px', height: '24px', color: 'white' }
+                })}
                 </div>
-                <h1 className="text-xl font-bold text-gray-900">Ashraf Courier</h1>
+                <h1 className="text-xl font-bold text-gray-900">Parcego</h1>
               </div>
             </div>
             
             <div className="flex items-center space-x-4">
               <Button variant="ghost" size="sm">
-                <Bell className="h-5 w-5" />
+{React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:bell',
+                  style: { width: '20px', height: '20px', color: 'currentColor' }
+                })}
               </Button>
               <div className="relative group">
                 <Button variant="ghost" size="sm" className="flex items-center space-x-2">
                   <div className="bg-blue-600 rounded-full p-2">
-                    <User className="h-4 w-4 text-white" />
+{React.createElement('span', {
+                      className: 'iconify lucide-icon',
+                      'data-icon': 'lucide:user',
+                      style: { width: '16px', height: '16px', color: 'white' }
+                    })}
                   </div>
                   <span className="text-sm font-medium">John Merchant</span>
                 </Button>
@@ -136,11 +151,19 @@ export default function MerchantDashboard() {
                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg border border-gray-200 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none group-hover:pointer-events-auto z-10">
                   <div className="py-1">
                     <a href="#" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                      <Settings className="h-4 w-4 mr-3" />
+                      {React.createElement('span', {
+                    className: 'iconify lucide-icon',
+                    'data-icon': 'lucide:settings',
+                    style: { width: '16px', height: '16px', marginRight: '12px', color: 'currentColor' }
+                  })}
                       Account Settings
                     </a>
                     <a href="#" className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                      <LogOut className="h-4 w-4 mr-3" />
+                      {React.createElement('span', {
+                    className: 'iconify lucide-icon',
+                    'data-icon': 'lucide:log-out',
+                    style: { width: '16px', height: '16px', marginRight: '12px', color: 'currentColor' }
+                  })}
                       Sign Out
                     </a>
                   </div>
@@ -164,7 +187,11 @@ export default function MerchantDashboard() {
             <CardContent className="p-6">
               <div className="flex items-center">
                 <div className="bg-blue-100 rounded-lg p-3 mr-4">
-                  <Package className="h-6 w-6 text-blue-600" />
+                  {React.createElement('span', {
+              className: 'iconify lucide-icon',
+              'data-icon': 'lucide:package',
+              style: { width: '24px', height: '24px', color: '#2563eb' }
+            })}
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Shipments</p>
@@ -178,7 +205,11 @@ export default function MerchantDashboard() {
             <CardContent className="p-6">
               <div className="flex items-center">
                 <div className="bg-yellow-100 rounded-lg p-3 mr-4">
-                  <Clock className="h-6 w-6 text-yellow-600" />
+                  {React.createElement('span', {
+              className: 'iconify lucide-icon',
+              'data-icon': 'lucide:clock',
+              style: { width: '24px', height: '24px', color: '#ca8a04' }
+            })}
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-600">Active Shipments</p>
@@ -192,7 +223,11 @@ export default function MerchantDashboard() {
             <CardContent className="p-6">
               <div className="flex items-center">
                 <div className="bg-green-100 rounded-lg p-3 mr-4">
-                  <CheckCircle className="h-6 w-6 text-green-600" />
+                  {React.createElement('span', {
+              className: 'iconify lucide-icon',
+              'data-icon': 'lucide:check-circle',
+              style: { width: '24px', height: '24px', color: '#16a34a' }
+            })}
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-600">Delivered Today</p>
@@ -206,7 +241,11 @@ export default function MerchantDashboard() {
             <CardContent className="p-6">
               <div className="flex items-center">
                 <div className="bg-purple-100 rounded-lg p-3 mr-4">
-                  <BarChart3 className="h-6 w-6 text-purple-600" />
+                  {React.createElement('span', {
+              className: 'iconify lucide-icon',
+              'data-icon': 'lucide:bar-chart-3',
+              style: { width: '24px', height: '24px', color: '#9333ea' }
+            })}
                 </div>
                 <div>
                   <p className="text-sm font-medium text-gray-600">Revenue</p>
@@ -230,7 +269,11 @@ export default function MerchantDashboard() {
                 onClick={() => router.push('/create-shipment')}
                 id="parcego-dashboard-create-shipment-btn"
               >
-                <Plus className="h-6 w-6" />
+                {React.createElement('span', {
+            className: 'iconify lucide-icon',
+            'data-icon': 'lucide:plus',
+            style: { width: '24px', height: '24px', color: 'currentColor' }
+          })}
                 <span>Create New Shipment</span>
               </Button>
               <Button 
@@ -239,7 +282,11 @@ export default function MerchantDashboard() {
                 onClick={() => router.push('/find-dropoff')}
                 id="parcego-dashboard-find-dropoff-btn"
               >
-                <MapPin className="h-6 w-6" />
+                {React.createElement('span', {
+            className: 'iconify lucide-icon',
+            'data-icon': 'lucide:map-pin',
+            style: { width: '24px', height: '24px', color: 'currentColor' }
+          })}
                 <span>Find Drop-off</span>
               </Button>
               <Button 
@@ -248,7 +295,11 @@ export default function MerchantDashboard() {
                 onClick={() => router.push('/courier')}
                 id="parcego-dashboard-courier-btn"
               >
-                <Truck className="h-6 w-6" />
+                {React.createElement('span', {
+            className: 'iconify lucide-icon',
+            'data-icon': 'lucide:truck',
+            style: { width: '24px', height: '24px', color: 'currentColor' }
+          })}
                 <span>Courier Dashboard</span>
               </Button>
               <Button 
@@ -257,7 +308,11 @@ export default function MerchantDashboard() {
                 onClick={() => router.push('/admin')}
                 id="parcego-dashboard-admin-btn"
               >
-                <Shield className="h-6 w-6" />
+                {React.createElement('span', {
+            className: 'iconify lucide-icon',
+            'data-icon': 'lucide:shield',
+            style: { width: '24px', height: '24px', color: 'currentColor' }
+          })}
                 <span>Admin Dashboard</span>
               </Button>
             </div>
@@ -286,10 +341,18 @@ export default function MerchantDashboard() {
                       </div>
                       <div className="flex space-x-2">
                         <Button variant="ghost" size="sm">
-                          <Eye className="h-4 w-4" />
+                          {React.createElement('span', {
+                      className: 'iconify lucide-icon',
+                      'data-icon': 'lucide:eye',
+                      style: { width: '16px', height: '16px', color: 'currentColor' }
+                    })}
                         </Button>
                         <Button variant="ghost" size="sm">
-                          <Download className="h-4 w-4" />
+                          {React.createElement('span', {
+                      className: 'iconify lucide-icon',
+                      'data-icon': 'lucide:download',
+                      style: { width: '16px', height: '16px', color: 'currentColor' }
+                    })}
                         </Button>
                       </div>
                     </div>
