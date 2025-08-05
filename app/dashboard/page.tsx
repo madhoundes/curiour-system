@@ -22,7 +22,8 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
-  XCircle
+  XCircle,
+  Shield
 } from "lucide-react";
 
 // Mock data for dashboard
@@ -240,11 +241,11 @@ export default function MerchantDashboard() {
             <CardDescription>Get started with your most common tasks</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <Button 
                 className="h-16 flex flex-col space-y-2"
                 onClick={() => router.push('/create-shipment')}
-                id="ashraf-dashboard-create-shipment-btn"
+                id="parcego-dashboard-create-shipment-btn"
               >
                 <Plus className="h-6 w-6" />
                 <span>Create New Shipment</span>
@@ -253,7 +254,7 @@ export default function MerchantDashboard() {
                 variant="outline" 
                 className="h-16 flex flex-col space-y-2"
                 onClick={() => router.push('/find-dropoff')}
-                id="ashraf-dashboard-find-dropoff-btn"
+                id="parcego-dashboard-find-dropoff-btn"
               >
                 <MapPin className="h-6 w-6" />
                 <span>Find Drop-off</span>
@@ -266,6 +267,15 @@ export default function MerchantDashboard() {
               >
                 <Truck className="h-6 w-6" />
                 <span>Courier Dashboard</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-16 flex flex-col space-y-2 border-blue-200 text-blue-600 hover:bg-blue-50"
+                onClick={() => router.push('/admin')}
+                id="parcego-dashboard-admin-btn"
+              >
+                <Shield className="h-6 w-6" />
+                <span>Admin Dashboard</span>
               </Button>
             </div>
           </CardContent>
