@@ -63,7 +63,6 @@ export default function MerchantLandingPage() {
             Create shipments, track deliveries, and grow your business with confidence.
           </p>
           
-          {/* Feature Cards - Temporarily Hidden
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
             <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-250">
               <Package className="h-12 w-12 text-blue-600 mx-auto mb-4" />
@@ -81,7 +80,6 @@ export default function MerchantLandingPage() {
               <p className="text-gray-600 text-sm">Comprehensive insights to optimize your shipping operations</p>
             </div>
           </div>
-          */}
         </div>
 
         <div className="max-w-md mx-auto">
