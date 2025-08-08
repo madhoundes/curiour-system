@@ -4,8 +4,6 @@ import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -42,13 +40,11 @@ export default function ProofOfDelivery() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const captureButtonRef = useRef<HTMLButtonElement>(null);
-  const recipientInputRef = useRef<HTMLInputElement>(null);
   
   // State management
   const [deliveryData] = useState<DeliveryData>(mockDeliveryData);
   const [photos, setPhotos] = useState<string[]>([]);
   const [signature, setSignature] = useState<string>("");
-  const [recipientName, setRecipientName] = useState("");
   const [deliveryNotes, setDeliveryNotes] = useState("");
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -157,15 +153,11 @@ export default function ProofOfDelivery() {
       newErrors.push("Customer signature is required");
     }
     
-    if (!recipientName.trim()) {
-      newErrors.push("Recipient name is required");
-    }
-    
     setErrors(newErrors);
     return newErrors.length === 0;
   };
 
-  const isFormValid = photos.length > 0 && Boolean(signature) && recipientName.trim().length > 0;
+  const isFormValid = photos.length > 0 && Boolean(signature);
 
   const focusFirstError = () => {
     if (photos.length === 0) {
@@ -174,10 +166,6 @@ export default function ProofOfDelivery() {
     }
     if (!signature) {
       canvasRef.current?.focus();
-      return;
-    }
-    if (!recipientName.trim()) {
-      recipientInputRef.current?.focus();
     }
   };
 
@@ -525,37 +513,7 @@ export default function ProofOfDelivery() {
           </CardContent>
         </Card>
 
-        {/* Recipient Name */}
-        <Card id="parcego-proof-recipient-section">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Recipient Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div>
-                <Label htmlFor="recipient-name">
-                  Recipient Name <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="recipient-name"
-                  placeholder="Enter recipient name"
-                  value={recipientName}
-                  onChange={(e) => setRecipientName(e.target.value)}
-                  className="mt-1 h-12"
-                  ref={recipientInputRef}
-                  aria-required="true"
-                  aria-invalid={!recipientName.trim() ? true : undefined}
-                  aria-describedby={!recipientName.trim() ? "parcego-proof-recipient-error" : undefined}
-                />
-                {!recipientName.trim() && (
-                  <p id="parcego-proof-recipient-error" className="text-sm text-red-600 mt-1">
-                    Recipient name is required
-                  </p>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Recipient Name removed: shown in Delivery Information card (customerName) */}
 
         {/* Delivery Notes */}
         <Card id="parcego-proof-notes-section">
