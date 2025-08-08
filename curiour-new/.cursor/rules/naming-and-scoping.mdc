@@ -1,0 +1,93 @@
+---
+alwaysApply: true
+---
+# Naming & Scoping Rules
+
+## 1. Unique IDs
+
+- **Rule:** All HTML IDs must be globally unique and follow a structured pattern.
+- **Format:** `[project]-[component]-[purpose]-[unique-identifier]`
+  - Example: `prj-header-nav-contact-btn`, `prj-user-profile-avatar-img`
+- **Avoid:** Generic names like `button-1`, `image-2`
+- **Dynamic IDs:** For generated elements, append a unique hash or UUID (e.g., `prj-user-card-abc123`).
+
+## 2. Class Names
+
+- **Rule:** Classes must be reusable, scoped, and follow BEM or SMACSS conventions, always prefixed by the project.
+- **Format:** `prj-block__element--modifier`
+  - Example: `.prj-card__header--active`, `.prj-form__input-error`
+- **Dynamic Classes:** Append a unique hash for runtime-generated classes (e.g., `.prj-user-card-abc123`).
+
+## 3. CSS/SCSS Structure
+
+- **Rule:** Scope all styles to components using unique classes/IDs.
+- **Good:** `.prj-contact-form__submit-btn { ... }`, `#prj-homepage-hero-cta { ... }`
+- **Bad:** `.button { ... }`, `#submit { ... }`
+
+## 4. Dynamic Element Handling
+
+- **Rule:** For dynamically generated elements (React, Vue, etc.), auto-append a unique ID/class.
+  - Example (React):
+    ```jsx
+    <div id={`prj-feature-card-${uuidv4()}`}>...</div>
+    ```
+
+## 5. Automation & Validation
+
+- **Linting:** Use Stylelint/ESLint to enforce patterns:
+  ```json
+  {
+    "rules": {
+      "selector-id-pattern": "^prj-[a-z]+(-[a-z]+)*$",
+      "selector-class-pattern": "^prj-[a-z]+(__[a-z]+)?(--[a-z]+)?$"
+    }
+  }
+  ```
+- **Build Process:** Use a prefixer plugin (e.g., PostCSS) to auto-add project prefixes:
+  ```js
+  // postcss.config.js
+  module.exports = {
+    plugins: [
+      require('postcss-prefixwrap')('.prj', { /* options */ }),
+    ]
+  };
+  ```
+
+## 6. Documentation
+
+- **Maintain:** A `STYLE_GUIDE.md` with:
+  - Naming conventions and examples (valid/invalid)
+  - Links to automation tools and linting rules
+
+## 7. Example Implementation
+
+**HTML:**
+```html
+<nav id="prj-main-nav" class="prj-nav prj-nav--dark">
+  <a href="#" class="prj-nav__link prj-nav__link--active" id="prj-nav-home-btn">Home</a>
+</nav>
+```
+
+**CSS/SCSS:**
+```scss
+.prj-nav {
+  &__link {
+    &--active { ... }
+  }
+}
+#prj-main-nav { ... }
+```
+
+## 8. Validation Checklist
+
+1. **Uniqueness:** Use tools like [W3C Validator](https://validator.w3.org/) to check for duplicate IDs.
+2. **Specificity:** Avoid overqualified selectors (e.g., `div#prj-header` → use `#prj-header`).
+3. **Dynamic Content:** Test auto-generated IDs/classes in UI frameworks.
+
+---
+
+**By following these rules, you ensure a scalable, conflict-free, and maintainable codebase. Adjust the `prj` prefix as needed for your project.**
+description:
+globs:
+alwaysApply: false
+---
