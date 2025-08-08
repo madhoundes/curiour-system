@@ -41,6 +41,8 @@ export default function ProofOfDelivery() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const captureButtonRef = useRef<HTMLButtonElement>(null);
+  const recipientInputRef = useRef<HTMLInputElement>(null);
   
   // State management
   const [deliveryData] = useState<DeliveryData>(mockDeliveryData);
@@ -64,6 +66,12 @@ export default function ProofOfDelivery() {
   // Handle photo capture/upload
   const handlePhotoCapture = () => {
     fileInputRef.current?.click();
+  };
+  const handlePhotoCaptureKeyDown: React.KeyboardEventHandler<HTMLButtonElement> = (e) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      handlePhotoCapture();
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -156,9 +164,26 @@ export default function ProofOfDelivery() {
     return newErrors.length === 0;
   };
 
+  const isFormValid = photos.length > 0 && Boolean(signature) && recipientName.trim().length > 0;
+
+  const focusFirstError = () => {
+    if (photos.length === 0) {
+      captureButtonRef.current?.focus();
+      return;
+    }
+    if (!signature) {
+      canvasRef.current?.focus();
+      return;
+    }
+    if (!recipientName.trim()) {
+      recipientInputRef.current?.focus();
+    }
+  };
+
   // Upload proof
   const handleUploadProof = async () => {
     if (!validateForm()) {
+      focusFirstError();
       return;
     }
 
@@ -248,7 +273,11 @@ export default function ProofOfDelivery() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50" id="parcego-proof-container">
+    <div
+      className="min-h-screen bg-gray-50"
+      id="parcego-proof-container"
+      aria-busy={isUploading ? "true" : undefined}
+    >
       {/* Header */}
       <div className="bg-white shadow-sm border-b sticky top-0 z-10" id="parcego-proof-header">
         <div className="max-w-md mx-auto px-4 py-3">
@@ -258,6 +287,7 @@ export default function ProofOfDelivery() {
               size="sm"
               onClick={() => router.back()}
               id="parcego-proof-back-btn"
+              aria-label="Go back"
             >
               {React.createElement('span', {
                 className: 'iconify lucide-icon',
@@ -354,9 +384,9 @@ export default function ProofOfDelivery() {
         </Card>
 
         {/* Photo Capture */}
-        <Card id="parcego-proof-photo-section">
+        <Card id="parcego-proof-photo-section" aria-labelledby="parcego-proof-photo-title">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center">
+            <CardTitle className="text-base flex items-center" id="parcego-proof-photo-title">
               {React.createElement('span', {
                 className: 'iconify lucide-icon',
                 'data-icon': 'lucide:camera',
@@ -375,6 +405,7 @@ export default function ProofOfDelivery() {
               onChange={handleFileChange}
               className="hidden"
               id="parcego-proof-file-input"
+              aria-label="Upload or capture a package photo"
             />
             
             {photos.length > 0 && (
@@ -396,6 +427,7 @@ export default function ProofOfDelivery() {
                       className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity h-8 w-8 p-0"
                       onClick={() => removePhoto(index)}
                       id={`parcego-proof-remove-photo-${index}`}
+                      aria-label={`Remove photo ${index + 1}`}
                     >
                       {React.createElement('span', {
                         className: 'iconify lucide-icon',
@@ -407,12 +439,21 @@ export default function ProofOfDelivery() {
                 ))}
               </div>
             )}
+            {photos.length === 0 && (
+              <p id="parcego-proof-photo-error" className="text-sm text-red-600 mb-3">
+                At least one photo is required
+              </p>
+            )}
             
             <Button 
               className="w-full h-12"
               variant={photos.length > 0 ? "outline" : "default"}
               onClick={handlePhotoCapture}
               id="parcego-proof-capture-btn"
+              ref={captureButtonRef}
+              onKeyDown={handlePhotoCaptureKeyDown}
+              aria-describedby={photos.length === 0 ? "parcego-proof-photo-error" : undefined}
+              aria-label={photos.length > 0 ? 'Add another delivery photo' : 'Take a delivery photo'}
             >
               {React.createElement('span', {
                 className: 'iconify lucide-icon',
@@ -425,9 +466,9 @@ export default function ProofOfDelivery() {
         </Card>
 
         {/* Digital Signature */}
-        <Card id="parcego-proof-signature-section">
+        <Card id="parcego-proof-signature-section" aria-labelledby="parcego-proof-signature-title">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center">
+            <CardTitle className="text-base flex items-center" id="parcego-proof-signature-title">
               {React.createElement('span', {
                 className: 'iconify lucide-icon',
                 'data-icon': 'lucide:pen-tool',
@@ -452,8 +493,17 @@ export default function ProofOfDelivery() {
                 onTouchMove={draw}
                 onTouchEnd={stopDrawing}
                 id="parcego-proof-signature-canvas"
+                tabIndex={0}
+                aria-label="Signature pad. Use touch or mouse to sign."
+                aria-required="true"
+                aria-describedby={!signature ? "parcego-proof-signature-error" : undefined}
               />
             </div>
+            {!signature && (
+              <p id="parcego-proof-signature-error" className="text-sm text-red-600 mb-2">
+                Customer signature is required
+              </p>
+            )}
             <div className="flex space-x-2">
               <Button 
                 variant="outline" 
@@ -461,6 +511,7 @@ export default function ProofOfDelivery() {
                 onClick={clearSignature}
                 className="flex-1"
                 id="parcego-proof-clear-signature-btn"
+                aria-label="Clear signature"
               >
                 {React.createElement('span', {
                   className: 'iconify lucide-icon',
@@ -490,7 +541,16 @@ export default function ProofOfDelivery() {
                   value={recipientName}
                   onChange={(e) => setRecipientName(e.target.value)}
                   className="mt-1 h-12"
+                  ref={recipientInputRef}
+                  aria-required="true"
+                  aria-invalid={!recipientName.trim() ? true : undefined}
+                  aria-describedby={!recipientName.trim() ? "parcego-proof-recipient-error" : undefined}
                 />
+                {!recipientName.trim() && (
+                  <p id="parcego-proof-recipient-error" className="text-sm text-red-600 mt-1">
+                    Recipient name is required
+                  </p>
+                )}
               </div>
             </div>
           </CardContent>
@@ -522,15 +582,17 @@ export default function ProofOfDelivery() {
 
         {/* Error Messages */}
         {errors.length > 0 && (
-          <Alert variant="destructive" id="parcego-proof-errors">
-            <AlertDescription>
-              <ul className="list-disc list-inside space-y-1">
-                {errors.map((error, index) => (
-                  <li key={index} className="text-sm">{error}</li>
-                ))}
-              </ul>
-            </AlertDescription>
-          </Alert>
+          <div role="alert" aria-live="assertive">
+            <Alert variant="destructive" id="parcego-proof-errors">
+              <AlertDescription>
+                <ul className="list-disc list-inside space-y-1">
+                  {errors.map((error, index) => (
+                    <li key={index} className="text-sm">{error}</li>
+                  ))}
+                </ul>
+              </AlertDescription>
+            </Alert>
+          </div>
         )}
 
         {/* Upload Button */}
@@ -538,8 +600,9 @@ export default function ProofOfDelivery() {
           <Button 
             className="w-full h-14 text-lg font-semibold"
             onClick={handleUploadProof}
-            disabled={isUploading}
+            disabled={!isFormValid || isUploading}
             id="parcego-proof-upload-btn"
+            aria-disabled={!isFormValid || isUploading}
           >
             {isUploading ? (
               <>
@@ -548,6 +611,15 @@ export default function ProofOfDelivery() {
                   'data-icon': 'lucide:loader-2',
                   style: { width: '24px', height: '24px', marginRight: '8px', color: 'currentColor' }
                 })}
+                <span
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={uploadProgress}
+                  className="sr-only"
+                >
+                  Upload progress {uploadProgress}%
+                </span>
                 Uploading... {uploadProgress}%
               </>
             ) : (
