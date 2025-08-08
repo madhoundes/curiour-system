@@ -1,0 +1,99 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Parcego Courier Platform – Courier Dashboard Rule
+
+## Objective
+
+Build the **Courier Dashboard UI** for the Parcego Courier Business Platform, strictly following the provided user flowchart and naming/scoping conventions.  
+**No backend logic or API integration—focus is on layout, navigation, and user experience.**
+
+---
+
+## 1. Technology & Design System
+
+- **Framework:** Next.js 14+ (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS only
+- **UI Components:** shadcn/ui (https://ui.shadcn.com/)
+- **State Management:** Zustand (for client-side state, if needed)
+- **Transitions:** Use premium, subtle transitions as per premium-transitions-and-effects.mdc
+- **Accessibility:** All UI must be accessible (ARIA, keyboard navigation, color contrast)
+- **Naming & Scoping:**  
+  - All HTML IDs and class names must strictly follow the rules in `@naming-and-scoping.mdc`:
+    - IDs: `parcego-[component]-[purpose]-[unique-identifier]`
+    - Classes: `parcego-[block]__[element]--[modifier]` (BEM/SMACSS, always prefixed by `parcego`)
+    - Dynamic elements: Append a unique hash/UUID for runtime-generated IDs/classes
+
+---
+
+## 2. Scope & Requirements
+
+### Dashboard Features (All UI, No Backend)
+- **Welcome Banner:** Personalized greeting, courier name, and quick stats (e.g., deliveries today, completed, earnings)
+- **Quick Actions:** Prominent buttons for "Start Next Delivery", "View Route", "Performance Stats"
+- **Assigned Deliveries:** List or cards of today's assigned deliveries (mock data), with status badges and action buttons (e.g., "Scan Package", "Start Route", "Mark Delivered")
+- **Delivery Workflow:**  
+  - **Scan Package:** Barcode/QR scanner UI (mock)
+  - **Route Navigation:** Map placeholder with route steps (mock)
+  - **Proof of Delivery:** Photo upload UI, digital signature (mock)
+  - **Mark as Delivered:** Confirmation UI
+- **Performance Tracking:** Mini chart or summary cards (mock data)
+- **Notifications:** Section for recent alerts or updates (mock)
+- **Navigation:** Bottom nav or sidebar for dashboard sections (Deliveries, Route, Performance, Profile)
+- **Profile/Account Menu:** Avatar with dropdown for account settings and logout (UI only)
+- **Mobile-First:** Layout and interactions must be optimized for mobile and tablet use
+
+---
+
+## 3. Navigation
+
+- Use Next.js App Router for all navigation.
+- All flows must match the provided user flowchart.
+- All navigation and state changes handled client-side (no server calls).
+
+---
+
+## 4. Data & Logic
+
+- All data is static, mocked, or placeholder.
+- No API calls, no backend logic, no authentication.
+- Use mock data for lists, workflow steps, and status updates.
+
+---
+
+## 5. Code Quality & Structure
+
+- Use TypeScript everywhere.
+- Functional components only.
+- Early returns, no dead code, no TODOs.
+- Descriptive naming and clear structure.
+- All forms, buttons, and flows must be visually complete and accessible.
+- **All IDs and class names must strictly follow `@naming-and-scoping.mdc` for easy inspection and debugging.**
+
+---
+
+## 6. Deliverables
+
+- Courier Dashboard page and all required UI components.
+- Fully navigable UI demo (no backend).
+- README update with instructions for running the courier dashboard demo.
+
+---
+
+## 7. Enforcement
+
+- Code reviews must verify adherence to this rule file and referenced standards, especially `@naming-and-scoping.mdc`.
+- Any deviation must be documented and approved by the project lead.
+
+---
+
+**Goal:**  
+Deliver a pixel-perfect, accessible, and modern Courier Dashboard UI for the Parcego platform, ready for future backend/API integration and mobile-first usage.
+
+---
+
+**Brand Note:**  
+All new code, files, and identifiers must use the **Parcego** brand name and updated naming structure.

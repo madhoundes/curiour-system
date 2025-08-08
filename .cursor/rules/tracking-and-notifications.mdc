@@ -1,0 +1,283 @@
+---
+description: UI-only tracking lifecycle, timeline, and notifications rules for the Ashraf Courier Business Platform (Next.js App Router, Tailwind, shadcn/ui).
+globs:
+alwaysApply: false
+---
+
+# Tracking & Notifications Rule (@tracking-and-notifications.mdc)
+
+## 1) Purpose & Scope
+- Define the tracking lifecycle, events taxonomy, UI/UX specs for timeline, badges, and notifications.
+- Phase 1 is UI-only: static/mocked data, no backend calls, no Shopify features.
+- Stack: Next.js 14+ (App Router), TypeScript, Tailwind CSS, shadcn/ui.
+- Enforce naming/ID scoping and icon usage rules [[@naming-and-scoping.mdc]][[lucide-kebab-case-icon-structure.mdc]].
+
+---
+
+## 2) Shipment Status Model (Single Active State)
+- Statuses:
+  - LabelCreated
+  - DropoffConfirmed
+  - ReceivedAtFacility
+  - InTransit
+  - OutForDelivery
+  - DeliveryAttempted
+  - Delivered
+  - FailedDelivery
+  - ReturnedToSender
+  - Cancelled
+- Allowed transitions:
+  - LabelCreated → DropoffConfirmed | Cancelled
+  - DropoffConfirmed → ReceivedAtFacility
+  - ReceivedAtFacility → InTransit
+  - InTransit → OutForDelivery | ReturnedToSender
+  - OutForDelivery → Delivered | DeliveryAttempted | FailedDelivery
+  - DeliveryAttempted → OutForDelivery | FailedDelivery
+  - FailedDelivery → ReturnedToSender | OutForDelivery
+  - ReturnedToSender → Cancelled
+- Badge color mapping (Tailwind):
+  - LabelCreated: slate
+  - DropoffConfirmed: indigo
+  - ReceivedAtFacility: violet
+  - InTransit: blue
+  - OutForDelivery: amber
+  - DeliveryAttempted: orange
+  - Delivered: green
+  - FailedDelivery: red
+  - ReturnedToSender: rose
+  - Cancelled: gray
+
+---
+
+## 3) Event Taxonomy (Append-only Timeline)
+- Types:
+  - LABEL_CREATED
+  - DROP_OFF_CONFIRMED
+  - SCANNED_AT_FACILITY
+  - IN_TRANSIT_DEPARTED
+  - IN_TRANSIT_ARRIVED
+  - OUT_FOR_DELIVERY
+  - DELIVERY_ATTEMPTED
+  - DELIVERY_FAILED
+  - DELIVERED
+  - RETURNED_TO_SENDER
+  - POD_UPLOADED (photo/signature)
+  - NOTE_ADDED (internal/merchant-visible)
+- Event object (UI contract):
+  - id (uuid), timestamp (ISO), type (string), statusAfter (ShipmentStatus)
+  - location (string), coordinates? { lat: number; lng: number }
+  - actor: 'system' | 'courier' | 'merchant'
+  - details? (string)
+  - attachments?: Array<{ url: string; type: 'photo' | 'signature' | 'doc' }>
+  - meta?: Record<string, unknown>
+
+---
+
+## 4) Identifiers & Formats (Mock)
+- Tracking number: `ASH-YYYYMMDD-XXXXXX` (X = alphanumeric).
+- Barcode: Code128 of the tracking string (UI mock).
+- Courier scan payload (mock): { trackingNumber, scannedAt, scanType: 'DROP_OFF'|'FACILITY_IN'|'FACILITY_OUT'|'POD', coordinates? }
+
+---
+
+## 5) UI Components & IDs (shadcn/ui + Tailwind)
+- Tracking Widget (Dashboard)
+  - Elements: input, submit button, compact result card with current status and link to full page.
+  - IDs:
+    - `parcego-tracking-widget-input`
+    - `parcego-tracking-widget-submit-btn`
+    - `parcego-tracking-widget-result-card`
+- Full Tracking Page
+  - Sections:
+    - Header: tracking number, current status badge, last update
+    - Timeline: vertical, newest first
+    - Shipment Summary: origin, destination, ETA (mock), carrier (mock)
+    - Proof of Delivery gallery: thumbnails + modal preview
+  - IDs:
+    - `parcego-tracking-header`
+    - `parcego-tracking-status-badge`
+    - `parcego-tracking-timeline`
+    - `parcego-tracking-summary-card`
+    - `parcego-tracking-pod-gallery`
+- Notifications Center (Dashboard)
+  - Elements: unread filter, list, mark-as-read, clear-all (UI-only)
+  - IDs:
+    - `parcego-notif-center`
+    - `parcego-notif-item-{uuid}`
+    - `parcego-notif-mark-read-btn`
+    - `parcego-notif-clear-all-btn`
+- Icons (global rule):
+  - Must use `<span>` with `class="iconify lucide-icon"`, `data-icon="lucide:..."`, inline style for size/color. Do not use Lucide React components directly [[lucide-kebab-case-icon-structure.mdc]].
+
+---
+
+## 6) Notification Channels, Triggers, Preferences (UI-only)
+- Channels: 'in-app' (required), 'email' (mock), 'sms' (mock), 'push' (mock).
+- Default triggers:
+  - LABEL_CREATED: in-app
+  - DROP_OFF_CONFIRMED: in-app, email
+  - RECEIVED_AT_FACILITY: in-app
+  - IN_TRANSIT_*: in-app
+  - OUT_FOR_DELIVERY: in-app, sms
+  - DELIVERY_ATTEMPTED: in-app, email
+  - DELIVERED: in-app, email, sms
+  - DELIVERY_FAILED: in-app, email, sms
+  - RETURNED_TO_SENDER: in-app, email
+  - POD_UPLOADED: in-app
+- Dedup & quiet hours (mock policy):
+  - Coalesce identical events within 2 minutes per channel
+  - Max 3 SMS per shipment per day
+  - Quiet hours 21:00–07:00 local defer non-critical SMS/Email (in-app unaffected)
+- User preferences (per-merchant, UI state only):
+  - Opt-in/out per channel and trigger, quiet hours, locale/time zone.
+
+---
+
+## 7) Accessibility & Motion
+- Keyboard operable inputs/buttons; use `aria-label` or `aria-labelledby`.
+- Live regions: announce current status updates via `role="status"` and `aria-live="polite"`.
+- Respect `prefers-reduced-motion`: reduce to opacity-only.
+- Hover/active transitions:
+  - Use `transition-all` with shared CSS variables.
+  - Avoid default `transform: translateY(-2px)` on hover across the project.
+  - Active state may use `scale-95` for tactile feedback; avoid vertical shift.
+
+---
+
+## 8) Premium Transitions (Consistent)
+- Global CSS variables (in `globals.css`):
+  - `--transition-quick: 150ms;`
+  - `--transition-normal: 250ms;`
+  - `--transition-slow: 350ms;`
+  - `--easing-smooth: cubic-bezier(0.4, 0, 0.2, 1);`
+  - `--easing-premium: cubic-bezier(0.165, 0.84, 0.44, 1);`
+- Patterns:
+  - Cards/Buttons: subtle hover shadow/color; `active:scale-95`
+  - Timeline entrance: fade + slide with stagger; disable when reduced motion
+  - Modals (POD preview): opacity + scale
+
+---
+
+## 9) Naming & Scoping (IDs/classes)
+- IDs must be globally unique: `parcego-[component]-[purpose]-[unique]`
+  - Examples: `parcego-tracking-widget-input`, `parcego-tracking-timeline-item-abc123`
+- Classes follow BEM-like pattern when custom class needed: `parcego-block__element--modifier`
+- Append UUIDs to IDs for dynamic lists.
+- Validate uniqueness via linting and reviews [[@naming-and-scoping.mdc]].
+
+---
+
+## 10) Data Contracts (TypeScript, UI-only)
+```ts
+export type ShipmentStatus =
+  | 'LabelCreated'
+  | 'DropoffConfirmed'
+  | 'ReceivedAtFacility'
+  | 'InTransit'
+  | 'OutForDelivery'
+  | 'DeliveryAttempted'
+  | 'Delivered'
+  | 'FailedDelivery'
+  | 'ReturnedToSender'
+  | 'Cancelled';
+
+export type TrackingEvent = {
+  id: string;
+  timestamp: string; // ISO
+  type: string;
+  statusAfter: ShipmentStatus;
+  location?: string;
+  coordinates?: { lat: number; lng: number };
+  actor: 'system' | 'courier' | 'merchant';
+  details?: string;
+  attachments?: Array<{ url: string; type: 'photo' | 'signature' | 'doc' }>;
+  meta?: Record<string, unknown>;
+};
+
+export type NotificationChannel = 'in-app' | 'email' | 'sms' | 'push';
+
+export type Notification = {
+  id: string;
+  createdAt: string; // ISO
+  channel: NotificationChannel;
+  title: string;
+  body: string;
+  importance: 'low' | 'normal' | 'high';
+  relatedTrackingNumber?: string;
+  read: boolean;
+  actions?: Array<{ label: string; action: 'view' | 'dismiss' }>;
+};
+
+export type ShipmentSummary = {
+  trackingNumber: string;
+  status: ShipmentStatus;
+  origin: string;
+  destination: string;
+  eta?: string;
+  carrier?: string;
+  lastUpdate: string;
+  hasPOD: boolean;
+};
+```
+
+---
+
+## 11) UI Behaviors
+- Tracking Widget:
+  - Validate format; inline error on invalid pattern.
+  - On submit route to: `/track-package?tracking={trackingNumber}`.
+  - Optional skeleton before showing mock result.
+- Timeline:
+  - Render newest first; collapse older events behind “Show older updates”.
+  - Each item: icon, title, timestamp (TZ-aware), location, details, attachments.
+- POD Gallery:
+  - Thumbnails open keyboard-accessible modal; ESC to close; focus trap.
+- Notifications Center:
+  - Newest first; unread emphasized; “Mark all as read” updates local state only.
+  - Optional toasts respect reduced motion.
+
+---
+
+## 12) Navigation (App Router)
+- Dashboard widget → `/track-package?tracking={trackingNumber}`
+- Courier mock flows (as already present):
+  - `/courier/scan`, `/courier/proof`, `/courier/route`
+- Do not add any Shopify routes in this phase.
+
+---
+
+## 13) Copy & Localization
+- English defaults; format times for user locale/time zone when available, else UTC.
+- Status titles in sentence case; concise, action-oriented notifications.
+
+---
+
+## 14) Error & Empty States (UI-only)
+- Invalid tracking:
+  - Inline error in widget; no navigation.
+- No events yet:
+  - Friendly placeholder with guidance and CTA.
+- Missing POD:
+  - Hide gallery, show “No proof of delivery available yet”.
+
+---
+
+## 15) Privacy (UI-only)
+- Do not render PII beyond shipment summary.
+- Mask phone/email in notification previews where relevant.
+
+---
+
+## 16) Admin & Audit (UI-only)
+- Internal notes flagged “Internal” in timeline.
+- Optional audit panel: collapsible raw JSON of events for debug.
+
+---
+
+## 17) QA Checklist
+- Keyboard navigation for all controls.
+- Screen reader live-announces status changes.
+- Reduced motion respected; no layout shifts.
+- Unique `parcego-` IDs; accessible color contrast.
+- No default translateY(-2px) hover effect.
+- No Shopify artifacts.

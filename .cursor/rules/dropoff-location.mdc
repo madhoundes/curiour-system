@@ -1,0 +1,92 @@
+---
+alwaysApply: false
+---
+
+# Drop-off Location Finder – UI Implementation Rule
+
+## Objective
+
+Build the complete UI for the Drop-off Location Finder, allowing merchants to search, view, and confirm drop-off locations for their shipments.  
+**No backend logic or API integration—focus is on layout, navigation, and user experience.**
+
+---
+
+## 1. Technology & Design System
+
+- **Framework:** Next.js 14+ (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS only
+- **UI Components:** shadcn/ui (https://ui.shadcn.com/)
+- **State Management:** Zustand (if needed)
+- **Transitions:** Use premium, subtle transitions as per premium-transitions-and-effects.mdc
+- **Accessibility:** All UI must be accessible (ARIA, keyboard navigation, color contrast)
+- **Naming & Scoping:** All new UI features, pages, and components **must** follow the rules in `@naming-and-scoping.mdc` for unique IDs, class names, and structure. This is required for easy inspection and debugging.
+
+---
+
+## 2. Scope & Requirements
+
+### Drop-off Location Finder Flow (All UI, No Backend)
+- **Find Drop-off Location Page:**
+  - Google Maps UI placeholder (no real API calls)
+  - Search bar for location/address
+  - List of mock drop-off locations (name, address, hours, distance)
+  - Location cards with details and "Select" button
+  - Map marker icons for each location
+  - Option to filter by open/closed, distance, or type
+  - Responsive design for mobile and desktop
+
+- **Drop-off Confirmation:**
+  - Confirmation UI after selecting a location
+  - Show selected location details
+  - "Confirm Drop-off" button
+  - Success message and navigation back to dashboard
+
+---
+
+## 3. Navigation
+
+- Use Next.js App Router for all navigation.
+- "Find Drop-off Location" button on dashboard or post-purchase must route to this flow.
+- All navigation and state changes handled client-side (no server calls).
+
+---
+
+## 4. Data & Logic
+
+- All data is static, mocked, or placeholder.
+- No API calls, no backend logic, no authentication.
+- Use mock data for locations, hours, and status.
+
+---
+
+## 5. Code Quality & Structure
+
+- Use TypeScript everywhere.
+- Functional components only.
+- Early returns, no dead code, no TODOs.
+- Descriptive naming and clear structure.
+- All forms, buttons, and flows must be visually complete and accessible.
+- **All new UI features, pages, and components must follow the rules in `@naming-and-scoping.mdc` for IDs and class names.**
+
+---
+
+## 6. Deliverables
+
+- All pages and components for the drop-off location finder flow.
+- Fully navigable UI demo (no backend).
+- README update with instructions for running and testing the drop-off flow.
+
+---
+
+## 7. Enforcement
+
+- Code reviews must verify adherence to this rule file, `@naming-and-scoping.mdc`, and all referenced standards.
+- Any deviation must be documented and approved by the project lead.
+
+---
+
+**Goal:**  
+Deliver a pixel-perfect, accessible, and modern drop-off location finder UI, ready for future backend/API integration.
+
+---

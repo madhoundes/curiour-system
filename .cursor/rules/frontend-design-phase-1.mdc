@@ -1,0 +1,112 @@
+---
+alwaysApply: true
+---
+
+# Ashraf Project – Courier Business Platform: Frontend Design Phase 1
+
+## Objective
+
+Build the complete frontend UI for the first stage of the Courier Business Platform, strictly following the provided user flowchart.  
+**No backend logic or API integration—focus is on layout, navigation, and user experience.**
+
+---
+
+## 1. Technology & Design System
+
+- **Framework:** Next.js 14+ (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS only
+- **UI Components:** shadcn/ui (https://ui.shadcn.com/)
+- **State Management:** Zustand (for client-side state, if needed)
+- **Transitions:** Use premium, subtle transitions as per premium-transitions-and-effects.mdc
+- **Accessibility:** All UI must be accessible (ARIA, keyboard navigation, color contrast)
+
+---
+
+## 2. Scope & Requirements
+
+### Pages & Components (All UI, No Backend)
+- Merchant Landing Page (Login/Signup)
+- Create Account (email, password, business info)
+- Email Verification (mock)
+- Secure Login (with optional 2FA UI)
+- Merchant Dashboard (main hub)
+- **[Shopify integration and related UI are excluded from this phase. Do NOT implement or mock any Shopify-related flows, forms, or components.]**
+- Create New Shipment (manual form)
+- Enter Package Details (form)
+- Generate Real-time Quote (mock)
+- Purchase Label (mock Stripe UI)
+- Generate 4x6 PDF Label (mock preview)
+- Download & Print Label (button)
+- Find Drop-off Location (Google Maps UI placeholder)
+- Drop Package at Location (confirmation UI)
+- Courier Scans Barcode (mock UI)
+- Tracking Updates (mock status)
+- AI Route Optimization (mock UI)
+- Courier Out for Delivery (mock status)
+- Photo Proof of Delivery (mock upload UI)
+- Upload to Supabase Storage (mock)
+- Tracking Update: Delivered (mock)
+- Merchant Views Proof (dashboard)
+- Analytics & Reporting (mock charts)
+- Admin Panel (Super Admin access, mock)
+- Manage All Accounts (mock)
+- Platform Analytics (mock)
+- Operational Management (mock)
+
+---
+
+## 3. Navigation
+
+- Use Next.js App Router for all navigation.
+- All flows must match the provided user flowchart (excluding Shopify).
+- All navigation and state changes handled client-side (no server calls).
+
+---
+
+## 4. Data & Logic
+
+- All data is static, mocked, or placeholder.
+- No API calls, no backend logic, no authentication.
+- Use mock data for lists, forms, and status updates.
+
+---
+
+## 5. Code Quality & Structure
+
+- Use TypeScript everywhere.
+- Functional components only.
+- Early returns, no dead code, no TODOs.
+- Descriptive naming and clear structure.
+- All forms, buttons, and flows must be visually complete and accessible.
+
+---
+
+## 6. Deliverables
+
+- All pages and components as per the flowchart (excluding Shopify).
+- Fully navigable UI demo (no backend).
+- README update with instructions for running the frontend demo.
+
+---
+
+## 7. Enforcement
+
+- Code reviews must verify adherence to this rule file and referenced standards.
+- Any deviation must be documented and approved by the project lead.
+
+---
+
+**Note:**  
+**Shopify integration and related UI will be covered in a subsequent development phase. Do NOT include any Shopify-related features in this stage.**
+
+---
+
+**Goal:**  
+Deliver a pixel-perfect, accessible, and modern UI foundation for the Courier Business Platform, ready for future backend/API integration.
+
+---
+description:
+globs:
+alwaysApply: false
+---

@@ -1,0 +1,73 @@
+# Lucide Kebab-Case Icon Structure & Inspectability Rule
+
+## Objective
+
+Enforce a consistent, inspectable, and easily editable structure for all Lucide icon usage in the codebase, with a focus on:
+- Kebab-case class names
+- `<span>` wrappers
+- `data-icon` attributes
+- Inline style for size, color, and font
+
+---
+
+## 1. Technology & Structure
+
+- **Icon Wrapper:** All Lucide icons must be rendered as `<span>` elements, not `<svg>` or direct React components.
+- **Class Names:** All icon class names must use kebab-case (e.g., `iconify lucide-icon`).
+- **Data Attribute:** The icon type must be set via a `data-icon` attribute (e.g., `data-icon="lucide:users"`).
+- **Style:** All icon size, color, and font must be set via the `style` prop on the `<span>`.
+- **No Direct JSX:** Do not use Lucide React components directly in JSX. Always use the `<span>` structure.
+- **Example:**
+  ```jsx
+  React.createElement('span', {
+    className: 'iconify lucide-icon',
+    'data-icon': 'lucide:users',
+    style: { fontSize: '24px', color: 'currentColor' }
+  })
+  ```
+
+---
+
+## 2. Scope & Enforcement
+
+- **Global Application:** This rule applies to all Lucide icon usage in all UI code, including all pages, components, and layouts.
+- **Inspectability:** All icons must be easily inspectable and modifiable in browser dev tools.
+- **Editability:** Developers must be able to change icon size, color, and font style via the `style` prop or class.
+- **Naming:** All class names and data attributes must use kebab-case.
+
+---
+
+## 3. Code Quality
+
+- **No direct `<svg>` or Lucide React components in JSX.**
+- **No camelCase or PascalCase class names for icons.**
+- **All icon-related code must be easy to inspect, debug, and override.**
+
+---
+
+## 4. Example Implementation
+
+```jsx
+// Good:
+React.createElement('span', {
+  className: 'iconify lucide-icon',
+  'data-icon': 'lucide:users',
+  style: { color: '#a78bfa', width: '24px', height: '24px' }
+})
+
+// Bad:
+<Users className="h-6 w-6 text-muted-foreground" />
+<svg ... />
+<SomeIconComponent ... />
+```
+
+---
+
+## 5. Always Apply
+
+**This rule is always enforced. All code reviews and automated checks must verify compliance.**
+
+---
+
+**File name:**  
+`.cursor/rules/lucide-kebab-case-icon-structure.mdc`

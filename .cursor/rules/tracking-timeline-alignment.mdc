@@ -1,0 +1,73 @@
+---
+description: Alignment pattern for tracking timelines – two-column grid with fixed icon rail and connector lines.
+globs:
+alwaysApply: false
+---
+
+# Tracking Timeline Alignment Rule (@tracking-timeline-alignment.mdc)
+
+## Objective
+Ensure timeline items are consistently aligned without overlap by using a two-column grid: a fixed-width icon rail and a flexible content column.
+
+---
+
+## Pattern
+- Layout: `grid grid-cols-[28px_1fr] gap-3`
+- Icon rail (col 1):
+  - Circle: `w-7 h-7 rounded-full bg-white border border-gray-200 grid place-items-center`
+  - Connector line below (except last item): `flex-1 w-px bg-gray-200 mt-2`
+- Content (col 2):
+  - Title row with status badge
+  - Meta row: timestamp • location
+  - Optional details and attachments
+- No absolute positioning; avoid overlap on small screens.
+
+---
+
+## IDs & Naming
+- Container: `parcego-tracking-timeline`
+- Item: `parcego-tracking-timeline-item-{uuid}`
+- Attachments: `parcego-tracking-attachment-{eventId}`
+
+---
+
+## Accessibility
+- Icons must be decorative; context is conveyed via title/status text.
+- Use semantic list: `<ol>` with `<li>` items.
+- Respect `prefers-reduced-motion`.
+
+---
+
+## Icons
+- Must follow `lucide-kebab-case-icon-structure.mdc`: `<span class="iconify lucide-icon" data-icon="lucide:*" style="..." />`
+
+---
+
+## Example (JSX)
+```jsx
+<ol id="parcego-tracking-timeline" className="space-y-6">
+  <li id="parcego-tracking-timeline-item-evt-1" className="grid grid-cols-[28px_1fr] gap-3">
+    <div className="flex flex-col items-center">
+      <div className="w-7 h-7 rounded-full bg-white border border-gray-200 grid place-items-center">
+        {React.createElement('span', { className: 'iconify lucide-icon', 'data-icon': 'lucide:truck', style: { width: '16px', height: '16px' } })}
+      </div>
+      <div className="flex-1 w-px bg-gray-200 mt-2" aria-hidden="true" />
+    </div>
+    <div className="flex flex-col gap-1">
+      <div className="flex items-center gap-2">
+        <span className="font-medium text-gray-900">Out for delivery</span>
+        <span className="text-xs px-2 py-0.5 rounded bg-amber-100 text-amber-800">OutForDelivery</span>
+      </div>
+      <span className="text-xs text-gray-500">2025-08-07 10:00 • Destination City</span>
+      <p className="text-sm text-gray-700">Courier has the package</p>
+    </div>
+  </li>
+</ol>
+```
+
+---
+
+## Enforcement
+- Use this pattern for all timelines to prevent misalignment and overlapping content.
+- No `position: absolute` for timeline icons.
+
