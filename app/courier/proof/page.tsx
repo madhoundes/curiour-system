@@ -27,7 +27,8 @@ const mockDeliveryData: DeliveryData = {
   customerName: "Sarah Johnson",
   address: "123 Main Street, Downtown District, NY 10001",
   packageType: "Express Delivery",
-  deliveryTime: new Date().toLocaleTimeString(),
+  // Filled on client via effect to avoid SSR/CSR mismatch
+  deliveryTime: "",
   gpsLocation: {
     lat: 40.7128,
     lng: -74.0060,
@@ -53,12 +54,16 @@ export default function ProofOfDelivery() {
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentLocation, setCurrentLocation] = useState("");
   const [timestamp, setTimestamp] = useState("");
+  const [clientDeliveryTime, setClientDeliveryTime] = useState("");
 
   // Get current location and timestamp (mock)
   useEffect(() => {
     setCurrentLocation(deliveryData.gpsLocation.address);
     setTimestamp(new Date().toLocaleString());
-  }, [deliveryData.gpsLocation.address]);
+    if (!clientDeliveryTime) {
+      setClientDeliveryTime(new Date().toLocaleTimeString());
+    }
+  }, [deliveryData.gpsLocation.address, clientDeliveryTime]);
 
   // Handle photo capture/upload
   const handlePhotoCapture = () => {
@@ -357,7 +362,7 @@ export default function ProofOfDelivery() {
                 </div>
               </div>
               
-              <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3">
                 {React.createElement('span', {
                   className: 'iconify lucide-icon',
                   'data-icon': 'lucide:clock',
@@ -365,7 +370,8 @@ export default function ProofOfDelivery() {
                 })}
                 <div className="flex-1">
                   <p className="text-sm font-medium">Timestamp</p>
-                  <p className="text-xs text-gray-600">{timestamp || 'Loading...'}</p>
+                    <p className="text-xs text-gray-600">{timestamp || 'Loading...'}</p>
+                    <p className="text-xs text-gray-500">{clientDeliveryTime || '...'}</p>
                 </div>
               </div>
             </div>

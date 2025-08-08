@@ -40,6 +40,17 @@ alwaysApply: Yes
 - **No TODOs**: All TODOs must be resolved before PR approval.
 - **Testing**: All new features must include Vitest tests. Aim for 80%+ coverage.
 
+### 3.1 Minimal, Predictable, and Maintainable Code Structure (Enforced)
+
+- Pages must be small and focused: one route per file (e.g., `app/courier/route/page.tsx`, `app/courier/route/[id]/page.tsx`).
+- Extract repeated UI into shared components under `components/` (e.g., `components/courier/DeliveryListItem.tsx`).
+- Keep functions/components short (target <50 lines). Use guard clauses to avoid deep nesting.
+- No business logic inside UI components: move logic to helpers or hooks.
+- Enforce naming and scoping: IDs/classes must follow `parcego-` prefix and kebab-case per `@naming-and-scoping.mdc`.
+- Icons must use `<span class="iconify lucide-icon" data-icon="lucide:..." style="..." />` structure only.
+- Avoid commented-out blocks and placeholders. Remove unused code before commit.
+- Prefer predictable patterns to aid AI-assisted refactors (pure functions, clear props, explicit types).
+
 ---
 
 ## 4. Security & Auth

@@ -28,13 +28,21 @@ export default function DropoffConfirmationPage() {
   const [isConfirming, setIsConfirming] = useState(false);
   const [confirmationComplete, setConfirmationComplete] = useState(false);
 
-  // Mock tracking number - in real app this would come from order context
-  const [trackingNumber] = useState(() => {
-    return `PCG${Date.now().toString().slice(-6)}${Math.random().toString(36).substr(2, 3).toUpperCase()}`;
-  });
+  // Mock tracking number (deferred to client to avoid SSR hydration mismatch)
+  const [trackingNumber, setTrackingNumber] = useState<string>("");
 
   // Load selected location from localStorage
   useEffect(() => {
+    // Generate after mount to keep SSR/CSR markup identical
+    const generateTracking = () => {
+      const suffix = Math.random().toString(36).substring(2, 5).toUpperCase();
+      const ts = Date.now().toString().slice(-6);
+      return `PCG${ts}${suffix}`;
+    };
+    if (!trackingNumber) {
+      setTrackingNumber(generateTracking());
+    }
+
     const savedLocation = localStorage.getItem('selectedDropoffLocation');
     if (savedLocation) {
       setSelectedLocation(JSON.parse(savedLocation));
@@ -42,7 +50,7 @@ export default function DropoffConfirmationPage() {
       // If no location selected, redirect back to finder
       router.push('/find-dropoff');
     }
-  }, [router]);
+  }, [router, trackingNumber]);
 
   const handleBackToFinder = () => {
     router.push('/find-dropoff');
@@ -393,7 +401,7 @@ export default function DropoffConfirmationPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                   <div>
                     <span className="font-medium text-gray-900">Tracking Number:</span>
-                    <span className="ml-2 text-gray-700 font-mono">{trackingNumber}</span>
+                      <span className="ml-2 text-gray-700 font-mono">{trackingNumber || "Generating..."}</span>
                   </div>
                   <div>
                     <span className="font-medium text-gray-900">Service:</span>
