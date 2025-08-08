@@ -348,8 +348,8 @@ For support, email support@ashrafproject.com or join our Slack channel.
 - [ ] Integration with more e-commerce platforms
 - [ ] White-label solutions
 
-## 🎯 **Current Branch: `Proof-of-Delivery`**
-This branch contains the latest hydration fixes and accessibility improvements for Proof of Delivery, plus deterministic tracking generation in drop-off confirmation.
+## 🎯 **Current Branch: `Tracking-packges`**
+This branch contains the latest tracking timeline and drop-off confirmation UIs, plus accessibility and hydration stability improvements.
 
 ### 🌳 **Branch Structure:**
 - **`main`**: Production-ready releases
@@ -358,7 +358,7 @@ This branch contains the latest hydration fixes and accessibility improvements f
 - **`drop-off-system`**: Phase 2b - Drop-off location finder
 - **`courier-dashboard`**: Phase 3 - Courier app UI
 - **`super-admin-dashboard`**: Phase 4 - Super Admin UI
-- **`Proof-of-Delivery`**: Proof of Delivery fixes and improvements (current)
+- **`Tracking-packges`**: Shipment tracking and drop-off confirmation (current)
 
 ---
 

@@ -227,3 +227,5 @@
  GET /find-dropoff 200 in 89ms
  GET /dropoff-confirmation 200 in 153ms
  GET /find-dropoff 200 in 318ms
+ ✓ Compiled in 1497ms (323 modules)
+ GET /find-dropoff 200 in 43ms
