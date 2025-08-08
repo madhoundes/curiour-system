@@ -44,6 +44,11 @@ This platform enables merchants to create shipments, generate labels, and track 
   - Success confirmation with next delivery navigation
 - **Performance Tracking**: Personal analytics, earnings, ratings, and achievements
 - **Bottom Navigation**: Mobile-first navigation optimized for courier workflow
+ 
+#### Proof of Delivery – Technical Notes
+- Avoid SSR/client hydration mismatches: timestamps and IDs are set in `useEffect` with loading fallbacks.
+- Icons use kebab-case span structure: `<span class="iconify lucide-icon" data-icon="lucide:..." style="..." />`.
+- Accessibility: inline errors, focus management, ARIA roles, and progress announced via `aria-live`.
 
 ### ✅ **Phase 4: Super Admin Dashboard (COMPLETED)**
 - **Platform Overview**: System health monitoring with real-time stats (merchants, couriers, shipments, revenue)
@@ -322,7 +327,7 @@ For support, email support@ashrafproject.com or join our Slack channel.
 - [x] Drop-off location finder with search, filters, and maps UI
 - [x] Drop-off confirmation with detailed instructions
 
-### 🚧 **Phase 3: Tracking & Delivery (NEXT)**
+### 🚧 **Phase 5: Tracking & Delivery (NEXT)**
 - [ ] Package tracking system with real-time updates
 - [ ] Courier barcode scanning interface
 - [ ] Photo proof of delivery capture
@@ -336,25 +341,24 @@ For support, email support@ashrafproject.com or join our Slack channel.
 - [ ] Payment processing integration
 - [ ] Email notifications system
 
-### 🚀 **Phase 4: Integrations & Scale**
+### 🚀 **Phase 6: Integrations & Scale**
 - [ ] Shopify integration and OAuth
 - [ ] Multi-language support
 - [ ] Advanced route optimization
 - [ ] Integration with more e-commerce platforms
 - [ ] White-label solutions
 
-## 🎯 **Current Branch: `drop-off-system`**
-This branch contains the complete implementation of Phases 1 & 2, including:
-- Complete merchant authentication and dashboard
-- Full shipment creation workflow (4 pages)
-- Drop-off location finder with confirmation
-- All frontend UI components with premium design
+## 🎯 **Current Branch: `Proof-of-Delivery`**
+This branch contains the latest hydration fixes and accessibility improvements for Proof of Delivery, plus deterministic tracking generation in drop-off confirmation.
 
 ### 🌳 **Branch Structure:**
 - **`main`**: Production-ready releases
 - **`merchant-dashboard`**: Phase 1 - Dashboard and authentication
 - **`create-shipment`**: Phase 2a - Shipment creation flow
-- **`drop-off-system`**: Phase 2b - Drop-off location finder (current)
+- **`drop-off-system`**: Phase 2b - Drop-off location finder
+- **`courier-dashboard`**: Phase 3 - Courier app UI
+- **`super-admin-dashboard`**: Phase 4 - Super Admin UI
+- **`Proof-of-Delivery`**: Proof of Delivery fixes and improvements (current)
 
 ---
 
