@@ -79,7 +79,6 @@ export default function MerchantDashboard() {
   const [isTracking, setIsTracking] = useState(false);
 
   const handleTrackPackage = () => {
-    if (!trackingNumber) return;
     setIsTracking(true);
     setTimeout(() => {
       setIsTracking(false);
@@ -375,7 +374,7 @@ export default function MerchantDashboard() {
                 <CardDescription>Enter tracking number to get status</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
+                <div className="space-y-2" id="parcego-tracking-widget-result-card">
                   <Label htmlFor="parcego-tracking-widget-input">Tracking Number</Label>
                   <Input
                     id="parcego-tracking-widget-input"
@@ -396,7 +395,7 @@ export default function MerchantDashboard() {
             </Card>
 
             {/* Notifications */}
-            <Card>
+            <Card id="parcego-notif-center">
               <CardHeader>
                 <CardTitle>Recent Activity</CardTitle>
                 <CardDescription>Latest updates and notifications</CardDescription>
@@ -404,14 +403,19 @@ export default function MerchantDashboard() {
               <CardContent>
                 <div className="space-y-3">
                   {mockNotifications.map((notification) => (
-                    <div key={notification.id} className="p-3 rounded-lg bg-gray-50 border border-gray-200">
+                    <div
+                      key={notification.id}
+                      id={`parcego-notif-item-${notification.id}`}
+                      className="p-3 rounded-lg bg-gray-50 border border-gray-200"
+                    >
                       <p className="text-sm text-gray-900">{notification.message}</p>
                       <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
                     </div>
                   ))}
                 </div>
-                <div className="mt-4">
-                  <Button variant="ghost" className="w-full text-sm">View All Notifications</Button>
+                <div className="mt-4 flex gap-2">
+                  <Button variant="ghost" className="w-full text-sm" id="parcego-notif-mark-read-btn">Mark all as read</Button>
+                  <Button variant="outline" className="w-full text-sm" id="parcego-notif-clear-all-btn">Clear all</Button>
                 </div>
               </CardContent>
             </Card>

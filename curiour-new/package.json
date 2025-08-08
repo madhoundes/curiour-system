@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
+    "dev:local": "next dev --turbopack -p 3000 -H localhost",
+    "dev:lan": "next dev --turbopack -p 3000 -H 0.0.0.0",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"

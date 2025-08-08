@@ -141,19 +141,11 @@ Deliver a scalable, affordable, and transparent courier platform for small busin
 
 3. **Run the development server**
    ```bash
-   # Local machine only
-   npm run dev:local
-
-   # Or expose on your LAN (other devices can open it)
-   npm run dev:lan
-
-   # Classic default
    npm run dev
    ```
 
 4. **Open your browser**
-   - Local: [http://localhost:3000](http://localhost:3000)
-   - Network (LAN): use your machine IP with port 3000 (e.g., http://192.168.1.10:3000)
+   Navigate to [http://localhost:3000](http://localhost:3000)
 
 ### 🎮 **Demo Credentials**
 For testing the current implementation, use these sample credentials:
@@ -213,8 +205,6 @@ NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_key
 
 ```bash
 npm run dev          # Start development server
-npm run dev:local    # Start on localhost:3000 only
-npm run dev:lan      # Start on 0.0.0.0:3000 (LAN-accessible)
 npm run build        # Build for production
 npm run start        # Start production server
 npm run lint         # Run ESLint
@@ -358,8 +348,8 @@ For support, email support@ashrafproject.com or join our Slack channel.
 - [ ] Integration with more e-commerce platforms
 - [ ] White-label solutions
 
-## 🎯 **Current Branch: `Proof-of-Delivery`**
-This branch contains the latest hydration fixes and accessibility improvements for Proof of Delivery, plus deterministic tracking generation in drop-off confirmation.
+## 🎯 **Current Branch: `Tracking-packges`**
+This branch contains the latest tracking timeline and drop-off confirmation UIs, plus accessibility and hydration stability improvements.
 
 ### 🌳 **Branch Structure:**
 - **`main`**: Production-ready releases
@@ -368,7 +358,7 @@ This branch contains the latest hydration fixes and accessibility improvements f
 - **`drop-off-system`**: Phase 2b - Drop-off location finder
 - **`courier-dashboard`**: Phase 3 - Courier app UI
 - **`super-admin-dashboard`**: Phase 4 - Super Admin UI
-- **`Proof-of-Delivery`**: Proof of Delivery fixes and improvements (current)
+- **`Tracking-packges`**: Shipment tracking and drop-off confirmation (current)
 
 ---
 
