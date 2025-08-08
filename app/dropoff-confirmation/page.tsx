@@ -1,21 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  ArrowLeft,
-  CheckCircle,
-  MapPin,
-  Clock,
-  Phone,
-  Star,
-  Navigation,
-  Package,
-  Calendar,
-  AlertCircle
-} from "lucide-react";
+// Icons will be rendered using React.createElement with kebab-case structure
 
 interface DropoffLocation {
   id: string;
@@ -41,7 +30,7 @@ export default function DropoffConfirmationPage() {
 
   // Mock tracking number - in real app this would come from order context
   const [trackingNumber] = useState(() => {
-    return `ASH${Date.now().toString().slice(-6)}${Math.random().toString(36).substr(2, 3).toUpperCase()}`;
+    return `PCG${Date.now().toString().slice(-6)}${Math.random().toString(36).substr(2, 3).toUpperCase()}`;
   });
 
   // Load selected location from localStorage
@@ -112,7 +101,11 @@ export default function DropoffConfirmationPage() {
             <div className="text-center">
               <div className="flex justify-center mb-4">
                 <div className="bg-white rounded-full p-3">
-                  <CheckCircle className="h-8 w-8 text-green-600" />
+                  {React.createElement('span', {
+                    className: 'iconify lucide-icon',
+                    'data-icon': 'lucide:check-circle',
+                    style: { width: '32px', height: '32px', color: '#16a34a' }
+                  })}
                 </div>
               </div>
               <h1 className="text-2xl font-bold">Drop-off Location Confirmed!</h1>
@@ -125,10 +118,14 @@ export default function DropoffConfirmationPage() {
           <div className="space-y-6">
             
             {/* Confirmation Details */}
-            <Card className="ashraf-card ashraf-card--success-confirmation">
+            <Card className="parcego-card parcego-card--success-confirmation">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <Package className="h-5 w-5 text-green-600" />
+                  {React.createElement('span', {
+                    className: 'iconify lucide-icon',
+                    'data-icon': 'lucide:package',
+                    style: { width: '20px', height: '20px', color: '#16a34a' }
+                  })}
                   <span>Drop-off Confirmed</span>
                 </CardTitle>
               </CardHeader>
@@ -160,7 +157,7 @@ export default function DropoffConfirmationPage() {
             </Card>
 
             {/* Instructions */}
-            <Card className="ashraf-card ashraf-card--instructions">
+            <Card className="parcego-card parcego-card--instructions">
               <CardHeader>
                 <CardTitle>Drop-off Instructions</CardTitle>
               </CardHeader>
@@ -193,17 +190,21 @@ export default function DropoffConfirmationPage() {
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
                 onClick={handleTrackPackage}
-                className="ashraf-action-btn ashraf-action-btn--track"
-                id="ashraf-track-package-btn"
+                className="parcego-action-btn parcego-action-btn--track"
+                id="parcego-track-package-btn"
               >
-                <Package className="h-4 w-4 mr-2" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:package',
+                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
+                })}
                 Track Your Package
               </Button>
               <Button
                 variant="outline"
                 onClick={handleGoToDashboard}
-                className="ashraf-action-btn ashraf-action-btn--dashboard"
-                id="ashraf-go-dashboard-btn"
+                className="parcego-action-btn parcego-action-btn--dashboard"
+                id="parcego-go-dashboard-btn"
               >
                 Return to Dashboard
               </Button>
@@ -226,10 +227,14 @@ export default function DropoffConfirmationPage() {
                 size="sm"
                 onClick={handleBackToFinder}
                 disabled={isConfirming}
-                id="ashraf-dropoff-confirmation-back-btn"
-                className="ashraf-nav__back-btn"
+                id="parcego-dropoff-confirmation-back-btn"
+                className="parcego-nav__back-btn"
               >
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:arrow-left',
+                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
+                })}
                 Back to Locations
               </Button>
               <div className="h-6 border-l border-gray-300"></div>
@@ -243,10 +248,14 @@ export default function DropoffConfirmationPage() {
         <div className="space-y-8">
 
           {/* Selected Location Details */}
-          <Card className="ashraf-card ashraf-card--selected-location">
+          <Card className="parcego-card parcego-card--selected-location">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <MapPin className="h-5 w-5 text-blue-600" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:map-pin',
+                  style: { width: '20px', height: '20px', color: '#2563eb' }
+                })}
                 <span>Selected Drop-off Location</span>
               </CardTitle>
               <CardDescription>
@@ -267,12 +276,20 @@ export default function DropoffConfirmationPage() {
                       </span>
                       {selectedLocation.isOpen ? (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          <CheckCircle className="h-3 w-3 mr-1" />
+                          {React.createElement('span', {
+                            className: 'iconify lucide-icon',
+                            'data-icon': 'lucide:check-circle',
+                            style: { width: '12px', height: '12px', marginRight: '4px', color: 'currentColor' }
+                          })}
                           Open Now
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          <Clock className="h-3 w-3 mr-1" />
+                          {React.createElement('span', {
+                            className: 'iconify lucide-icon',
+                            'data-icon': 'lucide:clock',
+                            style: { width: '12px', height: '12px', marginRight: '4px', color: 'currentColor' }
+                          })}
                           Closed
                         </span>
                       )}
@@ -284,7 +301,11 @@ export default function DropoffConfirmationPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div className="flex items-start space-x-3">
-                      <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
+                      {React.createElement('span', {
+                        className: 'iconify lucide-icon',
+                        'data-icon': 'lucide:map-pin',
+                        style: { width: '20px', height: '20px', marginTop: '2px', color: '#9ca3af' }
+                      })}
                       <div>
                         <p className="font-medium text-gray-900">Address</p>
                         <p className="text-gray-600">{selectedLocation.address}</p>
@@ -295,7 +316,11 @@ export default function DropoffConfirmationPage() {
                     </div>
 
                     <div className="flex items-start space-x-3">
-                      <Phone className="h-5 w-5 text-gray-400 mt-0.5" />
+                      {React.createElement('span', {
+                        className: 'iconify lucide-icon',
+                        'data-icon': 'lucide:phone',
+                        style: { width: '20px', height: '20px', marginTop: '2px', color: '#9ca3af' }
+                      })}
                       <div>
                         <p className="font-medium text-gray-900">Phone</p>
                         <p className="text-gray-600">{selectedLocation.phone}</p>
@@ -305,7 +330,11 @@ export default function DropoffConfirmationPage() {
 
                   <div className="space-y-4">
                     <div className="flex items-start space-x-3">
-                      <Clock className="h-5 w-5 text-gray-400 mt-0.5" />
+                      {React.createElement('span', {
+                        className: 'iconify lucide-icon',
+                        'data-icon': 'lucide:clock',
+                        style: { width: '20px', height: '20px', marginTop: '2px', color: '#9ca3af' }
+                      })}
                       <div>
                         <p className="font-medium text-gray-900">Hours</p>
                         <p className="text-gray-600">
@@ -316,7 +345,11 @@ export default function DropoffConfirmationPage() {
                     </div>
 
                     <div className="flex items-start space-x-3">
-                      <Star className="h-5 w-5 text-yellow-500 mt-0.5" />
+                      {React.createElement('span', {
+                        className: 'iconify lucide-icon',
+                        'data-icon': 'lucide:star',
+                        style: { width: '20px', height: '20px', marginTop: '2px', color: '#eab308' }
+                      })}
                       <div>
                         <p className="font-medium text-gray-900">Rating</p>
                         <p className="text-gray-600">{selectedLocation.rating} out of 5 stars</p>
@@ -344,10 +377,14 @@ export default function DropoffConfirmationPage() {
           </Card>
 
           {/* Shipment Information */}
-          <Card className="ashraf-card ashraf-card--shipment-info">
+          <Card className="parcego-card parcego-card--shipment-info">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <Package className="h-5 w-5 text-green-600" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:package',
+                  style: { width: '20px', height: '20px', color: '#16a34a' }
+                })}
                 <span>Your Shipment</span>
               </CardTitle>
             </CardHeader>
@@ -373,10 +410,14 @@ export default function DropoffConfirmationPage() {
 
           {/* Important Notice */}
           {!selectedLocation.isOpen && (
-            <Card className="ashraf-card ashraf-card--warning border-orange-200 bg-orange-50">
+            <Card className="parcego-card parcego-card--warning border-orange-200 bg-orange-50">
               <CardContent className="p-4">
                 <div className="flex items-start space-x-3">
-                  <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5" />
+                  {React.createElement('span', {
+                    className: 'iconify lucide-icon',
+                    'data-icon': 'lucide:alert-circle',
+                    style: { width: '20px', height: '20px', marginTop: '2px', color: '#ea580c' }
+                  })}
                   <div>
                     <h4 className="font-medium text-orange-800">Location Currently Closed</h4>
                     <p className="text-sm text-orange-700 mt-1">
@@ -395,28 +436,36 @@ export default function DropoffConfirmationPage() {
               variant="outline"
               onClick={handleBackToFinder}
               disabled={isConfirming}
-              className="ashraf-action-btn ashraf-action-btn--back order-2 sm:order-1"
-              id="ashraf-back-to-finder-btn"
+              className="parcego-action-btn parcego-action-btn--back order-2 sm:order-1"
+              id="parcego-back-to-finder-btn"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              {React.createElement('span', {
+                className: 'iconify lucide-icon',
+                'data-icon': 'lucide:arrow-left',
+                style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
+              })}
               Choose Different Location
             </Button>
 
             <div className="flex space-x-3 order-1 sm:order-2">
               <Button
                 variant="outline"
-                className="ashraf-action-btn ashraf-action-btn--directions"
-                id="ashraf-get-directions-btn"
+                className="parcego-action-btn parcego-action-btn--directions"
+                id="parcego-get-directions-btn"
               >
-                <Navigation className="h-4 w-4 mr-2" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:navigation',
+                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
+                })}
                 Get Directions
               </Button>
               
               <Button
                 onClick={handleConfirmDropoff}
                 disabled={isConfirming}
-                className="ashraf-action-btn ashraf-action-btn--confirm"
-                id="ashraf-confirm-dropoff-btn"
+                className="parcego-action-btn parcego-action-btn--confirm"
+                id="parcego-confirm-dropoff-btn"
               >
                 {isConfirming ? (
                   <div className="flex items-center space-x-2">
@@ -425,7 +474,11 @@ export default function DropoffConfirmationPage() {
                   </div>
                 ) : (
                   <>
-                    <CheckCircle className="h-4 w-4 mr-2" />
+                    {React.createElement('span', {
+                      className: 'iconify lucide-icon',
+                      'data-icon': 'lucide:check-circle',
+                      style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
+                    })}
                     Confirm Drop-off Location
                   </>
                 )}

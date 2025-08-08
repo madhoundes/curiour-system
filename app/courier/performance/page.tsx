@@ -1,24 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  ArrowLeft,
-  TrendingUp,
-  Clock,
-  MapPin,
-  Star,
-  DollarSign,
-  Package,
-  CheckCircle,
-  AlertCircle,
-  Target,
-  Award,
-  Calendar
-} from "lucide-react";
+// Icons will be rendered using React.createElement with kebab-case structure
 
 const mockPerformanceData = {
   courier: {
@@ -152,7 +139,11 @@ export default function CourierPerformance() {
             className="parcego-header__back-btn"
             id="parcego-performance-back-btn"
           >
-            <ArrowLeft className="h-5 w-5" />
+            {React.createElement('span', {
+              className: 'iconify lucide-icon',
+              'data-icon': 'lucide:arrow-left',
+              style: { width: '20px', height: '20px', color: 'currentColor' }
+            })}
           </Button>
           <h1 
             className="text-xl font-semibold"
@@ -216,7 +207,11 @@ export default function CourierPerformance() {
           >
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
-                <Package className="h-5 w-5 text-blue-600" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:package',
+                  style: { width: '20px', height: '20px', color: '#2563eb' }
+                })}
                 <div>
                   <p className="text-2xl font-bold">
                     {selectedPeriod === "today" ? currentData.deliveries : 
@@ -238,7 +233,11 @@ export default function CourierPerformance() {
           >
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
-                <DollarSign className="h-5 w-5 text-green-600" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:dollar-sign',
+                  style: { width: '20px', height: '20px', color: '#16a34a' }
+                })}
                 <div>
                   <p className="text-2xl font-bold">
                     ${selectedPeriod === "today" ? currentData.earnings :
@@ -257,7 +256,11 @@ export default function CourierPerformance() {
           >
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
-                <Star className="h-5 w-5 text-yellow-600" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:star',
+                  style: { width: '20px', height: '20px', color: '#ca8a04' }
+                })}
                 <div>
                   <p className="text-2xl font-bold">
                     {selectedPeriod === "today" ? (currentData as any).rating :
@@ -276,7 +279,11 @@ export default function CourierPerformance() {
           >
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
-                <MapPin className="h-5 w-5 text-purple-600" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:map-pin',
+                  style: { width: '20px', height: '20px', color: '#9333ea' }
+                })}
                 <div>
                   <p className="text-2xl font-bold">
                     {selectedPeriod === "today" ? currentData.distance :
@@ -297,7 +304,11 @@ export default function CourierPerformance() {
         >
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <Award className="h-5 w-5" />
+              {React.createElement('span', {
+                className: 'iconify lucide-icon',
+                'data-icon': 'lucide:award',
+                style: { width: '20px', height: '20px', color: 'currentColor' }
+              })}
               <span>Achievements</span>
             </CardTitle>
           </CardHeader>
@@ -352,7 +363,11 @@ export default function CourierPerformance() {
         >
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <Clock className="h-5 w-5" />
+              {React.createElement('span', {
+                className: 'iconify lucide-icon',
+                'data-icon': 'lucide:clock',
+                style: { width: '20px', height: '20px', color: 'currentColor' }
+              })}
               <span>Recent Deliveries</span>
             </CardTitle>
           </CardHeader>
@@ -392,7 +407,11 @@ export default function CourierPerformance() {
                 </div>
                 <div className="text-right">
                   <div className="flex items-center space-x-1 mb-1">
-                    <Star className="h-4 w-4 text-yellow-500" />
+                    {React.createElement('span', {
+                      className: 'iconify lucide-icon',
+                      'data-icon': 'lucide:star',
+                      style: { width: '16px', height: '16px', color: '#eab308' }
+                    })}
                     <span 
                       className="text-sm font-medium"
                       id={`parcego-delivery-rating-${delivery.id}`}
@@ -419,7 +438,11 @@ export default function CourierPerformance() {
         >
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <TrendingUp className="h-5 w-5" />
+              {React.createElement('span', {
+                className: 'iconify lucide-icon',
+                'data-icon': 'lucide:trending-up',
+                style: { width: '20px', height: '20px', color: 'currentColor' }
+              })}
               <span>Performance Insights</span>
             </CardTitle>
           </CardHeader>
@@ -429,7 +452,11 @@ export default function CourierPerformance() {
               id="parcego-insight-positive"
             >
               <div className="flex items-center mb-2">
-                <CheckCircle className="h-5 w-5 text-green-600 mr-2" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:check-circle',
+                  style: { width: '20px', height: '20px', marginRight: '8px', color: '#16a34a' }
+                })}
                 <h4 className="font-medium text-green-800">Great Performance!</h4>
               </div>
               <p className="text-green-700 text-sm">
@@ -442,7 +469,11 @@ export default function CourierPerformance() {
               id="parcego-insight-tip"
             >
               <div className="flex items-center mb-2">
-                <Target className="h-5 w-5 text-blue-600 mr-2" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:target',
+                  style: { width: '20px', height: '20px', marginRight: '8px', color: '#2563eb' }
+                })}
                 <h4 className="font-medium text-blue-800">Improvement Opportunity</h4>
               </div>
               <p className="text-blue-700 text-sm">
@@ -455,7 +486,11 @@ export default function CourierPerformance() {
               id="parcego-insight-reminder"
             >
               <div className="flex items-center mb-2">
-                <AlertCircle className="h-5 w-5 text-yellow-600 mr-2" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:alert-circle',
+                  style: { width: '20px', height: '20px', marginRight: '8px', color: '#ca8a04' }
+                })}
                 <h4 className="font-medium text-yellow-800">Reminder</h4>
               </div>
               <p className="text-yellow-700 text-sm">
@@ -472,7 +507,11 @@ export default function CourierPerformance() {
         >
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              <Calendar className="h-5 w-5" />
+              {React.createElement('span', {
+                className: 'iconify lucide-icon',
+                'data-icon': 'lucide:calendar',
+                style: { width: '20px', height: '20px', color: 'currentColor' }
+              })}
               <span>Career Progress</span>
             </CardTitle>
           </CardHeader>

@@ -1,23 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  ArrowLeft,
-  Search,
-  MapPin,
-  Clock,
-  Star,
-  Filter,
-  Navigation,
-  Phone,
-  CheckCircle,
-  Map
-} from "lucide-react";
+// Icons will be rendered using React.createElement with kebab-case structure
 
 // Mock drop-off location data
 const mockDropoffLocations = [
@@ -195,10 +184,14 @@ export default function FindDropoffPage() {
                 variant="ghost"
                 size="sm"
                 onClick={handleBackToDashboard}
-                id="ashraf-dropoff-finder-back-btn"
-                className="ashraf-nav__back-btn"
+                id="parcego-dropoff-finder-back-btn"
+                className="parcego-nav__back-btn"
               >
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:arrow-left',
+                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
+                })}
                 Back to Dashboard
               </Button>
               <div className="h-6 border-l border-gray-300"></div>
@@ -210,10 +203,14 @@ export default function FindDropoffPage() {
                 variant={showMap ? "default" : "outline"}
                 size="sm"
                 onClick={() => setShowMap(!showMap)}
-                id="ashraf-toggle-map-btn"
-                className="ashraf-dropoff__toggle-btn"
+                id="parcego-toggle-map-btn"
+                className="parcego-dropoff__toggle-btn"
               >
-                <Map className="h-4 w-4 mr-2" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:map',
+                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
+                })}
                 {showMap ? "Hide Map" : "Show Map"}
               </Button>
             </div>
@@ -225,20 +222,32 @@ export default function FindDropoffPage() {
         <div className="space-y-6">
 
           {/* Search and Filters */}
-          <Card className="ashraf-card ashraf-card--search">
+          <Card className="parcego-card parcego-card--search">
             <CardContent className="p-6">
               <div className="space-y-4">
                 {/* Search Bar */}
                 <div className="space-y-2">
-                  <Label htmlFor="ashraf-location-search">Search for drop-off locations</Label>
+                  <Label htmlFor="parcego-location-search">Search for drop-off locations</Label>
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    {React.createElement('span', {
+                      className: 'iconify lucide-icon',
+                      'data-icon': 'lucide:search',
+                      style: { 
+                        position: 'absolute',
+                        left: '12px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: '16px',
+                        height: '16px',
+                        color: '#9ca3af'
+                      }
+                    })}
                     <Input
-                      id="ashraf-location-search"
+                      id="parcego-location-search"
                       placeholder="Enter address, zip code, or location name"
                       value={searchQuery}
                       onChange={(e) => handleSearch(e.target.value)}
-                      className="ashraf-form__input pl-10"
+                      className="parcego-form__input pl-10"
                     />
                   </div>
                 </div>
@@ -261,10 +270,14 @@ export default function FindDropoffPage() {
                         variant={selectedFilter === filter.value ? "default" : "outline"}
                         size="sm"
                         onClick={() => handleFilterChange(filter.value)}
-                        className="ashraf-filter-btn"
-                        id={`ashraf-filter-${filter.value}`}
+                        className="parcego-filter-btn"
+                        id={`parcego-filter-${filter.value}`}
                       >
-                        <Filter className="h-3 w-3 mr-1" />
+                        {React.createElement('span', {
+                          className: 'iconify lucide-icon',
+                          'data-icon': 'lucide:filter',
+                          style: { width: '12px', height: '12px', marginRight: '4px', color: 'currentColor' }
+                        })}
                         {filter.label}
                       </Button>
                     ))}
@@ -287,9 +300,13 @@ export default function FindDropoffPage() {
               </div>
 
               {filteredLocations.length === 0 ? (
-                <Card className="ashraf-card ashraf-card--no-results">
+                <Card className="parcego-card parcego-card--no-results">
                   <CardContent className="p-8 text-center">
-                    <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    {React.createElement('span', {
+                      className: 'iconify lucide-icon',
+                      'data-icon': 'lucide:map-pin',
+                      style: { width: '48px', height: '48px', margin: '0 auto 16px', display: 'block', color: '#9ca3af' }
+                    })}
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No locations found</h3>
                     <p className="text-gray-600">Try adjusting your search or filters to find drop-off locations.</p>
                   </CardContent>
@@ -299,7 +316,7 @@ export default function FindDropoffPage() {
                   {filteredLocations.map((location) => (
                     <Card 
                       key={location.id}
-                      className="ashraf-card ashraf-card--location hover:shadow-md transition-shadow duration-200"
+                      className="parcego-card parcego-card--location hover:shadow-md transition-shadow duration-200"
                     >
                       <CardContent className="p-6">
                         <div className="flex items-start justify-between">
@@ -315,12 +332,20 @@ export default function FindDropoffPage() {
                                   </span>
                                   {location.isOpen ? (
                                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                      <CheckCircle className="h-3 w-3 mr-1" />
+                                      {React.createElement('span', {
+                                        className: 'iconify lucide-icon',
+                                        'data-icon': 'lucide:check-circle',
+                                        style: { width: '12px', height: '12px', marginRight: '4px', color: 'currentColor' }
+                                      })}
                                       Open
                                     </span>
                                   ) : (
                                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                      <Clock className="h-3 w-3 mr-1" />
+                                      {React.createElement('span', {
+                                        className: 'iconify lucide-icon',
+                                        'data-icon': 'lucide:clock',
+                                        style: { width: '12px', height: '12px', marginRight: '4px', color: 'currentColor' }
+                                      })}
                                       Closed
                                     </span>
                                   )}
@@ -328,18 +353,30 @@ export default function FindDropoffPage() {
                                 
                                 <div className="space-y-2 text-sm text-gray-600">
                                   <div className="flex items-center space-x-2">
-                                    <MapPin className="h-4 w-4" />
+                                    {React.createElement('span', {
+                                      className: 'iconify lucide-icon',
+                                      'data-icon': 'lucide:map-pin',
+                                      style: { width: '16px', height: '16px', color: 'currentColor' }
+                                    })}
                                     <span>{location.address}</span>
                                     <span className="text-blue-600 font-medium">({location.distance})</span>
                                   </div>
                                   
                                   <div className="flex items-center space-x-2">
-                                    <Phone className="h-4 w-4" />
+                                    {React.createElement('span', {
+                                      className: 'iconify lucide-icon',
+                                      'data-icon': 'lucide:phone',
+                                      style: { width: '16px', height: '16px', color: 'currentColor' }
+                                    })}
                                     <span>{location.phone}</span>
                                   </div>
 
                                   <div className="flex items-center space-x-2">
-                                    <Clock className="h-4 w-4" />
+                                    {React.createElement('span', {
+                                      className: 'iconify lucide-icon',
+                                      'data-icon': 'lucide:clock',
+                                      style: { width: '16px', height: '16px', color: 'currentColor' }
+                                    })}
                                     <span>
                                       Weekdays: {location.hours.weekday} | 
                                       Weekends: {location.hours.weekend}
@@ -347,7 +384,11 @@ export default function FindDropoffPage() {
                                   </div>
 
                                   <div className="flex items-center space-x-2">
-                                    <Star className="h-4 w-4 text-yellow-500" />
+                                    {React.createElement('span', {
+                                      className: 'iconify lucide-icon',
+                                      'data-icon': 'lucide:star',
+                                      style: { width: '16px', height: '16px', color: '#eab308' }
+                                    })}
                                     <span>{location.rating} rating</span>
                                   </div>
                                 </div>
@@ -371,18 +412,22 @@ export default function FindDropoffPage() {
                           <div className="flex flex-col space-y-2 ml-4">
                             <Button
                               onClick={() => handleSelectLocation(location)}
-                              className="ashraf-action-btn ashraf-action-btn--select"
-                              id={`ashraf-select-location-${location.id}`}
+                              className="parcego-action-btn parcego-action-btn--select"
+                              id={`parcego-select-location-${location.id}`}
                             >
                               Select Location
                             </Button>
                             <Button
                               variant="outline"
                               size="sm"
-                              className="ashraf-action-btn ashraf-action-btn--directions"
-                              id={`ashraf-directions-${location.id}`}
+                              className="parcego-action-btn parcego-action-btn--directions"
+                              id={`parcego-directions-${location.id}`}
                             >
-                              <Navigation className="h-3 w-3 mr-1" />
+                              {React.createElement('span', {
+                                className: 'iconify lucide-icon',
+                                'data-icon': 'lucide:navigation',
+                                style: { width: '12px', height: '12px', marginRight: '4px', color: 'currentColor' }
+                              })}
                               Directions
                             </Button>
                           </div>
@@ -396,10 +441,14 @@ export default function FindDropoffPage() {
 
             {/* Map Placeholder */}
             <div className="lg:col-span-1">
-              <Card className="ashraf-card ashraf-card--map sticky top-4">
+              <Card className="parcego-card parcego-card--map sticky top-4">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
-                    <Map className="h-5 w-5 text-blue-600" />
+                    {React.createElement('span', {
+                      className: 'iconify lucide-icon',
+                      'data-icon': 'lucide:map',
+                      style: { width: '20px', height: '20px', color: '#2563eb' }
+                    })}
                     <span>Map View</span>
                   </CardTitle>
                   <CardDescription>
@@ -410,7 +459,11 @@ export default function FindDropoffPage() {
                   {showMap ? (
                     <div className="bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg h-80 flex items-center justify-center">
                       <div className="text-center text-gray-500">
-                        <Map className="h-12 w-12 mx-auto mb-4" />
+                        {React.createElement('span', {
+                          className: 'iconify lucide-icon',
+                          'data-icon': 'lucide:map',
+                          style: { width: '48px', height: '48px', margin: '0 auto 16px', display: 'block', color: 'currentColor' }
+                        })}
                         <p className="text-sm">Google Maps Integration</p>
                         <p className="text-xs text-gray-400 mt-1">
                           (Placeholder for production implementation)
@@ -420,7 +473,11 @@ export default function FindDropoffPage() {
                   ) : (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg h-80 flex items-center justify-center">
                       <div className="text-center text-blue-600">
-                        <Map className="h-12 w-12 mx-auto mb-4" />
+                        {React.createElement('span', {
+                          className: 'iconify lucide-icon',
+                          'data-icon': 'lucide:map',
+                          style: { width: '48px', height: '48px', margin: '0 auto 16px', display: 'block', color: 'currentColor' }
+                        })}
                         <p className="text-sm font-medium">Click "Show Map" to view locations</p>
                         <p className="text-xs text-blue-500 mt-1">
                           See all drop-off points on an interactive map

@@ -1,22 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  ArrowLeft,
-  CreditCard,
-  Shield,
-  CheckCircle,
-  Download,
-  Printer,
-  Package,
-  MapPin,
-  Clock
-} from "lucide-react";
+// Icons will be rendered using React.createElement with kebab-case structure
 
 interface OrderData {
   recipientName: string;
@@ -51,47 +41,86 @@ interface OrderData {
 
 export default function PurchaseLabelPage() {
   const router = useRouter();
-  const [isLoading, setIsLoading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [paymentComplete, setPaymentComplete] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [orderData, setOrderData] = useState<OrderData | null>(null);
+  const [trackingNumber, setTrackingNumber] = useState("");
   
-  // Mock payment form data
-  const [paymentData, setPaymentData] = useState({
-    cardNumber: "",
-    expiryDate: "",
-    cvv: "",
-    cardholderName: "",
-    billingAddress: "",
-    billingCity: "",
-    billingState: "",
-    billingZip: ""
+  const [cardNumber, setCardNumber] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
+  const [cvv, setCvv] = useState("");
+  const [cardholderName, setCardholderName] = useState("");
+  const [billingAddress, setBillingAddress] = useState({
+    address: "",
+    city: "",
+    state: "",
+    zip: ""
   });
 
-  // Generated tracking number (mock)
-  const [trackingNumber] = useState(() => {
-    return `ASH${Date.now().toString().slice(-6)}${Math.random().toString(36).substr(2, 3).toUpperCase()}`;
-  });
-
-  // Load order data
+  // Load order data on component mount
   useEffect(() => {
-    const savedOrderData = localStorage.getItem('orderData');
-    if (savedOrderData) {
-      setOrderData(JSON.parse(savedOrderData));
+    const savedData = localStorage.getItem('orderData');
+    if (savedData) {
+      setOrderData(JSON.parse(savedData));
     } else {
       router.push('/create-shipment');
     }
   }, [router]);
 
-  const handleInputChange = (field: string, value: string) => {
-    setPaymentData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+  const handleCardNumberChange = (value: string) => {
+    // Format card number with spaces every 4 digits
+    const cleaned = value.replace(/\s+/g, '');
+    const formatted = cleaned.match(/.{1,4}/g)?.join(' ') || cleaned;
+    setCardNumber(formatted);
+  };
+
+  const handleExpiryDateChange = (value: string) => {
+    // Format expiry date as MM/YY
+    const cleaned = value.replace(/\D+/g, '');
+    if (cleaned.length >= 2) {
+      const formatted = cleaned.slice(0, 2) + '/' + cleaned.slice(2, 4);
+      setExpiryDate(formatted);
+    } else {
+      setExpiryDate(cleaned);
+    }
   };
 
   const handleBackToQuote = () => {
     router.push('/quote-preview');
+  };
+
+  const handleProcessPayment = () => {
+    setIsProcessing(true);
+    
+    // Simulate payment processing
+    setTimeout(() => {
+      setIsProcessing(false);
+      setPaymentSuccess(true);
+      // Generate tracking number
+      const newTrackingNumber = `PCG${Date.now().toString().slice(-10)}`;
+      setTrackingNumber(newTrackingNumber);
+      
+      // Clear form data from localStorage after successful payment
+      localStorage.removeItem('shipmentFormData');
+      localStorage.removeItem('orderData');
+    }, 3000);
+  };
+
+  const handleDownloadLabel = () => {
+    // Simulate label download
+    console.log('Downloading label for tracking number:', trackingNumber);
+    // In real app, this would trigger PDF generation and download
+  };
+
+  const handlePrintLabel = () => {
+    // Simulate label printing
+    console.log('Printing label for tracking number:', trackingNumber);
+    // In real app, this would trigger print dialog
+    window.print();
+  };
+
+  const handleGoToDashboard = () => {
+    router.push('/dashboard');
   };
 
   const calculateTotalCost = () => {
@@ -107,50 +136,11 @@ export default function PurchaseLabelPage() {
     return total;
   };
 
-  const handleProcessPayment = () => {
-    setIsProcessing(true);
-    
-    // Simulate payment processing
-    setTimeout(() => {
-      setIsProcessing(false);
-      setPaymentComplete(true);
-      
-      // Save successful order data
-      const completedOrder = {
-        ...orderData,
-        trackingNumber,
-        orderDate: new Date().toISOString(),
-        totalCost: calculateTotalCost(),
-        status: 'label_created'
-      };
-      
-      localStorage.setItem('completedOrder', JSON.stringify(completedOrder));
-      localStorage.removeItem('shipmentFormData');
-      localStorage.removeItem('orderData');
-    }, 3000);
-  };
-
-  const handleDownloadLabel = () => {
-    // Mock PDF download
-    console.log('Downloading shipping label...');
-    alert('Shipping label downloaded! (This is a mock implementation)');
-  };
-
-  const handlePrintLabel = () => {
-    // Mock print functionality
-    console.log('Printing shipping label...');
-    alert('Printing shipping label... (This is a mock implementation)');
-  };
-
-  const handleGoToDashboard = () => {
-    router.push('/dashboard');
-  };
-
-  const isPaymentFormValid = () => {
-    return paymentData.cardNumber.length >= 16 && 
-           paymentData.expiryDate.length >= 5 && 
-           paymentData.cvv.length >= 3 && 
-           paymentData.cardholderName.length > 0;
+  const isFormValid = () => {
+    return cardNumber.length >= 16 && 
+           expiryDate.length === 5 && 
+           cvv.length >= 3 && 
+           cardholderName.trim() !== "";
   };
 
   if (!orderData) {
@@ -164,251 +154,252 @@ export default function PurchaseLabelPage() {
     );
   }
 
-  if (paymentComplete) {
+  // Success screen
+  if (paymentSuccess) {
     return (
       <div className="min-h-screen bg-gray-50">
-        {/* Success Header */}
-        <div className="bg-green-600 text-white">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            <div className="text-center">
-              <div className="flex justify-center mb-4">
-                <div className="bg-white rounded-full p-3">
-                  <CheckCircle className="h-8 w-8 text-green-600" />
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+          <div className="text-center mb-8">
+            <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-green-100 mb-4">
+              {React.createElement('span', {
+                className: 'iconify lucide-icon',
+                'data-icon': 'lucide:check-circle',
+                style: { width: '48px', height: '48px', color: '#16a34a' }
+              })}
+            </div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Payment Successful!</h1>
+            <p className="text-lg text-gray-600">Your shipping label has been generated</p>
+          </div>
+
+          <Card className="parcego-card parcego-card--confirmation">
+            <CardHeader>
+              <CardTitle>Order Confirmation</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center space-x-2">
+                  {React.createElement('span', {
+                    className: 'iconify lucide-icon',
+                    'data-icon': 'lucide:package',
+                    style: { width: '20px', height: '20px', color: '#2563eb' }
+                  })}
+                  <div>
+                    <p className="font-medium text-blue-900">Tracking Number</p>
+                    <p className="text-2xl font-mono font-bold text-blue-700">{trackingNumber}</p>
+                  </div>
                 </div>
               </div>
-              <h1 className="text-2xl font-bold">Payment Successful!</h1>
-              <p className="text-green-100 mt-2">Your shipping label has been created and is ready for use.</p>
-            </div>
-          </div>
-        </div>
 
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="space-y-6">
-            
-            {/* Order Confirmation */}
-            <Card className="ashraf-card ashraf-card--confirmation">
-              <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <Package className="h-5 w-5 text-green-600" />
-                  <span>Order Confirmation</span>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">Tracking Number</h4>
-                    <div className="bg-gray-50 p-3 rounded-lg font-mono text-lg">
-                      {trackingNumber}
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">Total Paid</h4>
-                    <div className="text-2xl font-bold text-green-600">
-                      ${calculateTotalCost().toFixed(2)}
-                    </div>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">Service</h4>
-                    <p className="text-gray-600">{orderData.selectedQuote.name}</p>
-                    <p className="text-sm text-gray-500">{orderData.selectedQuote.deliveryTime}</p>
-                  </div>
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">Destination</h4>
-                    <p className="text-gray-600">
-                      {orderData.recipientName}<br />
-                      {orderData.recipientCity}, {orderData.recipientState}
-                    </p>
-                  </div>
+              <div className="space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Recipient:</span>
+                  <span className="font-medium">{orderData.recipientName}</span>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Destination:</span>
+                  <span className="font-medium">{orderData.recipientCity}, {orderData.recipientState}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Service:</span>
+                  <span className="font-medium">{orderData.selectedQuote.name}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Delivery Time:</span>
+                  <span className="font-medium">{orderData.selectedQuote.deliveryTime}</span>
+                </div>
+                <div className="flex justify-between text-lg font-semibold">
+                  <span>Total Paid:</span>
+                  <span className="text-green-600">${calculateTotalCost().toFixed(2)}</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
-            {/* Label Actions */}
-            <Card className="ashraf-card ashraf-card--label-actions">
-              <CardHeader>
-                <CardTitle>Your Shipping Label</CardTitle>
-                <CardDescription>
-                  Download or print your label and attach it to your package
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <Button 
-                    onClick={handleDownloadLabel}
-                    className="ashraf-action-btn ashraf-action-btn--download flex-1"
-                    id="ashraf-download-label-btn"
-                  >
-                    <Download className="h-4 w-4 mr-2" />
-                    Download PDF Label
-                  </Button>
-                  <Button 
-                    variant="outline"
-                    onClick={handlePrintLabel}
-                    className="ashraf-action-btn ashraf-action-btn--print flex-1"
-                    id="ashraf-print-label-btn"
-                  >
-                    <Printer className="h-4 w-4 mr-2" />
-                    Print Label
-                  </Button>
-                </div>
-                
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <h4 className="font-medium text-blue-900 mb-2">Next Steps:</h4>
-                  <ol className="text-sm text-blue-800 space-y-1">
-                    <li>1. Download and print the shipping label (4x6 inches recommended)</li>
-                    <li>2. Securely attach the label to your package</li>
-                    <li>3. Find a convenient drop-off location near you</li>
-                    <li>4. Drop off your package and get a receipt</li>
-                    <li>5. Track your shipment using the tracking number above</li>
-                  </ol>
-                </div>
-                
-                <div className="mt-4">
-                  <Button
-                    onClick={() => router.push('/find-dropoff')}
-                    variant="outline"
-                    className="ashraf-action-btn ashraf-action-btn--find-dropoff w-full"
-                    id="ashraf-find-dropoff-from-success-btn"
-                  >
-                    <MapPin className="h-4 w-4 mr-2" />
-                    Find Drop-off Locations
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+          <Card className="parcego-card parcego-card--label-actions">
+            <CardHeader>
+              <CardTitle>Label Actions</CardTitle>
+              <CardDescription>
+                Download or print your shipping label (4x6 inches)
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex space-x-4">
+                <Button
+                  onClick={handleDownloadLabel}
+                  className="parcego-action-btn parcego-action-btn--download flex-1"
+                  id="parcego-download-label-btn"
+                >
+                  {React.createElement('span', {
+                    className: 'iconify lucide-icon',
+                    'data-icon': 'lucide:download',
+                    style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
+                  })}
+                  Download Label (PDF)
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={handlePrintLabel}
+                  className="parcego-action-btn parcego-action-btn--print flex-1"
+                  id="parcego-print-label-btn"
+                >
+                  {React.createElement('span', {
+                    className: 'iconify lucide-icon',
+                    'data-icon': 'lucide:printer',
+                    style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
+                  })}
+                  Print Label
+                </Button>
+              </div>
 
-            {/* Action Button */}
-            <div className="flex justify-center pt-6">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h4 className="font-medium text-gray-900 mb-2">Next Steps:</h4>
+                <ol className="text-sm text-gray-600 space-y-1 list-decimal list-inside">
+                  <li>Print the shipping label on 4x6 inch label paper</li>
+                  <li>Attach the label securely to your package</li>
+                  <li>Drop off at any Parcego partner location</li>
+                </ol>
+              </div>
+
               <Button
-                onClick={handleGoToDashboard}
-                className="ashraf-action-btn ashraf-action-btn--dashboard"
-                id="ashraf-go-dashboard-btn"
+                onClick={() => router.push('/find-dropoff')}
+                variant="outline"
+                className="parcego-action-btn parcego-action-btn--find-dropoff w-full"
+                id="parcego-find-dropoff-from-success-btn"
               >
-                Return to Dashboard
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:map-pin',
+                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
+                })}
+                Find Drop-off Locations
               </Button>
-            </div>
+            </CardContent>
+          </Card>
+
+          <div className="mt-8 text-center">
+            <Button
+              onClick={handleGoToDashboard}
+              className="parcego-action-btn parcego-action-btn--dashboard"
+              id="parcego-go-dashboard-btn"
+            >
+              Go to Dashboard
+            </Button>
           </div>
         </div>
       </div>
     );
   }
 
+  // Payment form
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-4">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={handleBackToQuote}
-                disabled={isProcessing}
-                id="ashraf-purchase-back-btn"
-                className="ashraf-nav__back-btn"
+                id="parcego-purchase-back-btn"
+                className="parcego-nav__back-btn"
               >
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:arrow-left',
+                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
+                })}
                 Back to Quote
               </Button>
               <div className="h-6 border-l border-gray-300"></div>
-              <h1 className="text-xl font-semibold text-gray-900">Purchase Shipping Label</h1>
+              <h1 className="text-xl font-semibold text-gray-900">Complete Purchase</h1>
             </div>
             
-            <div className="flex items-center space-x-1 text-sm text-gray-500">
-              <Shield className="h-4 w-4 text-green-600" />
-              <span>Secure Payment</span>
+            <div className="flex items-center space-x-2 text-sm text-gray-500">
+              {React.createElement('span', {
+                className: 'iconify lucide-icon',
+                'data-icon': 'lucide:shield',
+                style: { width: '16px', height: '16px', color: '#16a34a' }
+              })}
+              <span>Secure Checkout</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          
-          {/* Payment Form */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-8">
             
-            {/* Payment Method */}
-            <Card className="ashraf-card ashraf-card--payment">
+            {/* Payment Information */}
+            <Card className="parcego-card parcego-card--payment">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  <CreditCard className="h-5 w-5 text-blue-600" />
+                  {React.createElement('span', {
+                    className: 'iconify lucide-icon',
+                    'data-icon': 'lucide:credit-card',
+                    style: { width: '20px', height: '20px', color: '#2563eb' }
+                  })}
                   <span>Payment Information</span>
                 </CardTitle>
                 <CardDescription>
-                  Your payment information is secure and encrypted
+                  Enter your card details for secure payment
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Card Number */}
                 <div className="space-y-2">
-                  <Label htmlFor="ashraf-card-number">Card Number *</Label>
+                  <Label htmlFor="parcego-card-number">Card Number *</Label>
                   <Input
-                    id="ashraf-card-number"
+                    id="parcego-card-number"
+                    type="text"
                     placeholder="1234 5678 9012 3456"
-                    value={paymentData.cardNumber}
-                    onChange={(e) => {
-                      // Format card number with spaces
-                      const value = e.target.value.replace(/\s/g, '').replace(/(.{4})/g, '$1 ').trim();
-                      if (value.replace(/\s/g, '').length <= 16) {
-                        handleInputChange('cardNumber', value);
-                      }
-                    }}
-                    className="ashraf-form__input font-mono"
+                    value={cardNumber}
+                    onChange={(e) => handleCardNumberChange(e.target.value)}
                     maxLength={19}
+                    className="parcego-form__input font-mono"
                     required
                   />
                 </div>
 
-                {/* Expiry and CVV */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="ashraf-expiry-date">Expiry Date *</Label>
+                    <Label htmlFor="parcego-expiry-date">Expiry Date *</Label>
                     <Input
-                      id="ashraf-expiry-date"
+                      id="parcego-expiry-date"
+                      type="text"
                       placeholder="MM/YY"
-                      value={paymentData.expiryDate}
-                      onChange={(e) => {
-                        let value = e.target.value.replace(/\D/g, '');
-                        if (value.length >= 2) {
-                          value = value.substring(0, 2) + '/' + value.substring(2, 4);
-                        }
-                        handleInputChange('expiryDate', value);
-                      }}
-                      className="ashraf-form__input font-mono"
+                      value={expiryDate}
+                      onChange={(e) => handleExpiryDateChange(e.target.value)}
                       maxLength={5}
+                      className="parcego-form__input font-mono"
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="ashraf-cvv">CVV *</Label>
+                    <Label htmlFor="parcego-cvv">CVV *</Label>
                     <Input
-                      id="ashraf-cvv"
+                      id="parcego-cvv"
+                      type="text"
                       placeholder="123"
-                      value={paymentData.cvv}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/\D/g, '');
-                        if (value.length <= 4) {
-                          handleInputChange('cvv', value);
-                        }
-                      }}
-                      className="ashraf-form__input font-mono"
+                      value={cvv}
+                      onChange={(e) => setCvv(e.target.value.replace(/\D/g, ''))}
                       maxLength={4}
+                      className="parcego-form__input font-mono"
                       required
                     />
                   </div>
                 </div>
 
-                {/* Cardholder Name */}
                 <div className="space-y-2">
-                  <Label htmlFor="ashraf-cardholder-name">Cardholder Name *</Label>
+                  <Label htmlFor="parcego-cardholder-name">Cardholder Name *</Label>
                   <Input
-                    id="ashraf-cardholder-name"
+                    id="parcego-cardholder-name"
+                    type="text"
                     placeholder="John Smith"
-                    value={paymentData.cardholderName}
-                    onChange={(e) => handleInputChange('cardholderName', e.target.value)}
-                    className="ashraf-form__input"
+                    value={cardholderName}
+                    onChange={(e) => setCardholderName(e.target.value)}
+                    className="parcego-form__input"
                     required
                   />
                 </div>
@@ -416,54 +407,53 @@ export default function PurchaseLabelPage() {
             </Card>
 
             {/* Billing Address */}
-            <Card className="ashraf-card ashraf-card--billing">
+            <Card className="parcego-card parcego-card--billing">
               <CardHeader>
-                <CardTitle className="flex items-center space-x-2">
-                  <MapPin className="h-5 w-5 text-green-600" />
-                  <span>Billing Address</span>
-                </CardTitle>
+                <CardTitle>Billing Address</CardTitle>
+                <CardDescription>
+                  Optional billing address for this transaction
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
-                  <Label htmlFor="ashraf-billing-address">Address</Label>
+                  <Label htmlFor="parcego-billing-address">Address</Label>
                   <Input
-                    id="ashraf-billing-address"
-                    placeholder="123 Billing St"
-                    value={paymentData.billingAddress}
-                    onChange={(e) => handleInputChange('billingAddress', e.target.value)}
-                    className="ashraf-form__input"
+                    id="parcego-billing-address"
+                    placeholder="123 Main Street"
+                    value={billingAddress.address}
+                    onChange={(e) => setBillingAddress({...billingAddress, address: e.target.value})}
+                    className="parcego-form__input"
                   />
                 </div>
-                
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
-                    <Label htmlFor="ashraf-billing-city">City</Label>
+                    <Label htmlFor="parcego-billing-city">City</Label>
                     <Input
-                      id="ashraf-billing-city"
+                      id="parcego-billing-city"
                       placeholder="New York"
-                      value={paymentData.billingCity}
-                      onChange={(e) => handleInputChange('billingCity', e.target.value)}
-                      className="ashraf-form__input"
+                      value={billingAddress.city}
+                      onChange={(e) => setBillingAddress({...billingAddress, city: e.target.value})}
+                      className="parcego-form__input"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="ashraf-billing-state">State</Label>
+                    <Label htmlFor="parcego-billing-state">State</Label>
                     <Input
-                      id="ashraf-billing-state"
+                      id="parcego-billing-state"
                       placeholder="NY"
-                      value={paymentData.billingState}
-                      onChange={(e) => handleInputChange('billingState', e.target.value)}
-                      className="ashraf-form__input"
+                      value={billingAddress.state}
+                      onChange={(e) => setBillingAddress({...billingAddress, state: e.target.value})}
+                      className="parcego-form__input"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="ashraf-billing-zip">ZIP Code</Label>
+                    <Label htmlFor="parcego-billing-zip">ZIP Code</Label>
                     <Input
-                      id="ashraf-billing-zip"
+                      id="parcego-billing-zip"
                       placeholder="10001"
-                      value={paymentData.billingZip}
-                      onChange={(e) => handleInputChange('billingZip', e.target.value)}
-                      className="ashraf-form__input"
+                      value={billingAddress.zip}
+                      onChange={(e) => setBillingAddress({...billingAddress, zip: e.target.value})}
+                      className="parcego-form__input"
                     />
                   </div>
                 </div>
@@ -471,79 +461,85 @@ export default function PurchaseLabelPage() {
             </Card>
           </div>
 
-          {/* Order Summary */}
-          <div className="space-y-6">
-            <Card className="ashraf-card ashraf-card--order-summary sticky top-4">
+          {/* Order Summary Sidebar */}
+          <div className="lg:col-span-1">
+            <Card className="parcego-card parcego-card--order-summary sticky top-4">
               <CardHeader>
                 <CardTitle>Order Summary</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Shipment Details */}
                 <div className="space-y-3">
-                  <div className="flex items-start space-x-3">
-                    <Package className="h-5 w-5 text-blue-600 mt-0.5" />
-                    <div className="flex-1">
-                      <div className="font-medium text-gray-900">{orderData.selectedQuote.name}</div>
-                      <div className="text-sm text-gray-600">{orderData.selectedQuote.deliveryTime}</div>
-                    </div>
-                    <div className="font-medium">${orderData.selectedQuote.price.toFixed(2)}</div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Shipping Service</span>
+                    <span className="font-medium">{orderData.selectedQuote.name}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Base Cost</span>
+                    <span>${orderData.selectedQuote.price.toFixed(2)}</span>
                   </div>
                   
                   {orderData.fragile && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Fragile handling</span>
+                      <span className="text-gray-600">Fragile Handling</span>
                       <span>$3.00</span>
                     </div>
                   )}
                   
                   {orderData.valuable && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">High value handling</span>
+                      <span className="text-gray-600">High Value</span>
                       <span>$5.00</span>
                     </div>
                   )}
                   
                   {orderData.insurance && (
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-600">Additional insurance</span>
+                      <span className="text-gray-600">Insurance</span>
                       <span>$8.00</span>
                     </div>
                   )}
-                </div>
-
-                <div className="border-t pt-4">
-                  <div className="flex justify-between items-center">
-                    <span className="font-semibold text-gray-900">Total</span>
-                    <span className="text-xl font-bold text-blue-600">${calculateTotalCost().toFixed(2)}</span>
+                  
+                  <div className="border-t pt-3">
+                    <div className="flex justify-between">
+                      <span className="text-lg font-semibold">Total</span>
+                      <span className="text-xl font-bold text-blue-600">${calculateTotalCost().toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Purchase Button */}
                 <Button
                   onClick={handleProcessPayment}
-                  disabled={!isPaymentFormValid() || isProcessing}
-                  className="ashraf-action-btn ashraf-action-btn--purchase w-full"
-                  id="ashraf-process-payment-btn"
+                  disabled={isProcessing || !isFormValid()}
+                  className="parcego-action-btn parcego-action-btn--purchase w-full"
+                  id="parcego-process-payment-btn"
                 >
                   {isProcessing ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>Processing Payment...</span>
-                    </div>
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Processing...
+                    </>
                   ) : (
                     <>
-                      <CreditCard className="h-4 w-4 mr-2" />
+                      {React.createElement('span', {
+                        className: 'iconify lucide-icon',
+                        'data-icon': 'lucide:shield',
+                        style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
+                      })}
                       Complete Purchase
                     </>
                   )}
                 </Button>
 
-                {/* Security Notice */}
-                <div className="text-xs text-gray-500 text-center">
+                <div className="space-y-2 text-xs text-gray-500 text-center">
                   <div className="flex items-center justify-center space-x-1">
-                    <Shield className="h-3 w-3" />
-                    <span>Your payment is secured with 256-bit SSL encryption</span>
+                    {React.createElement('span', {
+                      className: 'iconify lucide-icon',
+                      'data-icon': 'lucide:shield',
+                      style: { width: '12px', height: '12px', color: '#16a34a' }
+                    })}
+                    <span>Secure 256-bit SSL encryption</span>
                   </div>
+                  <p>Your payment information is safe and secure</p>
                 </div>
               </CardContent>
             </Card>

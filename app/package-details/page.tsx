@@ -1,21 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { 
-  ArrowLeft,
-  ArrowRight,
-  Package,
-  Scale,
-  Ruler,
-  Shield,
-  AlertTriangle,
-  DollarSign
-} from "lucide-react";
+// Icons will be rendered using React.createElement with kebab-case structure
 
 interface ShipmentData {
   recipientName: string;
@@ -117,10 +108,14 @@ export default function PackageDetailsPage() {
                 variant="ghost"
                 size="sm"
                 onClick={handleBackToShipmentDetails}
-                id="ashraf-package-details-back-btn"
-                className="ashraf-nav__back-btn"
+                id="parcego-package-details-back-btn"
+                className="parcego-nav__back-btn"
               >
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:arrow-left',
+                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
+                })}
                 Back to Shipment Details
               </Button>
               <div className="h-6 border-l border-gray-300"></div>
@@ -134,14 +129,22 @@ export default function PackageDetailsPage() {
                 </div>
                 <span>Shipment Details</span>
               </div>
-              <ArrowRight className="h-4 w-4" />
+              {React.createElement('span', {
+                className: 'iconify lucide-icon',
+                'data-icon': 'lucide:arrow-right',
+                style: { width: '16px', height: '16px', color: 'currentColor' }
+              })}
               <div className="flex items-center space-x-1">
                 <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
                   <span className="text-white text-xs font-medium">2</span>
                 </div>
                 <span>Package Details</span>
               </div>
-              <ArrowRight className="h-4 w-4" />
+              {React.createElement('span', {
+                className: 'iconify lucide-icon',
+                'data-icon': 'lucide:arrow-right',
+                style: { width: '16px', height: '16px', color: 'currentColor' }
+              })}
               <div className="flex items-center space-x-1">
                 <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center">
                   <span className="text-gray-600 text-xs font-medium">3</span>
@@ -157,10 +160,14 @@ export default function PackageDetailsPage() {
         <div className="space-y-8">
 
           {/* Package Dimensions */}
-          <Card className="ashraf-card ashraf-card--dimensions">
+          <Card className="parcego-card parcego-card--dimensions">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <Ruler className="h-5 w-5 text-blue-600" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:ruler',
+                  style: { width: '20px', height: '20px', color: '#2563eb' }
+                })}
                 <span>Package Dimensions</span>
               </CardTitle>
               <CardDescription>
@@ -180,12 +187,12 @@ export default function PackageDetailsPage() {
                       key={unit.value}
                       type="button"
                       onClick={() => handleInputChange('dimensionUnit', unit.value)}
-                      className={`ashraf-dimension-unit__btn px-4 py-2 border-2 rounded-lg transition-all duration-200 ${
+                      className={`parcego-dimension-unit__btn px-4 py-2 border-2 rounded-lg transition-all duration-200 ${
                         formData.dimensionUnit === unit.value
                           ? 'border-blue-500 bg-blue-50 text-blue-700'
                           : 'border-gray-200 hover:border-gray-300 text-gray-700'
                       }`}
-                      id={`ashraf-dimension-unit-${unit.value}`}
+                      id={`parcego-dimension-unit-${unit.value}`}
                     >
                       {unit.label}
                     </button>
@@ -196,15 +203,15 @@ export default function PackageDetailsPage() {
               {/* Dimensions Grid */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="ashraf-package-length">Length *</Label>
+                  <Label htmlFor="parcego-package-length">Length *</Label>
                   <div className="relative">
                     <Input
-                      id="ashraf-package-length"
+                      id="parcego-package-length"
                       type="number"
                       placeholder="12"
                       value={formData.length}
                       onChange={(e) => handleInputChange('length', e.target.value)}
-                      className="ashraf-form__input pr-12"
+                      className="parcego-form__input pr-12"
                       required
                     />
                     <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
@@ -213,15 +220,15 @@ export default function PackageDetailsPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="ashraf-package-width">Width *</Label>
+                  <Label htmlFor="parcego-package-width">Width *</Label>
                   <div className="relative">
                     <Input
-                      id="ashraf-package-width"
+                      id="parcego-package-width"
                       type="number"
                       placeholder="8"
                       value={formData.width}
                       onChange={(e) => handleInputChange('width', e.target.value)}
-                      className="ashraf-form__input pr-12"
+                      className="parcego-form__input pr-12"
                       required
                     />
                     <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
@@ -230,15 +237,15 @@ export default function PackageDetailsPage() {
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="ashraf-package-height">Height *</Label>
+                  <Label htmlFor="parcego-package-height">Height *</Label>
                   <div className="relative">
                     <Input
-                      id="ashraf-package-height"
+                      id="parcego-package-height"
                       type="number"
                       placeholder="6"
                       value={formData.height}
                       onChange={(e) => handleInputChange('height', e.target.value)}
-                      className="ashraf-form__input pr-12"
+                      className="parcego-form__input pr-12"
                       required
                     />
                     <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
@@ -252,7 +259,11 @@ export default function PackageDetailsPage() {
               {formData.length && formData.width && formData.height && (
                 <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <div className="flex items-center space-x-2 text-blue-700 text-sm">
-                    <Package className="h-4 w-4" />
+                    {React.createElement('span', {
+                      className: 'iconify lucide-icon',
+                      'data-icon': 'lucide:package',
+                      style: { width: '16px', height: '16px', color: 'currentColor' }
+                    })}
                     <span>Package Preview: {formData.length} × {formData.width} × {formData.height} {formData.dimensionUnit}</span>
                   </div>
                 </div>
@@ -261,10 +272,14 @@ export default function PackageDetailsPage() {
           </Card>
 
           {/* Package Weight */}
-          <Card className="ashraf-card ashraf-card--weight">
+          <Card className="parcego-card parcego-card--weight">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <Scale className="h-5 w-5 text-green-600" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:scale',
+                  style: { width: '20px', height: '20px', color: '#16a34a' }
+                })}
                 <span>Package Weight</span>
               </CardTitle>
               <CardDescription>
@@ -284,12 +299,12 @@ export default function PackageDetailsPage() {
                       key={unit.value}
                       type="button"
                       onClick={() => handleInputChange('weightUnit', unit.value)}
-                      className={`ashraf-weight-unit__btn px-4 py-2 border-2 rounded-lg transition-all duration-200 ${
+                      className={`parcego-weight-unit__btn px-4 py-2 border-2 rounded-lg transition-all duration-200 ${
                         formData.weightUnit === unit.value
                           ? 'border-green-500 bg-green-50 text-green-700'
                           : 'border-gray-200 hover:border-gray-300 text-gray-700'
                       }`}
-                      id={`ashraf-weight-unit-${unit.value}`}
+                      id={`parcego-weight-unit-${unit.value}`}
                     >
                       {unit.label}
                     </button>
@@ -299,16 +314,16 @@ export default function PackageDetailsPage() {
 
               {/* Weight Input */}
               <div className="space-y-2">
-                <Label htmlFor="ashraf-package-weight">Package Weight *</Label>
+                <Label htmlFor="parcego-package-weight">Package Weight *</Label>
                 <div className="relative max-w-xs">
                   <Input
-                    id="ashraf-package-weight"
+                    id="parcego-package-weight"
                     type="number"
                     step="0.1"
                     placeholder="2.5"
                     value={formData.weight}
                     onChange={(e) => handleInputChange('weight', e.target.value)}
-                    className="ashraf-form__input pr-16"
+                    className="parcego-form__input pr-16"
                     required
                   />
                   <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 text-sm">
@@ -320,10 +335,14 @@ export default function PackageDetailsPage() {
           </Card>
 
           {/* Special Handling */}
-          <Card className="ashraf-card ashraf-card--special-handling">
+          <Card className="parcego-card parcego-card--special-handling">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <Shield className="h-5 w-5 text-purple-600" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:shield',
+                  style: { width: '20px', height: '20px', color: '#9333ea' }
+                })}
                 <span>Special Handling</span>
               </CardTitle>
               <CardDescription>
@@ -338,39 +357,42 @@ export default function PackageDetailsPage() {
                     key: 'fragile',
                     label: 'Fragile Item',
                     desc: 'Package contains breakable items requiring careful handling',
-                    icon: AlertTriangle,
-                    color: 'orange'
+                    iconName: 'lucide:alert-triangle',
+                    color: '#ea580c'
                   },
                   {
                     key: 'valuable',
                     label: 'High Value Item',
                     desc: 'Package contains valuable items (over $100)',
-                    icon: DollarSign,
-                    color: 'yellow'
+                    iconName: 'lucide:dollar-sign',
+                    color: '#ca8a04'
                   },
                   {
                     key: 'insurance',
                     label: 'Additional Insurance',
                     desc: 'Add extra insurance coverage for this shipment',
-                    icon: Shield,
-                    color: 'blue'
+                    iconName: 'lucide:shield',
+                    color: '#2563eb'
                   }
                 ].map((option) => {
-                  const IconComponent = option.icon;
                   return (
                     <div key={option.key} className="flex items-start space-x-3 p-4 border border-gray-200 rounded-lg">
                       <input
                         type="checkbox"
-                        id={`ashraf-special-${option.key}`}
+                        id={`parcego-special-${option.key}`}
                         checked={formData[option.key as keyof ShipmentData] as boolean}
                         onChange={(e) => handleInputChange(option.key, e.target.checked)}
-                        className="ashraf-form__checkbox mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        className="parcego-form__checkbox mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
                       />
                       <div className="flex-1">
                         <div className="flex items-center space-x-2">
-                          <IconComponent className={`h-4 w-4 text-${option.color}-600`} />
+                          {React.createElement('span', {
+                            className: 'iconify lucide-icon',
+                            'data-icon': option.iconName,
+                            style: { width: '16px', height: '16px', color: option.color }
+                          })}
                           <label 
-                            htmlFor={`ashraf-special-${option.key}`}
+                            htmlFor={`parcego-special-${option.key}`}
                             className="font-medium text-gray-900 cursor-pointer"
                           >
                             {option.label}
@@ -387,10 +409,14 @@ export default function PackageDetailsPage() {
 
           {/* Package Summary */}
           {isFormValid() && (
-            <Card className="ashraf-card ashraf-card--summary border-green-200 bg-green-50">
+            <Card className="parcego-card parcego-card--summary border-green-200 bg-green-50">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2 text-green-800">
-                  <Package className="h-5 w-5" />
+                  {React.createElement('span', {
+                    className: 'iconify lucide-icon',
+                    'data-icon': 'lucide:package',
+                    style: { width: '20px', height: '20px', color: 'currentColor' }
+                  })}
                   <span>Package Summary</span>
                 </CardTitle>
               </CardHeader>
@@ -442,25 +468,33 @@ export default function PackageDetailsPage() {
             <Button
               variant="outline"
               onClick={handleBackToShipmentDetails}
-              className="ashraf-action-btn ashraf-action-btn--back"
-              id="ashraf-back-shipment-details-btn"
+              className="parcego-action-btn parcego-action-btn--back"
+              id="parcego-back-shipment-details-btn"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              {React.createElement('span', {
+                className: 'iconify lucide-icon',
+                'data-icon': 'lucide:arrow-left',
+                style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
+              })}
               Back to Shipment Details
             </Button>
             
             <Button
               onClick={handleContinueToQuote}
               disabled={isLoading || !isFormValid()}
-              className="ashraf-action-btn ashraf-action-btn--continue"
-              id="ashraf-continue-quote-btn"
+              className="parcego-action-btn parcego-action-btn--continue"
+              id="parcego-continue-quote-btn"
             >
               {isLoading ? (
                 "Processing..."
               ) : (
                 <>
                   Get Shipping Quote
-                  <ArrowRight className="h-4 w-4 ml-2" />
+                  {React.createElement('span', {
+                    className: 'iconify lucide-icon',
+                    'data-icon': 'lucide:arrow-right',
+                    style: { width: '16px', height: '16px', marginLeft: '8px', color: 'currentColor' }
+                  })}
                 </>
               )}
             </Button>

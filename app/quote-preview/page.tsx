@@ -1,19 +1,10 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { 
-  ArrowLeft,
-  ArrowRight,
-  Package,
-  Clock,
-  Shield,
-  DollarSign,
-  Truck,
-  CheckCircle
-} from "lucide-react";
+// Icons will be rendered using React.createElement with kebab-case structure
 
 interface ShipmentData {
   recipientName: string;
@@ -173,10 +164,14 @@ export default function QuotePreviewPage() {
                 variant="ghost"
                 size="sm"
                 onClick={handleBackToPackageDetails}
-                id="ashraf-quote-preview-back-btn"
-                className="ashraf-nav__back-btn"
+                id="parcego-quote-preview-back-btn"
+                className="parcego-nav__back-btn"
               >
-                <ArrowLeft className="h-4 w-4 mr-2" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:arrow-left',
+                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
+                })}
                 Back to Package Details
               </Button>
               <div className="h-6 border-l border-gray-300"></div>
@@ -190,14 +185,22 @@ export default function QuotePreviewPage() {
                 </div>
                 <span>Shipment Details</span>
               </div>
-              <ArrowRight className="h-4 w-4" />
+              {React.createElement('span', {
+                className: 'iconify lucide-icon',
+                'data-icon': 'lucide:arrow-right',
+                style: { width: '16px', height: '16px', color: 'currentColor' }
+              })}
               <div className="flex items-center space-x-1">
                 <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
                   <span className="text-white text-xs font-medium">✓</span>
                 </div>
                 <span>Package Details</span>
               </div>
-              <ArrowRight className="h-4 w-4" />
+              {React.createElement('span', {
+                className: 'iconify lucide-icon',
+                'data-icon': 'lucide:arrow-right',
+                style: { width: '16px', height: '16px', color: 'currentColor' }
+              })}
               <div className="flex items-center space-x-1">
                 <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
                   <span className="text-white text-xs font-medium">3</span>
@@ -213,10 +216,14 @@ export default function QuotePreviewPage() {
         <div className="space-y-8">
 
           {/* Shipment Summary */}
-          <Card className="ashraf-card ashraf-card--shipment-summary">
+          <Card className="parcego-card parcego-card--shipment-summary">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <Package className="h-5 w-5 text-blue-600" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:package',
+                  style: { width: '20px', height: '20px', color: '#2563eb' }
+                })}
                 <span>Shipment Summary</span>
               </CardTitle>
             </CardHeader>
@@ -266,10 +273,14 @@ export default function QuotePreviewPage() {
           </Card>
 
           {/* Quote Options */}
-          <Card className="ashraf-card ashraf-card--quote-options">
+          <Card className="parcego-card parcego-card--quote-options">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <Truck className="h-5 w-5 text-green-600" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:truck',
+                  style: { width: '20px', height: '20px', color: '#16a34a' }
+                })}
                 <span>Select Shipping Option</span>
               </CardTitle>
               <CardDescription>
@@ -280,13 +291,13 @@ export default function QuotePreviewPage() {
               {quoteOptions.map((quote) => (
                 <div
                   key={quote.id}
-                  className={`ashraf-quote-option relative p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
+                  className={`parcego-quote-option relative p-4 border-2 rounded-lg cursor-pointer transition-all duration-200 ${
                     selectedQuote === quote.id
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300'
                   } ${quote.recommended ? 'ring-2 ring-green-500 ring-opacity-50' : ''}`}
                   onClick={() => setSelectedQuote(quote.id)}
-                  id={`ashraf-quote-option-${quote.id}`}
+                  id={`parcego-quote-option-${quote.id}`}
                 >
                   {quote.recommended && (
                     <div className="absolute -top-2 left-4 bg-green-500 text-white text-xs px-2 py-1 rounded">
@@ -302,8 +313,8 @@ export default function QuotePreviewPage() {
                         value={quote.id}
                         checked={selectedQuote === quote.id}
                         onChange={() => setSelectedQuote(quote.id)}
-                        className="ashraf-form__radio h-4 w-4 text-blue-600 focus:ring-blue-500"
-                        id={`ashraf-quote-radio-${quote.id}`}
+                        className="parcego-form__radio h-4 w-4 text-blue-600 focus:ring-blue-500"
+                        id={`parcego-quote-radio-${quote.id}`}
                       />
                       <div>
                         <h3 className={`font-medium ${
@@ -318,7 +329,11 @@ export default function QuotePreviewPage() {
                         </p>
                         <div className="flex items-center space-x-4 mt-2">
                           <div className="flex items-center space-x-1">
-                            <Clock className="h-4 w-4 text-gray-400" />
+                            {React.createElement('span', {
+                              className: 'iconify lucide-icon',
+                              'data-icon': 'lucide:clock',
+                              style: { width: '16px', height: '16px', color: '#9ca3af' }
+                            })}
                             <span className="text-sm text-gray-600">{quote.deliveryTime}</span>
                           </div>
                         </div>
@@ -344,7 +359,11 @@ export default function QuotePreviewPage() {
                             : 'bg-gray-100 text-gray-600'
                         }`}
                       >
-                        <CheckCircle className="h-3 w-3 mr-1" />
+                        {React.createElement('span', {
+                          className: 'iconify lucide-icon',
+                          'data-icon': 'lucide:check-circle',
+                          style: { width: '12px', height: '12px', marginRight: '4px', color: 'currentColor' }
+                        })}
                         {feature}
                       </span>
                     ))}
@@ -355,10 +374,14 @@ export default function QuotePreviewPage() {
           </Card>
 
           {/* Cost Breakdown */}
-          <Card className="ashraf-card ashraf-card--cost-breakdown">
+          <Card className="parcego-card parcego-card--cost-breakdown">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <DollarSign className="h-5 w-5 text-purple-600" />
+                {React.createElement('span', {
+                  className: 'iconify lucide-icon',
+                  'data-icon': 'lucide:dollar-sign',
+                  style: { width: '20px', height: '20px', color: '#9333ea' }
+                })}
                 <span>Cost Breakdown</span>
               </CardTitle>
             </CardHeader>
@@ -405,25 +428,33 @@ export default function QuotePreviewPage() {
             <Button
               variant="outline"
               onClick={handleBackToPackageDetails}
-              className="ashraf-action-btn ashraf-action-btn--back"
-              id="ashraf-back-package-details-btn"
+              className="parcego-action-btn parcego-action-btn--back"
+              id="parcego-back-package-details-btn"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
+              {React.createElement('span', {
+                className: 'iconify lucide-icon',
+                'data-icon': 'lucide:arrow-left',
+                style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
+              })}
               Back to Package Details
             </Button>
             
             <Button
               onClick={handleContinueToPayment}
               disabled={isLoading}
-              className="ashraf-action-btn ashraf-action-btn--continue"
-              id="ashraf-continue-payment-btn"
+              className="parcego-action-btn parcego-action-btn--continue"
+              id="parcego-continue-payment-btn"
             >
               {isLoading ? (
                 "Processing..."
               ) : (
                 <>
                   Continue to Payment
-                  <ArrowRight className="h-4 w-4 ml-2" />
+                  {React.createElement('span', {
+                    className: 'iconify lucide-icon',
+                    'data-icon': 'lucide:arrow-right',
+                    style: { width: '16px', height: '16px', marginLeft: '8px', color: 'currentColor' }
+                  })}
                 </>
               )}
             </Button>
