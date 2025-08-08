@@ -56,11 +56,12 @@ export default function ProofOfDelivery() {
   const [errors, setErrors] = useState<string[]>([]);
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentLocation, setCurrentLocation] = useState("");
-  const [timestamp] = useState(new Date().toLocaleString());
+  const [timestamp, setTimestamp] = useState("");
 
-  // Get current location (mock)
+  // Get current location and timestamp (mock)
   useEffect(() => {
     setCurrentLocation(deliveryData.gpsLocation.address);
+    setTimestamp(new Date().toLocaleString());
   }, [deliveryData.gpsLocation.address]);
 
   // Handle photo capture/upload
@@ -364,7 +365,7 @@ export default function ProofOfDelivery() {
                 })}
                 <div className="flex-1">
                   <p className="text-sm font-medium">Current Location</p>
-                  <p className="text-xs text-gray-600">{currentLocation}</p>
+                  <p className="text-xs text-gray-600">{currentLocation || 'Loading...'}</p>
                 </div>
               </div>
               
@@ -376,7 +377,7 @@ export default function ProofOfDelivery() {
                 })}
                 <div className="flex-1">
                   <p className="text-sm font-medium">Timestamp</p>
-                  <p className="text-xs text-gray-600">{timestamp}</p>
+                  <p className="text-xs text-gray-600">{timestamp || 'Loading...'}</p>
                 </div>
               </div>
             </div>
