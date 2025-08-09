@@ -7,8 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-// Lucide icons now implemented as kebab-case spans with data-icon attributes
-// Following @lucide-kebab-case-icon-structure.mdc rule
+import { Icon } from "@/components/ui/icon";
 
 export default function MerchantLandingPage() {
   const [isLoading, setIsLoading] = useState(false);
@@ -52,13 +51,9 @@ export default function MerchantLandingPage() {
       <div className="container mx-auto px-4 py-16">
         <div className="text-center mb-16">
           <div className="flex items-center justify-center mb-6">
-            <div className="bg-blue-600 rounded-lg p-3 mr-4">
-                              {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:truck',
-                  style: { width: '32px', height: '32px', color: 'white' }
-                })}
-            </div>
+                          <div className="bg-blue-600 rounded-lg p-3 mr-4">
+                <Icon name="Truck" size={32} className="text-white" />
+              </div>
             <h1 className="text-4xl font-bold text-gray-900">
               Parcego Courier Platform
             </h1>
@@ -70,29 +65,23 @@ export default function MerchantLandingPage() {
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
             <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-250">
-                                  {React.createElement('span', {
-                      className: 'iconify lucide-icon',
-                      'data-icon': 'lucide:package',
-                      style: { width: '48px', height: '48px', color: '#2563eb', margin: '0 auto 16px auto', display: 'block' }
-                    })}
+                              <div className="flex justify-center mb-4">
+                  <Icon name="Package" size={48} className="text-blue-600" />
+                </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Easy Shipment Creation</h3>
               <p className="text-gray-600 text-sm">Generate shipping labels with real-time quotes in seconds</p>
             </div>
             <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-250">
-                                  {React.createElement('span', {
-                      className: 'iconify lucide-icon',
-                      'data-icon': 'lucide:map-pin',
-                      style: { width: '48px', height: '48px', color: '#16a34a', margin: '0 auto 16px auto', display: 'block' }
-                    })}
+                              <div className="flex justify-center mb-4">
+                  <Icon name="MapPin" size={48} className="text-green-600" />
+                </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Real-time Tracking</h3>
               <p className="text-gray-600 text-sm">Track your packages with GPS precision and photo proof</p>
             </div>
             <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-250">
-                                  {React.createElement('span', {
-                      className: 'iconify lucide-icon',
-                      'data-icon': 'lucide:bar-chart-3',
-                      style: { width: '48px', height: '48px', color: '#9333ea', margin: '0 auto 16px auto', display: 'block' }
-                    })}
+                              <div className="flex justify-center mb-4">
+                  <Icon name="BarChart3" size={48} className="text-purple-600" />
+                </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">Business Analytics</h3>
               <p className="text-gray-600 text-sm">Comprehensive insights to optimize your shipping operations</p>
             </div>
@@ -198,27 +187,15 @@ export default function MerchantLandingPage() {
           <p className="text-sm text-gray-500 mb-4">Trusted by 1,000+ businesses worldwide</p>
           <div className="flex items-center justify-center space-x-8 text-gray-400">
             <div className="flex items-center space-x-2">
-                                      {React.createElement('span', {
-                          className: 'iconify lucide-icon',
-                          'data-icon': 'lucide:shield',
-                          style: { width: '20px', height: '20px', color: 'currentColor' }
-                        })}
+              <Icon name="Shield" size={20} />
               <span className="text-sm">SSL Encrypted</span>
             </div>
             <div className="flex items-center space-x-2">
-                                      {React.createElement('span', {
-                          className: 'iconify lucide-icon',
-                          'data-icon': 'lucide:clock',
-                          style: { width: '20px', height: '20px', color: 'currentColor' }
-                        })}
+              <Icon name="Clock" size={20} />
               <span className="text-sm">24/7 Support</span>
             </div>
             <div className="flex items-center space-x-2">
-                                      {React.createElement('span', {
-                          className: 'iconify lucide-icon',
-                          'data-icon': 'lucide:package',
-                          style: { width: '20px', height: '20px', color: 'currentColor' }
-                        })}
+              <Icon name="Package" size={20} />
               <span className="text-sm">99.9% Uptime</span>
             </div>
           </div>

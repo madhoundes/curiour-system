@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-// Icons will be rendered using React.createElement with kebab-case structure
+import { Icon } from "@/components/ui/icon";
 
 interface OrderData {
   recipientName: string;
@@ -161,11 +161,7 @@ export default function PurchaseLabelPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center mb-8">
             <div className="mx-auto flex items-center justify-center h-20 w-20 rounded-full bg-green-100 mb-4">
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:check-circle',
-                style: { width: '48px', height: '48px', color: '#16a34a' }
-              })}
+              <Icon name="CheckCircle" size={48} className="text-green-600" />
             </div>
             <h1 className="text-3xl font-bold text-gray-900 mb-2">Payment Successful!</h1>
             <p className="text-lg text-gray-600">Your shipping label has been generated</p>
@@ -178,11 +174,7 @@ export default function PurchaseLabelPage() {
             <CardContent className="space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <div className="flex items-center space-x-2">
-                  {React.createElement('span', {
-                    className: 'iconify lucide-icon',
-                    'data-icon': 'lucide:package',
-                    style: { width: '20px', height: '20px', color: '#2563eb' }
-                  })}
+                  <Icon name="Package" size={20} className="text-blue-600" />
                   <div>
                     <p className="font-medium text-blue-900">Tracking Number</p>
                     <p className="text-2xl font-mono font-bold text-blue-700">{trackingNumber}</p>
@@ -223,17 +215,24 @@ export default function PurchaseLabelPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              <Button
+                onClick={() => router.push(`/label/preview?tracking=${encodeURIComponent(trackingNumber || "PCG-TEST-000001")}`)}
+                variant="outline"
+                className="w-full"
+                id="parcego-label-open-preview-btn"
+                aria-label="Open label 4x6 preview"
+              >
+                <Icon name="ScanBarcode" size={16} className="mr-2" />
+                Open Label Preview (4x6)
+              </Button>
+
               <div className="flex space-x-4">
                 <Button
                   onClick={handleDownloadLabel}
                   className="parcego-action-btn parcego-action-btn--download flex-1"
                   id="parcego-download-label-btn"
                 >
-                  {React.createElement('span', {
-                    className: 'iconify lucide-icon',
-                    'data-icon': 'lucide:download',
-                    style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-                  })}
+                  <Icon name="Download" size={16} className="mr-2" />
                   Download Label (PDF)
                 </Button>
                 <Button
@@ -242,11 +241,7 @@ export default function PurchaseLabelPage() {
                   className="parcego-action-btn parcego-action-btn--print flex-1"
                   id="parcego-print-label-btn"
                 >
-                  {React.createElement('span', {
-                    className: 'iconify lucide-icon',
-                    'data-icon': 'lucide:printer',
-                    style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-                  })}
+                  <Icon name="Printer" size={16} className="mr-2" />
                   Print Label
                 </Button>
               </div>
@@ -266,11 +261,7 @@ export default function PurchaseLabelPage() {
                 className="parcego-action-btn parcego-action-btn--find-dropoff w-full"
                 id="parcego-find-dropoff-from-success-btn"
               >
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:map-pin',
-                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-                })}
+                <Icon name="MapPin" size={16} className="mr-2" />
                 Find Drop-off Locations
               </Button>
             </CardContent>
@@ -305,11 +296,7 @@ export default function PurchaseLabelPage() {
                 id="parcego-purchase-back-btn"
                 className="parcego-nav__back-btn"
               >
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:arrow-left',
-                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-                })}
+                              <Icon name="ArrowLeft" size={16} className="mr-2" />
                 Back to Quote
               </Button>
               <div className="h-6 border-l border-gray-300"></div>
@@ -317,11 +304,7 @@ export default function PurchaseLabelPage() {
             </div>
             
             <div className="flex items-center space-x-2 text-sm text-gray-500">
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:shield',
-                style: { width: '16px', height: '16px', color: '#16a34a' }
-              })}
+              <Icon name="Shield" size={16} className="text-green-600" />
               <span>Secure Checkout</span>
             </div>
           </div>
@@ -336,11 +319,7 @@ export default function PurchaseLabelPage() {
             <Card className="parcego-card parcego-card--payment">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  {React.createElement('span', {
-                    className: 'iconify lucide-icon',
-                    'data-icon': 'lucide:credit-card',
-                    style: { width: '20px', height: '20px', color: '#2563eb' }
-                  })}
+                  <Icon name="CreditCard" size={20} className="text-blue-600" />
                   <span>Payment Information</span>
                 </CardTitle>
                 <CardDescription>
@@ -520,11 +499,7 @@ export default function PurchaseLabelPage() {
                     </>
                   ) : (
                     <>
-                      {React.createElement('span', {
-                        className: 'iconify lucide-icon',
-                        'data-icon': 'lucide:shield',
-                        style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-                      })}
+                      <Icon name="Shield" size={16} className="mr-2" />
                       Complete Purchase
                     </>
                   )}
@@ -532,11 +507,7 @@ export default function PurchaseLabelPage() {
 
                 <div className="space-y-2 text-xs text-gray-500 text-center">
                   <div className="flex items-center justify-center space-x-1">
-                    {React.createElement('span', {
-                      className: 'iconify lucide-icon',
-                      'data-icon': 'lucide:shield',
-                      style: { width: '12px', height: '12px', color: '#16a34a' }
-                    })}
+                    <Icon name="Shield" size={12} className="text-green-600" />
                     <span>Secure 256-bit SSL encryption</span>
                   </div>
                   <p>Your payment information is safe and secure</p>

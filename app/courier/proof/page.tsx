@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-// Icons will be rendered using React.createElement with kebab-case structure
+import { Icon } from "@/components/ui/icon";
 
 interface DeliveryData {
   trackingNumber: string;

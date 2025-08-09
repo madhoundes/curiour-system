@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-// Icons will be rendered using React.createElement with kebab-case structure
+import { Icon } from "@/components/ui/icon";
 
 // Mock data for courier dashboard
 const mockCourierData = {
@@ -168,11 +168,7 @@ export default function CourierDashboard() {
             className="parcego-header__notification-btn"
             id="parcego-courier-notifications-btn"
           >
-            {React.createElement('span', {
-              className: 'iconify lucide-icon',
-              'data-icon': 'lucide:bell',
-              style: { width: '20px', height: '20px', color: 'currentColor' }
-            })}
+            <Icon name="Bell" size={20} />
           </Button>
         </div>
       </div>
@@ -189,11 +185,7 @@ export default function CourierDashboard() {
           >
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:package',
-                  style: { width: '20px', height: '20px', color: '#2563eb' }
-                })}
+                <Icon name="Package" size={20} className="text-blue-600" />
                 <div>
                   <p className="text-2xl font-bold">{mockCourierData.stats.deliveriesToday}</p>
                   <p className="text-xs text-gray-500">Deliveries Today</p>
@@ -208,11 +200,7 @@ export default function CourierDashboard() {
           >
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:check-circle',
-                  style: { width: '20px', height: '20px', color: '#16a34a' }
-                })}
+                <Icon name="CheckCircle" size={20} className="text-green-600" />
                 <div>
                   <p className="text-2xl font-bold">{mockCourierData.stats.completed}</p>
                   <p className="text-xs text-gray-500">Completed</p>
@@ -227,11 +215,7 @@ export default function CourierDashboard() {
           >
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:dollar-sign',
-                  style: { width: '20px', height: '20px', color: '#ca8a04' }
-                })}
+                <Icon name="DollarSign" size={20} className="text-yellow-600" />
                 <div>
                   <p className="text-2xl font-bold">${mockCourierData.stats.earnings}</p>
                   <p className="text-xs text-gray-500">Today's Earnings</p>
@@ -246,11 +230,7 @@ export default function CourierDashboard() {
           >
             <CardContent className="p-4">
               <div className="flex items-center space-x-2">
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:star',
-                  style: { width: '20px', height: '20px', color: '#9333ea' }
-                })}
+                <Icon name="Star" size={20} className="text-purple-600" />
                 <div>
                   <p className="text-2xl font-bold">{mockCourierData.stats.rating}</p>
                   <p className="text-xs text-gray-500">Rating</p>
@@ -275,11 +255,7 @@ export default function CourierDashboard() {
                 onClick={() => handleStartRoute(mockDeliveries[0].id)}
                 id="parcego-courier-next-delivery-btn"
               >
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:navigation',
-                  style: { width: '20px', height: '20px', color: 'currentColor' }
-                })}
+                <Icon name="Navigation" size={20} />
                 <span className="text-sm">Start Next</span>
               </Button>
               
@@ -289,11 +265,7 @@ export default function CourierDashboard() {
                 onClick={() => router.push('/courier/route')}
                 id="parcego-courier-view-route-btn"
               >
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:route',
-                  style: { width: '20px', height: '20px', color: 'currentColor' }
-                })}
+                <Icon name="Route" size={20} />
                 <span className="text-sm">View Route</span>
               </Button>
               
@@ -303,11 +275,7 @@ export default function CourierDashboard() {
                 onClick={() => router.push('/courier/scan')}
                 id="parcego-courier-scan-btn"
               >
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:camera',
-                  style: { width: '20px', height: '20px', color: 'currentColor' }
-                })}
+                <Icon name="Camera" size={20} />
                 <span className="text-sm">Scan Package</span>
               </Button>
               
@@ -317,11 +285,7 @@ export default function CourierDashboard() {
                 onClick={handleViewPerformance}
                 id="parcego-courier-performance-btn"
               >
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:bar-chart-3',
-                  style: { width: '20px', height: '20px', color: 'currentColor' }
-                })}
+                <Icon name="BarChart3" size={20} />
                 <span className="text-sm">Performance</span>
               </Button>
             </div>
@@ -372,31 +336,19 @@ export default function CourierDashboard() {
                       className="text-sm text-gray-600 flex items-center"
                       id={`parcego-delivery-address-${delivery.id}`}
                     >
-                      {React.createElement('span', {
-                        className: 'iconify lucide-icon',
-                        'data-icon': 'lucide:map-pin',
-                        style: { width: '16px', height: '16px', marginRight: '4px', color: 'currentColor' }
-                      })}
+                      <Icon name="MapPin" size={16} className="mr-1" />
                       {delivery.address}
                     </p>
                     <p 
                       className="text-sm text-gray-500 flex items-center mt-1"
                       id={`parcego-delivery-time-${delivery.id}`}
                     >
-                      {React.createElement('span', {
-                        className: 'iconify lucide-icon',
-                        'data-icon': 'lucide:clock',
-                        style: { width: '16px', height: '16px', marginRight: '4px', color: 'currentColor' }
-                      })}
+                      <Icon name="Clock" size={16} className="mr-1" />
                       {delivery.timeWindow} (Est: {delivery.estimatedTime})
                     </p>
                     <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                      <span>
-                        {React.createElement('span', {
-                          className: 'iconify lucide-icon',
-                          'data-icon': 'lucide:package',
-                          style: { width: '12px', height: '12px', marginRight: '4px', display: 'inline-block', color: 'currentColor' }
-                        })}
+                      <span className="flex items-center">
+                        <Icon name="Package" size={12} className="mr-1" />
                         {delivery.packageType}
                       </span>
                       <span>{delivery.weight}</span>
@@ -415,11 +367,7 @@ export default function CourierDashboard() {
                         className="text-xs text-blue-600 mt-2 flex items-center"
                         id={`parcego-delivery-instructions-${delivery.id}`}
                       >
-                        {React.createElement('span', {
-                          className: 'iconify lucide-icon',
-                          'data-icon': 'lucide:alert-circle',
-                          style: { width: '12px', height: '12px', marginRight: '4px', color: 'currentColor' }
-                        })}
+                        <Icon name="AlertCircle" size={12} className="mr-1" />
                         {delivery.specialInstructions}
                       </p>
                     )}
@@ -436,11 +384,7 @@ export default function CourierDashboard() {
                         className="flex-1 parcego-delivery-action-btn parcego-delivery-action-btn--scan"
                         id={`parcego-scan-btn-${delivery.id}`}
                       >
-                        {React.createElement('span', {
-                          className: 'iconify lucide-icon',
-                          'data-icon': 'lucide:camera',
-                          style: { width: '16px', height: '16px', marginRight: '4px', color: 'currentColor' }
-                        })}
+                        <Icon name="Camera" size={16} className="mr-1" />
                         Scan Package
                       </Button>
                       <Button
@@ -449,11 +393,7 @@ export default function CourierDashboard() {
                         className="flex-1 parcego-delivery-action-btn parcego-delivery-action-btn--route"
                         id={`parcego-route-btn-${delivery.id}`}
                       >
-                        {React.createElement('span', {
-                          className: 'iconify lucide-icon',
-                          'data-icon': 'lucide:route',
-                          style: { width: '16px', height: '16px', marginRight: '4px', color: 'currentColor' }
-                        })}
+                        <Icon name="Route" size={16} className="mr-1" />
                         Start Route
                       </Button>
                     </>
@@ -466,11 +406,7 @@ export default function CourierDashboard() {
                       className="w-full parcego-delivery-action-btn parcego-delivery-action-btn--delivered"
                       id={`parcego-delivered-btn-${delivery.id}`}
                     >
-                      {React.createElement('span', {
-                        className: 'iconify lucide-icon',
-                        'data-icon': 'lucide:check-circle',
-                        style: { width: '16px', height: '16px', marginRight: '4px', color: 'currentColor' }
-                      })}
+                      <Icon name="CheckCircle" size={16} className="mr-1" />
                       Mark as Delivered
                     </Button>
                   )}
@@ -483,11 +419,7 @@ export default function CourierDashboard() {
                       className="w-full parcego-delivery-action-btn parcego-delivery-action-btn--waiting"
                       id={`parcego-waiting-btn-${delivery.id}`}
                     >
-                      {React.createElement('span', {
-                        className: 'iconify lucide-icon',
-                        'data-icon': 'lucide:clock',
-                        style: { width: '16px', height: '16px', marginRight: '4px', color: 'currentColor' }
-                      })}
+                      <Icon name="Clock" size={16} className="mr-1" />
                       Waiting for Pickup
                     </Button>
                   )}
@@ -511,11 +443,7 @@ export default function CourierDashboard() {
             className="flex flex-col items-center space-y-1 parcego-nav-btn parcego-nav-btn--deliveries"
             id="parcego-nav-deliveries-btn"
           >
-            {React.createElement('span', {
-              className: 'iconify lucide-icon',
-              'data-icon': 'lucide:package',
-              style: { width: '16px', height: '16px', color: 'currentColor' }
-            })}
+            <Icon name="Package" size={16} />
             <span className="text-xs">Deliveries</span>
           </Button>
           
@@ -529,11 +457,7 @@ export default function CourierDashboard() {
             className="flex flex-col items-center space-y-1 parcego-nav-btn parcego-nav-btn--route"
             id="parcego-nav-route-btn"
           >
-            {React.createElement('span', {
-              className: 'iconify lucide-icon',
-              'data-icon': 'lucide:route',
-              style: { width: '16px', height: '16px', color: 'currentColor' }
-            })}
+            <Icon name="Route" size={16} />
             <span className="text-xs">Route</span>
           </Button>
           
@@ -547,11 +471,7 @@ export default function CourierDashboard() {
             className="flex flex-col items-center space-y-1 parcego-nav-btn parcego-nav-btn--performance"
             id="parcego-nav-performance-btn"
           >
-            {React.createElement('span', {
-              className: 'iconify lucide-icon',
-              'data-icon': 'lucide:bar-chart-3',
-              style: { width: '16px', height: '16px', color: 'currentColor' }
-            })}
+            <Icon name="BarChart3" size={16} />
             <span className="text-xs">Performance</span>
           </Button>
           
@@ -565,11 +485,7 @@ export default function CourierDashboard() {
             className="flex flex-col items-center space-y-1 parcego-nav-btn parcego-nav-btn--profile"
             id="parcego-nav-profile-btn"
           >
-            {React.createElement('span', {
-              className: 'iconify lucide-icon',
-              'data-icon': 'lucide:user',
-              style: { width: '16px', height: '16px', color: 'currentColor' }
-            })}
+            <Icon name="User" size={16} />
             <span className="text-xs">Profile</span>
           </Button>
         </div>

@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-// Icons will be rendered using React.createElement with kebab-case structure
+import { Icon } from "@/components/ui/icon";
 
 interface ShipmentData {
   recipientName: string;
@@ -111,11 +111,7 @@ export default function PackageDetailsPage() {
                 id="parcego-package-details-back-btn"
                 className="parcego-nav__back-btn"
               >
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:arrow-left',
-                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-                })}
+                <span aria-hidden className="mr-2 text-sm">←</span>
                 Back to Shipment Details
               </Button>
               <div className="h-6 border-l border-gray-300"></div>
@@ -129,22 +125,14 @@ export default function PackageDetailsPage() {
                 </div>
                 <span>Shipment Details</span>
               </div>
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:arrow-right',
-                style: { width: '16px', height: '16px', color: 'currentColor' }
-              })}
+              <span aria-hidden className="text-sm">→</span>
               <div className="flex items-center space-x-1">
                 <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
                   <span className="text-white text-xs font-medium">2</span>
                 </div>
                 <span>Package Details</span>
               </div>
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:arrow-right',
-                style: { width: '16px', height: '16px', color: 'currentColor' }
-              })}
+              <span aria-hidden className="text-sm">→</span>
               <div className="flex items-center space-x-1">
                 <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center">
                   <span className="text-gray-600 text-xs font-medium">3</span>
@@ -163,11 +151,7 @@ export default function PackageDetailsPage() {
           <Card className="parcego-card parcego-card--dimensions">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:ruler',
-                  style: { width: '20px', height: '20px', color: '#2563eb' }
-                })}
+                <span aria-hidden>📏</span>
                 <span>Package Dimensions</span>
               </CardTitle>
               <CardDescription>
@@ -259,11 +243,7 @@ export default function PackageDetailsPage() {
               {formData.length && formData.width && formData.height && (
                 <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <div className="flex items-center space-x-2 text-blue-700 text-sm">
-                    {React.createElement('span', {
-                      className: 'iconify lucide-icon',
-                      'data-icon': 'lucide:package',
-                      style: { width: '16px', height: '16px', color: 'currentColor' }
-                    })}
+                    <Icon name="Package" size={16} />
                     <span>Package Preview: {formData.length} × {formData.width} × {formData.height} {formData.dimensionUnit}</span>
                   </div>
                 </div>
@@ -275,11 +255,7 @@ export default function PackageDetailsPage() {
           <Card className="parcego-card parcego-card--weight">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:scale',
-                  style: { width: '20px', height: '20px', color: '#16a34a' }
-                })}
+                <span aria-hidden>⚖️</span>
                 <span>Package Weight</span>
               </CardTitle>
               <CardDescription>
@@ -338,11 +314,7 @@ export default function PackageDetailsPage() {
           <Card className="parcego-card parcego-card--special-handling">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:shield',
-                  style: { width: '20px', height: '20px', color: '#9333ea' }
-                })}
+                <span aria-hidden>🛡️</span>
                 <span>Special Handling</span>
               </CardTitle>
               <CardDescription>
@@ -357,21 +329,21 @@ export default function PackageDetailsPage() {
                     key: 'fragile',
                     label: 'Fragile Item',
                     desc: 'Package contains breakable items requiring careful handling',
-                    iconName: 'lucide:alert-triangle',
+                    iconName: 'AlertTriangle',
                     color: '#ea580c'
                   },
                   {
                     key: 'valuable',
                     label: 'High Value Item',
                     desc: 'Package contains valuable items (over $100)',
-                    iconName: 'lucide:dollar-sign',
+                    iconName: 'DollarSign',
                     color: '#ca8a04'
                   },
                   {
                     key: 'insurance',
                     label: 'Additional Insurance',
                     desc: 'Add extra insurance coverage for this shipment',
-                    iconName: 'lucide:shield',
+                    iconName: 'Shield',
                     color: '#2563eb'
                   }
                 ].map((option) => {
@@ -386,11 +358,11 @@ export default function PackageDetailsPage() {
                       />
                       <div className="flex-1">
                         <div className="flex items-center space-x-2">
-                          {React.createElement('span', {
-                            className: 'iconify lucide-icon',
-                            'data-icon': option.iconName,
-                            style: { width: '16px', height: '16px', color: option.color }
-                          })}
+                          <Icon 
+                            name={option.iconName as "AlertTriangle" | "DollarSign" | "Shield"}
+                            size={16}
+                            style={{ color: option.color }}
+                          />
                           <label 
                             htmlFor={`parcego-special-${option.key}`}
                             className="font-medium text-gray-900 cursor-pointer"
@@ -412,11 +384,7 @@ export default function PackageDetailsPage() {
             <Card className="parcego-card parcego-card--summary border-green-200 bg-green-50">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2 text-green-800">
-                  {React.createElement('span', {
-                    className: 'iconify lucide-icon',
-                    'data-icon': 'lucide:package',
-                    style: { width: '20px', height: '20px', color: 'currentColor' }
-                  })}
+                  <Icon name="Package" size={20} />
                   <span>Package Summary</span>
                 </CardTitle>
               </CardHeader>
@@ -471,11 +439,7 @@ export default function PackageDetailsPage() {
               className="parcego-action-btn parcego-action-btn--back"
               id="parcego-back-shipment-details-btn"
             >
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:arrow-left',
-                style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-              })}
+              <Icon name="ArrowLeft" size={16} className="mr-2" />
               Back to Shipment Details
             </Button>
             
@@ -490,11 +454,7 @@ export default function PackageDetailsPage() {
               ) : (
                 <>
                   Get Shipping Quote
-                  {React.createElement('span', {
-                    className: 'iconify lucide-icon',
-                    'data-icon': 'lucide:arrow-right',
-                    style: { width: '16px', height: '16px', marginLeft: '8px', color: 'currentColor' }
-                  })}
+                  <Icon name="ArrowRight" size={16} className="ml-2" />
                 </>
               )}
             </Button>

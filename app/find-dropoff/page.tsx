@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-// Icons will be rendered using React.createElement with kebab-case structure
+import { Icon } from "@/components/ui/icon";
 
 // Mock drop-off location data
 const mockDropoffLocations = [
@@ -187,11 +187,7 @@ export default function FindDropoffPage() {
                 id="parcego-dropoff-finder-back-btn"
                 className="parcego-nav__back-btn"
               >
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:arrow-left',
-                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-                })}
+                <Icon name="ArrowLeft" size={16} className="mr-2" />
                 Back to Dashboard
               </Button>
               <div className="h-6 border-l border-gray-300"></div>
@@ -206,11 +202,7 @@ export default function FindDropoffPage() {
                 id="parcego-toggle-map-btn"
                 className="parcego-dropoff__toggle-btn"
               >
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:map',
-                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-                })}
+                <Icon name="Map" size={16} className="mr-2" />
                 {showMap ? "Hide Map" : "Show Map"}
               </Button>
             </div>
@@ -229,19 +221,11 @@ export default function FindDropoffPage() {
                 <div className="space-y-2">
                   <Label htmlFor="parcego-location-search">Search for drop-off locations</Label>
                   <div className="relative">
-                    {React.createElement('span', {
-                      className: 'iconify lucide-icon',
-                      'data-icon': 'lucide:search',
-                      style: { 
-                        position: 'absolute',
-                        left: '12px',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        width: '16px',
-                        height: '16px',
-                        color: '#9ca3af'
-                      }
-                    })}
+                    <Icon 
+                      name="Search" 
+                      size={16} 
+                      className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" 
+                    />
                     <Input
                       id="parcego-location-search"
                       placeholder="Enter address, zip code, or location name"
@@ -273,11 +257,6 @@ export default function FindDropoffPage() {
                         className="parcego-filter-btn"
                         id={`parcego-filter-${filter.value}`}
                       >
-                        {React.createElement('span', {
-                          className: 'iconify lucide-icon',
-                          'data-icon': 'lucide:filter',
-                          style: { width: '12px', height: '12px', marginRight: '4px', color: 'currentColor' }
-                        })}
                         {filter.label}
                       </Button>
                     ))}
@@ -302,11 +281,7 @@ export default function FindDropoffPage() {
               {filteredLocations.length === 0 ? (
                 <Card className="parcego-card parcego-card--no-results">
                   <CardContent className="p-8 text-center">
-                    {React.createElement('span', {
-                      className: 'iconify lucide-icon',
-                      'data-icon': 'lucide:map-pin',
-                      style: { width: '48px', height: '48px', margin: '0 auto 16px', display: 'block', color: '#9ca3af' }
-                    })}
+                    <Icon name="MapPin" size={48} className="mx-auto mb-4 text-gray-400" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No locations found</h3>
                     <p className="text-gray-600">Try adjusting your search or filters to find drop-off locations.</p>
                   </CardContent>
@@ -332,20 +307,12 @@ export default function FindDropoffPage() {
                                   </span>
                                   {location.isOpen ? (
                                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                      {React.createElement('span', {
-                                        className: 'iconify lucide-icon',
-                                        'data-icon': 'lucide:check-circle',
-                                        style: { width: '12px', height: '12px', marginRight: '4px', color: 'currentColor' }
-                                      })}
+                                      <Icon name="CheckCircle" size={12} className="mr-1" />
                                       Open
                                     </span>
                                   ) : (
                                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                                      {React.createElement('span', {
-                                        className: 'iconify lucide-icon',
-                                        'data-icon': 'lucide:clock',
-                                        style: { width: '12px', height: '12px', marginRight: '4px', color: 'currentColor' }
-                                      })}
+                                      <Icon name="Clock" size={12} className="mr-1" />
                                       Closed
                                     </span>
                                   )}
@@ -353,30 +320,18 @@ export default function FindDropoffPage() {
                                 
                                 <div className="space-y-2 text-sm text-gray-600">
                                   <div className="flex items-center space-x-2">
-                                    {React.createElement('span', {
-                                      className: 'iconify lucide-icon',
-                                      'data-icon': 'lucide:map-pin',
-                                      style: { width: '16px', height: '16px', color: 'currentColor' }
-                                    })}
+                                    <Icon name="MapPin" size={16} />
                                     <span>{location.address}</span>
                                     <span className="text-blue-600 font-medium">({location.distance})</span>
                                   </div>
                                   
                                   <div className="flex items-center space-x-2">
-                                    {React.createElement('span', {
-                                      className: 'iconify lucide-icon',
-                                      'data-icon': 'lucide:phone',
-                                      style: { width: '16px', height: '16px', color: 'currentColor' }
-                                    })}
+                                    <Icon name="Phone" size={16} />
                                     <span>{location.phone}</span>
                                   </div>
 
                                   <div className="flex items-center space-x-2">
-                                    {React.createElement('span', {
-                                      className: 'iconify lucide-icon',
-                                      'data-icon': 'lucide:clock',
-                                      style: { width: '16px', height: '16px', color: 'currentColor' }
-                                    })}
+                                    <Icon name="Clock" size={16} />
                                     <span>
                                       Weekdays: {location.hours.weekday} | 
                                       Weekends: {location.hours.weekend}
@@ -384,11 +339,7 @@ export default function FindDropoffPage() {
                                   </div>
 
                                   <div className="flex items-center space-x-2">
-                                    {React.createElement('span', {
-                                      className: 'iconify lucide-icon',
-                                      'data-icon': 'lucide:star',
-                                      style: { width: '16px', height: '16px', color: '#eab308' }
-                                    })}
+                                    <Icon name="Star" size={16} className="text-yellow-500" />
                                     <span>{location.rating} rating</span>
                                   </div>
                                 </div>
@@ -423,11 +374,7 @@ export default function FindDropoffPage() {
                               className="parcego-action-btn parcego-action-btn--directions"
                               id={`parcego-directions-${location.id}`}
                             >
-                              {React.createElement('span', {
-                                className: 'iconify lucide-icon',
-                                'data-icon': 'lucide:navigation',
-                                style: { width: '12px', height: '12px', marginRight: '4px', color: 'currentColor' }
-                              })}
+                              <Icon name="Navigation" size={12} className="mr-1" />
                               Directions
                             </Button>
                           </div>
@@ -444,11 +391,7 @@ export default function FindDropoffPage() {
               <Card className="parcego-card parcego-card--map sticky top-4">
                 <CardHeader>
                   <CardTitle className="flex items-center space-x-2">
-                    {React.createElement('span', {
-                      className: 'iconify lucide-icon',
-                      'data-icon': 'lucide:map',
-                      style: { width: '20px', height: '20px', color: '#2563eb' }
-                    })}
+                    <Icon name="Map" size={20} className="text-blue-600" />
                     <span>Map View</span>
                   </CardTitle>
                   <CardDescription>
@@ -459,11 +402,7 @@ export default function FindDropoffPage() {
                   {showMap ? (
                     <div className="bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg h-80 flex items-center justify-center">
                       <div className="text-center text-gray-500">
-                        {React.createElement('span', {
-                          className: 'iconify lucide-icon',
-                          'data-icon': 'lucide:map',
-                          style: { width: '48px', height: '48px', margin: '0 auto 16px', display: 'block', color: 'currentColor' }
-                        })}
+                        <Icon name="Map" size={48} className="mx-auto mb-4" />
                         <p className="text-sm">Google Maps Integration</p>
                         <p className="text-xs text-gray-400 mt-1">
                           (Placeholder for production implementation)
@@ -473,11 +412,7 @@ export default function FindDropoffPage() {
                   ) : (
                     <div className="bg-blue-50 border border-blue-200 rounded-lg h-80 flex items-center justify-center">
                       <div className="text-center text-blue-600">
-                        {React.createElement('span', {
-                          className: 'iconify lucide-icon',
-                          'data-icon': 'lucide:map',
-                          style: { width: '48px', height: '48px', margin: '0 auto 16px', display: 'block', color: 'currentColor' }
-                        })}
+                        <Icon name="Map" size={48} className="mx-auto mb-4" />
                         <p className="text-sm font-medium">Click "Show Map" to view locations</p>
                         <p className="text-xs text-blue-500 mt-1">
                           See all drop-off points on an interactive map

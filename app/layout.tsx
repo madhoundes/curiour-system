@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import Script from "next/script";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -29,10 +28,8 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <Script
-          src="https://code.iconify.design/3/3.1.1/iconify.min.js"
-          strategy="afterInteractive"
-        />
+        {/* Iconify script removed to prevent DOM mutation side-effects during fast refresh.
+            Use static icons, emojis, or a React icon library instead. */}
         {children}
       </body>
     </html>

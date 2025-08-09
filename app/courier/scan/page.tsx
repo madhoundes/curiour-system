@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-// Icons will be rendered using React.createElement with kebab-case structure
+import { Icon } from "@/components/ui/icon";
 
 const mockPackageData = {
   trackingNumber: "PCG789123456",
@@ -71,11 +71,7 @@ export default function ScanPackage() {
             className="parcego-header__back-btn"
             id="parcego-scan-back-btn"
           >
-            {React.createElement('span', {
-              className: 'iconify lucide-icon',
-              'data-icon': 'lucide:arrow-left',
-              style: { width: '20px', height: '20px', color: 'currentColor' }
-            })}
+            <Icon name="ArrowLeft" size={20} />
           </Button>
           <h1 
             className="text-xl font-semibold"
@@ -97,11 +93,7 @@ export default function ScanPackage() {
         >
           <CardHeader>
             <CardTitle className="flex items-center space-x-2">
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:qr-code',
-                style: { width: '20px', height: '20px', color: 'currentColor' }
-              })}
+              <Icon name="QrCode" size={20} />
               <span>Barcode Scanner</span>
             </CardTitle>
           </CardHeader>
@@ -111,11 +103,7 @@ export default function ScanPackage() {
                 className="bg-gray-100 rounded-lg p-8 text-center"
                 id="parcego-scanner-placeholder"
               >
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:camera',
-                  style: { width: '64px', height: '64px', margin: '0 auto 16px', display: 'block', color: '#9ca3af' }
-                })}
+                <Icon name="Camera" size={64} className="mx-auto mb-4 text-gray-400" />
                 <p className="text-gray-600 mb-4">
                   Position the package barcode within the frame
                 </p>
@@ -124,11 +112,7 @@ export default function ScanPackage() {
                   className="parcego-action-btn parcego-action-btn--scan"
                   id="parcego-start-scan-btn"
                 >
-                  {React.createElement('span', {
-                    className: 'iconify lucide-icon',
-                    'data-icon': 'lucide:camera',
-                    style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-                  })}
+                  <Icon name="Camera" size={16} className="mr-2" />
                   Start Scanning
                 </Button>
               </div>
@@ -140,11 +124,7 @@ export default function ScanPackage() {
                 id="parcego-scanning-active"
               >
                 <div className="animate-pulse">
-                  {React.createElement('span', {
-                    className: 'iconify lucide-icon',
-                    'data-icon': 'lucide:qr-code',
-                    style: { width: '64px', height: '64px', margin: '0 auto 16px', display: 'block', color: '#3b82f6' }
-                  })}
+                  <Icon name="QrCode" size={64} className="mx-auto mb-4 text-blue-600" />
                 </div>
                 <p className="text-blue-600 mb-2">Scanning...</p>
                 <p className="text-sm text-gray-600">
@@ -158,11 +138,7 @@ export default function ScanPackage() {
                 className="bg-green-50 rounded-lg p-6 text-center"
                 id="parcego-scan-success"
               >
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:check-circle',
-                  style: { width: '48px', height: '48px', margin: '0 auto 12px', display: 'block', color: '#10b981' }
-                })}
+                <Icon name="CheckCircle" size={48} className="mx-auto mb-3 text-green-600" />
                 <p className="text-green-700 font-medium mb-2">Scan Successful!</p>
                 <p className="text-sm text-gray-600 mb-4">
                   Package verified: {scannedCode}
@@ -175,11 +151,7 @@ export default function ScanPackage() {
                 className="bg-red-50 rounded-lg p-6 text-center"
                 id="parcego-scan-error"
               >
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:alert-circle',
-                  style: { width: '48px', height: '48px', margin: '0 auto 12px', display: 'block', color: '#ef4444' }
-                })}
+                <Icon name="AlertCircle" size={48} className="mx-auto mb-3 text-red-600" />
                 <p className="text-red-700 font-medium mb-2">Scan Failed</p>
                 <p className="text-sm text-gray-600 mb-4">
                   Package not found or invalid barcode
@@ -246,11 +218,7 @@ export default function ScanPackage() {
           >
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:package',
-                  style: { width: '20px', height: '20px', color: 'currentColor' }
-                })}
+                <Icon name="Package" size={20} />
                 <span>Package Details</span>
               </CardTitle>
             </CardHeader>
@@ -272,11 +240,7 @@ export default function ScanPackage() {
                     className="text-gray-900 flex items-center"
                     id="parcego-package-address"
                   >
-                    {React.createElement('span', {
-                      className: 'iconify lucide-icon',
-                      'data-icon': 'lucide:map-pin',
-                      style: { width: '16px', height: '16px', marginRight: '4px', color: '#6b7280' }
-                    })}
+                    <Icon name="MapPin" size={16} className="mr-1 text-gray-500" />
                     {mockPackageData.address}
                   </p>
                 </div>
@@ -310,11 +274,7 @@ export default function ScanPackage() {
                       id="parcego-package-instructions"
                     >
                       <p className="text-yellow-800 text-sm flex items-center">
-                        {React.createElement('span', {
-                          className: 'iconify lucide-icon',
-                          'data-icon': 'lucide:alert-circle',
-                          style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-                        })}
+                        <Icon name="AlertCircle" size={16} className="mr-2" />
                         {mockPackageData.specialInstructions}
                       </p>
                     </div>
@@ -326,11 +286,7 @@ export default function ScanPackage() {
                   id="parcego-pickup-status"
                 >
                   <div className="flex items-center">
-                    {React.createElement('span', {
-                      className: 'iconify lucide-icon',
-                      'data-icon': 'lucide:check-circle',
-                      style: { width: '20px', height: '20px', marginRight: '8px', color: '#16a34a' }
-                    })}
+                    <Icon name="CheckCircle" size={20} className="mr-2 text-green-600" />
                     <div>
                       <p className="text-green-800 font-medium">Ready for Pickup</p>
                       <p className="text-green-700 text-sm">Package verified and ready for delivery</p>
@@ -344,11 +300,7 @@ export default function ScanPackage() {
                 className="w-full parcego-action-btn parcego-action-btn--confirm-pickup"
                 id="parcego-confirm-pickup-btn"
               >
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:check-circle',
-                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-                })}
+                <Icon name="CheckCircle" size={16} className="mr-2" />
                 Confirm Pickup & Start Route
               </Button>
             </CardContent>

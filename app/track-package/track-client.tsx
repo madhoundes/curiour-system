@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Circle, FilePlus, Hand, Scan, ArrowRight, Truck, XCircle, CheckCircle, Undo2, Image, StickyNote, Dot, Pen, File, X, AlertCircle } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -74,26 +75,21 @@ const titleForEvent = (event: TrackingEvent): string => {
 };
 
 const iconForEvent = (eventType: string) => {
-  const iconMap: Record<string, string> = {
-    LABEL_CREATED: "lucide:file-plus",
-    DROP_OFF_CONFIRMED: "lucide:hand",
-    SCANNED_AT_FACILITY: "lucide:scan",
-    IN_TRANSIT_DEPARTED: "lucide:arrow-right",
-    IN_TRANSIT_ARRIVED: "lucide:arrow-left",
-    OUT_FOR_DELIVERY: "lucide:truck",
-    DELIVERY_ATTEMPTED: "lucide:alert-circle",
-    DELIVERY_FAILED: "lucide:x-circle",
-    DELIVERED: "lucide:check-circle",
-    RETURNED_TO_SENDER: "lucide:undo-2",
-    POD_UPLOADED: "lucide:image",
-    NOTE_ADDED: "lucide:sticky-note",
+  const iconMap: Record<string, React.ReactElement> = {
+    LABEL_CREATED: <FilePlus size={16} />,
+    DROP_OFF_CONFIRMED: <Hand size={16} />,
+    SCANNED_AT_FACILITY: <Scan size={16} />,
+    IN_TRANSIT_DEPARTED: <ArrowRight size={16} />,
+    IN_TRANSIT_ARRIVED: <ArrowRight size={16} />,
+    OUT_FOR_DELIVERY: <Truck size={16} />,
+    DELIVERY_ATTEMPTED: <AlertCircle size={16} />,
+    DELIVERY_FAILED: <XCircle size={16} />,
+    DELIVERED: <CheckCircle size={16} />,
+    RETURNED_TO_SENDER: <Undo2 size={16} />,
+    POD_UPLOADED: <Image size={16} />,
+    NOTE_ADDED: <StickyNote size={16} />,
   };
-  const dataIcon = iconMap[eventType] ?? "lucide:dot";
-  return React.createElement("span", {
-    className: "iconify lucide-icon",
-    "data-icon": dataIcon,
-    style: { width: "16px", height: "16px", color: "currentColor" },
-  });
+  return iconMap[eventType] ?? <Dot size={16} />;
 };
 
 const mockTrackingData = (trackingNumber: string): { summary: ShipmentSummary; events: TrackingEvent[] } => {
@@ -173,7 +169,7 @@ export default function TrackPackageClient() {
               className="parcego-nav__back-btn"
               aria-label="Back to Dashboard"
             >
-              {React.createElement('span', { className: 'iconify lucide-icon', 'data-icon': 'lucide:arrow-left', style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' } })}
+              <ArrowLeft size={16} className="mr-2" />
               Back to Dashboard
             </Button>
           </div>
@@ -184,7 +180,7 @@ export default function TrackPackageClient() {
               <p className="text-sm text-gray-500">Last update {new Date(summary.lastUpdate).toLocaleString()}</p>
             </div>
             <Badge id="parcego-tracking-status-badge" className={`px-3 py-1 ${statusBadgeClasses[summary.status]}`}>
-              {React.createElement("span", { className: "iconify lucide-icon", "data-icon": "lucide:circle", style: { width: "12px", height: "12px", marginRight: "6px" } })}
+              <Circle size={12} className="mr-1" />
               {summary.status}
             </Badge>
           </div>
@@ -219,7 +215,7 @@ export default function TrackPackageClient() {
                         <div className="mt-2 flex gap-2">
                           {evt.attachments.map((a) => (
                             <button key={a.url} id={`parcego-tracking-attachment-${evt.id}`} className="group inline-flex items-center gap-2 rounded border px-2 py-1 text-xs hover:bg-gray-50 transition-all" onClick={() => setPreview({ url: a.url })} aria-label="Open attachment preview">
-                              {React.createElement("span", { className: "iconify lucide-icon", "data-icon": a.type === "photo" ? "lucide:image" : a.type === "signature" ? "lucide:pen" : "lucide:file", style: { width: "14px", height: "14px", color: "currentColor" } })}
+                              {a.type === "photo" ? <Image size={14} /> : a.type === "signature" ? <Pen size={14} /> : <File size={14} />}
                               <span className="text-gray-700">{a.type}</span>
                             </button>
                           ))}
@@ -282,7 +278,7 @@ export default function TrackPackageClient() {
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-medium">Preview</h2>
               <Button variant="ghost" onClick={() => setPreview(null)} aria-label="Close preview">
-                {React.createElement("span", { className: "iconify lucide-icon", "data-icon": "lucide:x", style: { width: "18px", height: "18px" } })}
+                <X size={18} />
               </Button>
             </div>
             <div className="max-h-[70vh] overflow-auto">

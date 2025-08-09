@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-// Icons will be rendered using React.createElement with kebab-case structure
+import { Icon } from "@/components/ui/icon";
 
 interface ShipmentData {
   recipientName: string;
@@ -167,11 +167,7 @@ export default function QuotePreviewPage() {
                 id="parcego-quote-preview-back-btn"
                 className="parcego-nav__back-btn"
               >
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:arrow-left',
-                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-                })}
+                <Icon name="ArrowLeft" size={16} className="mr-2" />
                 Back to Package Details
               </Button>
               <div className="h-6 border-l border-gray-300"></div>
@@ -185,22 +181,14 @@ export default function QuotePreviewPage() {
                 </div>
                 <span>Shipment Details</span>
               </div>
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:arrow-right',
-                style: { width: '16px', height: '16px', color: 'currentColor' }
-              })}
+              <Icon name="ArrowRight" size={16} />
               <div className="flex items-center space-x-1">
                 <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
                   <span className="text-white text-xs font-medium">✓</span>
                 </div>
                 <span>Package Details</span>
               </div>
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:arrow-right',
-                style: { width: '16px', height: '16px', color: 'currentColor' }
-              })}
+              <Icon name="ArrowRight" size={16} />
               <div className="flex items-center space-x-1">
                 <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
                   <span className="text-white text-xs font-medium">3</span>
@@ -219,11 +207,7 @@ export default function QuotePreviewPage() {
           <Card className="parcego-card parcego-card--shipment-summary">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:package',
-                  style: { width: '20px', height: '20px', color: '#2563eb' }
-                })}
+                <Icon name="Package" size={20} className="text-blue-600" />
                 <span>Shipment Summary</span>
               </CardTitle>
             </CardHeader>
@@ -276,11 +260,7 @@ export default function QuotePreviewPage() {
           <Card className="parcego-card parcego-card--quote-options">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:truck',
-                  style: { width: '20px', height: '20px', color: '#16a34a' }
-                })}
+                <Icon name="Truck" size={20} className="text-green-600" />
                 <span>Select Shipping Option</span>
               </CardTitle>
               <CardDescription>
@@ -329,11 +309,7 @@ export default function QuotePreviewPage() {
                         </p>
                         <div className="flex items-center space-x-4 mt-2">
                           <div className="flex items-center space-x-1">
-                            {React.createElement('span', {
-                              className: 'iconify lucide-icon',
-                              'data-icon': 'lucide:clock',
-                              style: { width: '16px', height: '16px', color: '#9ca3af' }
-                            })}
+                            <Icon name="Clock" size={16} className="text-gray-400" />
                             <span className="text-sm text-gray-600">{quote.deliveryTime}</span>
                           </div>
                         </div>
@@ -359,11 +335,7 @@ export default function QuotePreviewPage() {
                             : 'bg-gray-100 text-gray-600'
                         }`}
                       >
-                        {React.createElement('span', {
-                          className: 'iconify lucide-icon',
-                          'data-icon': 'lucide:check-circle',
-                          style: { width: '12px', height: '12px', marginRight: '4px', color: 'currentColor' }
-                        })}
+                        <Icon name="CheckCircle" size={12} className="mr-1" />
                         {feature}
                       </span>
                     ))}
@@ -377,11 +349,7 @@ export default function QuotePreviewPage() {
           <Card className="parcego-card parcego-card--cost-breakdown">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:dollar-sign',
-                  style: { width: '20px', height: '20px', color: '#9333ea' }
-                })}
+                <Icon name="DollarSign" size={20} className="text-purple-600" />
                 <span>Cost Breakdown</span>
               </CardTitle>
             </CardHeader>
@@ -431,11 +399,7 @@ export default function QuotePreviewPage() {
               className="parcego-action-btn parcego-action-btn--back"
               id="parcego-back-package-details-btn"
             >
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:arrow-left',
-                style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-              })}
+              <Icon name="ArrowLeft" size={16} className="mr-2" />
               Back to Package Details
             </Button>
             
@@ -450,11 +414,7 @@ export default function QuotePreviewPage() {
               ) : (
                 <>
                   Continue to Payment
-                  {React.createElement('span', {
-                    className: 'iconify lucide-icon',
-                    'data-icon': 'lucide:arrow-right',
-                    style: { width: '16px', height: '16px', marginLeft: '8px', color: 'currentColor' }
-                  })}
+                  <Icon name="ArrowRight" size={16} className="ml-2" />
                 </>
               )}
             </Button>
