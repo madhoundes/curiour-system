@@ -1,18 +1,10 @@
-import { Suspense } from "react";
-import Client from "./track-client";
+"use client";
 
-export const dynamic = "force-dynamic";
-
-export default function Page() {
-  return (
-    <Suspense fallback={<div className="p-6 text-sm text-gray-500">Loading tracking…</div>}>
-      <Client />
-    </Suspense>
-  );
-}
-
-// The previous client logic has been moved to app/track-package/track-client.tsx
-// to satisfy Next.js CSR bailout requirements for useSearchParams.
+import React, { useEffect, useMemo, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 type ShipmentStatus =
   | "LabelCreated"
@@ -108,51 +100,11 @@ const mockTrackingData = (trackingNumber: string): { summary: ShipmentSummary; e
   const now = new Date();
   const toISO = (d: Date) => d.toISOString();
   const events: TrackingEvent[] = [
-    {
-      id: "evt-10",
-      timestamp: toISO(new Date(now.getTime() - 1000 * 60 * 60 * 26)),
-      type: "LABEL_CREATED",
-      statusAfter: "LabelCreated",
-      location: "Merchant Portal",
-      actor: "merchant",
-      details: "Label created and awaiting drop-off",
-    },
-    {
-      id: "evt-20",
-      timestamp: toISO(new Date(now.getTime() - 1000 * 60 * 60 * 22)),
-      type: "DROP_OFF_CONFIRMED",
-      statusAfter: "DropoffConfirmed",
-      location: "Local Drop-off Point",
-      actor: "courier",
-      details: "Package received at drop-off location",
-    },
-    {
-      id: "evt-30",
-      timestamp: toISO(new Date(now.getTime() - 1000 * 60 * 60 * 19)),
-      type: "SCANNED_AT_FACILITY",
-      statusAfter: "ReceivedAtFacility",
-      location: "Central Facility",
-      actor: "system",
-      details: "Package scanned into facility",
-    },
-    {
-      id: "evt-40",
-      timestamp: toISO(new Date(now.getTime() - 1000 * 60 * 60 * 15)),
-      type: "IN_TRANSIT_DEPARTED",
-      statusAfter: "InTransit",
-      location: "Central Facility",
-      actor: "system",
-      details: "Departed facility en route",
-    },
-    {
-      id: "evt-50",
-      timestamp: toISO(new Date(now.getTime() - 1000 * 60 * 60 * 6)),
-      type: "OUT_FOR_DELIVERY",
-      statusAfter: "OutForDelivery",
-      location: "Destination City",
-      actor: "system",
-      details: "Courier has the package",
-    },
+    { id: "evt-10", timestamp: toISO(new Date(now.getTime() - 1000 * 60 * 60 * 26)), type: "LABEL_CREATED", statusAfter: "LabelCreated", location: "Merchant Portal", actor: "merchant", details: "Label created and awaiting drop-off" },
+    { id: "evt-20", timestamp: toISO(new Date(now.getTime() - 1000 * 60 * 60 * 22)), type: "DROP_OFF_CONFIRMED", statusAfter: "DropoffConfirmed", location: "Local Drop-off Point", actor: "courier", details: "Package received at drop-off location" },
+    { id: "evt-30", timestamp: toISO(new Date(now.getTime() - 1000 * 60 * 60 * 19)), type: "SCANNED_AT_FACILITY", statusAfter: "ReceivedAtFacility", location: "Central Facility", actor: "system", details: "Package scanned into facility" },
+    { id: "evt-40", timestamp: toISO(new Date(now.getTime() - 1000 * 60 * 60 * 15)), type: "IN_TRANSIT_DEPARTED", statusAfter: "InTransit", location: "Central Facility", actor: "system", details: "Departed facility en route" },
+    { id: "evt-50", timestamp: toISO(new Date(now.getTime() - 1000 * 60 * 60 * 6)), type: "OUT_FOR_DELIVERY", statusAfter: "OutForDelivery", location: "Destination City", actor: "system", details: "Courier has the package" },
   ];
 
   const summary: ShipmentSummary = {
@@ -169,12 +121,12 @@ const mockTrackingData = (trackingNumber: string): { summary: ShipmentSummary; e
   return { summary, events };
 };
 
-export default function TrackPackagePage() {
+export default function TrackPackageClient() {
   const params = useSearchParams();
   const router = useRouter();
   const [trackingParam, setTrackingParam] = useState<string | null>(null);
+
   useEffect(() => {
-    // Read search param only on client to avoid hydration mismatch
     setTrackingParam(params.get("tracking") || "ASH-20250101-ABC123");
   }, [params]);
 
@@ -187,7 +139,6 @@ export default function TrackPackagePage() {
   const [preview, setPreview] = useState<{ url: string } | null>(null);
 
   if (!trackingParam) {
-    // Render a stable placeholder during SSR/first paint to avoid hydration mismatch
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -212,9 +163,7 @@ export default function TrackPackagePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
         <div id="parcego-tracking-header" className="mb-6">
-          {/* Back Row */}
           <div className="flex items-center mb-3">
             <Button
               variant="ghost"
@@ -224,39 +173,26 @@ export default function TrackPackagePage() {
               className="parcego-nav__back-btn"
               aria-label="Back to Dashboard"
             >
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:arrow-left',
-                style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-              })}
+              {React.createElement('span', { className: 'iconify lucide-icon', 'data-icon': 'lucide:arrow-left', style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' } })}
               Back to Dashboard
             </Button>
           </div>
 
-          {/* Title Row */}
           <div className="flex items-start justify-between gap-4">
             <div>
               <h1 className="text-2xl font-semibold text-gray-900">Tracking {summary.trackingNumber}</h1>
               <p className="text-sm text-gray-500">Last update {new Date(summary.lastUpdate).toLocaleString()}</p>
             </div>
             <Badge id="parcego-tracking-status-badge" className={`px-3 py-1 ${statusBadgeClasses[summary.status]}`}>
-              {React.createElement("span", {
-                className: "iconify lucide-icon",
-                "data-icon": "lucide:circle",
-                style: { width: "12px", height: "12px", marginRight: "6px" },
-              })}
+              {React.createElement("span", { className: "iconify lucide-icon", "data-icon": "lucide:circle", style: { width: "12px", height: "12px", marginRight: "6px" } })}
               {summary.status}
             </Badge>
           </div>
 
-          {/* Live region for SR */}
-          <div role="status" aria-live="polite" className="sr-only">
-            Current status {summary.status}
-          </div>
+          <div role="status" aria-live="polite" className="sr-only">Current status {summary.status}</div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Timeline */}
           <Card className="lg:col-span-2">
             <CardHeader>
               <CardTitle>Tracking Timeline</CardTitle>
@@ -265,45 +201,25 @@ export default function TrackPackagePage() {
             <CardContent>
               <ol id="parcego-tracking-timeline" className="space-y-6">
                 {[...visibleEvents].reverse().map((evt, idx, arr) => (
-                  <li
-                    key={evt.id}
-                    id={`parcego-tracking-timeline-item-${evt.id}`}
-                    className="grid grid-cols-[28px_1fr] gap-3"
-                  >
+                  <li key={evt.id} id={`parcego-tracking-timeline-item-${evt.id}`} className="grid grid-cols-[28px_1fr] gap-3">
                     <div className="flex flex-col items-center">
                       <div className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-600 grid place-items-center">
                         {iconForEvent(evt.type)}
                       </div>
-                      {idx !== arr.length - 1 ? (
-                        <div className="flex-1 w-px bg-gray-200 mt-2" aria-hidden="true" />
-                      ) : null}
+                      {idx !== arr.length - 1 ? <div className="flex-1 w-px bg-gray-200 mt-2" aria-hidden="true" /> : null}
                     </div>
                     <div className="flex flex-col gap-1">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-gray-900">{titleForEvent(evt)}</span>
                         <span className={`text-xs px-2 py-0.5 rounded ${statusBadgeClasses[evt.statusAfter]}`}>{evt.statusAfter}</span>
                       </div>
-                      <span className="text-xs text-gray-500">
-                        {new Date(evt.timestamp).toLocaleString()} {evt.location ? `• ${evt.location}` : ""}
-                      </span>
-                      {evt.details ? (
-                        <p className="text-sm text-gray-700">{evt.details}</p>
-                      ) : null}
+                      <span className="text-xs text-gray-500">{new Date(evt.timestamp).toLocaleString()} {evt.location ? `• ${evt.location}` : ""}</span>
+                      {evt.details ? <p className="text-sm text-gray-700">{evt.details}</p> : null}
                       {evt.attachments && evt.attachments.length > 0 ? (
                         <div className="mt-2 flex gap-2">
                           {evt.attachments.map((a) => (
-                            <button
-                              key={a.url}
-                              id={`parcego-tracking-attachment-${evt.id}`}
-                              className="group inline-flex items-center gap-2 rounded border px-2 py-1 text-xs hover:bg-gray-50 transition-all"
-                              onClick={() => setPreview({ url: a.url })}
-                              aria-label="Open attachment preview"
-                            >
-                              {React.createElement("span", {
-                                className: "iconify lucide-icon",
-                                "data-icon": a.type === "photo" ? "lucide:image" : a.type === "signature" ? "lucide:pen" : "lucide:file",
-                                style: { width: "14px", height: "14px", color: "currentColor" },
-                              })}
+                            <button key={a.url} id={`parcego-tracking-attachment-${evt.id}`} className="group inline-flex items-center gap-2 rounded border px-2 py-1 text-xs hover:bg-gray-50 transition-all" onClick={() => setPreview({ url: a.url })} aria-label="Open attachment preview">
+                              {React.createElement("span", { className: "iconify lucide-icon", "data-icon": a.type === "photo" ? "lucide:image" : a.type === "signature" ? "lucide:pen" : "lucide:file", style: { width: "14px", height: "14px", color: "currentColor" } })}
                               <span className="text-gray-700">{a.type}</span>
                             </button>
                           ))}
@@ -315,15 +231,12 @@ export default function TrackPackagePage() {
               </ol>
               {events.length > 3 ? (
                 <div className="mt-4">
-                  <Button variant="outline" onClick={() => setShowAll((v) => !v)}>
-                    {showAll ? "Show recent only" : "Show older updates"}
-                  </Button>
+                  <Button variant="outline" onClick={() => setShowAll((v) => !v)}>{showAll ? "Show recent only" : "Show older updates"}</Button>
                 </div>
               ) : null}
             </CardContent>
           </Card>
 
-          {/* Summary & POD */}
           <div className="space-y-6">
             <Card id="parcego-tracking-summary-card">
               <CardHeader>
@@ -348,21 +261,11 @@ export default function TrackPackagePage() {
               <CardContent>
                 {summary.hasPOD ? (
                   <div className="grid grid-cols-3 gap-2">
-                    {/* Mock thumbnails if any in events */}
-                    {events
-                      .flatMap((e) => e.attachments || [])
-                      .filter((a) => a.type === "photo")
-                      .slice(0, 6)
-                      .map((a) => (
-                        <button
-                          key={a.url}
-                          className="aspect-square w-full rounded border overflow-hidden hover:shadow-sm transition-all"
-                          onClick={() => setPreview({ url: a.url })}
-                          aria-label="Open photo preview"
-                        >
-                          <img src={a.url} alt="Proof of delivery" className="h-full w-full object-cover" />
-                        </button>
-                      ))}
+                    {events.flatMap((e) => e.attachments || []).filter((a) => a.type === "photo").slice(0, 6).map((a) => (
+                      <button key={a.url} className="aspect-square w-full rounded border overflow-hidden hover:shadow-sm transition-all" onClick={() => setPreview({ url: a.url })} aria-label="Open photo preview">
+                        <img src={a.url} alt="Proof of delivery" className="h-full w-full object-cover" />
+                      </button>
+                    ))}
                   </div>
                 ) : (
                   <div className="text-sm text-gray-600">No proof of delivery available yet</div>
@@ -373,26 +276,13 @@ export default function TrackPackagePage() {
         </div>
       </div>
 
-      {/* Simple Modal Preview (UI only) */}
       {preview ? (
-        <div
-          role="dialog"
-          aria-modal="true"
-          className="fixed inset-0 z-50 grid place-items-center bg-black/50"
-          onClick={() => setPreview(null)}
-        >
-          <div
-            className="bg-white rounded-lg shadow-xl max-w-3xl w-[90vw] p-4"
-            onClick={(e) => e.stopPropagation()}
-          >
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-50 grid place-items-center bg-black/50" onClick={() => setPreview(null)}>
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-[90vw] p-4" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-3">
               <h2 className="text-lg font-medium">Preview</h2>
               <Button variant="ghost" onClick={() => setPreview(null)} aria-label="Close preview">
-                {React.createElement("span", {
-                  className: "iconify lucide-icon",
-                  "data-icon": "lucide:x",
-                  style: { width: "18px", height: "18px" },
-                })}
+                {React.createElement("span", { className: "iconify lucide-icon", "data-icon": "lucide:x", style: { width: "18px", height: "18px" } })}
               </Button>
             </div>
             <div className="max-h-[70vh] overflow-auto">
