@@ -45,10 +45,11 @@ This platform enables merchants to create shipments, generate labels, and track 
 - **Performance Tracking**: Personal analytics, earnings, ratings, and achievements
 - **Bottom Navigation**: Mobile-first navigation optimized for courier workflow
  
-#### Proof of Delivery – Technical Notes
-- Avoid SSR/client hydration mismatches: timestamps and IDs are set in `useEffect` with loading fallbacks.
-- Icons use kebab-case span structure: `<span class="iconify lucide-icon" data-icon="lucide:..." style="..." />`.
-- Accessibility: inline errors, focus management, ARIA roles, and progress announced via `aria-live`.
+#### Technical Architecture Notes
+- **SSR/Hydration**: Timestamps and IDs are set in `useEffect` with loading fallbacks to avoid mismatches.
+- **Icon System**: Centralized `<Icon name="PackageName" />` component using Lucide React for consistency and performance.
+- **Accessibility**: Inline errors, focus management, ARIA roles, and progress announced via `aria-live`.
+- **State Management**: Client-side state with Zustand, forms with React Hook Form + Zod validation.
 
 ### ✅ **Phase 4: Super Admin Dashboard (COMPLETED)**
 - **Platform Overview**: System health monitoring with real-time stats (merchants, couriers, shipments, revenue)
@@ -57,6 +58,14 @@ This platform enables merchants to create shipments, generate labels, and track 
 - **Platform Analytics**: Revenue trends, shipment volume, geographic distribution, and delivery performance
 - **System Administration**: General settings, security controls, billing configuration, and support management
 - **Activity Monitoring**: Real-time platform activity feed with system alerts and notifications
+
+### ✅ **Phase 5: Icon System Overhaul (COMPLETED)**
+- **Centralized Icon Architecture**: Created reusable Icon component (`components/ui/icon.tsx`) with TypeScript support
+- **Performance Optimization**: Migrated from runtime Iconify to static Lucide React components
+- **Eliminated DOM Conflicts**: Fixed all `removeChild` errors and runtime DOM manipulation issues
+- **Consistent Design System**: Standardized icon sizing, colors, and styling across all 13+ pages
+- **Developer Experience**: Added icon aliases and auto-completion for improved maintainability
+- **Core Flow Validation**: All major user journeys (merchant shipment, courier operations) fully functional
 
 ### 🎯 Mission
 Deliver a scalable, affordable, and transparent courier platform for small businesses, with seamless merchant experience, robust tracking, and operational efficiency.
@@ -74,6 +83,7 @@ Deliver a scalable, affordable, and transparent courier platform for small busin
 - **Framework**: Next.js 14+ (App Router)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS + shadcn/ui components
+- **Icons**: Centralized Lucide React component system
 - **State Management**: Zustand (client), React Query (server)
 - **Forms**: React Hook Form + Zod validation
 - **Charts**: Recharts
