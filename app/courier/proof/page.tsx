@@ -219,11 +219,7 @@ export default function ProofOfDelivery() {
           <Card className="text-center" id="parcego-proof-success-card">
             <CardContent className="pt-12 pb-8">
               <div className="mb-6 flex justify-center">
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:check-circle',
-                  style: { width: '80px', height: '80px', color: '#10b981' }
-                })}
+                <Icon name="CircleCheck" size={80} className="text-emerald-500" />
               </div>
               <h2 className="text-2xl font-bold mb-2">Delivery Completed!</h2>
               <p className="text-gray-600 mb-2">Package #{deliveryData.trackingNumber}</p>
@@ -237,11 +233,7 @@ export default function ProofOfDelivery() {
                   onClick={handleNextDelivery}
                   id="parcego-proof-next-delivery-btn"
                 >
-                  {React.createElement('span', {
-                    className: 'iconify lucide-icon',
-                    'data-icon': 'lucide:arrow-right',
-                    style: { width: '20px', height: '20px', marginRight: '8px', color: 'currentColor' }
-                  })}
+                  <Icon name="ArrowRight" size={20} className="mr-2" />
                   Next Delivery
                 </Button>
                 
@@ -251,11 +243,7 @@ export default function ProofOfDelivery() {
                   onClick={handleBackToDashboard}
                   id="parcego-proof-dashboard-btn"
                 >
-                  {React.createElement('span', {
-                    className: 'iconify lucide-icon',
-                    'data-icon': 'lucide:home',
-                    style: { width: '20px', height: '20px', marginRight: '8px', color: 'currentColor' }
-                  })}
+                  <Icon name="Home" size={20} className="mr-2" />
                   Back to Dashboard
                 </Button>
               </div>
@@ -283,11 +271,7 @@ export default function ProofOfDelivery() {
               id="parcego-proof-back-btn"
               aria-label="Go back"
             >
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:arrow-left',
-                style: { width: '20px', height: '20px', marginRight: '8px', color: 'currentColor' }
-              })}
+              <Icon name="ArrowLeft" size={20} className="mr-2" />
               Back
             </Button>
             <h1 className="text-lg font-semibold">Proof of Delivery</h1>
@@ -309,11 +293,7 @@ export default function ProofOfDelivery() {
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-start space-x-3">
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:package',
-                style: { width: '20px', height: '20px', color: '#6b7280', flexShrink: 0 }
-              })}
+              <Icon name="Package" size={20} className="text-gray-500 flex-shrink-0" />
               <div className="flex-1">
                 <p className="text-sm font-medium">Tracking Number</p>
                 <p className="text-sm text-gray-600">{deliveryData.trackingNumber}</p>
@@ -321,11 +301,7 @@ export default function ProofOfDelivery() {
             </div>
             
             <div className="flex items-start space-x-3">
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:user',
-                style: { width: '20px', height: '20px', color: '#6b7280', flexShrink: 0 }
-              })}
+              <Icon name="User" size={20} className="text-gray-500 flex-shrink-0" />
               <div className="flex-1">
                 <p className="text-sm font-medium">Customer</p>
                 <p className="text-sm text-gray-600">{deliveryData.customerName}</p>
@@ -333,11 +309,7 @@ export default function ProofOfDelivery() {
             </div>
             
             <div className="flex items-start space-x-3">
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:map-pin',
-                style: { width: '20px', height: '20px', color: '#6b7280', flexShrink: 0 }
-              })}
+              <Icon name="MapPin" size={20} className="text-gray-500 flex-shrink-0" />
               <div className="flex-1">
                 <p className="text-sm font-medium">Delivery Address</p>
                 <p className="text-sm text-gray-600">{deliveryData.address}</p>
@@ -351,11 +323,7 @@ export default function ProofOfDelivery() {
           <CardContent className="pt-4">
             <div className="space-y-3">
               <div className="flex items-center space-x-3">
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:map',
-                  style: { width: '24px', height: '24px', color: '#2563eb' }
-                })}
+                <Icon name="Map" size={24} className="text-blue-600" />
                 <div className="flex-1">
                   <p className="text-sm font-medium">Current Location</p>
                   <p className="text-xs text-gray-600">{currentLocation || 'Loading...'}</p>
@@ -363,11 +331,7 @@ export default function ProofOfDelivery() {
               </div>
               
                 <div className="flex items-center space-x-3">
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:clock',
-                  style: { width: '24px', height: '24px', color: '#2563eb' }
-                })}
+                <Icon name="Clock" size={24} className="text-blue-600" />
                 <div className="flex-1">
                   <p className="text-sm font-medium">Timestamp</p>
                     <p className="text-xs text-gray-600">{timestamp || 'Loading...'}</p>
@@ -382,11 +346,7 @@ export default function ProofOfDelivery() {
         <Card id="parcego-proof-photo-section" aria-labelledby="parcego-proof-photo-title">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center" id="parcego-proof-photo-title">
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:camera',
-                style: { width: '20px', height: '20px', marginRight: '8px', color: 'currentColor' }
-              })}
+              <Icon name="Camera" size={20} className="mr-2" />
               Package Photo
               <span className="text-red-500 ml-1">*</span>
             </CardTitle>
@@ -424,11 +384,7 @@ export default function ProofOfDelivery() {
                       id={`parcego-proof-remove-photo-${index}`}
                       aria-label={`Remove photo ${index + 1}`}
                     >
-                      {React.createElement('span', {
-                        className: 'iconify lucide-icon',
-                        'data-icon': 'lucide:x',
-                        style: { width: '16px', height: '16px', color: 'white' }
-                      })}
+                      <Icon name="X" size={16} className="text-white" />
                     </Button>
                   </div>
                 ))}
@@ -450,11 +406,7 @@ export default function ProofOfDelivery() {
               aria-describedby={photos.length === 0 ? "parcego-proof-photo-error" : undefined}
               aria-label={photos.length > 0 ? 'Add another delivery photo' : 'Take a delivery photo'}
             >
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:camera',
-                style: { width: '24px', height: '24px', marginRight: '8px', color: 'currentColor' }
-              })}
+              <Icon name="Camera" size={24} className="mr-2" />
               {photos.length > 0 ? 'Add Another Photo' : 'Take Photo'}
             </Button>
           </CardContent>
@@ -464,11 +416,7 @@ export default function ProofOfDelivery() {
         <Card id="parcego-proof-signature-section" aria-labelledby="parcego-proof-signature-title">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center" id="parcego-proof-signature-title">
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:pen-tool',
-                style: { width: '20px', height: '20px', marginRight: '8px', color: 'currentColor' }
-              })}
+              <Icon name="PenTool" size={20} className="mr-2" />
               Customer Signature
               <span className="text-red-500 ml-1">*</span>
             </CardTitle>
@@ -508,11 +456,7 @@ export default function ProofOfDelivery() {
                 id="parcego-proof-clear-signature-btn"
                 aria-label="Clear signature"
               >
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:eraser',
-                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-                })}
+                <Icon name="Eraser" size={16} className="mr-2" />
                 Clear
               </Button>
             </div>
@@ -525,11 +469,7 @@ export default function ProofOfDelivery() {
         <Card id="parcego-proof-notes-section">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center">
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:file-text',
-                style: { width: '20px', height: '20px', marginRight: '8px', color: 'currentColor' }
-              })}
+              <Icon name="FileText" size={20} className="mr-2" />
               Delivery Notes
             </CardTitle>
           </CardHeader>
@@ -571,11 +511,7 @@ export default function ProofOfDelivery() {
           >
             {isUploading ? (
               <>
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon animate-spin',
-                  'data-icon': 'lucide:loader-2',
-                  style: { width: '24px', height: '24px', marginRight: '8px', color: 'currentColor' }
-                })}
+                <Icon name="Loader2" size={24} className="mr-2 animate-spin" />
                 <span
                   role="progressbar"
                   aria-valuemin={0}
@@ -589,11 +525,7 @@ export default function ProofOfDelivery() {
               </>
             ) : (
               <>
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:upload',
-                  style: { width: '28px', height: '28px', marginRight: '8px', color: 'currentColor' }
-                })}
+                <Icon name="Upload" size={28} className="mr-2" />
                 Upload Proof of Delivery
               </>
             )}

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-// Icons will be rendered using React.createElement with kebab-case structure
+import { Icon } from "@/components/ui/icon";
 
 interface DropoffLocation {
   id: string;
@@ -109,11 +109,7 @@ export default function DropoffConfirmationPage() {
             <div className="text-center">
               <div className="flex justify-center mb-4">
                 <div className="bg-white rounded-full p-3">
-                  {React.createElement('span', {
-                    className: 'iconify lucide-icon',
-                    'data-icon': 'lucide:check-circle',
-                    style: { width: '32px', height: '32px', color: '#16a34a' }
-                  })}
+                  <Icon name="CircleCheck" size={32} className="text-green-600" />
                 </div>
               </div>
               <h1 className="text-2xl font-bold">Drop-off Location Confirmed!</h1>
@@ -129,11 +125,7 @@ export default function DropoffConfirmationPage() {
             <Card className="parcego-card parcego-card--success-confirmation">
               <CardHeader>
                 <CardTitle className="flex items-center space-x-2">
-                  {React.createElement('span', {
-                    className: 'iconify lucide-icon',
-                    'data-icon': 'lucide:package',
-                    style: { width: '20px', height: '20px', color: '#16a34a' }
-                  })}
+                  <Icon name="Package" size={20} className="text-green-600" />
                   <span>Drop-off Confirmed</span>
                 </CardTitle>
               </CardHeader>
@@ -201,11 +193,7 @@ export default function DropoffConfirmationPage() {
                 className="parcego-action-btn parcego-action-btn--track"
                 id="parcego-track-package-btn"
               >
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:package',
-                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-                })}
+                <Icon name="Package" size={16} className="mr-2" />
                 Track Your Package
               </Button>
               <Button
@@ -238,11 +226,7 @@ export default function DropoffConfirmationPage() {
                 id="parcego-dropoff-confirmation-back-btn"
                 className="parcego-nav__back-btn"
               >
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:arrow-left',
-                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-                })}
+                <Icon name="ArrowLeft" size={16} className="mr-2" />
                 Back to Locations
               </Button>
               <div className="h-6 border-l border-gray-300"></div>
@@ -259,11 +243,7 @@ export default function DropoffConfirmationPage() {
           <Card className="parcego-card parcego-card--selected-location">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:map-pin',
-                  style: { width: '20px', height: '20px', color: '#2563eb' }
-                })}
+                <Icon name="MapPin" size={20} className="text-blue-600" />
                 <span>Selected Drop-off Location</span>
               </CardTitle>
               <CardDescription>
@@ -284,20 +264,12 @@ export default function DropoffConfirmationPage() {
                       </span>
                       {selectedLocation.isOpen ? (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                          {React.createElement('span', {
-                            className: 'iconify lucide-icon',
-                            'data-icon': 'lucide:check-circle',
-                            style: { width: '12px', height: '12px', marginRight: '4px', color: 'currentColor' }
-                          })}
+                          <Icon name="CircleCheck" size={12} className="mr-1" />
                           Open Now
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">
-                          {React.createElement('span', {
-                            className: 'iconify lucide-icon',
-                            'data-icon': 'lucide:clock',
-                            style: { width: '12px', height: '12px', marginRight: '4px', color: 'currentColor' }
-                          })}
+                          <Icon name="Clock" size={12} className="mr-1" />
                           Closed
                         </span>
                       )}
@@ -309,11 +281,7 @@ export default function DropoffConfirmationPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-4">
                     <div className="flex items-start space-x-3">
-                      {React.createElement('span', {
-                        className: 'iconify lucide-icon',
-                        'data-icon': 'lucide:map-pin',
-                        style: { width: '20px', height: '20px', marginTop: '2px', color: '#9ca3af' }
-                      })}
+                      <Icon name="MapPin" size={20} className="mt-0.5 text-gray-400" />
                       <div>
                         <p className="font-medium text-gray-900">Address</p>
                         <p className="text-gray-600">{selectedLocation.address}</p>
@@ -324,11 +292,7 @@ export default function DropoffConfirmationPage() {
                     </div>
 
                     <div className="flex items-start space-x-3">
-                      {React.createElement('span', {
-                        className: 'iconify lucide-icon',
-                        'data-icon': 'lucide:phone',
-                        style: { width: '20px', height: '20px', marginTop: '2px', color: '#9ca3af' }
-                      })}
+                      <Icon name="Phone" size={20} className="mt-0.5 text-gray-400" />
                       <div>
                         <p className="font-medium text-gray-900">Phone</p>
                         <p className="text-gray-600">{selectedLocation.phone}</p>
@@ -338,11 +302,7 @@ export default function DropoffConfirmationPage() {
 
                   <div className="space-y-4">
                     <div className="flex items-start space-x-3">
-                      {React.createElement('span', {
-                        className: 'iconify lucide-icon',
-                        'data-icon': 'lucide:clock',
-                        style: { width: '20px', height: '20px', marginTop: '2px', color: '#9ca3af' }
-                      })}
+                      <Icon name="Clock" size={20} className="mt-0.5 text-gray-400" />
                       <div>
                         <p className="font-medium text-gray-900">Hours</p>
                         <p className="text-gray-600">
@@ -353,11 +313,7 @@ export default function DropoffConfirmationPage() {
                     </div>
 
                     <div className="flex items-start space-x-3">
-                      {React.createElement('span', {
-                        className: 'iconify lucide-icon',
-                        'data-icon': 'lucide:star',
-                        style: { width: '20px', height: '20px', marginTop: '2px', color: '#eab308' }
-                      })}
+                      <Icon name="Star" size={20} className="mt-0.5 text-yellow-500" />
                       <div>
                         <p className="font-medium text-gray-900">Rating</p>
                         <p className="text-gray-600">{selectedLocation.rating} out of 5 stars</p>
@@ -388,11 +344,7 @@ export default function DropoffConfirmationPage() {
           <Card className="parcego-card parcego-card--shipment-info">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:package',
-                  style: { width: '20px', height: '20px', color: '#16a34a' }
-                })}
+                <Icon name="Package" size={20} className="text-green-600" />
                 <span>Your Shipment</span>
               </CardTitle>
             </CardHeader>
@@ -421,11 +373,7 @@ export default function DropoffConfirmationPage() {
             <Card className="parcego-card parcego-card--warning border-orange-200 bg-orange-50">
               <CardContent className="p-4">
                 <div className="flex items-start space-x-3">
-                  {React.createElement('span', {
-                    className: 'iconify lucide-icon',
-                    'data-icon': 'lucide:alert-circle',
-                    style: { width: '20px', height: '20px', marginTop: '2px', color: '#ea580c' }
-                  })}
+                  <Icon name="AlertCircle" size={20} className="mt-0.5 text-orange-600" />
                   <div>
                     <h4 className="font-medium text-orange-800">Location Currently Closed</h4>
                     <p className="text-sm text-orange-700 mt-1">
@@ -447,11 +395,7 @@ export default function DropoffConfirmationPage() {
               className="parcego-action-btn parcego-action-btn--back order-2 sm:order-1"
               id="parcego-back-to-finder-btn"
             >
-              {React.createElement('span', {
-                className: 'iconify lucide-icon',
-                'data-icon': 'lucide:arrow-left',
-                style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-              })}
+              <Icon name="ArrowLeft" size={16} className="mr-2" />
               Choose Different Location
             </Button>
 
@@ -461,11 +405,7 @@ export default function DropoffConfirmationPage() {
                 className="parcego-action-btn parcego-action-btn--directions"
                 id="parcego-get-directions-btn"
               >
-                {React.createElement('span', {
-                  className: 'iconify lucide-icon',
-                  'data-icon': 'lucide:navigation',
-                  style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-                })}
+                <Icon name="Navigation" size={16} className="mr-2" />
                 Get Directions
               </Button>
               
@@ -482,11 +422,7 @@ export default function DropoffConfirmationPage() {
                   </div>
                 ) : (
                   <>
-                    {React.createElement('span', {
-                      className: 'iconify lucide-icon',
-                      'data-icon': 'lucide:check-circle',
-                      style: { width: '16px', height: '16px', marginRight: '8px', color: 'currentColor' }
-                    })}
+                    <Icon name="CircleCheck" size={16} className="mr-2" />
                     Confirm Drop-off Location
                   </>
                 )}
