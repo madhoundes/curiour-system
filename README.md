@@ -73,6 +73,18 @@ This platform enables merchants to create shipments, generate labels, and track 
 - **Build Stability**: Resolved all Next.js prerender errors and compilation issues
 - **Production Ready**: Complete codebase now builds successfully with zero errors
 
+### ✅ **Phase 7: Courier Package Scanning (COMPLETED)**
+- **Real Barcode/QR Scanning**: Integrated `@zxing/browser` library for actual barcode detection from camera feed
+- **Improved UX Design**: Simplified one-button workflow based on package status
+  - `Pending` → "Confirm Pickup" button
+  - `Picked Up` → "Start Delivery" button  
+  - `In Transit` → "Complete Delivery (Proof)" button
+  - `Delivered` → No buttons, completion state
+- **Hydration Fixes**: Resolved SSR/client timestamp mismatches and iOS auto-linking issues
+- **Enhanced Error Handling**: Comprehensive camera permission management and user guidance
+- **Resource Management**: Proper cleanup of camera streams and barcode detection resources
+- **Mobile Optimization**: Designed for courier field use with clear visual feedback
+
 ### 🎯 Mission
 Deliver a scalable, affordable, and transparent courier platform for small businesses, with seamless merchant experience, robust tracking, and operational efficiency.
 
@@ -105,6 +117,12 @@ Deliver a scalable, affordable, and transparent courier platform for small busin
 - **Validation**: Zod
 - **Rate Limiting**: express-rate-limit + Redis
 - **CORS**: Secure configuration
+
+### Barcode Scanning
+- **Library**: @zxing/browser for WebAssembly-based barcode detection
+- **Formats**: QR codes, Code 128, Code 39, EAN-13, UPC-A, and more
+- **Camera**: Rear-facing camera preference with permission handling
+- **Fallback**: Manual tracking number input for accessibility
 
 ### Mobile (Courier App)
 - **Framework**: React Native (Expo)
@@ -374,8 +392,8 @@ For support, email support@ashrafproject.com or join our Slack channel.
 - [ ] Integration with more e-commerce platforms
 - [ ] White-label solutions
 
-## 🎯 **Current Branch: `Proof-of-Delivery`**
-This branch contains the latest hydration fixes and accessibility improvements for Proof of Delivery, plus deterministic tracking generation in drop-off confirmation.
+## 🎯 **Current Branch: `Courier-Package-scan`**
+This branch contains the latest courier scanning improvements with real barcode detection, simplified UX, and hydration fixes for production deployment.
 
 ### 🌳 **Branch Structure:**
 - **`main`**: Production-ready releases
@@ -384,7 +402,8 @@ This branch contains the latest hydration fixes and accessibility improvements f
 - **`drop-off-system`**: Phase 2b - Drop-off location finder
 - **`courier-dashboard`**: Phase 3 - Courier app UI
 - **`super-admin-dashboard`**: Phase 4 - Super Admin UI
-- **`Proof-of-Delivery`**: Proof of Delivery fixes and improvements (current)
+- **`Proof-of-Delivery`**: Proof of Delivery fixes and improvements
+- **`Courier-Package-scan`**: Real barcode scanning and UX improvements (current)
 
 ---
 

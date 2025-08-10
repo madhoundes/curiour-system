@@ -1,0 +1,113 @@
+# Courier Scan Package Page – UI Implementation Rule
+
+## Objective
+
+Build the Courier Scan Package Page (`/courier/scan`) for the Ashraf Courier Business Platform.  
+**Purpose:** Provide a seamless, accessible interface for couriers to scan package barcodes/QR codes, view package details, update status, and capture GPS location.
+
+---
+
+## 1. Technology & Design System
+
+- **Framework:** Next.js 14+ (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS only
+- **UI Components:** shadcn/ui (https://ui.shadcn.com/)
+- **State Management:** Zustand (if needed)
+- **Transitions:** Use premium, subtle transitions as per premium-transitions-and-effects.mdc
+- **Accessibility:** All UI must be accessible (ARIA, keyboard navigation, color contrast)
+- **Naming & Scoping:** All IDs and classes must follow the [Naming & Scoping Rules](./naming-and-scoping.mdc) (`parcego-` prefix for IDs, `parcego-` BEM/SMACSS for classes).
+
+---
+
+## 2. Scope & Requirements
+
+### Core Features
+
+- **Camera Viewfinder Overlay**
+  - Live camera preview for barcode/QR scanning (mobile-first, fallback to file upload on desktop)
+  - Overlay with scan area highlight
+  - Accessible controls for starting/stopping scan
+  - All elements must have unique IDs (e.g., `parcego-scan-viewfinder`, `parcego-scan-start-btn`)
+
+- **Manual Tracking Number Input Fallback**
+  - Input field for manual entry if scan fails
+  - Accessible label, clear button, and submit button
+  - Unique IDs (e.g., `parcego-scan-manual-input`, `parcego-scan-submit-btn`)
+
+- **Package Details Display**
+  - Show package info after successful scan/input (mock data)
+  - Card layout with tracking number, recipient, address, status
+  - Unique IDs (e.g., `parcego-scan-package-card`, `parcego-scan-package-status-badge`)
+
+- **Status Update Buttons**
+  - Prominent buttons for "Pickup", "In Transit", "Delivered"
+  - Use shadcn/ui Button, with unique IDs (e.g., `parcego-scan-status-pickup-btn`)
+  - Visual feedback for current status
+
+- **GPS Location Capture**
+  - Display current GPS coordinates/address (mocked)
+  - Button to refresh location, with unique ID (e.g., `parcego-scan-gps-refresh-btn`)
+  - Show error if location unavailable
+
+---
+
+## 3. Navigation
+
+- Use Next.js App Router for navigation.
+- All navigation and state changes handled client-side (no server calls).
+
+---
+
+## 4. Data & Logic
+
+- All data is static, mocked, or placeholder.
+- No API calls, no backend logic, no authentication.
+- Use mock data for package details and status updates.
+
+---
+
+## 5. Code Quality & Structure
+
+- Use TypeScript everywhere.
+- Functional components only.
+- Early returns, no dead code, no TODOs.
+- Descriptive naming and clear structure.
+- All forms, buttons, and flows must be visually complete and accessible.
+- **IDs:** All HTML IDs must be globally unique and follow the format:  
+  `parcego-[component]-[purpose]-[unique-identifier]`
+- **Classes:** All classes must be BEM/SMACSS, prefixed:  
+  `parcego-block__element--modifier`
+
+---
+
+## 6. Deliverables
+
+- `/courier/scan` page and all required UI components.
+- Fully navigable UI demo (no backend).
+- README update with instructions for running the frontend demo.
+
+---
+
+## 7. Enforcement
+
+- Code reviews must verify adherence to this rule file and referenced standards.
+- Any deviation must be documented and approved by project lead.
+
+---
+
+## 8. Example Naming
+
+```jsx
+<div id="parcego-scan-viewfinder" className="parcego-scan__viewfinder">
+  <button id="parcego-scan-start-btn" className="parcego-scan__btn--start">Start Scan</button>
+</div>
+<input id="parcego-scan-manual-input" className="parcego-scan__input" />
+```
+
+---
+
+**Goal:**  
+Deliver a pixel-perfect, accessible, and modern Courier Scan Package UI, ready for future backend/API integration.
+
+---

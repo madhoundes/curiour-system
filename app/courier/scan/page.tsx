@@ -1,329 +1,711 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Icon } from "@/components/ui/icon";
 
-const mockPackageData = {
-  trackingNumber: "PCG789123456",
+interface PackageData {
+  trackingNumber: string;
+  customerName: string;
+  address: string;
+  packageType: string;
+  weight: string;
+  destination: string;
+  currentStatus: "pending" | "picked_up" | "in_transit" | "delivered";
+  estimatedDelivery: string;
+}
+
+interface LocationData {
+  latitude: number;
+  longitude: number;
+  address: string;
+  timestamp: string;
+}
+
+// Mock package data
+const mockPackageData: PackageData = {
+  trackingNumber: "PCG-2025-ABC123",
   customerName: "Sarah Johnson",
-  address: "123 Main Street, Downtown",
-  packageType: "Standard",
+  address: "123 Main Street, Downtown District, NY 10001",
+  packageType: "Express Delivery",
   weight: "2.5 kg",
-  specialInstructions: "Call upon arrival"
+  destination: "456 Oak Avenue, Brooklyn, NY 11201",
+  currentStatus: "pending",
+  estimatedDelivery: "Today, 4:00 PM"
 };
 
-export default function ScanPackage() {
-  const router = useRouter();
-  const [scannedCode, setScannedCode] = useState("");
-  const [isScanning, setIsScanning] = useState(false);
-  const [scanResult, setScanResult] = useState<"success" | "error" | null>(null);
-  const [manualEntry, setManualEntry] = useState("");
+// Mock location data
+const mockLocationData: LocationData = {
+  latitude: 40.7128,
+  longitude: -74.0060,
+  address: "Manhattan, New York, NY 10001",
+  // Leave empty to avoid SSR/client hydration mismatch; will be set on mount
+  timestamp: ""
+};
 
-  const handleScan = () => {
-    setIsScanning(true);
-    // Simulate camera scanning
-    setTimeout(() => {
-      setIsScanning(false);
-      setScannedCode(mockPackageData.trackingNumber);
-      setScanResult("success");
-    }, 2000);
+export default function CourierScanPackagePage() {
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  // ZXing controls/readers (dynamic import)
+  const zxingReaderRef = useRef<any>(null);
+  const zxingControlsRef = useRef<any>(null);
+  
+  // State management
+  const [isScanning, setIsScanning] = useState(false);
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [manualInput, setManualInput] = useState("");
+  const [scannedPackage, setScannedPackage] = useState<PackageData | null>(null);
+  const [currentLocation, setCurrentLocation] = useState<LocationData>(mockLocationData);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [scanError, setScanError] = useState("");
+  const [locationError, setLocationError] = useState("");
+
+  // Initialize location on mount
+  useEffect(() => {
+    handleRefreshLocation();
+  }, []);
+
+  const handleBackToCourier = () => {
+    if (isCameraActive) {
+      stopCamera();
+    }
+    router.push('/courier');
   };
 
-  const handleManualEntry = () => {
-    if (manualEntry === mockPackageData.trackingNumber) {
-      setScannedCode(manualEntry);
-      setScanResult("success");
-    } else {
-      setScanResult("error");
+  const handleStartScan = async () => {
+    try {
+      setScanError("");
+      setIsScanning(true);
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        throw new Error("getUserMedia is not supported in this browser");
+      }
+
+      // Dynamically load @zxing/browser to avoid SSR issues
+      const ZXing = await import("@zxing/browser");
+
+      // Create a multi-format reader (QR + 1D barcodes)
+      zxingReaderRef.current = new ZXing.BrowserMultiFormatReader();
+
+      // Try to pick a rear/environment camera when available
+      const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
+      let selectedDeviceId: string | undefined = undefined;
+      if (devices && devices.length > 0) {
+        const rear = devices.find((d: MediaDeviceInfo) => /back|rear|environment/i.test(d.label));
+        selectedDeviceId = (rear || devices[devices.length - 1]).deviceId;
+      }
+
+      // Start decoding from the chosen device into our <video> element
+      zxingControlsRef.current = await zxingReaderRef.current.decodeFromVideoDevice(
+        selectedDeviceId,
+        videoRef.current!,
+        (result: any, error: any, controls: any) => {
+          if (result) {
+            const text = typeof result.getText === "function" ? result.getText() : result.text;
+            handleScanSuccess(text);
+            // Stop immediately after a successful detection
+            try { controls.stop(); } catch {}
+          }
+          // Ignore NotFound errors which occur on frames without codes
+          if (error && error.name && error.name !== "NotFoundException") {
+            // Non-fatal scanning error; surface as a hint without breaking the flow
+            // setScanError("Scanning issue detected. Try to steady the camera or improve lighting.");
+          }
+        }
+      );
+
+      // Mark as active once stream is attached to video
+      setIsCameraActive(true);
+      setIsScanning(false);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "Camera access denied or unavailable";
+      setScanError(
+        `${message}. Please allow camera permissions when prompted. If the camera does not open, check browser/site settings to enable camera access, ensure you're using HTTPS (or localhost), or use manual input below.`
+      );
+      setIsScanning(false);
     }
   };
 
-  const handleConfirmPickup = () => {
-    // Navigate to route page after successful scan
-    router.push('/courier/route');
+  const stopCamera = () => {
+    // Stop ZXing decoding
+    try {
+      if (zxingControlsRef.current) {
+        zxingControlsRef.current.stop();
+      }
+    } catch {}
+    zxingControlsRef.current = null;
+    try {
+      if (zxingReaderRef.current && typeof zxingReaderRef.current.reset === "function") {
+        zxingReaderRef.current.reset();
+      }
+    } catch {}
+    zxingReaderRef.current = null;
+
+    // Stop any active MediaStream tracks
+    const attached = (videoRef.current?.srcObject ?? null) as MediaStream | null;
+    const stream = attached || mediaStreamRef.current;
+    if (stream) {
+      try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+    }
+    mediaStreamRef.current = null;
+    if (videoRef.current) {
+      try { (videoRef.current as HTMLVideoElement).srcObject = null; } catch {}
+    }
+    setIsCameraActive(false);
+    setIsScanning(false);
   };
 
-  const handleGoBack = () => {
-    router.back();
+  const handleScanSuccess = (trackingNumber: string) => {
+    stopCamera();
+    setScannedPackage(mockPackageData);
+    setManualInput(trackingNumber);
   };
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      try { stopCamera(); } catch {}
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleManualSubmit = () => {
+    if (!manualInput.trim()) {
+      setScanError("Please enter a tracking number");
+      return;
+    }
+    
+    setScanError("");
+    setScannedPackage(mockPackageData);
+  };
+
+  const handleClearInput = () => {
+    setManualInput("");
+    setScanError("");
+  };
+
+  const handleStatusUpdate = (newStatus: PackageData["currentStatus"]) => {
+    if (!scannedPackage) return;
+    
+    setIsUpdatingStatus(true);
+    
+    // Mock status update
+    setTimeout(() => {
+      setScannedPackage({
+        ...scannedPackage,
+        currentStatus: newStatus
+      });
+      setIsUpdatingStatus(false);
+    }, 1500);
+  };
+
+  const handleRefreshLocation = () => {
+    setLocationError("");
+    
+    // Mock GPS refresh
+    setTimeout(() => {
+      setCurrentLocation({
+        ...mockLocationData,
+        timestamp: new Date().toLocaleString()
+      });
+    }, 1000);
+  };
+
+  const getStatusColor = (status: PackageData["currentStatus"]) => {
+    const statusConfig = {
+      pending: "bg-yellow-100 text-yellow-800",
+      picked_up: "bg-blue-100 text-blue-800",
+      in_transit: "bg-purple-100 text-purple-800",
+      delivered: "bg-green-100 text-green-800"
+    };
+    return statusConfig[status];
+  };
+
+  const getStatusText = (status: PackageData["currentStatus"]) => {
+    const statusText = {
+      pending: "Pending Pickup",
+      picked_up: "Picked Up",
+      in_transit: "In Transit",
+      delivered: "Delivered"
+    };
+    return statusText[status];
+  };
+
+  // Cleanup stream on unmount
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, []);
 
   return (
-    <div 
-      className="min-h-screen bg-gray-50"
-      id="parcego-scan-package-container"
-    >
+    <div className="min-h-screen bg-gray-50" id="parcego-scan-container">
       {/* Header */}
-      <div 
-        className="bg-white shadow-sm border-b px-4 py-4"
-        id="parcego-scan-header"
-      >
-        <div className="flex items-center space-x-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={handleGoBack}
-            className="parcego-header__back-btn"
-            id="parcego-scan-back-btn"
-          >
-            <Icon name="ArrowLeft" size={20} />
-          </Button>
-          <h1 
-            className="text-xl font-semibold"
-            id="parcego-scan-title"
-          >
-            Scan Package
-          </h1>
+      <div className="bg-white shadow-sm border-b sticky top-0 z-10" id="parcego-scan-header">
+        <div className="max-w-md mx-auto px-4 py-3">
+          <div className="flex items-center justify-between">
+            <Button 
+              variant="ghost" 
+              size="sm"
+              onClick={handleBackToCourier}
+              id="parcego-scan-back-btn"
+              className="parcego-scan__btn--back"
+              aria-label="Go back to courier dashboard"
+            >
+              <Icon name="ArrowLeft" size={20} className="mr-2" />
+              Back
+            </Button>
+            <h1 className="text-lg font-semibold">Scan Package</h1>
+            <div className="w-16"></div>
+          </div>
         </div>
       </div>
 
-      <div 
-        className="p-4 space-y-6"
-        id="parcego-scan-content"
-      >
-        {/* Scanner Interface */}
-        <Card 
-          className="parcego-scanner-card"
-          id="parcego-scanner-interface"
-        >
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Icon name="QrCode" size={20} />
-              <span>Barcode Scanner</span>
+      <div className="max-w-md mx-auto p-4 space-y-4">
+        
+        {/* Camera Viewfinder Section */}
+        <Card id="parcego-scan-camera-card" className="parcego-scan__camera-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center">
+              <Icon name="Camera" size={20} className="mr-2" />
+              Scan Barcode/QR Code
             </CardTitle>
+            <CardDescription>
+              Point your camera at the package barcode or QR code
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            {!isScanning && !scanResult && (
-              <div 
-                className="bg-gray-100 rounded-lg p-8 text-center"
-                id="parcego-scanner-placeholder"
-              >
-                <Icon name="Camera" size={64} className="mx-auto mb-4 text-gray-400" />
-                <p className="text-gray-600 mb-4">
-                  Position the package barcode within the frame
-                </p>
-                <Button
-                  onClick={handleScan}
-                  className="parcego-action-btn parcego-action-btn--scan"
-                  id="parcego-start-scan-btn"
-                >
-                  <Icon name="Camera" size={16} className="mr-2" />
-                  Start Scanning
-                </Button>
-              </div>
-            )}
-
-            {isScanning && (
-              <div 
-                className="bg-blue-50 rounded-lg p-8 text-center"
-                id="parcego-scanning-active"
-              >
-                <div className="animate-pulse">
-                  <Icon name="QrCode" size={64} className="mx-auto mb-4 text-blue-600" />
-                </div>
-                <p className="text-blue-600 mb-2">Scanning...</p>
-                <p className="text-sm text-gray-600">
-                  Hold steady and ensure the barcode is clearly visible
-                </p>
-              </div>
-            )}
-
-            {scanResult === "success" && (
-              <div 
-                className="bg-green-50 rounded-lg p-6 text-center"
-                id="parcego-scan-success"
-              >
-                <Icon name="CheckCircle" size={48} className="mx-auto mb-3 text-green-600" />
-                <p className="text-green-700 font-medium mb-2">Scan Successful!</p>
-                <p className="text-sm text-gray-600 mb-4">
-                  Package verified: {scannedCode}
-                </p>
-              </div>
-            )}
-
-            {scanResult === "error" && (
-              <div 
-                className="bg-red-50 rounded-lg p-6 text-center"
-                id="parcego-scan-error"
-              >
-                <Icon name="AlertCircle" size={48} className="mx-auto mb-3 text-red-600" />
-                <p className="text-red-700 font-medium mb-2">Scan Failed</p>
-                <p className="text-sm text-gray-600 mb-4">
-                  Package not found or invalid barcode
-                </p>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setScanResult(null);
-                    setScannedCode("");
-                    setManualEntry("");
-                  }}
-                  className="parcego-action-btn parcego-action-btn--retry"
-                  id="parcego-retry-scan-btn"
-                >
-                  Try Again
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Manual Entry */}
-        <Card 
-          className="parcego-manual-entry-card"
-          id="parcego-manual-entry"
-        >
-          <CardHeader>
-            <CardTitle className="text-lg">Manual Entry</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <Label 
-                htmlFor="manual-tracking"
-                className="parcego-label"
-                id="parcego-manual-tracking-label"
-              >
-                Tracking Number
-              </Label>
-              <Input
-                id="manual-tracking"
-                placeholder="Enter tracking number manually"
-                value={manualEntry}
-                onChange={(e) => setManualEntry(e.target.value)}
-                className="parcego-input parcego-input--tracking"
-              />
-            </div>
-            <Button
-              onClick={handleManualEntry}
-              variant="outline"
-              className="w-full parcego-action-btn parcego-action-btn--manual"
-              id="parcego-manual-submit-btn"
-              disabled={!manualEntry.trim()}
-            >
-              Verify Package
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Package Details (shown after successful scan) */}
-        {scanResult === "success" && (
-          <Card 
-            className="parcego-package-details-card"
-            id="parcego-package-details"
-          >
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Icon name="Package" size={20} />
-                <span>Package Details</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-3">
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Customer</Label>
-                  <p 
-                    className="text-gray-900"
-                    id="parcego-package-customer"
-                  >
-                    {mockPackageData.customerName}
-                  </p>
-                </div>
-                
-                <div>
-                  <Label className="text-sm font-medium text-gray-700">Delivery Address</Label>
-                  <p 
-                    className="text-gray-900 flex items-center"
-                    id="parcego-package-address"
-                  >
-                    <Icon name="MapPin" size={16} className="mr-1 text-gray-500" />
-                    {mockPackageData.address}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Package Type</Label>
-                    <p 
-                      className="text-gray-900"
-                      id="parcego-package-type"
-                    >
-                      {mockPackageData.packageType}
-                    </p>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Weight</Label>
-                    <p 
-                      className="text-gray-900"
-                      id="parcego-package-weight"
-                    >
-                      {mockPackageData.weight}
-                    </p>
-                  </div>
-                </div>
-
-                {mockPackageData.specialInstructions && (
-                  <div>
-                    <Label className="text-sm font-medium text-gray-700">Special Instructions</Label>
-                    <div 
-                      className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-1"
-                      id="parcego-package-instructions"
-                    >
-                      <p className="text-yellow-800 text-sm flex items-center">
-                        <Icon name="AlertCircle" size={16} className="mr-2" />
-                        {mockPackageData.specialInstructions}
-                      </p>
+          <CardContent>
+            <div className="relative bg-black rounded-lg overflow-hidden mb-4" id="parcego-scan-viewfinder">
+              {isCameraActive ? (
+                <div className="parcego-scan__viewfinder parcego-scan__viewfinder--active">
+                  <video
+                    ref={videoRef}
+                    className="w-full h-48 object-cover"
+                    autoPlay
+                    playsInline
+                    muted
+                    id="parcego-scan-video"
+                  />
+                  {/* Scan overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="parcego-scan__overlay">
+                      <div className="w-48 h-32 border-2 border-white border-dashed rounded-lg flex items-center justify-center">
+                        <div className="text-white text-center">
+                          <Icon name="Scan" size={32} className="mx-auto mb-2 animate-pulse" />
+                          <p className="text-sm">Scanning...</p>
+                        </div>
+                      </div>
                     </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="parcego-scan__viewfinder parcego-scan__viewfinder--inactive h-48 flex items-center justify-center bg-gray-800">
+                  <div className="text-center text-gray-300">
+                    <Icon name="Camera" size={48} className="mx-auto mb-3" />
+                    <p className="text-sm">Tap 'Start Scan' to activate camera</p>
+                    <p className="text-xs mt-1 px-4">Allow camera access when prompted</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Camera Instructions */}
+            {!isCameraActive && !isScanning && (
+              <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg" id="parcego-scan-instructions">
+                <div className="flex items-start space-x-2">
+                  <Icon name="Info" size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-blue-800">
+                    <p className="font-medium mb-1">Camera Setup Instructions:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-xs">
+                      <li>Tap 'Start Scan' to activate your device's camera</li>
+                      <li>If prompted, please allow camera access</li>
+                      <li>If camera doesn't open, check browser settings for camera permissions</li>
+                      <li>Try refreshing the page if issues persist</li>
+                    </ol>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="flex space-x-2">
+              {!isCameraActive ? (
+                <Button
+                  className="flex-1 h-12"
+                  onClick={handleStartScan}
+                  disabled={isScanning}
+                  id="parcego-scan-start-btn"
+                  className="parcego-scan__btn--start"
+                >
+                  {isScanning ? (
+                    <>
+                      <Icon name="Loader2" size={20} className="mr-2 animate-spin" />
+                      Starting Camera...
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="Camera" size={20} className="mr-2" />
+                      Start Scan
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  variant="destructive"
+                  className="flex-1 h-12"
+                  onClick={stopCamera}
+                  id="parcego-scan-stop-btn"
+                  className="parcego-scan__btn--stop"
+                >
+                  <Icon name="Square" size={20} className="mr-2" />
+                  Stop Scan
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Manual Input Fallback */}
+        <Card id="parcego-scan-manual-card" className="parcego-scan__manual-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center">
+              <Icon name="Edit3" size={20} className="mr-2" />
+              Manual Entry
+            </CardTitle>
+            <CardDescription>
+              Enter tracking number manually if scan doesn't work
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div>
+                <Label htmlFor="parcego-scan-manual-input" className="parcego-scan__label">
+                  Tracking Number
+                </Label>
+                <div className="flex space-x-2 mt-1">
+                  <Input
+                    id="parcego-scan-manual-input"
+                    className="parcego-scan__input"
+                    placeholder="Enter tracking number (e.g., PCG-2025-ABC123)"
+                    value={manualInput}
+                    onChange={(e) => setManualInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
+                  />
+                  {manualInput && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handleClearInput}
+                      id="parcego-scan-clear-btn"
+                      className="parcego-scan__btn--clear"
+                      aria-label="Clear input"
+                    >
+                      <Icon name="X" size={16} />
+                    </Button>
+                  )}
+                </div>
+              </div>
+              
+              <Button
+                className="w-full h-10"
+                onClick={handleManualSubmit}
+                disabled={!manualInput.trim()}
+                id="parcego-scan-submit-btn"
+                className="parcego-scan__btn--submit"
+              >
+                <Icon name="Search" size={16} className="mr-2" />
+                Look Up Package
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Error Messages with Troubleshooting */}
+        {scanError && (
+          <Alert variant="destructive" id="parcego-scan-error-alert">
+            <Icon name="AlertCircle" size={16} />
+            <AlertDescription>
+              <div className="space-y-2">
+                <p>{scanError}</p>
+                {scanError.includes("Camera") && (
+                  <div className="text-sm">
+                    <p className="font-medium">Troubleshooting steps:</p>
+                    <ul className="list-disc list-inside mt-1 space-y-1">
+                      <li>Refresh the page and try again</li>
+                      <li>Check if another app is using your camera</li>
+                      <li>Ensure you're using HTTPS (camera requires secure connection)</li>
+                      <li>Try using the manual input below as an alternative</li>
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Package Details Display */}
+        {scannedPackage && (
+          <>
+            <Card id="parcego-scan-package-card" className="parcego-scan__package-card">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center justify-between">
+                  <span className="flex items-center">
+                    <Icon name="Package" size={20} className="mr-2" />
+                    Package Details
+                  </span>
+                  <Badge 
+                    className={`parcego-scan__status-badge ${getStatusColor(scannedPackage.currentStatus)}`}
+                    id="parcego-scan-package-status-badge"
+                  >
+                    {getStatusText(scannedPackage.currentStatus)}
+                  </Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="parcego-scan__package-info">
+                  <div className="flex items-start space-x-3">
+                    <Icon name="Hash" size={16} className="text-gray-500 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Tracking Number</p>
+                      <p className="text-sm text-gray-600">{scannedPackage.trackingNumber}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start space-x-3">
+                    <Icon name="User" size={16} className="text-gray-500 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Customer</p>
+                      <p className="text-sm text-gray-600">{scannedPackage.customerName}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start space-x-3">
+                    <Icon name="MapPin" size={16} className="text-gray-500 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Delivery Address</p>
+                      <p className="text-sm text-gray-600">{scannedPackage.address}</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start space-x-3">
+                    <Icon name="Clock" size={16} className="text-gray-500 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium">Estimated Delivery</p>
+                      <p className="text-sm text-gray-600">{scannedPackage.estimatedDelivery}</p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Simplified Next Action - One Primary Button */}
+            <Card id="parcego-scan-status-card" className="parcego-scan__status-card">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base flex items-center">
+                  <Icon name="ArrowRight" size={20} className="mr-2" />
+                  Next Action
+                </CardTitle>
+                <CardDescription>
+                  Complete the next step for this package
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                {scannedPackage.currentStatus !== "delivered" && (
+                  <div className="space-y-3">
+                    {/* Primary Action Button */}
+                    {scannedPackage.currentStatus === "pending" && (
+                      <Button
+                        className="w-full h-14 text-lg font-semibold parcego-scan__primary-action"
+                        onClick={() => handleStatusUpdate("picked_up")}
+                        disabled={isUpdatingStatus}
+                        id="parcego-scan-confirm-pickup-btn"
+                      >
+                        <Icon name="PackageCheck" size={24} className="mr-3" />
+                        Confirm Pickup
+                      </Button>
+                    )}
+                    
+                    {scannedPackage.currentStatus === "picked_up" && (
+                      <Button
+                        className="w-full h-14 text-lg font-semibold parcego-scan__primary-action"
+                        onClick={() => handleStatusUpdate("in_transit")}
+                        disabled={isUpdatingStatus}
+                        id="parcego-scan-start-delivery-btn"
+                      >
+                        <Icon name="Truck" size={24} className="mr-3" />
+                        Start Delivery
+                      </Button>
+                    )}
+                    
+                    {scannedPackage.currentStatus === "in_transit" && (
+                      <Button
+                        className="w-full h-14 text-lg font-semibold parcego-scan__primary-action"
+                        onClick={() => router.push('/courier/proof')}
+                        disabled={isUpdatingStatus}
+                        id="parcego-scan-complete-delivery-btn"
+                      >
+                        <Icon name="Camera" size={24} className="mr-3" />
+                        Complete Delivery (Proof)
+                      </Button>
+                    )}
+
+                    {/* Status Updating Indicator */}
+                    {isUpdatingStatus && (
+                      <div className="flex items-center justify-center text-sm text-gray-600 py-2">
+                        <Icon name="Loader2" size={16} className="mr-2 animate-spin" />
+                        Updating status...
+                      </div>
+                    )}
+
+                    {/* Secondary Quick Actions - Smaller, Less Prominent */}
+                    {scannedPackage.currentStatus !== "delivered" && (
+                      <details className="mt-4">
+                        <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-700 transition-colors">
+                          Manual Status Override
+                        </summary>
+                        <div className="mt-3 grid grid-cols-2 gap-2">
+                          {scannedPackage.currentStatus !== "picked_up" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-10 text-xs"
+                              onClick={() => handleStatusUpdate("picked_up")}
+                              disabled={isUpdatingStatus}
+                              id="parcego-scan-manual-pickup-btn"
+                            >
+                              <Icon name="PackageCheck" size={14} className="mr-1" />
+                              Pickup
+                            </Button>
+                          )}
+                          
+                          {scannedPackage.currentStatus !== "in_transit" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-10 text-xs"
+                              onClick={() => handleStatusUpdate("in_transit")}
+                              disabled={isUpdatingStatus}
+                              id="parcego-scan-manual-transit-btn"
+                            >
+                              <Icon name="Truck" size={14} className="mr-1" />
+                              In Transit
+                            </Button>
+                          )}
+                        </div>
+                      </details>
+                    )}
                   </div>
                 )}
 
-                <div 
-                  className="bg-green-50 border border-green-200 rounded-lg p-3"
-                  id="parcego-pickup-status"
-                >
-                  <div className="flex items-center">
-                    <Icon name="CheckCircle" size={20} className="mr-2 text-green-600" />
-                    <div>
-                      <p className="text-green-800 font-medium">Ready for Pickup</p>
-                      <p className="text-green-700 text-sm">Package verified and ready for delivery</p>
-                    </div>
+                {/* Delivered State - Show Completion */}
+                {scannedPackage.currentStatus === "delivered" && (
+                  <div className="text-center py-6">
+                    <Icon name="CheckCircle" size={48} className="mx-auto mb-3 text-green-500" />
+                    <h3 className="text-lg font-semibold text-green-700 mb-2">Package Delivered</h3>
+                    <p className="text-sm text-gray-600">This package has been successfully delivered</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </>
+        )}
+
+        {/* GPS Location */}
+        <Card id="parcego-scan-location-card" className="parcego-scan__location-card">
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center">
+              <Icon name="MapPin" size={20} className="mr-2" />
+              Current Location
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <div className="parcego-scan__location-info">
+                <div className="flex items-start space-x-3">
+                  <Icon name="Navigation" size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Address</p>
+                    <p className="text-sm text-gray-600">{currentLocation.address}</p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-3">
+                  <Icon name="Clock" size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Last Updated</p>
+                    <p className="text-sm text-gray-600" suppressHydrationWarning>
+                      {currentLocation.timestamp || "—"}
+                    </p>
+                  </div>
+                </div>
+                
+                <div className="flex items-start space-x-3">
+                  <Icon name="Crosshair" size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Coordinates</p>
+                    <p className="text-sm text-gray-600">
+                      {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
+                    </p>
                   </div>
                 </div>
               </div>
 
               <Button
-                onClick={handleConfirmPickup}
-                className="w-full parcego-action-btn parcego-action-btn--confirm-pickup"
-                id="parcego-confirm-pickup-btn"
+                variant="outline"
+                className="w-full h-10"
+                onClick={handleRefreshLocation}
+                id="parcego-scan-gps-refresh-btn"
+                className="parcego-scan__btn--refresh-gps"
               >
-                <Icon name="CheckCircle" size={16} className="mr-2" />
-                Confirm Pickup & Start Route
+                <Icon name="RefreshCw" size={16} className="mr-2" />
+                Refresh Location
               </Button>
-            </CardContent>
-          </Card>
-        )}
 
-        {/* Help Text */}
-        <Card 
-          className="parcego-help-card"
-          id="parcego-scan-help"
-        >
-          <CardContent className="p-4">
-            <div className="text-center space-y-2">
-              <p className="text-sm text-gray-600">
-                Need help? Ensure the barcode is clean and well-lit.
-              </p>
-              <p className="text-xs text-gray-500">
-                If scanning continues to fail, use manual entry or contact support.
-              </p>
+              {locationError && (
+                <Alert variant="destructive" id="parcego-scan-location-error">
+                  <Icon name="AlertCircle" size={16} />
+                  <AlertDescription>{locationError}</AlertDescription>
+                </Alert>
+              )}
             </div>
           </CardContent>
         </Card>
+
+        {/* Secondary Action - View Route */}
+        {scannedPackage && scannedPackage.currentStatus !== "delivered" && (
+          <div className="mt-4">
+            <Button
+              variant="outline"
+              className="w-full h-10"
+              onClick={() => router.push('/courier/route')}
+              id="parcego-scan-route-btn"
+              className="parcego-scan__btn--route"
+            >
+              <Icon name="Navigation" size={16} className="mr-2" />
+              View Route & Navigation
+            </Button>
+          </div>
+        )}
       </div>
+
+      {/* Hidden file input for fallback photo upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        id="parcego-scan-file-input"
+      />
     </div>
   );
 }

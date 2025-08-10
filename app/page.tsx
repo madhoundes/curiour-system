@@ -48,22 +48,21 @@ export default function MerchantLandingPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      <div className="container mx-auto px-4 py-16">
-        <div className="text-center mb-16">
-          <div className="flex items-center justify-center mb-6">
-                          <div className="bg-blue-600 rounded-lg p-3 mr-4">
-                <Icon name="Truck" size={32} className="text-white" />
-              </div>
-            <h1 className="text-4xl font-bold text-gray-900">
-              Parcego Courier Platform
-            </h1>
+      <div className="container mx-auto px-4 pt-4 pb-8">
+        <div className="text-center mb-8">
+          <div className="flex items-center justify-center mb-4">
+            <img 
+              src="/Logo/Master-logo.svg" 
+              alt="Curiour Logo" 
+              className="h-32 w-auto"
+            />
           </div>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
+          <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-6 hidden">
             The affordable, efficient, and transparent delivery solution for small businesses. 
             Create shipments, track deliveries, and grow your business with confidence.
           </p>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 hidden">
             <div className="bg-white rounded-lg p-6 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-250">
                               <div className="flex justify-center mb-4">
                   <Icon name="Package" size={48} className="text-blue-600" />
@@ -183,7 +182,7 @@ export default function MerchantLandingPage() {
           </Card>
         </div>
 
-        <div className="mt-16 text-center">
+        <div className="mt-8 text-center">
           <p className="text-sm text-gray-500 mb-4">Trusted by 1,000+ businesses worldwide</p>
           <div className="flex items-center justify-center space-x-8 text-gray-400">
             <div className="flex items-center space-x-2">
