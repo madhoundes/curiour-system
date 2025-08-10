@@ -120,3 +120,269 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Premium transitions and animations for route optimization */
+@layer components {
+  /* Transition Variables */
+  :root {
+    --transition-quick: 150ms;
+    --transition-normal: 250ms;
+    --transition-slow: 350ms;
+    --easing-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+    --easing-premium: cubic-bezier(0.165, 0.84, 0.44, 1);
+    
+    /* Enhanced icon spacing tokens */
+    --icon-spacing-tight: 8px;
+    --icon-spacing-normal: 12px;
+    --icon-spacing-loose: 16px;
+    --icon-spacing-xl: 20px;
+  }
+  
+  /* Enhanced Icon Sizing and Spacing */
+  .parcego-icon-enhanced {
+    min-width: 24px;
+    min-height: 24px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .parcego-icon-large {
+    min-width: 32px;
+    min-height: 32px;
+  }
+  
+  .parcego-icon-critical {
+    filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1));
+    font-weight: 600;
+  }
+  
+  /* Parcego Route Optimization Transitions */
+  .parcego-delivery-item {
+    transition: all var(--transition-normal) var(--easing-smooth);
+    padding: 20px;
+    margin-bottom: 16px;
+    border-radius: 12px;
+  }
+  
+  .parcego-delivery-item:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  }
+  
+  .parcego-action-btn {
+    transition: all var(--transition-quick) var(--easing-smooth);
+    padding: 12px 16px;
+    font-weight: 500;
+  }
+  
+  .parcego-action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  .parcego-action-btn:active {
+    transform: translateY(0) scale(0.98);
+  }
+  
+  /* Map and visual transitions */
+  .parcego-map-card {
+    transition: all var(--transition-normal) var(--easing-smooth);
+  }
+  
+  .parcego-map-card:hover {
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  }
+  
+    /* Enhanced delivery action buttons */
+  .parcego-delivery-action-btn {
+    transition: all var(--transition-quick) var(--easing-smooth);
+    padding: 12px 20px;
+    font-weight: 600;
+    border-radius: 8px;
+    gap: var(--icon-spacing-normal);
+  }
+  
+  .parcego-delivery-action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  }
+  
+  .parcego-delivery-action-btn--navigate {
+    background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+    border: none;
+    color: white;
+  }
+  
+  .parcego-delivery-action-btn--navigate:hover {
+    background: linear-gradient(135deg, #2563eb, #1e40af);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(59, 130, 246, 0.3);
+  }
+
+  /* Drag and drop animations */
+  .parcego-delivery-item[draggable="true"] {
+    transition: all var(--transition-normal) var(--easing-premium);
+  }
+
+  .parcego-delivery-item[draggable="true"]:hover {
+    cursor: grab;
+    transform: translateY(-3px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+  }
+
+  .parcego-delivery-item[draggable="true"]:active {
+    cursor: grabbing;
+    transform: scale(1.02);
+  }
+  
+  /* Accessibility - Reduced Motion */
+  @media (prefers-reduced-motion: reduce) {
+    .parcego-delivery-item,
+    .parcego-action-btn,
+    .parcego-map-card {
+      transition: none;
+      transform: none !important;
+    }
+    
+    .parcego-delivery-item:hover,
+    .parcego-action-btn:hover,
+    .parcego-map-card:hover {
+      transform: none;
+    }
+    
+    @keyframes spin {
+      to {
+        transform: none;
+      }
+    }
+  }
+  
+  /* Loading state animations */
+  .parcego-optimize-btn[disabled] {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+  
+  /* Focus states for accessibility */
+  .parcego-delivery-item:focus {
+    outline: 2px solid rgba(59, 130, 246, 0.5);
+    outline-offset: 2px;
+  }
+  
+  /* Premium entrance animations */
+  .parcego-directions-panel {
+    animation: slideInRight var(--transition-slow) var(--easing-premium);
+  }
+  
+  @keyframes slideInRight {
+    from {
+      opacity: 0;
+      transform: translateX(100%);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  
+    /* Traffic indicator pulse */
+  .parcego-traffic-indicator {
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.7;
+    }
+  }
+  
+  /* Enhanced visual grouping and separation */
+  .parcego-section-divider {
+    border-top: 2px solid #e5e7eb;
+    margin: 24px 0;
+    position: relative;
+  }
+  
+  .parcego-section-divider::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 2px;
+    background: linear-gradient(90deg, #3b82f6, #8b5cf6);
+  }
+  
+  /* Critical information styling */
+  .parcego-critical-info {
+    background: linear-gradient(135deg, #fee2e2, #fef3c7);
+    border: 2px solid #f59e0b;
+    border-radius: 12px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .parcego-critical-info::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: linear-gradient(180deg, #ef4444, #f59e0b);
+  }
+  
+  /* Priority indicators */
+  .parcego-priority-urgent {
+    background: linear-gradient(135deg, #fee2e2, #fecaca);
+    border-color: #ef4444;
+    color: #991b1b;
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
+  }
+  
+  .parcego-priority-high {
+    background: linear-gradient(135deg, #fed7aa, #fef3c7);
+    border-color: #f59e0b;
+    color: #92400e;
+    font-weight: 600;
+  }
+  
+  .parcego-priority-medium {
+    background: linear-gradient(135deg, #dbeafe, #e0f2fe);
+    border-color: #3b82f6;
+    color: #1e40af;
+    font-weight: 500;
+  }
+  
+  /* Status indicators with enhanced visibility */
+  .parcego-status-current {
+    position: relative;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+    border-color: #3b82f6 !important;
+  }
+  
+  .parcego-status-current::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    background: linear-gradient(45deg, #3b82f6, #1d4ed8);
+    border-radius: 14px;
+    z-index: -1;
+    opacity: 0.1;
+  }
+  
+  .parcego-status-next {
+    border-color: #eab308 !important;
+    box-shadow: 0 0 0 2px rgba(234, 179, 8, 0.2);
+  }
+}

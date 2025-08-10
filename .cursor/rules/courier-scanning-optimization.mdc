@@ -1,0 +1,78 @@
+# AI Route Planning & Optimization – Feature Rule
+
+## Objective
+
+Deliver a premium, interactive UI for AI-powered courier route planning and optimization, supporting both automated and manual workflows.  
+**All UI must be accessible, responsive, and visually aligned with the Ashraf Courier Business Platform design system.**
+
+---
+
+## 1. Core Features
+
+- **Interactive Map:**  
+  - Display all delivery points (stops) on a Google Maps (or equivalent) map.
+  - Each point must be clearly marked and accessible (keyboard, ARIA labels).
+- **Route Visualization:**  
+  - Draw the optimized route connecting all delivery points in order.
+  - Show turn-by-turn directions in a sidebar or panel.
+- **Estimated Delivery Times:**  
+  - Display ETA for each stop, factoring in current traffic and stop order.
+  - Show total route time and distance.
+- **Traffic-Aware Routing:**  
+  - Visually indicate traffic conditions on the route (e.g., color-coded segments).
+  - Update ETAs and route if traffic data changes (mocked in UI phase).
+- **Manual Route Adjustment:**  
+  - Allow users to drag-and-drop stops to reorder deliveries.
+  - Instantly update route, ETAs, and directions on adjustment.
+  - Provide a “Re-optimize” button to let AI suggest the best route after manual changes.
+
+---
+
+## 2. UI/UX Requirements
+
+- **Map Integration:**  
+  - Use Google Maps JavaScript API (or mock for UI-only phase).
+  - All map controls must be accessible and keyboard-navigable.
+- **Directions Panel:**  
+  - List each stop with address, ETA, and action buttons (e.g., “Mark as Delivered”).
+  - Highlight the current/next stop.
+- **Responsive Design:**  
+  - Map and directions panel must adapt to mobile and desktop layouts.
+- **Transitions & Animations:**  
+  - Use premium, subtle transitions for map updates, panel slides, and drag-and-drop.
+  - Respect `prefers-reduced-motion` for accessibility.
+- **Accessibility:**  
+  - All interactive elements must have ARIA labels, keyboard support, and sufficient color contrast.
+  - Test with screen readers and keyboard navigation.
+
+---
+
+## 3. Data & Logic
+
+- **Mock Data:**  
+  - Use static/mock data for delivery points, traffic, and ETAs in UI-only phase.
+  - No backend/API integration at this stage.
+- **State Management:**  
+  - Use Zustand for client-side state if needed.
+- **No Dead Code:**  
+  - Remove all TODOs and commented-out code before submission.
+
+---
+
+## 4. Deliverables
+
+- Fully functional, navigable UI for route planning and optimization.
+- All features above implemented with mock/static data.
+- README update with usage and testing instructions.
+
+---
+
+## 5. Enforcement
+
+- Code reviews must verify adherence to this rule and referenced standards.
+- Any deviation must be documented and approved by the project lead.
+
+---
+
+**Goal:**  
+Deliver a modern, accessible, and delightful route planning UI that sets the foundation for future AI and backend integration.
