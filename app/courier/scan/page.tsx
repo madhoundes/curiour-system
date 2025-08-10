@@ -565,7 +565,7 @@ export default function CourierScanPackagePage() {
                     )}
 
                     {/* Secondary Quick Actions - Smaller, Less Prominent */}
-                    {scannedPackage.currentStatus !== "delivered" && (
+                    {(scannedPackage.currentStatus as PackageData["currentStatus"]) !== "delivered" && (
                       <details className="mt-4">
                         <summary className="text-sm text-gray-500 cursor-pointer hover:text-gray-700 transition-colors">
                           Manual Status Override
