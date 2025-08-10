@@ -55,8 +55,8 @@ export default function CourierScanPackagePage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
   // ZXing controls/readers (dynamic import)
-  const zxingReaderRef = useRef<any>(null);
-  const zxingControlsRef = useRef<any>(null);
+  const zxingReaderRef = useRef<unknown>(null);
+  const zxingControlsRef = useRef<unknown>(null);
   
   // State management
   const [isScanning, setIsScanning] = useState(false);
@@ -103,18 +103,20 @@ export default function CourierScanPackagePage() {
       }
 
       // Start decoding from the chosen device into our <video> element
-      zxingControlsRef.current = await zxingReaderRef.current.decodeFromVideoDevice(
+      zxingControlsRef.current = await (zxingReaderRef.current as { decodeFromVideoDevice: (...args: unknown[]) => Promise<unknown> }).decodeFromVideoDevice(
         selectedDeviceId,
         videoRef.current!,
-        (result: any, error: any, controls: any) => {
+        (result: unknown, error: unknown, controls: unknown) => {
           if (result) {
-            const text = typeof result.getText === "function" ? result.getText() : result.text;
+            const text = typeof (result as { getText?: () => string; text?: string }).getText === "function" 
+              ? (result as { getText: () => string }).getText() 
+              : (result as { text: string }).text;
             handleScanSuccess(text);
             // Stop immediately after a successful detection
-            try { controls.stop(); } catch {}
+            try { (controls as { stop: () => void }).stop(); } catch {}
           }
           // Ignore NotFound errors which occur on frames without codes
-          if (error && error.name && error.name !== "NotFoundException") {
+          if (error && (error as { name?: string }).name && (error as { name: string }).name !== "NotFoundException") {
             // Non-fatal scanning error; surface as a hint without breaking the flow
             // setScanError("Scanning issue detected. Try to steady the camera or improve lighting.");
           }
@@ -140,13 +142,13 @@ export default function CourierScanPackagePage() {
     // Stop ZXing decoding
     try {
       if (zxingControlsRef.current) {
-        zxingControlsRef.current.stop();
+        (zxingControlsRef.current as { stop: () => void }).stop();
       }
     } catch {}
     zxingControlsRef.current = null;
     try {
-      if (zxingReaderRef.current && typeof zxingReaderRef.current.reset === "function") {
-        zxingReaderRef.current.reset();
+      if (zxingReaderRef.current && typeof (zxingReaderRef.current as { reset?: () => void }).reset === "function") {
+        (zxingReaderRef.current as { reset: () => void }).reset();
       }
     } catch {}
     zxingReaderRef.current = null;
@@ -176,7 +178,6 @@ export default function CourierScanPackagePage() {
     return () => {
       try { stopCamera(); } catch {}
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleManualSubmit = () => {
@@ -312,7 +313,7 @@ export default function CourierScanPackagePage() {
                 <div className="parcego-scan__viewfinder parcego-scan__viewfinder--inactive h-48 flex items-center justify-center bg-gray-800">
                   <div className="text-center text-gray-300">
                     <Icon name="Camera" size={48} className="mx-auto mb-3" />
-                    <p className="text-sm">Tap 'Start Scan' to activate camera</p>
+                    <p className="text-sm">Tap &apos;Start Scan&apos; to activate camera</p>
                     <p className="text-xs mt-1 px-4">Allow camera access when prompted</p>
                   </div>
                 </div>
@@ -327,9 +328,9 @@ export default function CourierScanPackagePage() {
                   <div className="text-sm text-blue-800">
                     <p className="font-medium mb-1">Camera Setup Instructions:</p>
                     <ol className="list-decimal list-inside space-y-1 text-xs">
-                      <li>Tap 'Start Scan' to activate your device's camera</li>
+                      <li>Tap &apos;Start Scan&apos; to activate your device&apos;s camera</li>
                       <li>If prompted, please allow camera access</li>
-                      <li>If camera doesn't open, check browser settings for camera permissions</li>
+                      <li>If camera doesn&apos;t open, check browser settings for camera permissions</li>
                       <li>Try refreshing the page if issues persist</li>
                     </ol>
                   </div>
@@ -340,11 +341,10 @@ export default function CourierScanPackagePage() {
             <div className="flex space-x-2">
               {!isCameraActive ? (
                 <Button
-                  className="flex-1 h-12"
+                  className="flex-1 h-12 parcego-scan__btn--start"
                   onClick={handleStartScan}
                   disabled={isScanning}
                   id="parcego-scan-start-btn"
-                  className="parcego-scan__btn--start"
                 >
                   {isScanning ? (
                     <>
@@ -361,10 +361,9 @@ export default function CourierScanPackagePage() {
               ) : (
                 <Button
                   variant="destructive"
-                  className="flex-1 h-12"
+                  className="flex-1 h-12 parcego-scan__btn--stop"
                   onClick={stopCamera}
                   id="parcego-scan-stop-btn"
-                  className="parcego-scan__btn--stop"
                 >
                   <Icon name="Square" size={20} className="mr-2" />
                   Stop Scan
@@ -382,7 +381,7 @@ export default function CourierScanPackagePage() {
               Manual Entry
             </CardTitle>
             <CardDescription>
-              Enter tracking number manually if scan doesn't work
+              Enter tracking number manually if scan doesn&apos;t work
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -416,11 +415,10 @@ export default function CourierScanPackagePage() {
               </div>
               
               <Button
-                className="w-full h-10"
+                className="w-full h-10 parcego-scan__btn--submit"
                 onClick={handleManualSubmit}
                 disabled={!manualInput.trim()}
                 id="parcego-scan-submit-btn"
-                className="parcego-scan__btn--submit"
               >
                 <Icon name="Search" size={16} className="mr-2" />
                 Look Up Package
@@ -661,10 +659,9 @@ export default function CourierScanPackagePage() {
 
               <Button
                 variant="outline"
-                className="w-full h-10"
+                className="w-full h-10 parcego-scan__btn--refresh-gps"
                 onClick={handleRefreshLocation}
                 id="parcego-scan-gps-refresh-btn"
-                className="parcego-scan__btn--refresh-gps"
               >
                 <Icon name="RefreshCw" size={16} className="mr-2" />
                 Refresh Location
@@ -685,10 +682,9 @@ export default function CourierScanPackagePage() {
           <div className="mt-4">
             <Button
               variant="outline"
-              className="w-full h-10"
+              className="w-full h-10 parcego-scan__btn--route"
               onClick={() => router.push('/courier/route')}
               id="parcego-scan-route-btn"
-              className="parcego-scan__btn--route"
             >
               <Icon name="Navigation" size={16} className="mr-2" />
               View Route & Navigation
