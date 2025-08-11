@@ -22,7 +22,7 @@ const mockPerformanceData = {
     earnings: 145.50,
     distance: 45.8,
     averageTime: 18,
-    rating: 4.8
+    averageRating: 4.8
   },
   weekly: {
     deliveries: 42,
@@ -35,7 +35,7 @@ const mockPerformanceData = {
     deliveries: 178,
     earnings: 2845.75,
     distance: 892.3,
-    customerRating: 4.8,
+    averageRating: 4.8,
     efficiency: 94.2
   },
   achievements: [
@@ -247,9 +247,7 @@ export default function CourierPerformance() {
                 <Icon name="Star" size={20} className="text-yellow-600" />
                 <div>
                   <p className="text-2xl font-bold">
-                    {selectedPeriod === "today" ? currentData.rating :
-                     selectedPeriod === "weekly" ? currentData.averageRating :
-                     currentData.customerRating}
+                    {currentData.averageRating}
                   </p>
                   <p className="text-xs text-gray-500">Rating</p>
                 </div>
