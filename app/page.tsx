@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
@@ -51,9 +52,11 @@ export default function MerchantLandingPage() {
       <div className="container mx-auto px-4 pt-4 pb-8">
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            <img 
+            <Image 
               src="/Logo/Master-logo.svg" 
               alt="Curiour Logo" 
+              width={128}
+              height={128}
               className="h-32 w-auto"
             />
           </div>

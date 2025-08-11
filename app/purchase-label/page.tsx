@@ -67,6 +67,33 @@ export default function PurchaseLabelPage() {
     }
   }, [router]);
 
+  // Pre-fill payment fields with realistic dummy data for testing
+  useEffect(() => {
+    // Standard test card number (Visa test card)
+    setCardNumber("4111 1111 1111 1111");
+    
+    // Expiry date safely in the future (2 years from now)
+    const futureDate = new Date();
+    futureDate.setFullYear(futureDate.getFullYear() + 2);
+    const month = String(futureDate.getMonth() + 1).padStart(2, '0');
+    const year = String(futureDate.getFullYear()).slice(-2);
+    setExpiryDate(`${month}/${year}`);
+    
+    // Standard 3-digit CVV
+    setCvv("123");
+    
+    // Generic cardholder name
+    setCardholderName("John Smith");
+    
+    // Sample billing address
+    setBillingAddress({
+      address: "123 Main Street",
+      city: "New York",
+      state: "NY",
+      zip: "10001"
+    });
+  }, []);
+
   const handleCardNumberChange = (value: string) => {
     // Format card number with spaces every 4 digits
     const cleaned = value.replace(/\s+/g, '');
@@ -326,6 +353,18 @@ export default function PurchaseLabelPage() {
                   Enter your card details for secure payment
                 </CardDescription>
               </CardHeader>
+              
+              {/* Test Data Banner */}
+              <div className="mx-6 mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-center space-x-2 text-sm text-blue-800">
+                  <Icon name="Info" size={16} className="text-blue-600" />
+                  <span className="font-medium">🧪 Test Mode Active</span>
+                </div>
+                <p className="text-xs text-blue-700 mt-1">
+                  All payment fields are pre-filled with test data for easy testing. 
+                  These values are placeholders only and will not trigger real charges.
+                </p>
+              </div>
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="parcego-card-number">Card Number *</Label>
@@ -511,6 +550,12 @@ export default function PurchaseLabelPage() {
                     <span>Secure 256-bit SSL encryption</span>
                   </div>
                   <p>Your payment information is safe and secure</p>
+                  
+                  {/* Test Environment Note */}
+                  <div className="mt-3 p-2 bg-yellow-50 border border-yellow-200 rounded text-yellow-800">
+                    <p className="text-xs font-medium">🧪 Test Environment</p>
+                    <p className="text-xs">Click &quot;Complete Purchase&quot; to simulate payment flow</p>
+                  </div>
                 </div>
               </CardContent>
             </Card>

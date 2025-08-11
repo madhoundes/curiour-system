@@ -3,6 +3,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { ArrowLeft, Circle, FilePlus, Hand, Scan, ArrowRight, Truck, XCircle, CheckCircle, Undo2, Image, StickyNote, Dot, Pen, File, X, AlertCircle } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
+import NextImage from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -86,7 +87,7 @@ const iconForEvent = (eventType: string) => {
     DELIVERY_FAILED: <XCircle size={16} />,
     DELIVERED: <CheckCircle size={16} />,
     RETURNED_TO_SENDER: <Undo2 size={16} />,
-    POD_UPLOADED: <Image size={16} />,
+    POD_UPLOADED: <Image size={16} aria-label="Proof of delivery uploaded" />,
     NOTE_ADDED: <StickyNote size={16} />,
   };
   return iconMap[eventType] ?? <Dot size={16} />;
@@ -215,7 +216,7 @@ export default function TrackPackageClient() {
                         <div className="mt-2 flex gap-2">
                           {evt.attachments.map((a) => (
                             <button key={a.url} id={`parcego-tracking-attachment-${evt.id}`} className="group inline-flex items-center gap-2 rounded border px-2 py-1 text-xs hover:bg-gray-50 transition-all" onClick={() => setPreview({ url: a.url })} aria-label="Open attachment preview">
-                              {a.type === "photo" ? <Image size={14} /> : a.type === "signature" ? <Pen size={14} /> : <File size={14} />}
+                              {a.type === "photo" ? <Image size={14} aria-label="Photo attachment" /> : a.type === "signature" ? <Pen size={14} /> : <File size={14} />}
                               <span className="text-gray-700">{a.type}</span>
                             </button>
                           ))}
@@ -259,7 +260,7 @@ export default function TrackPackageClient() {
                   <div className="grid grid-cols-3 gap-2">
                     {events.flatMap((e) => e.attachments || []).filter((a) => a.type === "photo").slice(0, 6).map((a) => (
                       <button key={a.url} className="aspect-square w-full rounded border overflow-hidden hover:shadow-sm transition-all" onClick={() => setPreview({ url: a.url })} aria-label="Open photo preview">
-                        <img src={a.url} alt="Proof of delivery" className="h-full w-full object-cover" />
+                        <NextImage src={a.url} alt="Proof of delivery" width={100} height={100} className="h-full w-full object-cover" />
                       </button>
                     ))}
                   </div>
@@ -282,8 +283,7 @@ export default function TrackPackageClient() {
               </Button>
             </div>
             <div className="max-h-[70vh] overflow-auto">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={preview.url} alt="Attachment preview" className="w-full h-auto rounded" />
+              <NextImage src={preview.url} alt="Attachment preview" width={800} height={600} className="w-full h-auto rounded" />
             </div>
           </div>
         </div>

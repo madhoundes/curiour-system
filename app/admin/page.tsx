@@ -19,7 +19,6 @@ import {
   Bell,
   Search,
   Filter,
-  MoreHorizontal,
   ArrowLeft,
   BarChart3,
   Activity,

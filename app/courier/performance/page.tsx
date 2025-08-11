@@ -247,9 +247,9 @@ export default function CourierPerformance() {
                 <Icon name="Star" size={20} className="text-yellow-600" />
                 <div>
                   <p className="text-2xl font-bold">
-                    {selectedPeriod === "today" ? (currentData as any).rating :
-                     selectedPeriod === "weekly" ? (currentData as any).averageRating :
-                     (currentData as any).customerRating}
+                    {selectedPeriod === "today" ? currentData.rating :
+                     selectedPeriod === "weekly" ? currentData.averageRating :
+                     currentData.customerRating}
                   </p>
                   <p className="text-xs text-gray-500">Rating</p>
                 </div>
@@ -446,7 +446,7 @@ export default function CourierPerformance() {
                 <h4 className="font-medium text-yellow-800">Reminder</h4>
               </div>
               <p className="text-yellow-700 text-sm">
-                Don't forget to take photos for proof of delivery to maintain your rating.
+                Don&apos;t forget to take photos for proof of delivery to maintain your rating.
               </p>
             </div>
           </CardContent>

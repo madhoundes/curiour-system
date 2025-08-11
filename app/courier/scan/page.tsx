@@ -440,7 +440,7 @@ export default function CourierScanPackagePage() {
                     <ul className="list-disc list-inside mt-1 space-y-1">
                       <li>Refresh the page and try again</li>
                       <li>Check if another app is using your camera</li>
-                      <li>Ensure you're using HTTPS (camera requires secure connection)</li>
+                      <li>Ensure you&apos;re using HTTPS (camera requires secure connection)</li>
                       <li>Try using the manual input below as an alternative</li>
                     </ul>
                   </div>

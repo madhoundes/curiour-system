@@ -21,16 +21,7 @@ const generateBarsFromTracking = (trackingNumber: string): number[] => {
   });
 };
 
-// Mock QR Code: 5x5 grid based on tracking
-const generateQrFromTracking = (trackingNumber: string): boolean[][] => {
-  const seed = Array.from(trackingNumber).reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-  return Array.from({ length: 5 }, (_, row) =>
-    Array.from({ length: 5 }, (_, col) => {
-      const cell = (seed * (row + 3) * (col + 7)) % 13;
-      return cell > 6;
-    })
-  );
-};
+
 
 const LabelPreviewPage: React.FC = () => {
   const router = useRouter();

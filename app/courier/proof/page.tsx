@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -371,9 +372,11 @@ export default function ProofOfDelivery() {
                     className="relative group"
                     id={`parcego-proof-photo-${index}`}
                   >
-                    <img 
+                    <Image 
                       src={photo} 
                       alt={`Delivery photo ${index + 1}`}
+                      width={320}
+                      height={128}
                       className="w-full h-32 object-cover rounded-lg border"
                     />
                     <Button

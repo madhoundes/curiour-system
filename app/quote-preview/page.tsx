@@ -216,7 +216,7 @@ export default function QuotePreviewPage() {
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">From:</h4>
                   <p className="text-sm text-gray-600">
-                    John's Electronics Store<br />
+                    John&apos;s Electronics Store<br />
                     123 Business St, Suite 100<br />
                     New York, NY 10001
                   </p>

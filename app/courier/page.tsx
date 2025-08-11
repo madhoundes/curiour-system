@@ -218,7 +218,7 @@ export default function CourierDashboard() {
                 <Icon name="DollarSign" size={20} className="text-yellow-600" />
                 <div>
                   <p className="text-2xl font-bold">${mockCourierData.stats.earnings}</p>
-                  <p className="text-xs text-gray-500">Today's Earnings</p>
+                  <p className="text-xs text-gray-500">Today&apos;s Earnings</p>
                 </div>
               </div>
             </CardContent>
@@ -299,7 +299,7 @@ export default function CourierDashboard() {
         >
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="text-lg">Today's Deliveries</CardTitle>
+              <CardTitle className="text-lg">Today&apos;s Deliveries</CardTitle>
               <Badge 
                 variant="secondary"
                 className="parcego-badge parcego-badge--remaining"
@@ -310,7 +310,7 @@ export default function CourierDashboard() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {mockDeliveries.map((delivery, index) => (
+            {mockDeliveries.map((delivery) => (
               <div
                 key={delivery.id}
                 className={`border rounded-lg p-4 border-l-4 ${getPriorityColor(delivery.priority)} parcego-delivery-card`}

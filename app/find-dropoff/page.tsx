@@ -413,7 +413,7 @@ export default function FindDropoffPage() {
                     <div className="bg-blue-50 border border-blue-200 rounded-lg h-80 flex items-center justify-center">
                       <div className="text-center text-blue-600">
                         <Icon name="Map" size={48} className="mx-auto mb-4" />
-                        <p className="text-sm font-medium">Click "Show Map" to view locations</p>
+                        <p className="text-sm font-medium">Click &quot;Show Map&quot; to view locations</p>
                         <p className="text-xs text-blue-500 mt-1">
                           See all drop-off points on an interactive map
                         </p>
