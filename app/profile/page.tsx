@@ -39,15 +39,15 @@ const AccountSettingsSchema = z.object({
   language: z.enum(["en", "fr"]),
   timezone: z.string().min(2, { error: "Timezone is required" }),
   dateFormat: z.enum(["MM/DD/YYYY", "DD/MM/YYYY", "YYYY-MM-DD"]),
-  twoFactorEnabled: z.boolean().default(false),
+  twoFactorEnabled: z.boolean(),
 });
 
 const NotificationPrefsSchema = z.object({
-  emailUpdates: z.boolean().default(true),
-  smsUpdates: z.boolean().default(false),
-  pushUpdates: z.boolean().default(true),
-  deliveryAlerts: z.boolean().default(true),
-  weeklySummary: z.boolean().default(true),
+  emailUpdates: z.boolean(),
+  smsUpdates: z.boolean(),
+  pushUpdates: z.boolean(),
+  deliveryAlerts: z.boolean(),
+  weeklySummary: z.boolean(),
 });
 
 const ThirdPartyIntegrationSchema = z.object({
