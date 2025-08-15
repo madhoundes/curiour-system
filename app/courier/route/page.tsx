@@ -793,6 +793,23 @@ export default function AIRouteOptimization() {
             <CardTitle className="text-lg">Smart Actions</CardTitle>
           </CardHeader>
           <CardContent className="p-4">
+            {/* Start Delivery Button - Prominent CTA */}
+            <div className="mb-6">
+              <Button
+                size="lg"
+                onClick={() => router.push('/courier/out-for-delivery')}
+                className="w-full h-16 text-lg font-semibold bg-green-600 hover:bg-green-700 text-white transition-all duration-200 hover:scale-105 shadow-lg"
+                id="parcego-route-start-delivery-btn"
+                aria-label="Start the delivery route and begin deliveries"
+              >
+                <Icon name="Play" size={24} className="mr-3" />
+                Start Delivery Route
+              </Button>
+              <p className="text-sm text-gray-600 text-center mt-2">
+                Begin your delivery journey with optimized routing
+              </p>
+            </div>
+            
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <Button
                 variant="outline"

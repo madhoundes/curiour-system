@@ -1,0 +1,202 @@
+---
+title: Shipments History – UI-Only Module (Ashraf Courier Platform)
+owner: Frontend
+status: draft
+route: /shipments
+phase: Frontend Design Phase 1 (UI only)
+---
+
+## Objective
+Deliver a fully navigable, UI-only Shipments History experience with search, filtering, bulk operations, row actions (including re-ship), and detailed shipment management views. No backend or API calls; use mock data.
+
+## Tech & Standards
+- Framework: Next.js 14+ (App Router), TypeScript
+- UI: Tailwind CSS + shadcn/ui
+- State: Client-only (local state/Zustand if needed)
+- Accessibility: ARIA, keyboard support, color contrast
+- Transitions: Follow Premium Transitions rule; respect `prefers-reduced-motion`
+- Naming: IDs prefixed with `parcego-...`; classes follow BEM-like `parcego-...`
+- Data: Mocked; deterministic generators for repeatable demos
+- Out of scope: Any Shopify integrations; real API/auth
+
+## Routes & Files
+- `app/shipments/page.tsx`: Main listing with search, filters, table, bulk actions
+- `app/shipments/[id]/page.tsx`: Detailed shipment page (tabbed)
+- `components/shipments/ShipmentsTable.tsx`: Table with selection, sorting, pagination
+- `components/shipments/FiltersBar.tsx`: Search input, filters, badges, reset
+- `components/shipments/BulkActions.tsx`: Export, Print, Archive, Delete (confirm)
+- `components/shipments/QuickViewDrawer.tsx`: Row quick-view (drawer)
+- `components/shipments/RowActions.tsx`: View, Re-ship, Print, Download
+- `lib/mock/shipments.ts`: Types + mock data generator + helpers
+
+Note: If shadcn components are missing, add: `checkbox`, `table`, `dropdown-menu`, `dialog`, `drawer`, `popover`, `calendar`, `select`, `badge`, `toast`, `tabs`, `separator`.
+
+## Data Model (UI-only)
+Use these types for consistency:
+
+```ts
+export type ShipmentStatus =
+  | "LABEL_CREATED"
+  | "SCANNED"
+  | "IN_TRANSIT"
+  | "OUT_FOR_DELIVERY"
+  | "DELIVERED"
+  | "FAILED";
+
+export type Shipment = {
+  id: string;              // e.g., "ASH-2025-000123"
+  trackingNumber: string;  // e.g., "ASH-TRK-ABC12345"
+  orderNumber?: string;
+  createdAt: string;       // ISO
+  updatedAt: string;       // ISO
+  service: "Standard" | "Express" | "Same Day";
+  courier: "Ashraf" | "DHL" | "FedEx" | "UPS";
+  weightKg: number;
+  cost: number;
+  recipient: {
+    name: string;
+    email?: string;
+    phone?: string;
+    address1: string;
+    address2?: string;
+    city: string;
+    state?: string;
+    postalCode: string;
+    country: string;
+  };
+  originCountry: string;
+  destinationRegion?: "Domestic" | "International";
+  status: ShipmentStatus;
+  tags?: string[];
+  notes?: string;
+  labelUrl?: string;
+  invoiceUrl?: string;
+};
+```
+
+Mock generator:
+- Generate 120 items across past 90 days
+- Distribute statuses realistically (Delivered most frequent)
+- Ensure mixed services/couriers/regions
+- Provide stable seed for deterministic output
+
+## Listing Page – Layout & Behavior
+- Header:
+  - Title: “Shipments”
+  - Quick metrics (mock): Total, Delivered, In Transit, Failed
+- Controls Bar:
+  - Search input (placeholder: “Search by ID, tracking, recipient, address…”)
+  - Filters:
+    - Status (multi-select)
+    - Date range (calendar popover)
+    - Service (multi-select)
+    - Courier (multi-select)
+    - Destination Region
+    - Price range (min/max)
+    - Tags (token input or multi-select)
+  - Reset filters
+  - Bulk actions button (visible only when rows selected)
+  - Export CSV button
+- Table:
+  - Columns: Select, Shipment ID, Date, Recipient, Service, Courier, Weight, Status (badge), Cost, Actions
+  - Sorting: Date, Cost, Status, Service (client-side)
+  - Pagination: 10/25/50 per page; next/prev + page numbers
+  - Row selection: Checkbox (with shift-click range if feasible)
+  - Row actions: View, Quick View, Re-ship, Print Label, Download Docs
+- Empty States:
+  - No results: Offer to clear filters
+  - No shipments (initial): CTA to “Create New Shipment”
+- Keyboard & A11y:
+  - Search focuses with `/`
+  - Table rows focusable; actions reachable via keyboard
+  - Bulk actions announce selected count via `aria-live="polite"`
+
+IDs:
+- Page root: `parcego-shipments-page`
+- Search input: `parcego-shipments-search`
+- Filters bar: `parcego-shipments-filters`
+- Bulk actions bar: `parcego-shipments-bulk`
+- Table root: `parcego-shipments-table`
+- Row checkbox: `parcego-shipments-rowchk-{id}`
+- Row actions menu: `parcego-shipments-rowactions-{id}`
+
+## Filters – Details
+- Status: Badges to toggle + dropdown multi-select; reflect active count
+- Date range: From/To with calendar popover and presets (7d, 30d, 90d)
+- Service & Courier: Multi-select list with checkmarks
+- Destination Region: Segmented control (All/Domestic/International)
+- Price range: Two inputs; validate min <= max
+- Tags: Multi-select with removable chips
+
+All filters update client-side; URL query sync optional but not required in this phase.
+
+## Bulk Operations
+- Available when 1+ rows selected:
+  - Export CSV (selected or all on page)
+  - Print Labels (selected) – mock action/toast
+  - Archive (selected) – mock; visually mark archived if needed
+  - Delete (selected) – confirm dialog; non-destructive mock (toast)
+- Confirmation dialogs must include counts and sample IDs.
+
+## Row Actions
+- View Details: Navigate to `/shipments/[id]`
+- Quick View: Open drawer with key details (recipient, address, status, docs)
+- Re-ship: Opens confirm dialog then routes to `/create-shipment?from={id}` with mocked prefill
+- Print Label: Mock toast; optional open label preview if `labelUrl`
+- Download Docs: Mock dropdown (Label, Invoice) with fake links
+
+## Detailed Shipment Page `/shipments/[id]`
+- Header: ID, tracking, status badge, quick actions (Re-ship, Print, Download)
+- Tabs:
+  - Overview: recipient, service, courier, weight, cost, notes
+  - Timeline: status milestones (align with tracking timeline alignment rule)
+  - Label & Docs: mock links, preview card
+  - Activity: mock events list (created, status changes)
+  - Payments: mock cost breakdown
+- Back button to `/shipments` with ID `parcego-shipments-back-btn`
+
+## Quick View Drawer
+- Opens from right; contains:
+  - Top: ID, status, updatedAt
+  - Sections: Recipient, Service/Courier, Docs, Actions
+- Close via Esc, overlay click, or close button
+
+## Transitions & Motion
+- Hover states for row and actions (soft shadow/color)
+- Drawer/Dialog: fade + slide; use GPU-accelerated transforms
+- Staggered list on initial load (subtle)
+- Respect `prefers-reduced-motion`: reduce or disable animations
+
+## Accessibility
+- All interactive elements keyboard focusable with visible outlines
+- ARIA labels for buttons and menus
+- Live regions for selection counts and toasts
+- Color contrast minimum AA
+
+## Testing & QA (UI)
+- Search narrows results by ID, tracking, recipient, and address fields
+- Each filter updates the list; reset clears all
+- Sorting toggles asc/desc where applicable
+- Pagination changes page size and preserves selection per page
+- Bulk select (header checkbox) selects only visible rows
+- Bulk actions show accurate counts and confirmations
+- Row actions work for multiple sample rows
+- Detailed page renders for multiple IDs
+- Quick view opens/closes and is keyboard-accessible
+- Re-ship routes with the correct `from` query
+- Reduced-motion mode disables complex transitions
+
+## Implementation Notes
+- Prefer composition: small client components for filters/table/actions
+- Keep logic client-side; avoid server components for stateful elements
+- Mock data loaded once; memoize derived lists where helpful
+- Do not add TODOs; keep code clean and commented only where necessary
+- Follow project-wide rules for UI (shadcn), Tailwind, and naming
+
+## Deliverables
+- Fully navigable `/shipments` list with all controls and interactions (mocked)
+- Detailed `/shipments/[id]` page
+- Quick-view drawer
+- Re-ship flow entry point
+- Mock data module
+- README update: how to run and where to find the Shipments UI

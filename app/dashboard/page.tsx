@@ -216,14 +216,14 @@ export default function MerchantDashboard() {
           </Card>
         </div>
 
-        {/* Quick Actions */}
-        <Card className="mb-8">
+        {/* Quick Actions - Separated into its own row section */}
+        <Card className="mb-6">
           <CardHeader>
             <CardTitle>Quick Actions</CardTitle>
             <CardDescription>Get started with your most common tasks</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
               <Button 
                 className="h-16 flex flex-col space-y-2"
                 onClick={() => router.push('/create-shipment')}
@@ -231,6 +231,16 @@ export default function MerchantDashboard() {
               >
                 <Icon name="Plus" size={24} />
                 <span>Create New Shipment</span>
+              </Button>
+              <Button
+                variant="outline"
+                className="h-16 flex flex-col space-y-2"
+                onClick={() => router.push('/shipments')}
+                id="parcego-dashboard-shipments-history-btn"
+                aria-label="Open Shipments History"
+              >
+                <Icon name="History" size={24} />
+                <span>Shipments History</span>
               </Button>
               <Button 
                 variant="outline" 
@@ -244,6 +254,45 @@ export default function MerchantDashboard() {
               <Button 
                 variant="outline" 
                 className="h-16 flex flex-col space-y-2"
+                onClick={() => router.push('/analytics')}
+                id="parcego-dashboard-analytics-btn"
+              >
+                <Icon name="BarChart3" size={24} />
+                <span>Analytics</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-16 flex flex-col space-y-2"
+                onClick={() => router.push('/profile')}
+                id="parcego-dashboard-profile-btn"
+              >
+                <Icon name="User" size={24} />
+                <span>Account Profile</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-16 flex flex-col space-y-2"
+                onClick={() => router.push('/billing')}
+                id="parcego-dashboard-billing-btn"
+              >
+                <Icon name="CreditCard" size={24} />
+                <span>Billing & Payments</span>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Pages for Development Preview - New section */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Pages for Development Preview</CardTitle>
+            <CardDescription>Access development and testing pages</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Button 
+                variant="outline" 
+                className="h-16 flex flex-col space-y-2 border-blue-200 text-blue-600 hover:bg-blue-50"
                 onClick={() => router.push('/courier')}
                 id="parcego-dashboard-courier-btn"
               >
@@ -295,7 +344,15 @@ export default function MerchantDashboard() {
                   ))}
                 </div>
                 <div className="mt-4">
-                  <Button variant="outline" className="w-full">View All Shipments</Button>
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() => router.push('/shipments')}
+                    id="parcego-dashboard-view-all-shipments-btn"
+                    aria-label="View all shipments in history"
+                  >
+                    View All Shipments
+                  </Button>
                 </div>
               </CardContent>
             </Card>

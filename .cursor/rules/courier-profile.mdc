@@ -1,0 +1,203 @@
+# Courier Dashboard – Account Profile Page Rule
+
+## Objective
+
+Build a complete, accessible, and visually polished Account Profile page for couriers within the Courier Dashboard at `/courier/profile`.
+**No backend logic or API integration—focus is on layout, navigation, and user experience.**
+
+---
+
+## 1. Technology & Design System
+
+- **Framework:** Next.js 14+ (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS only
+- **UI Components:** shadcn/ui (https://ui.shadcn.com/)
+- **State Management:** Zustand (if needed, for client-side state)
+- **Transitions:** Use premium, subtle transitions as per `premium-transitions-and-effects.mdc`
+- **Accessibility:** All UI must be accessible (ARIA, keyboard navigation, color contrast)
+
+---
+
+## 2. Route & Naming
+
+- **Route:** `/courier/profile`
+- **ID Prefix:** `parcego-courier-profile-[purpose]-[unique]`
+- **Class Prefix (BEM):** `parcego-courier-profile__element--modifier`
+- **Examples:**
+  - `id="parcego-courier-profile-back-btn"`
+  - `id="parcego-courier-profile-avatar-input"`
+  - `class="parcego-courier-profile__card parcego-courier-profile__card--elevated"`
+
+---
+
+## 3. Page Structure & Features (UI Only)
+
+### 3.1 Header Bar
+- Back button to dashboard with icon and label; keyboard accessible
+- Title: "Account Profile"
+- Subtle page description
+- Avatar thumbnail and availability badge
+
+### 3.2 Profile Overview Card
+- Avatar with mock upload (drag-and-drop or click to select)
+- Name, Courier ID, status pill
+- Quick actions: Edit Profile, Change Password, View Performance
+
+### 3.3 Tabs
+- Tabs: Profile, Security, Notifications, Availability, Vehicle
+- Persist selected tab in client-state (Zustand optional)
+
+### 3.4 Profile Tab (Form)
+- Fields: Full Name, Email, Phone, Address
+- Inline hints and validation messages (UI only)
+- Primary Save button (shows mock toast/success banner)
+
+### 3.5 Security Tab
+- Change password button opens Dialog with fields: Current, New, Confirm
+- Password requirements checklist (UI-only)
+- Show/Hide password toggles
+
+### 3.6 Notifications Tab
+- Switches: Push, Email, In-app banners
+- Frequency radio group: Immediate, Hourly, Daily Digest
+- Sound/Vibration toggles (mobile-friendly)
+
+### 3.7 Availability Tab
+- Master availability Switch (Available/Unavailable)
+- Optional schedule picker (Day rows with time ranges – UI only)
+- Status preview banner with aria-live
+
+### 3.8 Vehicle Tab
+- Fields: Vehicle Type (Select), Plate Number, Color, Notes
+- Upload area for vehicle photo (mock)
+
+### 3.9 Stats Preview
+- Mini cards: Deliveries, Rating, Hours Online
+- Link to Performance Analytics `/courier/performance`
+
+### 3.10 Logout
+- Destructive button opens confirmation AlertDialog
+
+---
+
+## 4. Components to Use (shadcn/ui)
+
+- `Avatar`, `Button`, `Badge`, `Card`, `Tabs`, `Input`, `Textarea`, `Label`, `Switch`, `Select`, `RadioGroup`, `Separator`, `Dialog`, `AlertDialog`, `DropdownMenu`, `Toast` (or `useToast`), `Skeleton`
+- Use `Dialog` for Change Password; `AlertDialog` for Logout confirm
+- Use `Skeleton` for mock-loading states of avatar and stats cards
+
+---
+
+## 5. Accessibility
+
+- All form fields must pair `Label` and inputs with `htmlFor`/`id`
+- Provide `aria-describedby` for helper text and error text
+- Buttons and interactive icons must have `aria-label`
+- Avatar upload dropzone must support keyboard: `tabIndex=0`, `onKeyDown` Enter/Space triggers file picker
+- Use `aria-live="polite"` for non-blocking status updates (e.g., availability switch feedback)
+- Meet WCAG AA contrast; ensure visible focus rings on all focusable elements
+- Respect `prefers-reduced-motion`: disable non-essential animations
+
+---
+
+## 6. Premium Transitions & Micro-interactions
+
+- Use transition classes on interactive elements: `transition-all duration-200 ease-[var(--easing-smooth)]`
+- Hover: soft elevation and subtle border/scale; Active: `scale-95`
+- Entrance: fade+slide for cards and dialogs (opacity/translate only; no layout shift)
+- Focus: ring and outline visible on keyboard navigation
+- Avoid default translateY(-2px) on hover; use subtle shadow and border color shift instead
+
+---
+
+## 7. Validation UX (UI Only)
+
+- Real-time validation styles on blur/change; show compact helper text under fields
+- Error text pattern: concise, specific, accessible via `aria-live="polite"`
+- Disable primary submit button only if form is clearly incomplete; otherwise allow click and show inline errors
+- Success feedback: use Toast and/or inline success banner in the card header
+
+---
+
+## 8. Mock Data & State
+
+- Provide constants for sample profile: name, phone, email, courierId, avatar URL, availability
+- Provide constants for vehicle info and notification defaults
+- Use local component state or Zustand for tab selection and switches
+- No network calls; no persistence
+
+---
+
+## 9. Layout Blueprint
+
+- Container: responsive max-w-6xl with padding
+- Grid: `grid gap-6 lg:grid-cols-12`
+  - Left column (lg:col-span-4): Overview card, Stats cards
+  - Right column (lg:col-span-8): Tabs with forms
+- Mobile: stack cards; Tabs become scrollable horizontally
+
+---
+
+## 10. Navigation
+
+- Back button id: `parcego-courier-profile-back-btn` routes to `/courier`
+- "View Performance" button routes to `/courier/performance`
+- All navigations are client-side; use Next.js `useRouter`
+
+---
+
+## 11. ID, Class & Example Targets
+
+- IDs
+  - `parcego-courier-profile-header`
+  - `parcego-courier-profile-avatar`
+  - `parcego-courier-profile-availability-switch`
+  - `parcego-courier-profile-tabs`
+  - `parcego-courier-profile-form-save-btn`
+  - `parcego-courier-profile-logout-btn`
+- Classes
+  - `parcego-courier-profile__card`
+  - `parcego-courier-profile__stats-card`
+  - `parcego-courier-profile__form-field`
+
+---
+
+## 12. Error, Empty & Loading States
+
+- Show `Skeleton` while mock data loads (simulated with `useEffect` timeout)
+- Empty avatar falls back to initials via `AvatarFallback`
+- Failed image load shows fallback; show inline banner in overview card for any critical UI errors (mock)
+
+---
+
+## 13. QA Checklist
+
+- Keyboard: Tab through all controls, activate via Enter/Space
+- Screen Reader: Labels, roles, and `aria-describedby` are correct
+- Motion: All animations disabled under `prefers-reduced-motion`
+- Mobile: Layout stacks gracefully; tabs scroll horizontally
+- Theming: Dark mode styles readable and consistent
+- Performance: Only `transform` and `opacity` animated; no layout shift
+
+---
+
+## 14. Deliverables
+
+- `/courier/profile` page and all required UI components
+- Fully navigable UI demo (no backend)
+- README update with instructions for running the frontend demo
+
+---
+
+## 15. Enforcement
+
+- Code reviews must verify adherence to this rule file and referenced standards
+- Any deviation must be documented and approved by project lead
+
+---
+
+**Goal:**
+Deliver a pixel-perfect, accessible, and modern Courier Account Profile UI, ready for future backend/API integration.
+
+---

@@ -1,0 +1,109 @@
+# Courier Performance Analytics – UI Implementation Rule
+
+## Objective
+
+Build the Courier Performance Analytics page at `/courier/performance` for the Ashraf Courier Business Platform.  
+**Focus:** Pixel-perfect, accessible, and modern UI for individual courier performance metrics and insights.  
+**No backend logic or API integration—use only static/mock data.**
+
+---
+
+## 1. Technology & Design System
+
+- **Framework:** Next.js 14+ (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS only
+- **UI Components:** shadcn/ui (https://ui.shadcn.com/)
+- **State Management:** Zustand (if needed)
+- **Transitions:** Use premium, subtle transitions as per premium-transitions-and-effects.mdc
+- **Accessibility:** All UI must be accessible (ARIA, keyboard navigation, color contrast)
+
+---
+
+## 2. Page Structure & Features
+
+### 2.1. Header
+
+- **Title:** "Courier Performance Analytics"
+- **Courier Info:** Avatar, name, courier ID, and current status badge
+
+### 2.2. Key Metrics Overview
+
+- **Delivery Completion Rate:** Percentage, with visual indicator (progress bar or radial chart)
+- **Customer Ratings:** Average rating (stars), count, and recent feedback snippet
+- **Earnings Breakdown:** Total earnings, breakdown by week/month, and payout status
+- **Efficiency Metrics:** Average delivery time, distance per delivery, on-time rate
+
+### 2.3. Performance Trends
+
+- **Charts:** Line/bar charts for delivery completion, earnings, and efficiency over time (mock data)
+- **Filters:** Date range picker (UI only, no backend)
+
+### 2.4. Customer Feedback
+
+- **Recent Feedback List:** Customer comments, ratings, and delivery references
+- **Sentiment Indicator:** Positive/neutral/negative badge or icon
+
+### 2.5. Accessibility & Responsiveness
+
+- All elements must be keyboard navigable and screen-reader friendly
+- Color contrast must meet WCAG AA
+- Fully responsive: mobile, tablet, desktop
+
+---
+
+## 3. Data & Logic
+
+- All data is static, mocked, or placeholder
+- No API calls, no backend logic, no authentication
+- Use mock data for all metrics, charts, and feedback
+
+---
+
+## 4. Code Quality & Structure
+
+- Use TypeScript everywhere
+- Functional components only
+- Early returns, no dead code, no TODOs
+- Descriptive naming and clear structure
+- All forms, buttons, and flows must be visually complete and accessible
+
+---
+
+## 5. Naming & Scoping
+
+- **IDs:** Globally unique, format: `parcego-courier-performance-[purpose]-[unique]`
+- **Classes:** BEM/SMACSS, prefix: `parcego-courier-performance__element--modifier`
+- **Dynamic Elements:** Append unique hash/UUID for runtime-generated IDs/classes
+
+---
+
+## 6. UI/UX Patterns
+
+- Use shadcn/ui components for all UI blocks
+- Use Tailwind for all styling; no custom CSS unless necessary
+- Apply premium transitions for interactive elements (hover, focus, entrance)
+- Use subtle, modern effects (see premium-transitions-and-effects.mdc)
+- No layout shifts or jank; use only `transform` and `opacity` for animations
+
+---
+
+## 7. Deliverables
+
+- `/courier/performance` page and all required UI components
+- Fully navigable UI demo (no backend)
+- README update with instructions for running the frontend demo
+
+---
+
+## 8. Enforcement
+
+- Code reviews must verify adherence to this rule file and referenced standards
+- Any deviation must be documented and approved by project lead
+
+---
+
+**Goal:**  
+Deliver a pixel-perfect, accessible, and modern Courier Performance Analytics UI, ready for future backend/API integration.
+
+---

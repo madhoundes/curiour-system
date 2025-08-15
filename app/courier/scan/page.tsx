@@ -545,15 +545,27 @@ export default function CourierScanPackagePage() {
                     )}
                     
                     {scannedPackage.currentStatus === "in_transit" && (
-                      <Button
-                        className="w-full h-14 text-lg font-semibold parcego-scan__primary-action"
-                        onClick={() => router.push('/courier/proof')}
-                        disabled={isUpdatingStatus}
-                        id="parcego-scan-complete-delivery-btn"
-                      >
-                        <Icon name="Camera" size={24} className="mr-3" />
-                        Complete Delivery (Proof)
-                      </Button>
+                      <div className="space-y-3">
+                        <Button
+                          className="w-full h-14 text-lg font-semibold parcego-scan__primary-action"
+                          onClick={() => router.push('/courier/proof')}
+                          disabled={isUpdatingStatus}
+                          id="parcego-scan-complete-delivery-btn"
+                        >
+                          <Icon name="Camera" size={24} className="mr-3" />
+                          Complete Delivery (Proof)
+                        </Button>
+                        
+                        <Button
+                          variant="outline"
+                          className="w-full h-12 text-base parcego-scan__secondary-action"
+                          onClick={() => router.push('/courier/route')}
+                          id="parcego-scan-start-delivery-route-btn"
+                        >
+                          <Icon name="Route" size={20} className="mr-2" />
+                          Start Delivery Route
+                        </Button>
+                      </div>
                     )}
 
                     {/* Status Updating Indicator */}

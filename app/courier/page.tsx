@@ -251,6 +251,15 @@ export default function CourierDashboard() {
           <CardContent>
             <div className="grid grid-cols-2 gap-3">
               <Button
+                className="h-16 flex flex-col space-y-2 parcego-action-btn parcego-action-btn--start-route bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => router.push('/courier/route')}
+                id="parcego-courier-start-delivery-route-btn"
+              >
+                <Icon name="Route" size={20} />
+                <span className="text-sm">Start Delivery Route</span>
+              </Button>
+              
+              <Button
                 className="h-16 flex flex-col space-y-2 parcego-action-btn parcego-action-btn--next-delivery"
                 onClick={() => handleStartRoute(mockDeliveries[0].id)}
                 id="parcego-courier-next-delivery-btn"
@@ -265,7 +274,7 @@ export default function CourierDashboard() {
                 onClick={() => router.push('/courier/route')}
                 id="parcego-courier-view-route-btn"
               >
-                <Icon name="Route" size={20} />
+                <Icon name="Map" size={20} />
                 <span className="text-sm">View Route</span>
               </Button>
               
