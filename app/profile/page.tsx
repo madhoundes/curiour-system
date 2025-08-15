@@ -36,11 +36,9 @@ const BusinessInfoSchema = z.object({
 });
 
 const AccountSettingsSchema = z.object({
-  language: z.enum(["en", "fr"], { required_error: "Language is required" }),
-  timezone: z.string().min(2, "Timezone is required"),
-  dateFormat: z.enum(["MM/DD/YYYY", "DD/MM/YYYY", "YYYY-MM-DD"], {
-    required_error: "Date format is required",
-  }),
+  language: z.enum(["en", "fr"]),
+  timezone: z.string().min(2, { error: "Timezone is required" }),
+  dateFormat: z.enum(["MM/DD/YYYY", "DD/MM/YYYY", "YYYY-MM-DD"]),
   twoFactorEnabled: z.boolean().default(false),
 });
 
