@@ -11,13 +11,9 @@ const nextConfig: NextConfig = {
     contentDispositionType: 'attachment',
     contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
   },
-  // Fix for clientReferenceManifest error
-  experimental: {
-    // Enable proper client reference handling
-    clientReferenceManifest: true,
-    // Ensure proper RSC handling
-    serverComponentsExternalPackages: [],
-  },
+  // Modern Next.js 15+ configuration - no deprecated experimental options
+  // Use modern serverExternalPackages instead of deprecated serverComponentsExternalPackages
+  serverExternalPackages: [],
   // Ensure proper output configuration
   output: 'standalone',
   // Disable static optimization for development

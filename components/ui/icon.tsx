@@ -34,7 +34,7 @@ const iconAliases: Record<string, IconName> = {
   "mail": "Mail",
   "message-circle": "MessageCircle",
   "arrow-left": "ArrowLeft",
-  "arrow-right": "ArrowRight", // Add missing ArrowRight alias
+  "arrow-right": "ArrowRight",
   "plus": "Plus",
   "bookmark": "Bookmark",
   "bookmark-plus": "BookmarkPlus",
@@ -52,7 +52,6 @@ const iconAliases: Record<string, IconName> = {
   "MapPin": "MapPin",
   "Package": "Package",
   "Shield": "Shield",
-  "BarChart3": "ChartColumn",
   "ChartColumn": "ChartColumn",
   "ChartBar": "ChartBar",
   "ChartLine": "ChartLine",
