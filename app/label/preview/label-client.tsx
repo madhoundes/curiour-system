@@ -35,6 +35,17 @@ const LabelPreviewPage: React.FC = () => {
     }, 100);
   };
 
+  const handleBack = () => {
+    // Go back to the purchase-label page (previous step in the flow)
+    // This maintains workflow continuity and allows users to return to order details
+    router.push('/purchase-label');
+  };
+
+  const handleViewTracking = () => {
+    // Navigate to tracking page with the current shipment's tracking number
+    router.push(`/track-package?tracking=${encodeURIComponent(trackingParam)}`);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 print:bg-white">
       {/* Print-specific CSS to ensure consistency */}
@@ -49,6 +60,8 @@ const LabelPreviewPage: React.FC = () => {
             -webkit-print-color-adjust: exact !important;
             color-adjust: exact !important;
             print-color-adjust: exact !important;
+            font-size: 12pt !important;
+            line-height: 1.2 !important;
           }
           
           #parcego-label-canvas {
@@ -58,16 +71,20 @@ const LabelPreviewPage: React.FC = () => {
             box-shadow: none !important;
             background: white !important;
             color: black !important;
+            font-size: 12pt !important;
+            line-height: 1.2 !important;
+            padding: 0.1in !important;
+            box-sizing: border-box !important;
           }
           
           /* Logo print styles - ensure exact sizing and positioning */
           #parcego-label-canvas svg {
-            width: 22px !important;
-            height: 14px !important;
-            min-width: 22px !important;
-            min-height: 14px !important;
-            max-width: 22px !important;
-            max-height: 14px !important;
+            width: 0.3in !important;
+            height: 0.2in !important;
+            min-width: 0.3in !important;
+            min-height: 0.2in !important;
+            max-width: 0.3in !important;
+            max-height: 0.2in !important;
             display: block !important;
             flex-shrink: 0 !important;
             -webkit-print-color-adjust: exact !important;
@@ -96,6 +113,110 @@ const LabelPreviewPage: React.FC = () => {
             print-color-adjust: exact !important;
           }
           
+          /* Header text sizing for print */
+          #parcego-label-canvas .font-semibold {
+            font-size: 14pt !important;
+            font-weight: 600 !important;
+            line-height: 1.1 !important;
+          }
+          
+          #parcego-label-canvas .font-mono {
+            font-size: 12pt !important;
+            font-family: monospace !important;
+            line-height: 1.1 !important;
+          }
+          
+          /* FROM/TO labels */
+          #parcego-label-canvas .text-xs {
+            font-size: 12pt !important;
+            font-weight: 600 !important;
+            line-height: 1.1 !important;
+          }
+          
+          /* FROM/TO addresses */
+          #parcego-label-canvas .text-sm {
+            font-size: 11pt !important;
+            line-height: 1.2 !important;
+          }
+          
+          /* Service badge */
+          #parcego-label-canvas .text-sm.font-bold {
+            font-size: 12pt !important;
+            font-weight: 600 !important;
+            line-height: 1.1 !important;
+          }
+          
+          /* QR and meta info */
+          #parcego-label-canvas .text-xs {
+            font-size: 9pt !important;
+            line-height: 1.1 !important;
+          }
+          
+          /* Footer notes */
+          #parcego-label-canvas .text-xs {
+            font-size: 8pt !important;
+            line-height: 1.1 !important;
+          }
+          
+          /* Barcode container */
+          #parcego-label-barcode {
+            height: 0.8in !important;
+            margin-top: 0.1in !important;
+          }
+          
+          /* QR code sizing */
+          #parcego-label-qr {
+            width: 0.8in !important;
+            height: 0.8in !important;
+            border: 2px solid black !important;
+            background: white !important;
+            color: black !important;
+          }
+          
+          /* Spacing adjustments for print */
+          #parcego-label-canvas .space-y-2 > * + * {
+            margin-top: 0.05in !important;
+          }
+          
+          #parcego-label-canvas .mt-3 {
+            margin-top: 0.15in !important;
+          }
+          
+          #parcego-label-canvas .mt-4 {
+            margin-top: 0.2in !important;
+          }
+          
+          #parcego-label-canvas .pt-3 {
+            padding-top: 0.15in !important;
+          }
+          
+          #parcego-label-canvas .px-3 {
+            padding-left: 0.15in !important;
+            padding-right: 0.15in !important;
+          }
+          
+          #parcego-label-canvas .py-1 {
+            padding-top: 0.05in !important;
+            padding-bottom: 0.05in !important;
+          }
+          
+          #parcego-label-canvas .px-2 {
+            padding-left: 0.1in !important;
+            padding-right: 0.1in !important;
+          }
+          
+          /* Divider line */
+          #parcego-label-canvas .h-px {
+            height: 1px !important;
+            background-color: black !important;
+          }
+          
+          /* Service badge border */
+          #parcego-label-canvas .border {
+            border: 1px solid black !important;
+          }
+          
+          /* Barcode bars */
           #parcego-label-barcode .bg-black {
             background-color: black !important;
             -webkit-print-color-adjust: exact !important;
@@ -103,12 +224,12 @@ const LabelPreviewPage: React.FC = () => {
             print-color-adjust: exact !important;
           }
           
-          #parcego-label-qr {
-            border: 1px solid black !important;
-            background: white !important;
+          /* QR code text colors */
+          #parcego-label-qr > div {
             color: black !important;
           }
           
+          /* General color overrides for print */
           .bg-black {
             background-color: black !important;
           }
@@ -128,6 +249,34 @@ const LabelPreviewPage: React.FC = () => {
           .text-black\\/70 {
             color: rgba(0, 0, 0, 0.7) !important;
           }
+          
+          /* Ensure proper text rendering */
+          * {
+            -webkit-font-smoothing: antialiased !important;
+            -moz-osx-font-smoothing: grayscale !important;
+            text-rendering: optimizeLegibility !important;
+          }
+          
+          /* Additional print optimizations */
+          @page {
+            size: 4in 6in;
+            margin: 0;
+            bleed: 0;
+          }
+          
+          /* Ensure the label canvas fits exactly on the page */
+          #parcego-label-canvas {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            orphans: 1 !important;
+            widows: 1 !important;
+          }
+          
+          /* Optimize spacing for print */
+          #parcego-label-canvas > * {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
         }
       `}</style>
 
@@ -137,12 +286,12 @@ const LabelPreviewPage: React.FC = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => router.back()}
+            onClick={handleBack}
             id="parcego-label-preview-back-btn"
-            aria-label="Go back"
+            aria-label="Go back to order details"
           >
             <span aria-hidden className="mr-2 text-sm">←</span>
-            Back
+            Back to Order
           </Button>
           <div className="h-5 w-px bg-gray-200" />
           <span className="text-sm text-gray-600">Label Preview (4x6 inches)</span>
@@ -151,9 +300,9 @@ const LabelPreviewPage: React.FC = () => {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => router.push(`/track-package?tracking=${encodeURIComponent(trackingParam)}`)}
+            onClick={handleViewTracking}
             id="parcego-label-preview-track-btn"
-            aria-label="Open tracking page"
+            aria-label="View tracking details for this shipment"
           >
             <span aria-hidden className="mr-2 text-sm">📦</span>
             View Tracking
@@ -245,9 +394,9 @@ const LabelPreviewPage: React.FC = () => {
                         </clipPath>
                       </defs>
                     </svg>
-                    <span className="font-semibold text-[11px]">Parcego</span>
+                    <span className="font-semibold text-sm">Parcego</span>
                   </div>
-                  <div className="text-[11px] font-mono" id="parcego-label-tracking">
+                  <div className="text-sm font-mono" id="parcego-label-tracking">
                     {trackingParam}
                   </div>
                 </div>
@@ -257,8 +406,8 @@ const LabelPreviewPage: React.FC = () => {
                 {/* From / To blocks */}
                 <div className="px-3 space-y-2">
                   <div>
-                    <div className="text-[9px] font-semibold">FROM</div>
-                    <div className="text-[10px] leading-tight">
+                    <div className="text-xs font-semibold">FROM</div>
+                    <div className="text-sm leading-tight">
                       John&apos;s Electronics Store<br />
                       123 Business St, Suite 100<br />
                       New York, NY 10001
@@ -266,8 +415,8 @@ const LabelPreviewPage: React.FC = () => {
                   </div>
                   <div className="h-px bg-black/60" />
                   <div>
-                    <div className="text-[9px] font-semibold">TO</div>
-                    <div className="text-[10px] leading-tight" id="parcego-label-to-address">
+                    <div className="text-xs font-semibold">TO</div>
+                    <div className="text-sm leading-tight" id="parcego-label-to-address">
                       Sarah Johnson<br />
                       456 Customer Ave, Apt 2B<br />
                       Los Angeles, CA 90210
@@ -278,8 +427,8 @@ const LabelPreviewPage: React.FC = () => {
                 {/* Service badge */}
                 <div className="px-3 mt-3">
                   <div className="border border-black px-2 py-1 rounded-sm">
-                    <div className="text-[11px] font-bold tracking-wide">STANDARD</div>
-                    <div className="text-[9px]">3-5 Business Days</div>
+                    <div className="text-sm font-bold tracking-wide">STANDARD</div>
+                    <div className="text-xs">3-5 Business Days</div>
                   </div>
                 </div>
 
@@ -300,31 +449,36 @@ const LabelPreviewPage: React.FC = () => {
                       />
                     ))}
                   </div>
-                  <div className="mt-1 text-center text-[10px] font-mono tracking-wider">{trackingParam}</div>
+                  <div className="mt-1 text-center text-sm font-mono tracking-wider">{trackingParam}</div>
                 </div>
 
                 {/* QR + meta */}
                 <div className="px-3 mt-4 grid grid-cols-[1fr_56px] gap-2 items-start">
                   <div className="space-y-1">
-                    <div className="text-[9px]">Weight: 2.5 lb • Dim: 12x8x6 in</div>
-                    <div className="text-[9px]">Ref: WEB-ORDER-12345</div>
-                    <div className="text-[9px]">Carrier: Parcego</div>
+                    <div className="text-xs">Weight: 2.5 lb • Dim: 12x8x6 in</div>
+                    <div className="text-xs">Ref: WEB-ORDER-12345</div>
+                    <div className="text-xs">Carrier: Parcego</div>
                   </div>
                   <div 
-                    aria-label="QR" 
+                    aria-label="QR Code Placeholder" 
                     id="parcego-label-qr" 
-                    className="aspect-square w-14 border border-black grid place-items-center text-[10px] font-mono print:border-black print:bg-white print:text-black"
+                    className="aspect-square w-14 border-2 border-dashed border-gray-400 bg-gray-50 grid place-items-center text-center print:border-black print:bg-white print:text-black"
                     style={{
                       WebkitPrintColorAdjust: 'exact',
                       printColorAdjust: 'exact'
                     }}
                   >
-                    QR
+                    <div className="text-xs font-medium text-gray-600 print:text-black">
+                      QR Code
+                    </div>
+                    <div className="text-sm text-gray-500 print:text-black">
+                      Placeholder
+                    </div>
                   </div>
                 </div>
 
                 {/* Footer notes */}
-                <div className="absolute bottom-2 left-3 right-3 text-[8px] text-black/70 print:text-black/70">
+                <div className="absolute bottom-2 left-3 right-3 text-xs text-black/70 print:text-black/70">
                   Ship by: {new Date().toLocaleDateString()} • Non-hazardous • No signature required
                 </div>
               </div>
@@ -334,7 +488,8 @@ const LabelPreviewPage: React.FC = () => {
 
         {/* Helper (hidden when printing) */}
         <div className="mt-4 text-center text-xs text-gray-500 print:hidden">
-          Use the Print button. Ensure paper size 4x6 inches and scale 100%.
+          Use the Print button. Ensure paper size 4x6 inches, scale 100%, and margins set to minimum.
+          The printed label will have optimized font sizes for readability.
         </div>
       </div>
     </div>

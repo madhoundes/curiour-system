@@ -158,8 +158,9 @@ export default function FindDropoffPage() {
     router.push('/dropoff-confirmation');
   };
 
-  const handleBackToDashboard = () => {
-    router.push('/dashboard');
+  const handleClosePage = () => {
+    // Close the page and return to the previous page
+    router.back();
   };
 
   const getTypeColor = (type: string) => {
@@ -183,12 +184,12 @@ export default function FindDropoffPage() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleBackToDashboard}
-                id="parcego-dropoff-finder-back-btn"
-                className="parcego-nav__back-btn"
+                onClick={handleClosePage}
+                id="parcego-dropoff-finder-close-btn"
+                className="parcego-nav__close-btn"
               >
-                <Icon name="ArrowLeft" size={16} className="mr-2" />
-                Back to Dashboard
+                <Icon name="X" size={16} className="mr-2" />
+                Close
               </Button>
               <div className="h-6 border-l border-gray-300"></div>
               <h1 className="text-xl font-semibold text-gray-900">Find Drop-off Location</h1>
@@ -212,6 +213,21 @@ export default function FindDropoffPage() {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-6">
+
+          {/* General Use Context Banner */}
+          <Card className="parcego-card parcego-card--general-context bg-gray-50 border-gray-200">
+            <CardContent className="p-4">
+              <div className="flex items-center space-x-3">
+                <Icon name="MapPin" size={20} className="text-gray-600" />
+                <div>
+                  <h3 className="font-medium text-gray-900">General Drop-off Locations</h3>
+                  <p className="text-sm text-gray-700">
+                    Find drop-off locations for general shipping needs. For shipment-specific locations, use the shipment creation flow.
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           {/* Search and Filters */}
           <Card className="parcego-card parcego-card--search">

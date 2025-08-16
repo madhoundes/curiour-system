@@ -1,0 +1,348 @@
+---
+alwaysApply: true
+---
+# Notifications Center – UI Implementation Rule
+
+## Objective
+
+Build the Notifications Center page for the Ashraf Courier Business Platform, providing centralized notification management with delivery alerts, system updates, and customizable preferences. **No backend logic or API integration—focus is on layout, navigation, and user experience.**
+
+---
+
+## 1. Technology & Design System
+
+- **Framework:** Next.js 14+ (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS only
+- **UI Components:** shadcn/ui (https://ui.shadcn.com/)
+- **State Management:** Zustand (for client-side state, if needed)
+- **Transitions:** Use premium, subtle transitions as per premium-transitions-and-effects.mdc
+- **Accessibility:** All UI must be accessible (ARIA, keyboard navigation, color contrast)
+
+---
+
+## 2. Scope & Requirements
+
+### Notifications Center Features (All UI, No Backend)
+- **Notification List:** Chronological list of all notifications with unread indicators
+- **Category Filtering:** Filter by type (shipments, system, billing, announcements)
+- **Priority Levels:** Visual indicators for high, normal, and low priority
+- **Bulk Actions:** Mark all as read, clear all, delete selected
+- **Search & Filter:** Search notifications by content, date range, or type
+- **Notification Preferences:** Customize delivery channels and frequency
+- **Real-time Updates:** Mock real-time notification delivery
+- **Export Options:** Download notification history (mock)
+
+---
+
+## 3. Page Structure & Layout
+
+### Header Section
+- **Page Title:** "Notifications Center" with notification count badge
+- **Action Buttons:** Mark all as read, Clear all, Settings
+- **Search Bar:** Full-width search with filters dropdown
+- **View Toggle:** List view vs. Compact view
+
+### Filter Bar
+- **Category Tabs:** All, Shipments, System, Billing, Announcements
+- **Date Range:** Today, Last 7 days, Last 30 days, Custom
+- **Priority Filter:** High, Normal, Low
+- **Status Filter:** Unread, Read, All
+
+### Notification List
+- **Notification Items:** Each with type icon, title, preview, timestamp, priority badge
+- **Unread Indicators:** Bold text, colored left border, unread badge
+- **Action Buttons:** Mark as read, Dismiss, View details
+- **Grouping:** Group by date (Today, Yesterday, This week, Earlier)
+
+### Sidebar (Optional)
+- **Quick Stats:** Unread count, Today's notifications
+- **Quick Actions:** Create shipment, Track package
+- **Recent Activity:** Last 5 notifications preview
+
+---
+
+## 4. Notification Types & Categories
+
+### Shipment Notifications
+- **Status Updates:** Label created, scanned, out for delivery, delivered
+- **Delivery Alerts:** Failed delivery, retry attempts, proof of delivery
+- **Route Changes:** ETA updates, location changes, courier assignments
+
+### System Notifications
+- **Platform Updates:** New features, maintenance windows, policy changes
+- **Account Alerts:** Verification required, security notices, login attempts
+- **Performance Updates:** System status, API changes, integration updates
+
+### Billing Notifications
+- **Payment Confirmations:** Successful payments, failed charges
+- **Invoice Alerts:** New invoices, payment due reminders
+- **Billing Changes:** Rate updates, plan changes, credit adjustments
+
+### Announcements
+- **Feature Releases:** New capabilities, beta programs
+- **Business Updates:** Company news, partnership announcements
+- **Educational Content:** Tips, best practices, case studies
+
+---
+
+## 5. UI Components & IDs
+
+### Main Container
+- **ID:** `parcego-notifications-center-container`
+- **Class:** `min-h-screen bg-gray-50`
+
+### Header
+- **Title:** `parcego-notifications-header-title`
+- **Count Badge:** `parcego-notifications-count-badge`
+- **Action Buttons:** `parcego-notifications-mark-all-btn`, `parcego-notifications-clear-all-btn`, `parcego-notifications-settings-btn`
+
+### Search & Filters
+- **Search Input:** `parcego-notifications-search-input`
+- **Filter Dropdown:** `parcego-notifications-filter-dropdown`
+- **Category Tabs:** `parcego-notifications-category-tabs`
+- **Date Range:** `parcego-notifications-date-range`
+
+### Notification List
+- **List Container:** `parcego-notifications-list`
+- **Individual Items:** `parcego-notifications-item-{uuid}`
+- **Item Actions:** `parcego-notifications-item-mark-read-{uuid}`, `parcego-notifications-item-dismiss-{uuid}`
+
+### Empty States
+- **No Notifications:** `parcego-notifications-empty-state`
+- **No Search Results:** `parcego-notifications-no-results`
+- **Loading State:** `parcego-notifications-loading-skeleton`
+
+---
+
+## 6. Data Structure & Mock Data
+
+### Notification Object
+```typescript
+export type NotificationPriority = 'high' | 'normal' | 'low';
+export type NotificationType = 'shipment' | 'system' | 'billing' | 'announcement';
+export type NotificationStatus = 'unread' | 'read' | 'dismissed';
+
+export interface Notification {
+  id: string;
+  type: NotificationType;
+  priority: NotificationPriority;
+  status: NotificationStatus;
+  title: string;
+  message: string;
+  timestamp: string; // ISO string
+  category: string;
+  relatedId?: string; // tracking number, invoice ID, etc.
+  actions?: Array<{
+    label: string;
+    action: 'view' | 'dismiss' | 'mark-read' | 'navigate';
+    url?: string;
+  }>;
+  metadata?: Record<string, unknown>;
+}
+```
+
+### Mock Data Examples
+```typescript
+const mockNotifications: Notification[] = [
+  {
+    id: 'notif-001',
+    type: 'shipment',
+    priority: 'high',
+    status: 'unread',
+    title: 'Shipment Delivered Successfully',
+    message: 'Your package ASH-20250101-ABC123 has been delivered to John Smith in New York, NY.',
+    timestamp: '2025-01-15T10:30:00Z',
+    category: 'delivery',
+    relatedId: 'ASH-20250101-ABC123',
+    actions: [
+      { label: 'View Details', action: 'navigate', url: '/shipments/ASH-20250101-ABC123' },
+      { label: 'Mark as Read', action: 'mark-read' }
+    ]
+  },
+  // ... more mock notifications
+];
+```
+
+---
+
+## 7. State Management
+
+### Local State
+- **Notifications List:** Array of notification objects
+- **Filters:** Current filter selections (category, date, priority, status)
+- **Search Query:** Current search term
+- **View Mode:** List vs. Compact view
+- **Selected Items:** Array of selected notification IDs for bulk actions
+
+### State Updates
+- **Mark as Read:** Update notification status locally
+- **Dismiss:** Remove notification from list
+- **Bulk Actions:** Apply actions to multiple notifications
+- **Filter Changes:** Re-filter notifications based on selections
+- **Search:** Filter notifications by search term
+
+---
+
+## 8. User Interactions & Behaviors
+
+### Notification Actions
+- **Click Notification:** Navigate to related page or show details modal
+- **Mark as Read:** Update status, remove unread indicator
+- **Dismiss:** Remove from list with confirmation
+- **Bulk Selection:** Checkbox selection for multiple notifications
+
+### Filtering & Search
+- **Real-time Search:** Filter as user types
+- **Category Tabs:** Switch between notification types
+- **Date Range:** Filter by time period
+- **Priority Filter:** Show only specific priority levels
+
+### Responsive Behavior
+- **Mobile:** Stack layout, collapsible filters, touch-friendly actions
+- **Tablet:** Side-by-side layout with collapsible sidebar
+- **Desktop:** Full layout with persistent sidebar
+
+---
+
+## 9. Navigation & Routing
+
+### Page Route
+- **Path:** `/notifications`
+- **Access:** From dashboard notification bell, profile settings, or direct URL
+
+### Internal Navigation
+- **Shipment Details:** Navigate to `/shipments/{id}`
+- **Billing:** Navigate to `/billing`
+- **Settings:** Navigate to `/profile` notifications tab
+- **Back to Dashboard:** Breadcrumb or back button
+
+---
+
+## 10. Accessibility Requirements
+
+### ARIA Labels
+- **Notification Items:** `aria-label="Notification: {title}"`
+- **Action Buttons:** `aria-label="{action} notification"`
+- **Filter Controls:** `aria-label="Filter by {category}"`
+- **Search Input:** `aria-label="Search notifications"`
+
+### Keyboard Navigation
+- **Tab Order:** Logical flow through all interactive elements
+- **Arrow Keys:** Navigate between notification items
+- **Enter/Space:** Activate buttons and actions
+- **Escape:** Close modals and return to list
+
+### Screen Reader Support
+- **Live Regions:** Announce new notifications and status changes
+- **Status Updates:** Announce filter changes and search results
+- **Action Confirmations:** Announce successful actions
+
+---
+
+## 11. Performance & UX Considerations
+
+### Loading States
+- **Initial Load:** Skeleton loading for notification list
+- **Search Results:** Loading indicator during search
+- **Bulk Actions:** Progress indicator for multiple operations
+
+### Pagination & Virtualization
+- **Lazy Loading:** Load notifications in chunks
+- **Infinite Scroll:** Load more as user scrolls
+- **Virtual Scrolling:** For large notification lists (1000+ items)
+
+### Transitions & Animations
+- **Entrance Animations:** Staggered notification appearance
+- **Status Changes:** Smooth transitions for read/unread states
+- **Filter Changes:** Smooth list updates with fade effects
+
+---
+
+## 12. Error Handling & Edge Cases
+
+### Empty States
+- **No Notifications:** Friendly message with CTA to create shipment
+- **No Search Results:** Clear message with search suggestions
+- **Filtered Results Empty:** Show all notifications option
+
+### Error States
+- **Load Failures:** Retry button with error message
+- **Action Failures:** Toast notifications for failed operations
+- **Network Issues:** Offline indicator with cached notifications
+
+---
+
+## 13. Testing & Validation
+
+### Functionality Testing
+- **Filter Combinations:** Test all filter combinations work correctly
+- **Search Accuracy:** Verify search finds relevant notifications
+- **Bulk Actions:** Test mark all as read, clear all, delete selected
+- **Navigation:** Verify all navigation links work correctly
+
+### Accessibility Testing
+- **Screen Reader:** Test with NVDA, JAWS, VoiceOver
+- **Keyboard Navigation:** Test all interactions without mouse
+- **Color Contrast:** Verify WCAG AA compliance
+- **Reduced Motion:** Test with prefers-reduced-motion
+
+### Performance Testing
+- **Large Lists:** Test with 1000+ notifications
+- **Search Performance:** Test search with large datasets
+- **Memory Usage:** Monitor memory consumption during operations
+
+---
+
+## 14. Implementation Checklist
+
+### Core Features
+- [ ] Notification list with mock data
+- [ ] Category filtering and search
+- [ ] Priority indicators and unread badges
+- [ ] Bulk actions (mark all as read, clear all)
+- [ ] Responsive design for all screen sizes
+
+### UI Components
+- [ ] Header with title and action buttons
+- [ ] Search bar with filters
+- [ ] Category tabs and date range picker
+- [ ] Notification items with actions
+- [ ] Empty states and loading skeletons
+
+### Accessibility
+- [ ] ARIA labels and roles
+- [ ] Keyboard navigation support
+- [ ] Screen reader compatibility
+- [ ] Color contrast compliance
+
+### Performance
+- [ ] Efficient rendering for large lists
+- [ ] Smooth transitions and animations
+- [ ] Responsive interactions
+- [ ] Memory optimization
+
+---
+
+## 15. Future Enhancements (Phase 2+)
+
+### Advanced Features
+- **Push Notifications:** Browser push notifications
+- **Email Integration:** Email notification preferences
+- **SMS Alerts:** Text message notifications
+- **Webhook Support:** External notification delivery
+
+### Analytics & Insights
+- **Notification Metrics:** Read rates, response times
+- **User Behavior:** Most/least engaged notification types
+- **A/B Testing:** Different notification formats
+
+### Personalization
+- **Smart Filtering:** AI-powered notification relevance
+- **Custom Categories:** User-defined notification groups
+- **Notification Scheduling:** Time-based delivery preferences
+
+---
+
+**Goal:**  
+Deliver a comprehensive, accessible, and performant Notifications Center that provides merchants with complete visibility into their courier platform activities, enabling proactive business management and improved customer service.

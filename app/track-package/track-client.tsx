@@ -165,13 +165,13 @@ export default function TrackPackageClient() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => router.push('/dashboard')}
+              onClick={() => router.push(`/label/preview?tracking=${trackingParam}`)}
               id="parcego-tracking-back-btn"
               className="parcego-nav__back-btn"
-              aria-label="Back to Dashboard"
+              aria-label="Back to Label Preview"
             >
-              <ArrowLeft size={16} className="mr-2" />
-              Back to Dashboard
+              <X size={16} className="mr-2" />
+              Back to Label
             </Button>
           </div>
 

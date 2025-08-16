@@ -33,19 +33,34 @@ export default function ShipmentDetailPage() {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">{shipment.id}</h1>
-            <p className="text-sm text-gray-600">Tracking: {shipment.trackingNumber}</p>
+          {/* Left side: Back button */}
+          <div className="flex-shrink-0">
+            <Button 
+              variant="ghost" 
+              onClick={() => router.push("/shipments")} 
+              id="parcego-shipments-back-btn" 
+              aria-label="Back to shipments"
+              className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200 rounded-full"
+            >
+              <Icon name="ArrowLeft" size={18} />
+            </Button>
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* Center: Title and tracking info */}
+          <div className="flex-1 flex justify-center">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-gray-900">{shipment.id}</h1>
+              <p className="text-sm text-gray-600">Tracking: {shipment.trackingNumber}</p>
+            </div>
+          </div>
+
+          {/* Right side: Action buttons */}
+          <div className="flex-shrink-0 flex items-center gap-2">
             <Button variant="outline" onClick={() => router.push(`/create-shipment?from=${encodeURIComponent(shipment.id)}`)} aria-label="Re-ship">
               <Icon name="Repeat" size={16} className="mr-2" /> Re-ship
             </Button>
             <Button variant="outline" onClick={() => alert("Printing (mock)…")} aria-label="Print">
               <Icon name="Printer" size={16} className="mr-2" /> Print
-            </Button>
-            <Button variant="ghost" onClick={() => router.push("/shipments")} id="parcego-shipments-back-btn" aria-label="Back to shipments">
-              <Icon name="ArrowLeft" size={16} className="mr-2" /> Back
             </Button>
           </div>
         </div>
@@ -75,7 +90,7 @@ export default function ShipmentDetailPage() {
                   <div className="font-medium">{shipment.recipient.name}</div>
                   <div>{shipment.recipient.address1}</div>
                   <div>
-                    {shipment.recipient.city}, {shipment.recipient.state} {shipment.recipient.postalCode}
+                    {shipment.recipient.city}, {shipment.recipient.province} {shipment.recipient.postalCode}
                   </div>
                   <div>{shipment.recipient.country}</div>
                 </div>
@@ -123,7 +138,7 @@ export default function ShipmentDetailPage() {
                 <CardDescription>Label and invoice</CardDescription>
               </CardHeader>
               <CardContent className="flex items-center gap-2">
-                <Button variant="outline" onClick={() => router.push("/label/preview")}>
+                <Button variant="outline" onClick={() => router.push(`/label/preview?tracking=${encodeURIComponent(shipment.trackingNumber)}`)}>
                   <Icon name="FileText" size={16} className="mr-2" /> View Label
                 </Button>
                 <Button variant="outline" onClick={() => alert("Downloading invoice (mock)…")}>

@@ -7,6 +7,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Icon } from "@/components/ui/icon";
+import { Logo } from "@/components/ui/logo";
+import { NotificationDropdown } from "@/components/ui/notification-dropdown";
 
 // Mock data for dashboard
 const mockStats = {
@@ -53,22 +55,39 @@ const mockRecentShipments = [
 
 const mockNotifications = [
   {
-    id: 1,
+    id: "1",
     message: "Shipment SH002 is out for delivery",
     time: "2 hours ago",
-    type: "info"
+    type: "info" as const,
+    isRead: false
   },
   {
-    id: 2,
+    id: "2",
     message: "Payment received for shipment SH001",
     time: "4 hours ago", 
-    type: "success"
+    type: "success" as const,
+    isRead: false
   },
   {
-    id: 3,
+    id: "3",
     message: "New feature: Bulk shipping labels now available",
     time: "1 day ago",
-    type: "announcement"
+    type: "announcement" as const,
+    isRead: true
+  },
+  {
+    id: "4",
+    message: "System maintenance scheduled for tonight",
+    time: "3 hours ago",
+    type: "warning" as const,
+    isRead: false
+  },
+  {
+    id: "5",
+    message: "Failed to process payment for shipment SH003",
+    time: "5 hours ago",
+    type: "error" as const,
+    isRead: false
   }
 ];
 
@@ -76,6 +95,18 @@ export default function MerchantDashboard() {
   const router = useRouter();
   const [trackingNumber, setTrackingNumber] = useState("");
   const [isTracking, setIsTracking] = useState(false);
+  const [notifications, setNotifications] = useState(mockNotifications);
+  
+  // Calculate unread notifications count
+  const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  const handleMarkAsRead = (id: string) => {
+    setNotifications(prev => 
+      prev.map(notif => 
+        notif.id === id ? { ...notif, isRead: true } : notif
+      )
+    );
+  };
 
   const handleTrackPackage = () => {
     if (!trackingNumber) return;
@@ -111,18 +142,24 @@ export default function MerchantDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <div className="flex items-center">
-                <div className="bg-blue-600 rounded-lg p-2 mr-3">
-                  <Icon name="Truck" size={24} className="text-white" />
-                </div>
-                <h1 className="text-xl font-bold text-gray-900">Parcego</h1>
-              </div>
+              <Logo width={140} height={30} />
             </div>
             
             <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm">
-                <Icon name="Bell" size={20} />
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/support')}
+                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+              >
+                <Icon name="help-circle" size={16} />
+                <span className="text-sm font-medium">Help & Support</span>
               </Button>
+              <NotificationDropdown 
+                notifications={notifications}
+                unreadCount={unreadCount}
+                onMarkAsRead={handleMarkAsRead}
+              />
               <div className="relative group">
                 <Button variant="ghost" size="sm" className="flex items-center space-x-2">
                   <div className="bg-blue-600 rounded-full p-2">
@@ -249,7 +286,7 @@ export default function MerchantDashboard() {
                 id="parcego-dashboard-find-dropoff-btn"
               >
                 <Icon name="MapPin" size={24} />
-                <span>Find Drop-off</span>
+                <span>Find Drop-off Locations</span>
               </Button>
               <Button 
                 variant="outline" 
@@ -277,6 +314,15 @@ export default function MerchantDashboard() {
               >
                 <Icon name="CreditCard" size={24} />
                 <span>Billing & Payments</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-16 flex flex-col space-y-2"
+                onClick={() => router.push('/support')}
+                id="parcego-dashboard-support-btn"
+              >
+                <Icon name="help-circle" size={24} />
+                <span>Help & Support</span>
               </Button>
             </div>
           </CardContent>
@@ -403,7 +449,13 @@ export default function MerchantDashboard() {
                   ))}
                 </div>
                 <div className="mt-4">
-                  <Button variant="ghost" className="w-full text-sm">View All Notifications</Button>
+                  <Button 
+                    variant="ghost" 
+                    className="w-full text-sm"
+                    onClick={() => router.push('/notifications')}
+                  >
+                    View All Notifications
+                  </Button>
                 </div>
               </CardContent>
             </Card>

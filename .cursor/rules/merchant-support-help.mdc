@@ -1,0 +1,479 @@
+---
+alwaysApply: true
+---
+# Support & Help Center – UI Implementation Rule
+
+## Objective
+
+Build the Support & Help Center page for the Ashraf Courier Business Platform, providing comprehensive self-service resources, FAQ management, help articles, video tutorials, and multiple contact channels. **No backend logic or API integration—focus is on layout, navigation, and user experience.**
+
+---
+
+## 1. Technology & Design System
+
+- **Framework:** Next.js 14+ (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS only
+- **UI Components:** shadcn/ui (https://ui.shadcn.com/)
+- **State Management:** Zustand (for client-side state, if needed)
+- **Transitions:** Use premium, subtle transitions as per premium-transitions-and-effects.mdc
+- **Accessibility:** All UI must be accessible (ARIA, keyboard navigation, color contrast)
+- **Video Integration:** HTML5 video with custom controls, YouTube embeds, or Vimeo integration
+
+---
+
+## 2. Scope & Requirements
+
+### Support & Help Center Features (All UI, No Backend)
+- **FAQ System:** Categorized frequently asked questions with expandable answers
+- **Help Articles:** Comprehensive knowledge base with search and filtering
+- **Video Tutorials:** Embedded video content with playlists and progress tracking
+- **Contact Support:** Multiple contact methods (email, phone, live chat mock)
+- **Search & Navigation:** Global search across all help resources
+- **Category Organization:** Logical grouping of help topics by user journey
+- **Feedback System:** Rate helpfulness and suggest improvements (mock)
+- **Related Articles:** Smart suggestions based on current topic
+- **Bookmarking:** Save helpful articles for later reference (mock)
+- **Print/Export:** Download help articles as PDF (mock)
+
+---
+
+## 3. Page Structure & Layout
+
+### Header Section
+- **Page Title:** "Support & Help Center" with search prominence
+- **Global Search:** Full-width search bar with autocomplete suggestions
+- **Quick Actions:** Contact Support, Live Chat, Report Issue
+- **Breadcrumb Navigation:** Clear path to current location
+
+### Main Content Area
+- **Hero Section:** Welcome message, quick search, popular topics
+- **Category Grid:** Visual cards for main help categories
+- **Featured Content:** Latest articles, trending topics, new features
+- **Quick Start Guide:** Step-by-step onboarding for new users
+
+### Sidebar Navigation
+- **Help Categories:** Collapsible tree structure
+- **Recent Articles:** Last viewed help content
+- **Bookmarked Items:** Saved articles and tutorials
+- **Support Status:** Current ticket status (mock)
+
+### Footer Section
+- **Additional Resources:** External links, community forums
+- **Contact Information:** Support hours, response times
+- **Feedback Form:** Rate your experience, suggest improvements
+
+---
+
+## 4. Help Categories & Content Structure
+
+### Getting Started
+- **Account Setup:** Creating account, verification, first shipment
+- **Platform Overview:** Dashboard tour, key features, navigation
+- **Quick Start Guide:** First shipment in 5 minutes
+- **Common Terminology:** Glossary of courier terms
+
+### Shipment Management
+- **Creating Shipments:** Step-by-step guide, best practices
+- **Package Preparation:** Packaging guidelines, label requirements
+- **Tracking & Updates:** Understanding status updates, ETAs
+- **Delivery Issues:** Failed deliveries, returns, claims
+
+### Account & Billing
+- **Profile Management:** Update business info, preferences
+- **Billing & Payments:** Payment methods, invoices, refunds
+- **Security & Privacy:** Password changes, 2FA, data protection
+- **Account Limits:** Shipping limits, rate changes
+
+### Technical Support
+- **Platform Issues:** Login problems, error messages
+- **Integration Help:** API documentation, webhook setup
+- **Mobile App:** Courier app installation, troubleshooting
+- **Performance:** Slow loading, timeout issues
+
+### Business Operations
+- **Analytics & Reporting:** Understanding metrics, custom reports
+- **Bulk Operations:** Multiple shipments, batch processing
+- **Customer Service:** Handling customer inquiries, complaints
+- **Compliance:** Shipping regulations, documentation requirements
+
+---
+
+## 5. UI Components & IDs
+
+### Main Container
+- **ID:** `parcego-support-center-container`
+- **Class:** `min-h-screen bg-gray-50`
+
+### Header
+- **Title:** `parcego-support-header-title`
+- **Search Bar:** `parcego-support-global-search`
+- **Quick Actions:** `parcego-support-contact-btn`, `parcego-support-chat-btn`, `parcego-support-report-btn`
+
+### Search & Navigation
+- **Search Input:** `parcego-support-search-input`
+- **Search Suggestions:** `parcego-support-search-suggestions`
+- **Category Navigation:** `parcego-support-category-nav`
+- **Breadcrumbs:** `parcego-support-breadcrumbs`
+
+### Content Sections
+- **FAQ Container:** `parcego-support-faq-container`
+- **Help Articles:** `parcego-support-articles-list`
+- **Video Tutorials:** `parcego-support-video-section`
+- **Category Cards:** `parcego-support-category-{name}`
+
+### Interactive Elements
+- **FAQ Items:** `parcego-support-faq-item-{uuid}`
+- **Article Cards:** `parcego-support-article-{uuid}`
+- **Video Players:** `parcego-support-video-{uuid}`
+- **Contact Forms:** `parcego-support-contact-form`
+
+### Empty States
+- **No Search Results:** `parcego-support-no-results`
+- **Empty Category:** `parcego-support-empty-category`
+- **Loading State:** `parcego-support-loading-skeleton`
+
+---
+
+## 6. Data Structure & Mock Data
+
+### FAQ Object
+```typescript
+export type FAQCategory = 'getting-started' | 'shipments' | 'account' | 'technical' | 'business';
+export type FAQDifficulty = 'beginner' | 'intermediate' | 'advanced';
+
+export interface FAQ {
+  id: string;
+  question: string;
+  answer: string;
+  category: FAQCategory;
+  difficulty: FAQDifficulty;
+  tags: string[];
+  helpfulCount: number;
+  notHelpfulCount: number;
+  lastUpdated: string; // ISO string
+  relatedArticles?: string[]; // Article IDs
+  videoTutorial?: string; // Video ID if applicable
+}
+```
+
+### Help Article Object
+```typescript
+export interface HelpArticle {
+  id: string;
+  title: string;
+  content: string; // HTML content
+  excerpt: string;
+  category: FAQCategory;
+  difficulty: FAQDifficulty;
+  tags: string[];
+  author: string;
+  publishedDate: string;
+  lastUpdated: string;
+  readTime: number; // minutes
+  helpfulCount: number;
+  bookmarked: boolean;
+  relatedArticles: string[];
+  videoTutorial?: string;
+  attachments?: Array<{
+    name: string;
+    url: string;
+    type: 'pdf' | 'image' | 'video';
+  }>;
+}
+```
+
+### Video Tutorial Object
+```typescript
+export interface VideoTutorial {
+  id: string;
+  title: string;
+  description: string;
+  videoUrl: string;
+  thumbnailUrl: string;
+  duration: number; // seconds
+  category: FAQCategory;
+  difficulty: FAQDifficulty;
+  tags: string[];
+  transcript?: string;
+  chapters?: Array<{
+    title: string;
+    timestamp: number;
+  }>;
+  relatedContent: string[]; // Article and FAQ IDs
+}
+```
+
+### Mock Data Examples
+```typescript
+const mockFAQs: FAQ[] = [
+  {
+    id: 'faq-001',
+    question: 'How do I create my first shipment?',
+    answer: 'Creating your first shipment is easy! Start by clicking the "Create New Shipment" button on your dashboard...',
+    category: 'getting-started',
+    difficulty: 'beginner',
+    tags: ['first-shipment', 'onboarding', 'basics'],
+    helpfulCount: 127,
+    notHelpfulCount: 3,
+    lastUpdated: '2025-01-15T10:30:00Z',
+    relatedArticles: ['article-001', 'article-005'],
+    videoTutorial: 'video-001'
+  },
+  // ... more mock FAQs
+];
+
+const mockHelpArticles: HelpArticle[] = [
+  {
+    id: 'article-001',
+    title: 'Complete Guide to Creating Shipments',
+    content: '<h2>Getting Started</h2><p>Creating shipments on our platform is designed to be simple...</p>',
+    excerpt: 'Learn everything you need to know about creating and managing shipments...',
+    category: 'shipments',
+    difficulty: 'beginner',
+    tags: ['shipments', 'creation', 'guide'],
+    author: 'Support Team',
+    publishedDate: '2025-01-01T00:00:00Z',
+    lastUpdated: '2025-01-15T10:30:00Z',
+    readTime: 8,
+    helpfulCount: 89,
+    bookmarked: false,
+    relatedArticles: ['article-002', 'article-003'],
+    videoTutorial: 'video-001'
+  },
+  // ... more mock articles
+];
+```
+
+---
+
+## 7. State Management
+
+### Local State
+- **Search Query:** Current search term and results
+- **Active Category:** Currently selected help category
+- **Expanded FAQs:** Array of expanded FAQ item IDs
+- **Bookmarked Items:** Array of bookmarked content IDs
+- **Video Progress:** Current video playback position
+- **Contact Form:** Form data and submission state
+
+### State Updates
+- **Search Results:** Filter content based on search query
+- **Category Selection:** Update content display and navigation
+- **FAQ Expansion:** Toggle individual FAQ items
+- **Bookmark Toggle:** Add/remove items from bookmarks
+- **Video Tracking:** Update progress and completion status
+- **Form Submission:** Handle contact form submission (mock)
+
+---
+
+## 8. User Interactions & Behaviors
+
+### Search & Navigation
+- **Global Search:** Real-time search across all content types
+- **Category Navigation:** Expandable tree structure with breadcrumbs
+- **Content Filtering:** Filter by difficulty, tags, and content type
+- **Related Content:** Smart suggestions based on current topic
+
+### Content Interaction
+- **FAQ Expansion:** Smooth expand/collapse with chevron rotation
+- **Article Reading:** Progress indicator, bookmark toggle, helpful rating
+- **Video Playback:** Custom controls, progress tracking, transcript
+- **Content Sharing:** Copy links, print articles, download PDFs
+
+### Contact & Support
+- **Contact Form:** Multi-step form with issue categorization
+- **Live Chat:** Mock chat interface with predefined responses
+- **Ticket Creation:** Support ticket form with priority selection
+- **Feedback System:** Rate helpfulness, suggest improvements
+
+### Responsive Behavior
+- **Mobile:** Stack layout, collapsible navigation, touch-friendly controls
+- **Tablet:** Side-by-side layout with collapsible sidebar
+- **Desktop:** Full layout with persistent sidebar and advanced features
+
+---
+
+## 9. Navigation & Routing
+
+### Page Route
+- **Path:** `/support`
+- **Access:** From dashboard help icon, footer links, or direct URL
+
+### Internal Navigation
+- **Category Pages:** `/support/{category}` (e.g., `/support/shipments`)
+- **Article Pages:** `/support/article/{id}` (e.g., `/support/article/001`)
+- **FAQ Pages:** `/support/faq/{category}` (e.g., `/support/faq/getting-started`)
+- **Video Pages:** `/support/video/{id}` (e.g., `/support/video/001`)
+- **Contact Page:** `/support/contact`
+
+### External Links
+- **Community Forum:** Link to external community platform
+- **API Documentation:** Link to developer documentation
+- **Status Page:** Link to system status page
+- **Social Media:** Link to support social channels
+
+---
+
+## 10. Accessibility Requirements
+
+### ARIA Labels
+- **Search Input:** `aria-label="Search help center"`
+- **FAQ Items:** `aria-label="FAQ: {question}"`
+- **Video Players:** `aria-label="Video tutorial: {title}"`
+- **Navigation:** `aria-label="Help category navigation"`
+
+### Keyboard Navigation
+- **Tab Order:** Logical flow through all interactive elements
+- **Arrow Keys:** Navigate between FAQ items and articles
+- **Enter/Space:** Expand/collapse FAQs, play videos
+- **Escape:** Close modals and return to main content
+
+### Screen Reader Support
+- **Live Regions:** Announce search results and content changes
+- **Status Updates:** Announce video progress and form submissions
+- **Content Structure:** Proper heading hierarchy and landmark regions
+
+### Video Accessibility
+- **Captions:** Provide closed captions for all video content
+- **Transcripts:** Full text transcripts for video tutorials
+- **Audio Descriptions:** Describe visual content for blind users
+- **Keyboard Controls:** Full keyboard navigation for video players
+
+---
+
+## 11. Performance & UX Considerations
+
+### Loading States
+- **Initial Load:** Skeleton loading for content sections
+- **Search Results:** Loading indicator during search
+- **Video Loading:** Progressive loading with thumbnail previews
+- **Category Navigation:** Smooth transitions between categories
+
+### Content Optimization
+- **Lazy Loading:** Load content as needed
+- **Image Optimization:** Responsive images with proper sizing
+- **Video Optimization:** Adaptive bitrate, multiple quality options
+- **Caching Strategy:** Cache frequently accessed content
+
+### Transitions & Animations
+- **Content Transitions:** Smooth fade-in for search results
+- **FAQ Expansion:** Smooth height animation with easing
+- **Category Changes:** Smooth content replacement
+- **Loading States:** Subtle loading animations
+
+---
+
+## 12. Error Handling & Edge Cases
+
+### Empty States
+- **No Search Results:** Clear message with search suggestions
+- **Empty Category:** Friendly message with related categories
+- **No Content:** CTA to contact support or browse other categories
+
+### Error States
+- **Search Failures:** Retry button with error message
+- **Video Loading Errors:** Fallback thumbnail with retry option
+- **Form Submission Errors:** Clear error messages with suggestions
+- **Network Issues:** Offline indicator with cached content
+
+### Content Fallbacks
+- **Missing Images:** Placeholder images with alt text
+- **Video Unavailable:** Article version as fallback
+- **Broken Links:** 404 handling with search suggestions
+- **Content Not Found:** Redirect to relevant category
+
+---
+
+## 13. Testing & Validation
+
+### Functionality Testing
+- **Search Accuracy:** Verify search finds relevant content
+- **Navigation Flow:** Test all category and content navigation
+- **Form Submissions:** Test contact forms and feedback systems
+- **Video Playback:** Test video controls and progress tracking
+
+### Accessibility Testing
+- **Screen Reader:** Test with NVDA, JAWS, VoiceOver
+- **Keyboard Navigation:** Test all interactions without mouse
+- **Color Contrast:** Verify WCAG AA compliance
+- **Video Accessibility:** Test captions, transcripts, and controls
+
+### Performance Testing
+- **Search Performance:** Test search with large content datasets
+- **Video Loading:** Test video performance on different connections
+- **Mobile Performance:** Test on various mobile devices
+- **Memory Usage:** Monitor memory consumption during video playback
+
+---
+
+## 14. Implementation Checklist
+
+### Core Features
+- [ ] Global search across all content types
+- [ ] Categorized FAQ system with expandable items
+- [ ] Help articles with rich content and metadata
+- [ ] Video tutorials with custom controls and transcripts
+- [ ] Contact support forms and live chat mock
+
+### UI Components
+- [ ] Header with prominent search and quick actions
+- [ ] Category navigation with expandable tree structure
+- [ ] Content cards for articles, FAQs, and videos
+- [ ] Search results with filtering and sorting
+- [ ] Contact forms with issue categorization
+
+### Accessibility
+- [ ] ARIA labels and roles for all interactive elements
+- [ ] Keyboard navigation support for all features
+- [ ] Screen reader compatibility with proper landmarks
+- [ ] Video accessibility with captions and transcripts
+
+### Performance
+- [ ] Efficient search and filtering algorithms
+- [ ] Optimized video loading and playback
+- [ ] Smooth transitions and animations
+- [ ] Responsive design for all screen sizes
+
+---
+
+## 15. Future Enhancements (Phase 2+)
+
+### Advanced Features
+- **AI-Powered Search:** Natural language search with semantic understanding
+- **Personalized Content:** Content recommendations based on user behavior
+- **Interactive Tutorials:** Step-by-step guided tours with progress tracking
+- **Community Features:** User-generated content, Q&A forums
+
+### Analytics & Insights
+- **Content Analytics:** Most viewed articles, search patterns
+- **User Behavior:** Time spent on content, completion rates
+- **Feedback Analysis:** Sentiment analysis of user feedback
+- **A/B Testing:** Different content formats and layouts
+
+### Integration Features
+- **Knowledge Base API:** External knowledge base integration
+- **Chatbot Integration:** AI-powered support chatbot
+- **Video Platform Integration:** YouTube, Vimeo, or custom video hosting
+- **CRM Integration:** Support ticket management system
+
+---
+
+## 16. Content Management & SEO
+
+### Content Structure
+- **SEO Optimization:** Meta tags, structured data, sitemap
+- **Content Versioning:** Track changes and updates
+- **Translation Support:** Multi-language content structure
+- **Content Scheduling:** Plan content updates and releases
+
+### Search Engine Optimization
+- **Internal Linking:** Link related content for better discovery
+- **URL Structure:** Clean, descriptive URLs for all content
+- **Meta Descriptions:** Compelling descriptions for search results
+- **Schema Markup:** Rich snippets for FAQ and how-to content
+
+---
+
+**Goal:**  
+Deliver a comprehensive, accessible, and user-friendly Support & Help Center that empowers merchants with self-service capabilities, reduces support ticket volume, and provides an engaging learning experience for all platform features and best practices.

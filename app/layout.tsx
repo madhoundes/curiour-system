@@ -15,6 +15,18 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Parcego - Courier Business Platform",
   description: "Fast, reliable, and affordable delivery solutions for small businesses",
+  icons: {
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/icon', type: 'image/png', sizes: '32x32' },
+      { url: '/icon-192', type: 'image/png', sizes: '192x192' },
+    ],
+    shortcut: '/favicon.svg',
+    apple: [
+      { url: '/apple-icon', type: 'image/png', sizes: '180x180' },
+    ],
+  },
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({

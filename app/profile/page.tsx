@@ -21,6 +21,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { Icon } from "@/components/ui/icon";
 
 const BusinessInfoSchema = z.object({
   businessName: z.string().min(2, "Business name is required"),
@@ -199,22 +200,31 @@ export default function ProfileAccountPage() {
       <div className="bg-white border-b shadow-sm">
         <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
-            <div className="flex items-center gap-3">
+            {/* Left side: Back button */}
+            <div className="flex-shrink-0">
               <Button
                 id="parcego-profile-back-btn"
                 variant="ghost"
                 size="sm"
                 onClick={handleBackToDashboard}
                 aria-label="Back to Dashboard"
+                className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200 rounded-full"
               >
-                <span aria-hidden className="mr-2">←</span>
-                Back to Dashboard
+                <Icon name="ArrowLeft" size={18} />
               </Button>
-              <div className="h-6 border-l" />
-              <div>
+            </div>
+
+            {/* Center: Title and description */}
+            <div className="flex-1 flex justify-center">
+              <div className="text-center">
                 <h1 className="text-xl font-semibold text-gray-900">Profile & Account</h1>
                 <p className="text-sm text-gray-500">Manage business details, preferences, notifications, and API settings.</p>
               </div>
+            </div>
+
+            {/* Right side: Spacer to balance layout */}
+            <div className="flex-shrink-0 w-10">
+              {/* Invisible spacer to maintain title centering */}
             </div>
           </div>
         </div>

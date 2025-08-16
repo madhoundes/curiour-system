@@ -310,19 +310,41 @@ export default function SuperAdminDashboard() {
                     <td className="p-4">${merchant.monthlyRevenue.toLocaleString()}</td>
                     <td className="p-4">
                       <div className="flex space-x-2">
-                        <Button variant="outline" size="sm" id={`parcego-merchant-view-${merchant.id}`}>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          id={`parcego-merchant-view-${merchant.id}`}
+                          onClick={() => console.log(`View merchant ${merchant.id}`)}
+                        >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" id={`parcego-merchant-edit-${merchant.id}`}>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          id={`parcego-merchant-edit-${merchant.id}`}
+                          onClick={() => console.log(`Edit merchant ${merchant.id}`)}
+                        >
                           <Edit className="h-4 w-4" />
                         </Button>
                         {merchant.status === "pending" && (
-                          <Button variant="outline" size="sm" className="text-green-600" id={`parcego-merchant-approve-${merchant.id}`}>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-green-600" 
+                            id={`parcego-merchant-approve-${merchant.id}`}
+                            onClick={() => console.log(`Approve merchant ${merchant.id}`)}
+                          >
                             <UserCheck className="h-4 w-4" />
                           </Button>
                         )}
                         {merchant.status === "active" && (
-                          <Button variant="outline" size="sm" className="text-red-600" id={`parcego-merchant-suspend-${merchant.id}`}>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-red-600" 
+                            id={`parcego-merchant-suspend-${merchant.id}`}
+                            onClick={() => console.log(`Suspend merchant ${merchant.id}`)}
+                          >
                             <Ban className="h-4 w-4" />
                           </Button>
                         )}
@@ -406,19 +428,41 @@ export default function SuperAdminDashboard() {
                     <td className="p-4">{courier.vehicle}</td>
                     <td className="p-4">
                       <div className="flex space-x-2">
-                        <Button variant="outline" size="sm" id={`parcego-courier-view-${courier.id}`}>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          id={`parcego-courier-view-${courier.id}`}
+                          onClick={() => console.log(`View courier ${courier.id}`)}
+                        >
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="outline" size="sm" id={`parcego-courier-edit-${courier.id}`}>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          id={`parcego-courier-edit-${courier.id}`}
+                          onClick={() => console.log(`Edit courier ${courier.id}`)}
+                        >
                           <Edit className="h-4 w-4" />
                         </Button>
                         {courier.status === "pending" && (
-                          <Button variant="outline" size="sm" className="text-green-600" id={`parcego-courier-verify-${courier.id}`}>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-green-600" 
+                            id={`parcego-courier-verify-${courier.id}`}
+                            onClick={() => console.log(`Verify courier ${courier.id}`)}
+                          >
                             <UserCheck className="h-4 w-4" />
                           </Button>
                         )}
                         {courier.status === "active" && (
-                          <Button variant="outline" size="sm" className="text-red-600" id={`parcego-courier-deactivate-${courier.id}`}>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="text-red-600" 
+                            id={`parcego-courier-deactivate-${courier.id}`}
+                            onClick={() => console.log(`Deactivate courier ${courier.id}`)}
+                          >
                             <UserX className="h-4 w-4" />
                           </Button>
                         )}
@@ -514,15 +558,15 @@ export default function SuperAdminDashboard() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span>Platform Maintenance Mode</span>
-              <Button variant="outline" size="sm">Configure</Button>
+              <Button variant="outline" size="sm" onClick={() => console.log('Configure maintenance mode')}>Configure</Button>
             </div>
             <div className="flex items-center justify-between">
               <span>API Rate Limiting</span>
-              <Button variant="outline" size="sm">Manage</Button>
+              <Button variant="outline" size="sm" onClick={() => console.log('Manage API rate limiting')}>Manage</Button>
             </div>
             <div className="flex items-center justify-between">
               <span>Email Notifications</span>
-              <Button variant="outline" size="sm">Settings</Button>
+              <Button variant="outline" size="sm" onClick={() => console.log('Email notification settings')}>Settings</Button>
             </div>
           </CardContent>
         </Card>
@@ -538,11 +582,11 @@ export default function SuperAdminDashboard() {
             </div>
             <div className="flex items-center justify-between">
               <span>API Security</span>
-              <Button variant="outline" size="sm">Configure</Button>
+              <Button variant="outline" size="sm" onClick={() => console.log('Configure API security')}>Configure</Button>
             </div>
             <div className="flex items-center justify-between">
               <span>Access Logs</span>
-              <Button variant="outline" size="sm">View</Button>
+              <Button variant="outline" size="sm" onClick={() => console.log('View access logs')}>View</Button>
             </div>
           </CardContent>
         </Card>
@@ -554,15 +598,15 @@ export default function SuperAdminDashboard() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span>Payment Gateway</span>
-              <Button variant="outline" size="sm">Stripe Settings</Button>
+              <Button variant="outline" size="sm" onClick={() => console.log('Stripe settings')}>Stripe Settings</Button>
             </div>
             <div className="flex items-center justify-between">
               <span>Commission Rates</span>
-              <Button variant="outline" size="sm">Configure</Button>
+              <Button variant="outline" size="sm" onClick={() => console.log('Configure commission rates')}>Configure</Button>
             </div>
             <div className="flex items-center justify-between">
               <span>Payout Schedule</span>
-              <Button variant="outline" size="sm">Manage</Button>
+              <Button variant="outline" size="sm" onClick={() => console.log('Manage payout schedule')}>Manage</Button>
             </div>
           </CardContent>
         </Card>
@@ -574,15 +618,15 @@ export default function SuperAdminDashboard() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span>Help Documentation</span>
-              <Button variant="outline" size="sm">Manage</Button>
+              <Button variant="outline" size="sm" onClick={() => console.log('Manage help documentation')}>Manage</Button>
             </div>
             <div className="flex items-center justify-between">
               <span>Support Tickets</span>
-              <Button variant="outline" size="sm">View Queue</Button>
+              <Button variant="outline" size="sm" onClick={() => console.log('View support ticket queue')}>View Queue</Button>
             </div>
             <div className="flex items-center justify-between">
               <span>System Status Page</span>
-              <Button variant="outline" size="sm">Configure</Button>
+              <Button variant="outline" size="sm" onClick={() => console.log('Configure system status page')}>Configure</Button>
             </div>
           </CardContent>
         </Card>

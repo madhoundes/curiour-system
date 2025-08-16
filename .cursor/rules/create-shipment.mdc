@@ -37,7 +37,7 @@ Build the complete UI flow for creating a new shipment, including package detail
 - **Package Details Page:**  
   - Dimensions (length, width, height)
   - Weight and unit selection
-  - Package type (box, envelope, etc.)
+  - Package type (box only - default selection)
   - Fragile/valuable item flags
   - Custom packaging requirements
 

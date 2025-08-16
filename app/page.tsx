@@ -201,6 +201,36 @@ export default function MerchantLandingPage() {
               <span className="text-sm">99.9% Uptime</span>
             </div>
           </div>
+          
+          {/* Footer Links */}
+          <div className="mt-8 pt-6 border-t border-gray-200">
+            <div className="flex items-center justify-center space-x-6 text-sm">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/support')}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                Help & Support
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/dashboard')}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                Dashboard
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/create-shipment')}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                Create Shipment
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

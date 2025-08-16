@@ -377,7 +377,7 @@ export default function CourierScanPackagePage() {
         <Card id="parcego-scan-manual-card" className="parcego-scan__manual-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center">
-              <Icon name="Edit3" size={20} className="mr-2" />
+                              <Icon name="Edit" size={20} className="mr-2" />
               Manual Entry
             </CardTitle>
             <CardDescription>

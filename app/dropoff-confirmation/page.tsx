@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useWizardBack } from "@/lib/wizard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
@@ -24,9 +25,11 @@ interface DropoffLocation {
 
 export default function DropoffConfirmationPage() {
   const router = useRouter();
+  const wizardBack = useWizardBack();
   const [selectedLocation, setSelectedLocation] = useState<DropoffLocation | null>(null);
   const [isConfirming, setIsConfirming] = useState(false);
   const [confirmationComplete, setConfirmationComplete] = useState(false);
+  const [isShipmentFlow, setIsShipmentFlow] = useState(false);
 
   // Mock tracking number (deferred to client to avoid SSR hydration mismatch)
   const [trackingNumber, setTrackingNumber] = useState<string>("");
@@ -43,9 +46,18 @@ export default function DropoffConfirmationPage() {
       setTrackingNumber(generateTracking());
     }
 
-    const savedLocation = localStorage.getItem('selectedDropoffLocation');
-    if (savedLocation) {
-      setSelectedLocation(JSON.parse(savedLocation));
+    // Check for both types of saved locations
+    const savedShipmentLocation = localStorage.getItem('selectedShipmentDropoffLocation');
+    const savedGeneralLocation = localStorage.getItem('selectedDropoffLocation');
+    
+    if (savedShipmentLocation) {
+      setSelectedLocation(JSON.parse(savedShipmentLocation));
+      // This is from shipment flow
+      setIsShipmentFlow(true);
+    } else if (savedGeneralLocation) {
+      setSelectedLocation(JSON.parse(savedGeneralLocation));
+      // This is from general finder
+      setIsShipmentFlow(false);
     } else {
       // If no location selected, redirect back to finder
       router.push('/find-dropoff');
@@ -53,7 +65,13 @@ export default function DropoffConfirmationPage() {
   }, [router, trackingNumber]);
 
   const handleBackToFinder = () => {
-    router.push('/find-dropoff');
+    if (isShipmentFlow) {
+      // Go back to shipment dropoff page
+      router.push('/shipment-dropoff');
+    } else {
+      // Go back to general finder
+      wizardBack();
+    }
   };
 
   const handleConfirmDropoff = () => {
@@ -64,8 +82,12 @@ export default function DropoffConfirmationPage() {
       setIsConfirming(false);
       setConfirmationComplete(true);
       
-      // Clean up localStorage
-      localStorage.removeItem('selectedDropoffLocation');
+      // Clean up localStorage based on flow type
+      if (isShipmentFlow) {
+        localStorage.removeItem('selectedShipmentDropoffLocation');
+      } else {
+        localStorage.removeItem('selectedDropoffLocation');
+      }
     }, 2000);
   };
 

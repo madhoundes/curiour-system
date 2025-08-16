@@ -2,19 +2,22 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useWizardBack } from "@/lib/wizard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Icon } from "@/components/ui/icon";
+import { PageHeader } from "@/components/ui/page-header";
+import { createStepperSteps } from "@/components/ui/stepper";
 
 interface ShipmentData {
   recipientName: string;
   recipientCompany: string;
   recipientAddress: string;
   recipientCity: string;
-  recipientState: string;
-  recipientZip: string;
+  recipientProvince: string;
+  recipientPostalCode: string;
   recipientPhone: string;
   recipientEmail: string;
   packageType: string;
@@ -33,14 +36,15 @@ interface ShipmentData {
 
 export default function PackageDetailsPage() {
   const router = useRouter();
+  const wizardBack = useWizardBack();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<ShipmentData>({
     recipientName: "",
     recipientCompany: "",
     recipientAddress: "",
     recipientCity: "",
-    recipientState: "",
-    recipientZip: "",
+    recipientProvince: "",
+    recipientPostalCode: "",
     recipientPhone: "",
     recipientEmail: "",
     packageType: "box",
@@ -76,9 +80,8 @@ export default function PackageDetailsPage() {
   };
 
   const handleBackToShipmentDetails = () => {
-    // Save current data before going back
     localStorage.setItem('shipmentFormData', JSON.stringify(formData));
-    router.push('/create-shipment');
+    wizardBack();
   };
 
   const handleContinueToQuote = () => {
@@ -97,52 +100,17 @@ export default function PackageDetailsPage() {
     return formData.weight && formData.length && formData.width && formData.height;
   };
 
+  const stepperSteps = createStepperSteps(2);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleBackToShipmentDetails}
-                id="parcego-package-details-back-btn"
-                className="parcego-nav__back-btn"
-              >
-                <span aria-hidden className="mr-2 text-sm">←</span>
-                Back to Shipment Details
-              </Button>
-              <div className="h-6 border-l border-gray-300"></div>
-              <h1 className="text-xl font-semibold text-gray-900">Package Details</h1>
-            </div>
-            
-            <div className="flex items-center space-x-2 text-sm text-gray-500">
-              <div className="flex items-center space-x-1">
-                <div className="w-6 h-6 bg-green-600 rounded-full flex items-center justify-center">
-                  <span className="text-white text-xs font-medium">✓</span>
-                </div>
-                <span>Shipment Details</span>
-              </div>
-              <span aria-hidden className="text-sm">→</span>
-              <div className="flex items-center space-x-1">
-                <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
-                  <span className="text-white text-xs font-medium">2</span>
-                </div>
-                <span>Package Details</span>
-              </div>
-              <span aria-hidden className="text-sm">→</span>
-              <div className="flex items-center space-x-1">
-                <div className="w-6 h-6 bg-gray-300 rounded-full flex items-center justify-center">
-                  <span className="text-gray-600 text-xs font-medium">3</span>
-                </div>
-                <span>Quote & Pay</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Package Details"
+        onBack={handleBackToShipmentDetails}
+        backLabel="Back to Shipment Details"
+        steps={stepperSteps}
+      />
 
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
@@ -333,13 +301,6 @@ export default function PackageDetailsPage() {
                     color: '#ea580c'
                   },
                   {
-                    key: 'valuable',
-                    label: 'High Value Item',
-                    desc: 'Package contains valuable items (over $100)',
-                    iconName: 'DollarSign',
-                    color: '#ca8a04'
-                  },
-                  {
                     key: 'insurance',
                     label: 'Additional Insurance',
                     desc: 'Add extra insurance coverage for this shipment',
@@ -414,13 +375,12 @@ export default function PackageDetailsPage() {
                       {formData.serviceType}
                     </span>
                   </div>
-                  {(formData.fragile || formData.valuable || formData.insurance) && (
+                  {(formData.fragile || formData.insurance) && (
                     <div className="md:col-span-2">
                       <span className="font-medium text-green-800">Special Handling:</span>
                       <span className="ml-2 text-green-700">
                         {[
                           formData.fragile && 'Fragile',
-                          formData.valuable && 'High Value',
                           formData.insurance && 'Additional Insurance'
                         ].filter(Boolean).join(', ')}
                       </span>
@@ -434,13 +394,14 @@ export default function PackageDetailsPage() {
           {/* Action Buttons */}
           <div className="flex justify-between items-center pt-6 border-t border-gray-200">
             <Button
-              variant="outline"
+              variant="ghost"
+              size="sm"
               onClick={handleBackToShipmentDetails}
-              className="parcego-action-btn parcego-action-btn--back"
+              className="parcego-action-btn parcego-action-btn--back p-2 text-gray-700 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200 rounded-full"
               id="parcego-back-shipment-details-btn"
+              aria-label="Back to Shipment Details"
             >
-              <Icon name="ArrowLeft" size={16} className="mr-2" />
-              Back to Shipment Details
+              <Icon name="ArrowLeft" size={18} />
             </Button>
             
             <Button

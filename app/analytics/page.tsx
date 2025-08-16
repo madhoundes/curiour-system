@@ -45,10 +45,7 @@ const statusDistributionData = [
 ];
 
 const serviceMixData = [
-  { name: "Standard", value: 1680, color: "#8b5cf6" },
-  { name: "Express", value: 890, color: "#06b6d4" },
-  { name: "Overnight", value: 430, color: "#f97316" },
-  { name: "Same Day", value: 280, color: "#ec4899" }
+  { name: "Parcego Standard", value: 3280, color: "#8b5cf6" }
 ];
 
 const revenueData = [
@@ -121,39 +118,46 @@ export default function AnalyticsPage() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 items-center justify-between">
             <div className="flex items-center gap-3">
-              <Button 
-                id="parcego-analytics-back-btn" 
-                variant="ghost" 
-                size="sm" 
-                onClick={handleBack}
-                className="flex items-center gap-2"
-              >
-                <Icon name="ArrowLeft" size={16} />
-                Back to Dashboard
-              </Button>
-              <div className="h-6 border-l border-gray-300" />
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">Analytics Dashboard</h1>
-                <p className="text-sm text-gray-500">Performance insights and shipping analytics</p>
+              {/* Left side: Back button */}
+              <div className="flex-shrink-0">
+                <Button 
+                  id="parcego-analytics-back-btn" 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleBack}
+                  className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition-all duration-200 rounded-full"
+                  aria-label="Back to Dashboard"
+                >
+                  <Icon name="ArrowLeft" size={18} />
+                </Button>
               </div>
-            </div>
 
-            <div className="flex items-center gap-2">
-              <select
-                value={timeRange}
-                onChange={(e) => setTimeRange(e.target.value)}
-                className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="7days">Last 7 days</option>
-                <option value="30days">Last 30 days</option>
-                <option value="3months">Last 3 months</option>
-                <option value="6months">Last 6 months</option>
-                <option value="12months">Last 12 months</option>
-              </select>
-              <Button variant="outline" size="sm">
-                <Icon name="Download" size={16} className="mr-2" />
-                Export
-              </Button>
+              {/* Center: Title and description */}
+              <div className="flex-1 flex justify-center">
+                <div className="text-center">
+                  <h1 className="text-xl font-semibold text-gray-900">Analytics Dashboard</h1>
+                  <p className="text-sm text-gray-500">Performance insights and shipping analytics</p>
+                </div>
+              </div>
+
+              {/* Right side: Controls */}
+              <div className="flex-shrink-0 flex items-center gap-2">
+                <select
+                  value={timeRange}
+                  onChange={(e) => setTimeRange(e.target.value)}
+                  className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="7days">Last 7 days</option>
+                  <option value="30days">Last 30 days</option>
+                  <option value="3months">Last 3 months</option>
+                  <option value="6months">Last 6 months</option>
+                  <option value="12months">Last 12 months</option>
+                </select>
+                <Button variant="outline" size="sm">
+                  <Icon name="Download" size={16} className="mr-2" />
+                  Export
+                </Button>
+              </div>
             </div>
           </div>
         </div>
@@ -397,9 +401,9 @@ export default function AnalyticsPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Icon name="Truck" size={20} className="text-indigo-600" />
-                Service Type Distribution
+                Service Distribution
               </CardTitle>
-              <CardDescription>Breakdown by shipping service levels</CardDescription>
+              <CardDescription>Current shipping service usage</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="h-80">

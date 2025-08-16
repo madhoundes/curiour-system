@@ -2,19 +2,25 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useWizardBack } from "@/lib/wizard";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Icon } from "@/components/ui/icon";
+import { PageHeader } from "@/components/ui/page-header";
+import { createStepperSteps } from "@/components/ui/stepper";
+import { jsPDF } from "jspdf";
+import JsBarcode from "jsbarcode";
+import QRCode from "qrcode";
 
 interface OrderData {
   recipientName: string;
   recipientCompany: string;
   recipientAddress: string;
   recipientCity: string;
-  recipientState: string;
-  recipientZip: string;
+  recipientProvince: string;
+  recipientPostalCode: string;
   recipientPhone: string;
   recipientEmail: string;
   packageType: string;
@@ -41,10 +47,12 @@ interface OrderData {
 
 export default function PurchaseLabelPage() {
   const router = useRouter();
+  const wizardBack = useWizardBack();
   const [isProcessing, setIsProcessing] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [orderData, setOrderData] = useState<OrderData | null>(null);
   const [trackingNumber, setTrackingNumber] = useState("");
+  const [isDownloading, setIsDownloading] = useState(false);
   
   const [cardNumber, setCardNumber] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
@@ -53,8 +61,8 @@ export default function PurchaseLabelPage() {
   const [billingAddress, setBillingAddress] = useState({
     address: "",
     city: "",
-    state: "",
-    zip: ""
+    province: "",
+    postalCode: ""
   });
 
   // Load order data on component mount
@@ -87,10 +95,10 @@ export default function PurchaseLabelPage() {
     
     // Sample billing address
     setBillingAddress({
-      address: "123 Main Street",
-      city: "New York",
-      state: "NY",
-      zip: "10001"
+      address: "123 Main Avenue Crescent",
+      city: "Toronto",
+      province: "ON",
+      postalCode: "M5V3A8"
     });
   }, []);
 
@@ -113,7 +121,7 @@ export default function PurchaseLabelPage() {
   };
 
   const handleBackToQuote = () => {
-    router.push('/quote-preview');
+    wizardBack();
   };
 
   const handleProcessPayment = () => {
@@ -133,10 +141,212 @@ export default function PurchaseLabelPage() {
     }, 3000);
   };
 
-  const handleDownloadLabel = () => {
-    // Simulate label download
-    console.log('Downloading label for tracking number:', trackingNumber);
-    // In real app, this would trigger PDF generation and download
+  const generateShippingLabelPDF = async () => {
+    if (!orderData || !trackingNumber) return;
+    
+    // Create new PDF document (4x6 inches = 288x432 points)
+    const pdf = new jsPDF('p', 'pt', [288, 432]);
+    
+    // Set background to white
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, 288, 432, 'F');
+    
+    // Add border
+    pdf.setDrawColor(0, 0, 0);
+    pdf.setLineWidth(2);
+    pdf.rect(10, 10, 268, 412);
+    
+    // Header - Company Logo/Name
+    pdf.setFontSize(18);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(0, 145, 245); // Blue color
+    pdf.text('PARCEGO', 144, 35, { align: 'center' });
+    
+    // Subtitle
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(100, 100, 100);
+    pdf.text('Shipping Label', 144, 50, { align: 'center' });
+    
+    // Tracking Number
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(0, 0, 0);
+    pdf.text('Tracking:', 20, 80);
+    pdf.setFontSize(14);
+    pdf.text(trackingNumber, 20, 95);
+    
+    // Service Type
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(100, 100, 100);
+    pdf.text('Service:', 20, 115);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(0, 0, 0);
+    pdf.text(orderData.selectedQuote.name, 20, 130);
+    
+    // FROM Section
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(0, 0, 0);
+    pdf.text('FROM:', 20, 160);
+    
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.text('John\'s Electronics Store', 20, 175);
+    pdf.text('123 Business St, Suite 100', 20, 190);
+    pdf.text('New York, NY 10001', 20, 205);
+    
+    // TO Section
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(0, 0, 0);
+    pdf.text('TO:', 20, 235);
+    
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.text(orderData.recipientName, 20, 250);
+    if (orderData.recipientCompany) {
+      pdf.text(orderData.recipientCompany, 20, 265);
+    }
+    pdf.text(orderData.recipientAddress, 20, 280);
+    pdf.text(`${orderData.recipientCity}, ${orderData.recipientProvince} ${orderData.recipientPostalCode}`, 20, 295);
+    
+    // Package Details
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(0, 0, 0);
+    pdf.text('PACKAGE:', 20, 325);
+    
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(9);
+    pdf.text(`Dimensions: ${orderData.length}×${orderData.width}×${orderData.height} ${orderData.dimensionUnit}`, 20, 340);
+    pdf.text(`Weight: ${orderData.weight} ${orderData.weightUnit}`, 20, 355);
+    pdf.text(`Type: ${orderData.packageType}`, 20, 370);
+    
+    // Special Handling
+    if (orderData.fragile || orderData.valuable || orderData.insurance) {
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+      pdf.setTextColor(0, 0, 0);
+      pdf.text('HANDLING:', 20, 395);
+      
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      let yPos = 410;
+      if (orderData.fragile) {
+        pdf.setTextColor(220, 53, 69); // Red
+        pdf.text('FRAGILE', 20, yPos);
+        yPos += 15;
+      }
+      if (orderData.valuable) {
+        pdf.setTextColor(255, 193, 7); // Yellow
+        pdf.text('HIGH VALUE', 20, yPos);
+        yPos += 15;
+      }
+      if (orderData.insurance) {
+        pdf.setTextColor(0, 123, 255); // Blue
+        pdf.text('INSURED', 20, yPos);
+      }
+    }
+    
+    // Add Barcode (right side of the label)
+    try {
+      // Create a temporary canvas for the barcode
+      const canvas = document.createElement('canvas');
+      canvas.width = 120;
+      canvas.height = 60;
+      
+      // Generate barcode
+      JsBarcode(canvas, trackingNumber, {
+        format: "CODE128",
+        width: 2,
+        height: 50,
+        displayValue: false,
+        background: "#ffffff",
+        lineColor: "#000000"
+      });
+      
+      // Convert canvas to image data and add to PDF
+      const barcodeImageData = canvas.toDataURL('image/png');
+      pdf.addImage(barcodeImageData, 'PNG', 150, 80, 100, 50);
+      
+      // Add barcode label
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(100, 100, 100);
+      pdf.text('Scan to track', 200, 135, { align: 'center' });
+    } catch (error) {
+      console.warn('Could not generate barcode:', error);
+      // Fallback: just add text
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(100, 100, 100);
+      pdf.text('Barcode: ' + trackingNumber, 150, 110);
+    }
+    
+    // Add QR Code (below barcode)
+    try {
+      // Generate QR code data URL
+      const qrCodeDataURL = await QRCode.toDataURL(trackingNumber, {
+        width: 60,
+        margin: 1,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      });
+      
+      // Add QR code to PDF
+      pdf.addImage(qrCodeDataURL, 'PNG', 170, 150, 60, 60);
+      
+      // Add QR code label
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setTextColor(100, 100, 100);
+      pdf.text('QR Code', 200, 215, { align: 'center' });
+    } catch (error) {
+      console.warn('Could not generate QR code:', error);
+    }
+    
+    // Footer - Instructions
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setTextColor(100, 100, 100);
+    pdf.text('Scan barcode or QR code to track package', 144, 420, { align: 'center' });
+    
+    return pdf;
+  };
+
+  const handleDownloadLabel = async () => {
+    if (!orderData || !trackingNumber) {
+      console.error('Missing order data or tracking number');
+      return;
+    }
+    
+    setIsDownloading(true);
+    
+    try {
+      // Generate the PDF (now async)
+      const pdf = await generateShippingLabelPDF();
+      
+      if (pdf) {
+        // Generate filename with tracking number and date
+        const date = new Date().toISOString().split('T')[0];
+        const filename = `parcego-shipping-label-${trackingNumber}-${date}.pdf`;
+        
+        // Save the PDF
+        pdf.save(filename);
+        
+        // Optional: Show success message
+        console.log('Shipping label downloaded successfully:', filename);
+      }
+    } catch (error) {
+      console.error('Error generating PDF:', error);
+      // You could show a toast notification here
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const handlePrintLabel = () => {
@@ -181,6 +391,8 @@ export default function PurchaseLabelPage() {
     );
   }
 
+  const stepperSteps = createStepperSteps(4);
+
   // Success screen
   if (paymentSuccess) {
     return (
@@ -216,7 +428,7 @@ export default function PurchaseLabelPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Destination:</span>
-                  <span className="font-medium">{orderData.recipientCity}, {orderData.recipientState}</span>
+                  <span className="font-medium">{orderData.recipientCity}, {orderData.recipientProvince}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Service:</span>
@@ -238,38 +450,38 @@ export default function PurchaseLabelPage() {
             <CardHeader>
               <CardTitle>Label Actions</CardTitle>
               <CardDescription>
-                Download or print your shipping label (4x6 inches)
+                Download your shipping label or preview and print it (4x6 inches)
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <Button
-                onClick={() => router.push(`/label/preview?tracking=${encodeURIComponent(trackingNumber || "PCG-TEST-000001")}`)}
-                variant="outline"
-                className="w-full"
-                id="parcego-label-open-preview-btn"
-                aria-label="Open label 4x6 preview"
-              >
-                <Icon name="ScanBarcode" size={16} className="mr-2" />
-                Open Label Preview (4x6)
-              </Button>
-
               <div className="flex space-x-4">
                 <Button
                   onClick={handleDownloadLabel}
+                  disabled={isDownloading}
                   className="parcego-action-btn parcego-action-btn--download flex-1"
                   id="parcego-download-label-btn"
                 >
-                  <Icon name="Download" size={16} className="mr-2" />
-                  Download Label (PDF)
+                  {isDownloading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Generating PDF...
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="Download" size={16} className="mr-2" />
+                      Download Label (PDF)
+                    </>
+                  )}
                 </Button>
                 <Button
+                  onClick={() => router.push(`/label/preview?tracking=${encodeURIComponent(trackingNumber || "PCG-TEST-000001")}`)}
                   variant="outline"
-                  onClick={handlePrintLabel}
-                  className="parcego-action-btn parcego-action-btn--print flex-1"
-                  id="parcego-print-label-btn"
+                  className="parcego-action-btn parcego-action-btn--preview-print flex-1"
+                  id="parcego-preview-print-label-btn"
+                  aria-label="Preview and print shipping label"
                 >
-                  <Icon name="Printer" size={16} className="mr-2" />
-                  Print Label
+                  <Icon name="ScanBarcode" size={16} className="mr-2" />
+                  Preview & Print Label
                 </Button>
               </div>
 
@@ -283,7 +495,7 @@ export default function PurchaseLabelPage() {
               </div>
 
               <Button
-                onClick={() => router.push('/find-dropoff')}
+                onClick={() => router.push('/shipment-dropoff')}
                 variant="outline"
                 className="parcego-action-btn parcego-action-btn--find-dropoff w-full"
                 id="parcego-find-dropoff-from-success-btn"
@@ -312,31 +524,12 @@ export default function PurchaseLabelPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center space-x-4">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleBackToQuote}
-                id="parcego-purchase-back-btn"
-                className="parcego-nav__back-btn"
-              >
-                              <Icon name="ArrowLeft" size={16} className="mr-2" />
-                Back to Quote
-              </Button>
-              <div className="h-6 border-l border-gray-300"></div>
-              <h1 className="text-xl font-semibold text-gray-900">Complete Purchase</h1>
-            </div>
-            
-            <div className="flex items-center space-x-2 text-sm text-gray-500">
-              <Icon name="Shield" size={16} className="text-green-600" />
-              <span>Secure Checkout</span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="Complete Purchase"
+        onBack={handleBackToQuote}
+        backLabel="Back to Quote"
+        steps={stepperSteps}
+      />
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -437,7 +630,7 @@ export default function PurchaseLabelPage() {
                   <Label htmlFor="parcego-billing-address">Address</Label>
                   <Input
                     id="parcego-billing-address"
-                    placeholder="123 Main Street"
+                    placeholder="123 Main Avenue Crescent"
                     value={billingAddress.address}
                     onChange={(e) => setBillingAddress({...billingAddress, address: e.target.value})}
                     className="parcego-form__input"
@@ -448,29 +641,29 @@ export default function PurchaseLabelPage() {
                     <Label htmlFor="parcego-billing-city">City</Label>
                     <Input
                       id="parcego-billing-city"
-                      placeholder="New York"
+                      placeholder="Toronto"
                       value={billingAddress.city}
                       onChange={(e) => setBillingAddress({...billingAddress, city: e.target.value})}
                       className="parcego-form__input"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="parcego-billing-state">State</Label>
+                    <Label htmlFor="parcego-billing-province">Province</Label>
                     <Input
-                      id="parcego-billing-state"
-                      placeholder="NY"
-                      value={billingAddress.state}
-                      onChange={(e) => setBillingAddress({...billingAddress, state: e.target.value})}
+                      id="parcego-billing-province"
+                      placeholder="ON"
+                      value={billingAddress.province}
+                      onChange={(e) => setBillingAddress({...billingAddress, province: e.target.value})}
                       className="parcego-form__input"
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="parcego-billing-zip">ZIP Code</Label>
+                    <Label htmlFor="parcego-billing-postal-code">Postal Code</Label>
                     <Input
-                      id="parcego-billing-zip"
-                      placeholder="10001"
-                      value={billingAddress.zip}
-                      onChange={(e) => setBillingAddress({...billingAddress, zip: e.target.value})}
+                      id="parcego-billing-postal-code"
+                      placeholder="M5V3A8"
+                      value={billingAddress.postalCode}
+                      onChange={(e) => setBillingAddress({...billingAddress, postalCode: e.target.value})}
                       className="parcego-form__input"
                     />
                   </div>

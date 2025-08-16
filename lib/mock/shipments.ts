@@ -23,7 +23,7 @@ export type Shipment = {
     address1: string;
     address2?: string;
     city: string;
-    state?: string;
+    province?: string;
     postalCode: string;
     country: string;
   };
@@ -49,18 +49,18 @@ const createSeededRandom = (seed: number): Random => {
   };
 };
 
-const services: Array<Shipment["service"]> = ["Standard", "Express", "Same Day"];
+const services: Array<Shipment["service"]> = ["Standard"];
 const couriers: Array<Shipment["courier"]> = ["Ashraf", "DHL", "FedEx", "UPS"];
 
 const cities = [
-  { city: "New York", state: "NY" },
-  { city: "Los Angeles", state: "CA" },
-  { city: "Chicago", state: "IL" },
-  { city: "Houston", state: "TX" },
-  { city: "Phoenix", state: "AZ" },
-  { city: "Miami", state: "FL" },
-  { city: "Seattle", state: "WA" },
-  { city: "Boston", state: "MA" },
+  { city: "Toronto", province: "ON" },
+  { city: "Vancouver", province: "BC" },
+  { city: "Montreal", province: "QC" },
+  { city: "Calgary", province: "AB" },
+  { city: "Edmonton", province: "AB" },
+  { city: "Ottawa", province: "ON" },
+  { city: "Winnipeg", province: "MB" },
+  { city: "Quebec City", province: "QC" },
 ];
 
 const names = [
@@ -129,16 +129,16 @@ export const generateMockShipments = (count = 120, seed = 20250811): Shipment[] 
         name,
         address1: `${Math.floor(rand() * 9999)} Main St`,
         city: city.city,
-        state: city.state,
-        postalCode: String(10000 + Math.floor(rand() * 89999)),
+        province: city.province,
+        postalCode: `${String.fromCharCode(65 + Math.floor(rand() * 26))}${Math.floor(rand() * 10)}${String.fromCharCode(65 + Math.floor(rand() * 26))} ${Math.floor(rand() * 10)}${String.fromCharCode(65 + Math.floor(rand() * 26))}${Math.floor(rand() * 10)}`,
         country: domestic ? "USA" : "Canada",
       },
-      originCountry: "USA",
+      originCountry: "Canada",
       destinationRegion: domestic ? "Domestic" : "International",
       status,
       tags: rand() > 0.7 ? ["fragile"] : undefined,
       notes: rand() > 0.85 ? "Leave at front desk" : undefined,
-      labelUrl: "/label/preview",
+      labelUrl: `/label/preview?tracking=${encodeURIComponent(trackingNumber)}`,
       invoiceUrl: "/invoice/mock.pdf",
     });
   }

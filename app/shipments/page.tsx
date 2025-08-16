@@ -14,6 +14,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import type { Shipment, ShipmentStatus } from "@/lib/mock/shipments";
 import { formatCurrency, generateMockShipments } from "@/lib/mock/shipments";
 
@@ -79,6 +90,8 @@ export default function ShipmentsPage() {
   const [query, setQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
   const [isClient, setIsClient] = useState(false);
+  const [showExportDialog, setShowExportDialog] = useState(false);
+  const [exportType, setExportType] = useState<"all" | "selected">("all");
 
   // Ensure hydration consistency
   React.useEffect(() => {
@@ -117,7 +130,11 @@ export default function ShipmentsPage() {
   };
 
   const handleExportCsv = () => {
-    const rows = filtered.map((s) => ({
+    const dataToExport = exportType === "selected" ? 
+      allShipments.filter(s => selectedIds.has(s.id)) : 
+      filtered;
+    
+    const rows = dataToExport.map((s) => ({
       id: s.id,
       trackingNumber: s.trackingNumber,
       date: s.createdAt,
@@ -135,9 +152,18 @@ export default function ShipmentsPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `shipments_export.csv`;
+    a.download = exportType === "selected" ? `selected_shipments_export.csv` : `shipments_export.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    
+    // Close dialog and reset state
+    setShowExportDialog(false);
+    setExportType("all");
+  };
+
+  const handleExportCsvClick = (type: "all" | "selected") => {
+    setExportType(type);
+    setShowExportDialog(true);
   };
 
   const filtered = useMemo(() => {
@@ -150,7 +176,7 @@ export default function ShipmentsPage() {
           s.trackingNumber.toLowerCase().includes(q) ||
           s.recipient.name.toLowerCase().includes(q) ||
           s.recipient.city.toLowerCase().includes(q) ||
-          (s.recipient.state?.toLowerCase() ?? "").includes(q) ||
+          (s.recipient.province?.toLowerCase() ?? "").includes(q) ||
           s.recipient.address1.toLowerCase().includes(q)
         );
       });
@@ -232,10 +258,10 @@ export default function ShipmentsPage() {
                 <Button variant="ghost" onClick={() => { setSelectedStatus("ALL"); setQuery(""); setPageIndex(0); }} aria-label="Reset filters">
                   Reset
                 </Button>
-                            <Button variant="outline" onClick={() => handleExportCsv()} aria-label="Export CSV">
-              <Icon name="Download" size={16} className="mr-2" />
-              Export CSV
-            </Button>
+                            <Button variant="outline" onClick={() => handleExportCsvClick("all")} aria-label="Export CSV">
+                  <Icon name="Download" size={16} className="mr-2" />
+                  Export CSV
+                </Button>
               </div>
             </div>
           </CardContent>
@@ -248,7 +274,7 @@ export default function ShipmentsPage() {
               <CardContent className="p-4 flex items-center justify-between">
                 <span className="text-sm text-gray-700">{selectedIds.size} selected</span>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" onClick={() => handleExportCsv()} aria-label="Export selected">
+                  <Button variant="outline" onClick={() => handleExportCsvClick("selected")} aria-label="Export selected">
                     <Icon name="FileDown" size={16} className="mr-2" /> Export
                   </Button>
                   <Button variant="outline" onClick={() => alert("Printing labels (mock)…")} aria-label="Print labels">
@@ -405,6 +431,33 @@ export default function ShipmentsPage() {
           </div>
         </div>
       </div>
+
+      {/* Export CSV Confirmation Dialog */}
+      <AlertDialog open={showExportDialog} onOpenChange={setShowExportDialog}>
+        <AlertDialogContent id="parcego-export-csv-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Export Shipments to CSV</AlertDialogTitle>
+            <AlertDialogDescription>
+              {exportType === "selected" 
+                ? `This will export ${selectedIds.size} selected shipments to a CSV file.`
+                : `This will export ${filtered.length} filtered shipments to a CSV file.`
+              }
+              The file will include shipment ID, tracking number, date, recipient, service, courier, weight, cost, and status.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel id="parcego-export-csv-cancel-btn">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleExportCsv}
+              id="parcego-export-csv-confirm-btn"
+              className="bg-blue-600 hover:bg-blue-700 focus:ring-blue-500"
+            >
+              <Icon name="Download" size={16} className="mr-2" />
+              Export CSV
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
