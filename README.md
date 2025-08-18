@@ -13,6 +13,7 @@ A modern, scalable courier business platform built with Next.js 15+, React 19, T
 - **Billing System**: Complete payment management with multiple payment methods
 - **Notifications Center**: Centralized notification management system
 - **Support & Help**: Comprehensive help center with FAQs and tutorials
+- **Insurance Claims System**: Multi-step claims filing with document upload and status tracking
 
 ### Enhanced Payment System
 - **Smart Payment Modal**: Pre-filled with realistic test data for rapid development
@@ -55,6 +56,35 @@ npm run build
 # Start production server
 npm start
 ```
+
+## 🛡️ Insurance Claims System
+
+The platform includes a comprehensive insurance claims management system:
+
+### Claims Filing Process
+1. **Multi-step Form**: Guided 5-step process for easy claim submission
+2. **Document Upload**: Support for multiple file types (PDF, images, documents)
+3. **Insurance Coverage**: Clear display of coverage options and limits
+4. **Real-time Validation**: Form validation with helpful error messages
+5. **Claim Summary**: Final review before submission
+
+### Claims Management Features
+- **Claims History**: Track all submitted claims with status updates
+- **Status Tracking**: Real-time updates on claim processing
+- **Search & Filtering**: Find claims by ID, shipment number, or status
+- **Document Management**: Upload and manage supporting documents
+- **Processing Timeline**: Clear expectations for claim resolution
+
+### Insurance Coverage Options
+- **Basic Coverage**: Standard protection ($500 max, $50 deductible)
+- **Premium Coverage**: Comprehensive protection ($2,500 max, $25 deductible)
+- **Express Coverage**: High-value protection ($10,000 max, no deductible)
+
+### Quick Access
+- Dashboard quick action button for filing claims
+- Top navigation link for easy access
+- Direct routing from shipment tracking pages
+- Integration with notification system for updates
 
 ## 🔧 Payment Modal Development
 

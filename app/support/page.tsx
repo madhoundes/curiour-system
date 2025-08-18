@@ -9,14 +9,13 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Icon } from "@/components/ui/icon";
-import { Logo } from "@/components/ui/logo";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 // Import types and mock data from the support library
-import type { FAQCategory, FAQDifficulty, FAQ, HelpArticle, VideoTutorial, HelpCategory } from '@/lib/mock/support';
+import type { FAQCategory } from '@/lib/mock/support';
 import { mockFAQs, mockHelpArticles, mockVideoTutorials, helpCategories } from '@/lib/mock/support';
 
 // Mock data is now imported from the support library
@@ -298,7 +297,7 @@ export default function SupportHelpCenter() {
                     className="w-full space-y-4"
                     defaultValue={filteredFAQs[0]?.id}
                   >
-                    {filteredFAQs.map((faq, index) => (
+                    {filteredFAQs.map((faq) => (
                       <AccordionItem
                         key={faq.id}
                         value={faq.id}

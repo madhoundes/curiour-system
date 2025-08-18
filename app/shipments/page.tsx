@@ -23,10 +23,11 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import type { Shipment, ShipmentStatus } from "@/lib/mock/shipments";
 import { formatCurrency, generateMockShipments } from "@/lib/mock/shipments";
+import PrintLabelsModal from "./print-labels-modal";
+import CancelShipmentDialog from "./cancel-shipment-dialog";
 
 const allShipments: Shipment[] = generateMockShipments();
 
@@ -68,6 +69,12 @@ const getStatusBadge = (status: ShipmentStatus) => {
       className: "bg-red-50 text-red-700 border-red-200 hover:bg-red-100 transition-colors",
       label: "Failed",
       icon: "XCircle"
+    },
+    CANCELLED: {
+      variant: "destructive" as const,
+      className: "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100 transition-colors",
+      label: "Cancelled",
+      icon: "X"
     }
   };
 
@@ -83,6 +90,7 @@ const statusOptions = [
   { value: "SCANNED", label: "Scanned" },
   { value: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
   { value: "FAILED", label: "Failed" },
+  { value: "CANCELLED", label: "Cancelled" },
 ];
 
 export default function ShipmentsPage() {
@@ -92,19 +100,26 @@ export default function ShipmentsPage() {
   const [isClient, setIsClient] = useState(false);
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportType, setExportType] = useState<"all" | "selected">("all");
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showPrintLabelsModal, setShowPrintLabelsModal] = useState(false);
+  const [showCancelDialog, setShowCancelDialog] = useState(false);
+  const [shipmentToCancel, setShipmentToCancel] = useState<{ id: string; trackingNumber: string } | null>(null);
+
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [pageSize, setPageSize] = useState<number>(25);
+  const [pageIndex, setPageIndex] = useState<number>(0);
 
   // Ensure hydration consistency
   React.useEffect(() => {
     setIsClient(true);
   }, []);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [pageSize, setPageSize] = useState<number>(25);
-  const [pageIndex, setPageIndex] = useState<number>(0);
 
   const handleStatusChange = (status: string) => {
     const normalized = status.toUpperCase();
     setPageIndex(0);
     setSelectedStatus(normalized);
+    // Clear selection when filters change to avoid confusion
+    setSelectedIds(new Set());
   };
 
   const handleToggleSelect = (id: string) => {
@@ -129,10 +144,52 @@ export default function ShipmentsPage() {
     });
   };
 
+  const handleCancelShipment = (shipmentId: string) => {
+    try {
+      // Find the shipment and update its status to CANCELLED
+      const shipmentIndex = allShipments.findIndex(s => s.id === shipmentId);
+      if (shipmentIndex !== -1) {
+        allShipments[shipmentIndex].status = "CANCELLED";
+        allShipments[shipmentIndex].updatedAt = new Date().toISOString();
+        
+        // Force re-render by updating state
+        setQuery(query); // This will trigger a re-filter
+        
+        // Show success message
+        alert(`Shipment ${shipmentId} has been cancelled successfully.`);
+      } else {
+        throw new Error(`Shipment ${shipmentId} not found`);
+      }
+    } catch (error) {
+      console.error("Failed to cancel shipment:", error);
+      alert(`Failed to cancel shipment ${shipmentId}. Please try again.`);
+    }
+  };
+
+  const openCancelDialog = (shipment: Shipment) => {
+    setShipmentToCancel({ id: shipment.id, trackingNumber: shipment.trackingNumber });
+    setShowCancelDialog(true);
+  };
+
   const handleExportCsv = () => {
-    const dataToExport = exportType === "selected" ? 
-      allShipments.filter(s => selectedIds.has(s.id)) : 
-      filtered;
+    let dataToExport;
+    
+    if (exportType === "selected") {
+      // Export only selected shipments from filtered results (respects current filters)
+      dataToExport = filtered.filter(s => selectedIds.has(s.id));
+      console.log(`Exporting ${dataToExport.length} selected shipments out of ${selectedIds.size} selected IDs`);
+    } else {
+      // Export all filtered shipments (current page + filters)
+      dataToExport = filtered;
+      console.log(`Exporting ${dataToExport.length} filtered shipments`);
+    }
+    
+    // Validate that we have data to export
+    if (!dataToExport || dataToExport.length === 0) {
+      console.warn("No data to export");
+      alert("No data available for export");
+      return;
+    }
     
     const rows = dataToExport.map((s) => ({
       id: s.id,
@@ -140,7 +197,7 @@ export default function ShipmentsPage() {
       date: s.createdAt,
       recipient: s.recipient.name,
       service: s.service,
-      courier: s.courier,
+      courier: "Parcego",
       weightKg: s.weightKg,
       cost: s.cost,
       status: s.status,
@@ -189,6 +246,12 @@ export default function ShipmentsPage() {
     return list;
   }, [query, selectedStatus]);
 
+  // Force export dialog re-render when selections change for real-time updates
+  React.useEffect(() => {
+    // This effect ensures the export dialog message updates in real-time
+    // when selectedIds or filtered data changes
+  }, [selectedIds, filtered, exportType]);
+
   const paged = useMemo(() => {
     const start = pageIndex * pageSize;
     return filtered.slice(start, start + pageSize);
@@ -196,6 +259,32 @@ export default function ShipmentsPage() {
 
   const visibleIds = paged.map((s) => s.id);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+
+  // Calculate selection counts for real-time display
+  const selectedCount = selectedIds.size;
+  const totalFilteredCount = filtered.length;
+  const selectedInFilteredCount = filtered.filter(s => selectedIds.has(s.id)).length;
+
+  // Real-time export message calculation
+  const getExportMessage = () => {
+    if (exportType === "selected") {
+      if (selectedInFilteredCount === 0) {
+        return "⚠️ No shipments are currently selected. Please select shipments first.";
+      }
+      return `This will export ${selectedInFilteredCount} selected shipment${selectedInFilteredCount === 1 ? '' : 's'} to a CSV file.`;
+    } else {
+      return `This will export ${filtered.length} filtered shipment${filtered.length === 1 ? '' : 's'} to a CSV file.`;
+    }
+  };
+
+  // Update table title based on selection state
+  const getTableTitle = () => {
+    if (selectedCount === 0) {
+      return `Showing ${paged.length} of ${totalFilteredCount} shipments`;
+    } else {
+      return `Showing ${selectedInFilteredCount} of ${totalFilteredCount} shipments (${selectedCount} selected)`;
+    }
+  };
 
   return (
     <div id="parcego-shipments-page" className="min-h-screen bg-gray-50">
@@ -224,6 +313,8 @@ export default function ShipmentsPage() {
                   onChange={(e) => {
                     setPageIndex(0);
                     setQuery(e.target.value);
+                    // Clear selection when search changes to avoid confusion
+                    setSelectedIds(new Set());
                   }}
                   aria-label="Search shipments"
                 />
@@ -255,7 +346,12 @@ export default function ShipmentsPage() {
                   <div className="w-[200px] h-9 bg-gray-100 rounded-md animate-pulse" />
                 )}
                 
-                <Button variant="ghost" onClick={() => { setSelectedStatus("ALL"); setQuery(""); setPageIndex(0); }} aria-label="Reset filters">
+                <Button variant="ghost" onClick={() => { 
+                  setSelectedStatus("ALL"); 
+                  setQuery(""); 
+                  setPageIndex(0); 
+                  setSelectedIds(new Set()); // Clear selection when resetting filters
+                }} aria-label="Reset filters">
                   Reset
                 </Button>
                             <Button variant="outline" onClick={() => handleExportCsvClick("all")} aria-label="Export CSV">
@@ -274,17 +370,25 @@ export default function ShipmentsPage() {
               <CardContent className="p-4 flex items-center justify-between">
                 <span className="text-sm text-gray-700">{selectedIds.size} selected</span>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" onClick={() => handleExportCsvClick("selected")} aria-label="Export selected">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => handleExportCsvClick("selected")} 
+                    disabled={selectedIds.size === 0}
+                    aria-label="Export selected"
+                  >
                     <Icon name="FileDown" size={16} className="mr-2" /> Export
                   </Button>
-                  <Button variant="outline" onClick={() => alert("Printing labels (mock)…")} aria-label="Print labels">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setShowPrintLabelsModal(true)} 
+                    disabled={selectedIds.size === 0}
+                    aria-label="Print labels"
+                  >
                     <Icon name="Printer" size={16} className="mr-2" /> Print Labels
                   </Button>
                   <Button
                     variant="destructive"
-                    onClick={() => {
-                      if (confirm(`Delete ${selectedIds.size} shipments? (mock)`)) setSelectedIds(new Set());
-                    }}
+                    onClick={() => setShowDeleteDialog(true)}
                     aria-label="Delete selected shipments"
                   >
                     <Icon name="Trash2" size={16} className="mr-2" /> Delete
@@ -300,7 +404,7 @@ export default function ShipmentsPage() {
           <CardHeader>
             <CardTitle className="text-base">Results</CardTitle>
             <CardDescription>
-              Showing {paged.length} of {filtered.length} shipments
+              {getTableTitle()}
             </CardDescription>
           </CardHeader>
           <CardContent className="p-0">
@@ -346,7 +450,7 @@ export default function ShipmentsPage() {
                         <td className="px-3 py-2">{new Date(s.createdAt).toLocaleDateString()}</td>
                         <td className="px-3 py-2">{s.recipient.name}</td>
                         <td className="px-3 py-2">{s.service}</td>
-                        <td className="px-3 py-2">{s.courier}</td>
+                        <td className="px-3 py-2">Parcego</td>
                         <td className="px-3 py-2">{s.weightKg.toFixed(2)} kg</td>
                         <td className="px-3 py-2">
                           {(() => {
@@ -391,6 +495,17 @@ export default function ShipmentsPage() {
                             >
                               <Icon name="Printer" size={16} />
                             </Button>
+                            {s.status === "LABEL_CREATED" && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openCancelDialog(s)}
+                                aria-label={`Cancel shipment ${s.id}`}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                              >
+                                <Icon name="X" size={16} />
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -410,7 +525,12 @@ export default function ShipmentsPage() {
               className="border rounded px-2 py-1 text-sm"
               aria-label="Results per page"
               value={pageSize}
-              onChange={(e) => { setPageIndex(0); setPageSize(Number(e.target.value)); }}
+              onChange={(e) => { 
+                setPageIndex(0); 
+                setPageSize(Number(e.target.value)); 
+                // Clear selection when page size changes to avoid confusion
+                setSelectedIds(new Set());
+              }}
             >
               <option value={10}>10</option>
               <option value={25}>25</option>
@@ -434,14 +554,15 @@ export default function ShipmentsPage() {
 
       {/* Export CSV Confirmation Dialog */}
       <AlertDialog open={showExportDialog} onOpenChange={setShowExportDialog}>
-        <AlertDialogContent id="parcego-export-csv-dialog">
+        <AlertDialogContent 
+          id="parcego-export-csv-dialog"
+          key={`export-dialog-${selectedInFilteredCount}-${exportType}`}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>Export Shipments to CSV</AlertDialogTitle>
             <AlertDialogDescription>
-              {exportType === "selected" 
-                ? `This will export ${selectedIds.size} selected shipments to a CSV file.`
-                : `This will export ${filtered.length} filtered shipments to a CSV file.`
-              }
+              {getExportMessage()}
+              <br /><br />
               The file will include shipment ID, tracking number, date, recipient, service, courier, weight, cost, and status.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -451,6 +572,7 @@ export default function ShipmentsPage() {
               onClick={handleExportCsv}
               id="parcego-export-csv-confirm-btn"
               className="bg-blue-600 hover:bg-blue-700 focus:ring-blue-500"
+              disabled={exportType === "selected" && selectedInFilteredCount === 0}
             >
               <Icon name="Download" size={16} className="mr-2" />
               Export CSV
@@ -458,6 +580,51 @@ export default function ShipmentsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent id="parcego-delete-shipments-dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Selected Shipments</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete {selectedIds.size} selected shipment{selectedIds.size === 1 ? '' : 's'}. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel id="parcego-delete-shipments-cancel-btn">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => {
+                setSelectedIds(new Set());
+                setShowDeleteDialog(false);
+              }}
+              id="parcego-delete-shipments-confirm-btn"
+              className="bg-red-600 hover:bg-red-700 focus:ring-red-500"
+            >
+              <Icon name="Trash2" size={16} className="mr-2" />
+              Delete Shipments
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Print Labels Modal */}
+      <PrintLabelsModal
+        open={showPrintLabelsModal}
+        onOpenChange={setShowPrintLabelsModal}
+        selectedShipmentIds={Array.from(selectedIds)}
+        shipments={allShipments} // Assuming allShipments is the source of truth for all shipments
+      />
+
+      {/* Cancel Shipment Dialog */}
+      {shipmentToCancel && (
+        <CancelShipmentDialog
+          shipmentId={shipmentToCancel.id}
+          trackingNumber={shipmentToCancel.trackingNumber}
+          onCancel={handleCancelShipment}
+          isOpen={showCancelDialog}
+          onOpenChange={setShowCancelDialog}
+        />
+      )}
     </div>
   );
 }

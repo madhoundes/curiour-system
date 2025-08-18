@@ -28,7 +28,6 @@ const mockPerformanceData = {
     earnings: 145.5,
     distance: 45.8,
     averageTime: 18,
-    averageRating: 4.8,
     onTimeRate: 96.5,
   },
   weekly: {
@@ -38,7 +37,6 @@ const mockPerformanceData = {
     earnings: 680.25,
     distance: 215.4,
     averageTime: 19,
-    averageRating: 4.9,
     onTimeRate: 96.5,
   },
   monthly: {
@@ -48,22 +46,14 @@ const mockPerformanceData = {
     earnings: 2845.75,
     distance: 892.3,
     averageTime: 20,
-    averageRating: 4.8,
     onTimeRate: 95.2,
   },
   earningsBreakdown: {
     week: { base: 540.25, tips: 140.0, payouts: "On Schedule" },
     month: { base: 2280.75, tips: 565.0, payouts: "Processed" },
   },
-  feedback: [
-    { id: "fb-001", rating: 5, comment: "Great delivery, very polite!", orderId: "ORD-1021", sentiment: "positive" },
-    { id: "fb-002", rating: 4, comment: "On time, package in good condition.", orderId: "ORD-1019", sentiment: "positive" },
-    { id: "fb-003", rating: 3, comment: "A bit late but communicated well.", orderId: "ORD-1016", sentiment: "neutral" },
-  ],
-  achievements: [
-    { id: "streak", title: "Delivery Streak", description: "15 consecutive successful deliveries", icon: "🔥", earned: true },
-    { id: "speed", title: "Speed Demon", description: "10 deliveries in under 6 hours", icon: "⚡", earned: true },
-  ],
+
+
 };
 
 
@@ -406,30 +396,8 @@ export default function CourierPerformance() {
 
 
 
-        <div className="grid gap-4 md:grid-cols-2">
-          <Card id="parcego-courier-performance-achievements">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Icon name="Award" size={18} /> Achievements
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {mockPerformanceData.achievements.map((a) => (
-                <div
-                  key={a.id}
-                  id={`parcego-courier-performance-achievement-${a.id}`}
-                  className={`flex items-center gap-3 p-3 rounded-lg border ${a.earned ? "bg-green-50 border-green-200" : "bg-gray-50 border-gray-200"}`}
-                >
-                  <div className="text-2xl" aria-hidden>{a.icon}</div>
-                  <div className="flex-1">
-                    <h4 className={`font-medium ${a.earned ? "text-green-800" : "text-gray-700"}`}>{a.title}</h4>
-                    <p className={`text-sm ${a.earned ? "text-green-600" : "text-gray-500"}`}>{a.description}</p>
-                  </div>
-                  <Badge variant={a.earned ? "default" : "secondary"}>{a.earned ? "Earned" : "Locked"}</Badge>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+        <div className="grid gap-4 md:grid-cols-1">
+          {/* Achievements section disabled */}
 
           <Card id="parcego-courier-performance-career">
             <CardHeader>

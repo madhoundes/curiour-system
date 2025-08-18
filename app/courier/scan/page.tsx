@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+
 import { Icon } from "@/components/ui/icon";
 
 interface PackageData {
@@ -21,12 +21,7 @@ interface PackageData {
   estimatedDelivery: string;
 }
 
-interface LocationData {
-  latitude: number;
-  longitude: number;
-  address: string;
-  timestamp: string;
-}
+
 
 // Mock package data
 const mockPackageData: PackageData = {
@@ -40,14 +35,7 @@ const mockPackageData: PackageData = {
   estimatedDelivery: "Today, 4:00 PM"
 };
 
-// Mock location data
-const mockLocationData: LocationData = {
-  latitude: 40.7128,
-  longitude: -74.0060,
-  address: "Manhattan, New York, NY 10001",
-  // Leave empty to avoid SSR/client hydration mismatch; will be set on mount
-  timestamp: ""
-};
+
 
 export default function CourierScanPackagePage() {
   const router = useRouter();
@@ -63,15 +51,10 @@ export default function CourierScanPackagePage() {
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [manualInput, setManualInput] = useState("");
   const [scannedPackage, setScannedPackage] = useState<PackageData | null>(null);
-  const [currentLocation, setCurrentLocation] = useState<LocationData>(mockLocationData);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [scanError, setScanError] = useState("");
-  const [locationError, setLocationError] = useState("");
 
-  // Initialize location on mount
-  useEffect(() => {
-    handleRefreshLocation();
-  }, []);
+
 
   const handleBackToCourier = () => {
     if (isCameraActive) {
@@ -210,17 +193,7 @@ export default function CourierScanPackagePage() {
     }, 1500);
   };
 
-  const handleRefreshLocation = () => {
-    setLocationError("");
-    
-    // Mock GPS refresh
-    setTimeout(() => {
-      setCurrentLocation({
-        ...mockLocationData,
-        timestamp: new Date().toLocaleString()
-      });
-    }, 1000);
-  };
+
 
   const getStatusColor = (status: PackageData["currentStatus"]) => {
     const statusConfig = {
@@ -429,11 +402,11 @@ export default function CourierScanPackagePage() {
 
         {/* Error Messages with Troubleshooting */}
         {scanError && (
-          <Alert variant="destructive" id="parcego-scan-error-alert">
-            <Icon name="AlertCircle" size={16} />
-            <AlertDescription>
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg" id="parcego-scan-error-alert">
+            <div className="flex items-start space-x-2">
+              <Icon name="AlertCircle" size={16} className="text-red-600 flex-shrink-0 mt-0.5" />
               <div className="space-y-2">
-                <p>{scanError}</p>
+                <p className="text-red-800">{scanError}</p>
                 {scanError.includes("Camera") && (
                   <div className="text-sm">
                     <p className="font-medium">Troubleshooting steps:</p>
@@ -446,8 +419,8 @@ export default function CourierScanPackagePage() {
                   </div>
                 )}
               </div>
-            </AlertDescription>
-          </Alert>
+            </div>
+          </div>
         )}
 
         {/* Package Details Display */}
@@ -629,65 +602,7 @@ export default function CourierScanPackagePage() {
           </>
         )}
 
-        {/* GPS Location */}
-        <Card id="parcego-scan-location-card" className="parcego-scan__location-card">
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center">
-              <Icon name="MapPin" size={20} className="mr-2" />
-              Current Location
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="parcego-scan__location-info">
-                <div className="flex items-start space-x-3">
-                  <Icon name="Navigation" size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Address</p>
-                    <p className="text-sm text-gray-600">{currentLocation.address}</p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3">
-                  <Icon name="Clock" size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Last Updated</p>
-                    <p className="text-sm text-gray-600" suppressHydrationWarning>
-                      {currentLocation.timestamp || "—"}
-                    </p>
-                  </div>
-                </div>
-                
-                <div className="flex items-start space-x-3">
-                  <Icon name="Crosshair" size={16} className="text-blue-600 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Coordinates</p>
-                    <p className="text-sm text-gray-600">
-                      {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
-                    </p>
-                  </div>
-                </div>
-              </div>
 
-              <Button
-                variant="outline"
-                className="w-full h-10 parcego-scan__btn--refresh-gps"
-                onClick={handleRefreshLocation}
-                id="parcego-scan-gps-refresh-btn"
-              >
-                <Icon name="RefreshCw" size={16} className="mr-2" />
-                Refresh Location
-              </Button>
-
-              {locationError && (
-                <Alert variant="destructive" id="parcego-scan-location-error">
-                  <Icon name="AlertCircle" size={16} />
-                  <AlertDescription>{locationError}</AlertDescription>
-                </Alert>
-              )}
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Secondary Action - View Route */}
         {scannedPackage && scannedPackage.currentStatus !== "delivered" && (

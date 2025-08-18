@@ -76,7 +76,14 @@ const iconAliases: Record<string, IconName> = {
   "Play": "Play",
   "FileText": "FileText",
   "Video": "Video",
-  "X": "X"
+  "X": "X",
+  // Loading icons
+  "Loader2": "Loader",
+  "loader2": "Loader",
+  // Calculator and math icons for Quick Quote widget
+  "Calculator": "Calculator",
+  "calculator": "Calculator",
+  "calc": "Calculator"
 };
 
 // Centralized Lucide icon renderer to avoid scattered imports and runtime errors

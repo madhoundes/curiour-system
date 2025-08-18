@@ -9,6 +9,21 @@ import { Label } from "@/components/ui/label";
 import { Icon } from "@/components/ui/icon";
 import { Logo } from "@/components/ui/logo";
 import { NotificationDropdown } from "@/components/ui/notification-dropdown";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // Mock data for dashboard
 const mockStats = {
@@ -91,11 +106,55 @@ const mockNotifications = [
   }
 ];
 
+// Quick Quote form data and calculation logic
+const packageSizes = [
+  { value: "small", label: "Small (12x8x4 in)", basePrice: 8.99 },
+  { value: "medium", label: "Medium (16x12x8 in)", basePrice: 12.99 },
+  { value: "large", label: "Large (20x16x12 in)", basePrice: 18.99 },
+  { value: "xlarge", label: "Extra Large (24x20x16 in)", basePrice: 24.99 }
+];
+
+const calculateShippingPrice = (size: string, weight: number, postalCode: string): number => {
+  // Base price from package size
+  const sizeData = packageSizes.find(s => s.value === size);
+  if (!sizeData) return 0;
+  
+  let basePrice = sizeData.basePrice;
+  
+  // Weight factor (additional cost per pound over 5 lbs)
+  if (weight > 5) {
+    basePrice += (weight - 5) * 1.50;
+  }
+  
+  // Distance factor based on postal code (simplified)
+  const firstDigit = parseInt(postalCode.charAt(0));
+  let distanceMultiplier = 1.0;
+  
+  if (firstDigit >= 0 && firstDigit <= 3) {
+    distanceMultiplier = 1.0; // Local
+  } else if (firstDigit >= 4 && firstDigit <= 6) {
+    distanceMultiplier = 1.15; // Regional
+  } else if (firstDigit >= 7 && firstDigit <= 9) {
+    distanceMultiplier = 1.35; // National
+  }
+  
+  return Math.round((basePrice * distanceMultiplier) * 100) / 100;
+};
+
 export default function MerchantDashboard() {
   const router = useRouter();
   const [trackingNumber, setTrackingNumber] = useState("");
   const [isTracking, setIsTracking] = useState(false);
   const [notifications, setNotifications] = useState(mockNotifications);
+  
+  // Quick Quote state
+  const [quoteForm, setQuoteForm] = useState({
+    packageSize: "",
+    weight: "",
+    postalCode: ""
+  });
+  const [calculatedPrice, setCalculatedPrice] = useState<number | null>(null);
+  const [isCalculating, setIsCalculating] = useState(false);
   
   // Calculate unread notifications count
   const unreadCount = notifications.filter(n => !n.isRead).length;
@@ -115,6 +174,31 @@ export default function MerchantDashboard() {
       setIsTracking(false);
       router.push(`/track-package?tracking=${encodeURIComponent(trackingNumber)}`);
     }, 500);
+  };
+
+  const handleQuoteFormChange = (field: string, value: string) => {
+    setQuoteForm(prev => ({ ...prev, [field]: value }));
+    // Reset calculated price when form changes
+    setCalculatedPrice(null);
+  };
+
+  const handleGeneratePrice = () => {
+    if (!quoteForm.packageSize || !quoteForm.weight || !quoteForm.postalCode) return;
+    
+    setIsCalculating(true);
+    
+    // Simulate calculation delay for better UX
+    setTimeout(() => {
+      const weight = parseFloat(quoteForm.weight);
+      const price = calculateShippingPrice(quoteForm.packageSize, weight, quoteForm.postalCode);
+      setCalculatedPrice(price);
+      setIsCalculating(false);
+    }, 800);
+  };
+
+  const resetQuoteForm = () => {
+    setQuoteForm({ packageSize: "", weight: "", postalCode: "" });
+    setCalculatedPrice(null);
   };
 
   const getStatusBadge = (status: string) => {
@@ -146,6 +230,15 @@ export default function MerchantDashboard() {
             </div>
             
             <div className="flex items-center space-x-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => router.push('/claims')}
+                className="flex items-center space-x-2 text-gray-600 hover:text-gray-900"
+              >
+                <Icon name="Shield" size={16} />
+                <span className="text-sm font-medium">Claims</span>
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"
@@ -260,7 +353,131 @@ export default function MerchantDashboard() {
             <CardDescription>Get started with your most common tasks</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
+              {/* Quick Quote Widget - Prominent placement */}
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button 
+                    className="h-16 flex flex-col space-y-2 bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                    id="parcego-dashboard-quick-quote-btn"
+                  >
+                    <Icon name="Calculator" size={24} />
+                    <span>Quick Quote</span>
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center space-x-2">
+                      <Icon name="Calculator" size={20} className="text-blue-600" />
+                      <span>Get Instant Shipping Quote</span>
+                    </DialogTitle>
+                    <DialogDescription>
+                      Enter package details to get an instant price estimate
+                    </DialogDescription>
+                  </DialogHeader>
+                  
+                  <div className="space-y-4 py-4">
+                    {/* Package Size Selection */}
+                    <div className="space-y-2">
+                      <Label htmlFor="parcego-quote-package-size">Package Size</Label>
+                      <Select 
+                        value={quoteForm.packageSize} 
+                        onValueChange={(value) => handleQuoteFormChange('packageSize', value)}
+                      >
+                        <SelectTrigger id="parcego-quote-package-size">
+                          <SelectValue placeholder="Select package size" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {packageSizes.map((size) => (
+                            <SelectItem key={size.value} value={size.value}>
+                              {size.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Weight Input */}
+                    <div className="space-y-2">
+                      <Label htmlFor="parcego-quote-weight">Weight (lbs)</Label>
+                      <Input
+                        id="parcego-quote-weight"
+                        type="number"
+                        placeholder="Enter weight in pounds"
+                        value={quoteForm.weight}
+                        onChange={(e) => handleQuoteFormChange('weight', e.target.value)}
+                        min="0.1"
+                        step="0.1"
+                      />
+                    </div>
+
+                    {/* Postal Code Input */}
+                    <div className="space-y-2">
+                      <Label htmlFor="parcego-quote-postal-code">Destination Postal Code</Label>
+                      <Input
+                        id="parcego-quote-postal-code"
+                        placeholder="Enter postal code"
+                        value={quoteForm.postalCode}
+                        onChange={(e) => handleQuoteFormChange('postalCode', e.target.value)}
+                        maxLength={10}
+                      />
+                    </div>
+
+                    {/* Generate Price Button */}
+                    <Button 
+                      onClick={handleGeneratePrice}
+                      disabled={!quoteForm.packageSize || !quoteForm.weight || !quoteForm.postalCode || isCalculating}
+                      className="w-full bg-blue-600 hover:bg-blue-700"
+                      id="parcego-quote-generate-price-btn"
+                    >
+                      {isCalculating ? (
+                        <>
+                          <Icon name="Loader2" size={16} className="mr-2 animate-spin" />
+                          Calculating...
+                        </>
+                      ) : (
+                        <>
+                          <Icon name="Calculator" size={16} className="mr-2" />
+                          Generate Price
+                        </>
+                      )}
+                    </Button>
+
+                    {/* Price Display */}
+                    {calculatedPrice && (
+                      <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-medium text-green-800">Estimated Shipping Cost:</span>
+                          <span className="text-2xl font-bold text-green-600">${calculatedPrice}</span>
+                        </div>
+                        <p className="text-xs text-green-600 mt-1">
+                          Price includes base rate, weight surcharge, and distance factor
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="flex space-x-2 pt-4 border-t">
+                    <Button 
+                      variant="outline" 
+                      onClick={resetQuoteForm}
+                      className="flex-1"
+                      id="parcego-quote-reset-btn"
+                    >
+                      Reset
+                    </Button>
+                    <Button 
+                      onClick={() => router.push('/create-shipment')}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700"
+                      id="parcego-quote-create-shipment-btn"
+                    >
+                      Create Shipment
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
               <Button 
                 className="h-16 flex flex-col space-y-2"
                 onClick={() => router.push('/create-shipment')}
@@ -323,6 +540,15 @@ export default function MerchantDashboard() {
               >
                 <Icon name="help-circle" size={24} />
                 <span>Help & Support</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-16 flex flex-col space-y-2"
+                onClick={() => router.push('/claims')}
+                id="parcego-dashboard-claims-btn"
+              >
+                <Icon name="Shield" size={24} />
+                <span>File a Claim</span>
               </Button>
             </div>
           </CardContent>

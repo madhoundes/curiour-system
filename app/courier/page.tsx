@@ -17,7 +17,6 @@ const mockCourierData = {
     completed: 5,
     remaining: 3,
     earnings: 145.50,
-    rating: 4.8,
     efficiency: 92
   }
 };
@@ -31,7 +30,6 @@ const mockDeliveries = [
     timeWindow: "2:00 PM - 4:00 PM",
     estimatedTime: "2:30 PM",
     status: "ready_for_pickup",
-    priority: "high",
     packageType: "Standard",
     weight: "2.5 kg",
     specialInstructions: "Call upon arrival"
@@ -44,7 +42,6 @@ const mockDeliveries = [
     timeWindow: "3:00 PM - 5:00 PM",
     estimatedTime: "3:15 PM",
     status: "in_transit",
-    priority: "medium",
     packageType: "Fragile",
     weight: "1.2 kg",
     specialInstructions: "Handle with care - electronics"
@@ -57,7 +54,6 @@ const mockDeliveries = [
     timeWindow: "4:00 PM - 6:00 PM",
     estimatedTime: "4:45 PM",
     status: "assigned",
-    priority: "low",
     packageType: "Documents",
     weight: "0.3 kg",
     specialInstructions: "Signature required"
@@ -91,19 +87,6 @@ const getStatusText = (status: string) => {
       return "Assigned";
     default:
       return "Unknown";
-  }
-};
-
-const getPriorityColor = (priority: string) => {
-  switch (priority) {
-    case "high":
-      return "border-l-red-500";
-    case "medium":
-      return "border-l-yellow-500";
-    case "low":
-      return "border-l-green-500";
-    default:
-      return "border-l-gray-500";
   }
 };
 
@@ -224,78 +207,30 @@ export default function CourierDashboard() {
             </CardContent>
           </Card>
 
-          <Card 
-            className="parcego-stats-card parcego-stats-card--rating"
-            id="parcego-courier-rating-stat"
-          >
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-2">
-                <Icon name="Star" size={20} className="text-purple-600" />
-                <div>
-                  <p className="text-2xl font-bold">{mockCourierData.stats.rating}</p>
-                  <p className="text-xs text-gray-500">Rating</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+
         </div>
 
-        {/* Quick Actions */}
+        {/* Next Delivery Action */}
         <Card 
-          className="parcego-quick-actions-card"
-          id="parcego-courier-quick-actions"
+          className="parcego-next-delivery-card"
+          id="parcego-courier-next-delivery-action"
         >
-          <CardHeader>
-            <CardTitle className="text-lg">Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 gap-3">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Icon name="Navigation" size={24} className="text-blue-600" />
+                <div>
+                  <h3 className="font-medium text-gray-900">Ready for Next Delivery?</h3>
+                  <p className="text-sm text-gray-500">Start your next assigned delivery route</p>
+                </div>
+              </div>
               <Button
-                className="h-16 flex flex-col space-y-2 parcego-action-btn parcego-action-btn--start-route bg-green-600 hover:bg-green-700 text-white"
-                onClick={() => router.push('/courier/route')}
-                id="parcego-courier-start-delivery-route-btn"
-              >
-                <Icon name="Route" size={20} />
-                <span className="text-sm">Start Delivery Route</span>
-              </Button>
-              
-              <Button
-                className="h-16 flex flex-col space-y-2 parcego-action-btn parcego-action-btn--next-delivery"
+                className="bg-blue-600 hover:bg-blue-700 text-white"
                 onClick={() => handleStartRoute(mockDeliveries[0].id)}
                 id="parcego-courier-next-delivery-btn"
               >
-                <Icon name="Navigation" size={20} />
-                <span className="text-sm">Start Next</span>
-              </Button>
-              
-              <Button
-                variant="outline"
-                className="h-16 flex flex-col space-y-2 parcego-action-btn parcego-action-btn--route"
-                onClick={() => router.push('/courier/route')}
-                id="parcego-courier-view-route-btn"
-              >
-                <Icon name="Map" size={20} />
-                <span className="text-sm">View Route</span>
-              </Button>
-              
-              <Button
-                variant="outline"
-                className="h-16 flex flex-col space-y-2 parcego-action-btn parcego-action-btn--scan"
-                onClick={() => router.push('/courier/scan')}
-                id="parcego-courier-scan-btn"
-              >
-                <Icon name="Camera" size={20} />
-                <span className="text-sm">Scan Package</span>
-              </Button>
-              
-              <Button
-                variant="outline"
-                className="h-16 flex flex-col space-y-2 parcego-action-btn parcego-action-btn--performance"
-                onClick={handleViewPerformance}
-                id="parcego-courier-performance-btn"
-              >
-                <Icon name="BarChart3" size={20} />
-                <span className="text-sm">Performance</span>
+                <Icon name="Route" size={20} className="mr-2" />
+                Next Delivery
               </Button>
             </div>
           </CardContent>
@@ -322,7 +257,7 @@ export default function CourierDashboard() {
             {mockDeliveries.map((delivery) => (
               <div
                 key={delivery.id}
-                className={`border rounded-lg p-4 border-l-4 ${getPriorityColor(delivery.priority)} parcego-delivery-card`}
+                className="border rounded-lg p-4 parcego-delivery-card"
                 id={`parcego-delivery-card-${delivery.id}`}
               >
                 <div className="flex items-start justify-between mb-3">
@@ -361,15 +296,6 @@ export default function CourierDashboard() {
                         {delivery.packageType}
                       </span>
                       <span>{delivery.weight}</span>
-                      <span 
-                        className={`px-2 py-1 rounded text-xs ${
-                          delivery.priority === 'high' ? 'bg-red-100 text-red-700' :
-                          delivery.priority === 'medium' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-green-100 text-green-700'
-                        }`}
-                      >
-                        {delivery.priority.toUpperCase()}
-                      </span>
                     </div>
                     {delivery.specialInstructions && (
                       <p 

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { jsPDF } from "jspdf";
 import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
+import { loadLogoForPDF, addLogoToPDF } from "@/lib/utils";
 
 export default function TestPDFPage() {
   const [isGenerating, setIsGenerating] = useState(false);
@@ -25,11 +26,12 @@ export default function TestPDFPage() {
       pdf.setLineWidth(2);
       pdf.rect(10, 10, 268, 412);
       
-      // Header - Company Logo/Name
-      pdf.setFontSize(18);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(0, 145, 245); // Blue color
-      pdf.text('PARCEGO', 144, 35, { align: 'center' });
+          // Load and add company logo with exact pixel dimensions to prevent distortion
+    const logoData = await loadLogoForPDF();
+    // Convert 157px × 33px to points for PDF (72 DPI)
+    const logoWidthPoints = 157;  // 157 points
+    const logoHeightPoints = 33;  // 33 points
+    addLogoToPDF(pdf, 94, 15, logoWidthPoints, logoHeightPoints, logoData);
       
       // Subtitle
       pdf.setFontSize(10);

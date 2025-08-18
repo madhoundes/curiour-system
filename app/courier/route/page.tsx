@@ -12,11 +12,9 @@ const initialRouteData = {
   totalDeliveries: 5,
   totalDistance: "18.3 km",
   estimatedTime: "3h 25m",
-  fuelCost: "$12.80",
   trafficStatus: "moderate",
   currentDelivery: 1,
-  optimizationScore: 87,
-  co2Saved: "2.1 kg"
+  optimizationScore: 87
 };
 
 const initialDeliveries = [
@@ -26,12 +24,10 @@ const initialDeliveries = [
     address: "123 Main Street, Downtown",
     phone: "+1 (555) 123-4567",
     timeWindow: "2:00 PM - 4:00 PM",
-    estimatedArrival: "2:30 PM",
     status: "current",
     distance: "3.2 km",
     duration: "8 min",
     notes: "Call upon arrival",
-    priority: "high",
     coordinates: { lat: 40.7128, lng: -74.0060 },
     trafficLevel: "light"
   },
@@ -41,12 +37,10 @@ const initialDeliveries = [
     address: "456 Oak Avenue, Suburbs",
     phone: "+1 (555) 234-5678",
     timeWindow: "3:00 PM - 5:00 PM",
-    estimatedArrival: "3:15 PM",
     status: "next",
     distance: "5.1 km",
     duration: "12 min",
     notes: "Handle with care - electronics",
-    priority: "medium",
     coordinates: { lat: 40.7589, lng: -73.9851 },
     trafficLevel: "moderate"
   },
@@ -56,12 +50,10 @@ const initialDeliveries = [
     address: "789 Pine Road, Uptown",
     phone: "+1 (555) 345-6789",
     timeWindow: "4:00 PM - 6:00 PM",
-    estimatedArrival: "4:45 PM",
     status: "pending",
     distance: "4.5 km",
     duration: "15 min",
     notes: "Signature required",
-    priority: "high",
     coordinates: { lat: 40.7831, lng: -73.9712 },
     trafficLevel: "heavy"
   },
@@ -71,12 +63,10 @@ const initialDeliveries = [
     address: "321 Elm Street, Midtown",
     phone: "+1 (555) 456-7890",
     timeWindow: "5:00 PM - 7:00 PM",
-    estimatedArrival: "5:30 PM",
     status: "pending",
     distance: "3.8 km",
     duration: "10 min",
     notes: "Leave at reception",
-    priority: "low",
     coordinates: { lat: 40.7505, lng: -73.9934 },
     trafficLevel: "light"
   },
@@ -86,12 +76,10 @@ const initialDeliveries = [
     address: "567 Broadway, Theater District",
     phone: "+1 (555) 567-8901",
     timeWindow: "6:00 PM - 8:00 PM",
-    estimatedArrival: "6:15 PM",
     status: "pending",
     distance: "2.7 km",
     duration: "7 min",
     notes: "Express delivery",
-    priority: "urgent",
     coordinates: { lat: 40.7590, lng: -73.9845 },
     trafficLevel: "moderate"
   }
@@ -133,21 +121,6 @@ const getStatusText = (status: string) => {
       return "Completed";
     default:
       return "Unknown";
-  }
-};
-
-const getPriorityColor = (priority: string) => {
-  switch (priority) {
-    case "urgent":
-      return "bg-red-100 text-red-800 border-red-200";
-    case "high":
-      return "bg-orange-100 text-orange-800 border-orange-200";
-    case "medium":
-      return "bg-blue-100 text-blue-800 border-blue-200";
-    case "low":
-      return "bg-gray-100 text-gray-800 border-gray-200";
-    default:
-      return "bg-gray-100 text-gray-800 border-gray-200";
   }
 };
 
@@ -215,9 +188,8 @@ export default function AIRouteOptimization() {
     
     // Mock optimization results
     const optimizedDeliveries = [...deliveries].sort((a, b) => {
-      const priorityOrder = { urgent: 4, high: 3, medium: 2, low: 1 };
-      return (priorityOrder[b.priority as keyof typeof priorityOrder] || 0) - 
-             (priorityOrder[a.priority as keyof typeof priorityOrder] || 0);
+      return (a.status === "current" ? 0 : a.status === "next" ? 1 : 2) - 
+             (b.status === "current" ? 0 : b.status === "next" ? 1 : 2);
     });
     
     // Update route data with optimized metrics
@@ -226,9 +198,7 @@ export default function AIRouteOptimization() {
       ...prev,
       totalDistance: "16.2 km",
       estimatedTime: "2h 45m",
-      fuelCost: "$10.90",
-      optimizationScore: 94,
-      co2Saved: "3.2 kg"
+      optimizationScore: 94
     }));
     
     setIsOptimizing(false);
@@ -409,24 +379,6 @@ export default function AIRouteOptimization() {
                   <span className="text-2xl font-bold">{routeData.estimatedTime}</span>
                 </div>
                 <p className="text-xs text-gray-500">Est. Time</p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="text-center p-3 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center justify-center space-x-2 mb-2">
-                  <Icon name="Fuel" size={20} className="text-green-600" />
-                  <span className="text-lg font-bold text-green-800">{routeData.fuelCost}</span>
-                </div>
-                <p className="text-xs text-green-700">Fuel Cost</p>
-              </div>
-              
-              <div className="text-center p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center justify-center space-x-2 mb-2">
-                  <Icon name="Leaf" size={20} className="text-blue-600" />
-                  <span className="text-lg font-bold text-blue-800">{routeData.co2Saved}</span>
-                </div>
-                <p className="text-xs text-blue-700">CO₂ Saved</p>
               </div>
             </div>
 
@@ -666,17 +618,6 @@ export default function AIRouteOptimization() {
                         >
                           {getStatusText(delivery.status)}
                         </Badge>
-                        <Badge 
-                          className={`text-xs border font-semibold ${
-                            delivery.priority === 'urgent' ? 'parcego-priority-urgent' :
-                            delivery.priority === 'high' ? 'parcego-priority-high' :
-                            delivery.priority === 'medium' ? 'parcego-priority-medium' :
-                            getPriorityColor(delivery.priority)
-                          }`}
-                          id={`parcego-delivery-priority-${delivery.id}`}
-                        >
-                          {delivery.priority.toUpperCase()}
-                        </Badge>
                       </div>
                       <p 
                         className="text-sm text-gray-700 flex items-center mb-2"
@@ -690,7 +631,6 @@ export default function AIRouteOptimization() {
                   <Icon name="Clock" size={16} className="mr-2 text-blue-500" />
                   <span className="font-medium">{delivery.timeWindow}</span>
                 </span>
-                        <span>ETA: {delivery.estimatedArrival}</span>
                         <span>{delivery.distance}</span>
                         <span>{delivery.duration}</span>
                         <div className="flex items-center space-x-2">
@@ -703,11 +643,7 @@ export default function AIRouteOptimization() {
                       </div>
                       {delivery.notes && (
                         <div 
-                          className={`text-sm p-3 rounded-lg mt-2 ${
-                            delivery.priority === 'urgent' || delivery.priority === 'high' 
-                              ? 'parcego-critical-info' 
-                              : 'text-blue-700 bg-blue-50 border border-blue-200'
-                          }`}
+                          className={`text-sm p-3 rounded-lg mt-2 text-blue-700 bg-blue-50 border border-blue-200`}
                           id={`parcego-delivery-notes-${delivery.id}`}
                         >
                           <Icon name="FileText" size={16} className="mr-2 inline" />
@@ -860,23 +796,7 @@ export default function AIRouteOptimization() {
               </Button>
             </div>
             
-            {/* AI Insights */}
-            <div className="mt-4 p-3 bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200 rounded-lg">
-              <div className="flex items-start space-x-3">
-                <Icon name="Brain" size={24} className="text-purple-600 mt-1" />
-                <div className="flex-1">
-                  <h4 className="font-medium text-purple-900 mb-1">AI Insights</h4>
-                  <p className="text-sm text-purple-700">
-                    Current route saves <strong>{routeData.co2Saved}</strong> CO₂ and <strong>$3.20</strong> in fuel costs compared to standard routing.
-                  </p>
-                  <div className="flex items-center space-x-4 mt-2 text-xs text-purple-600">
-                    <span>🚦 Traffic-optimized</span>
-                    <span>⚡ Priority-sorted</span>
-                    <span>🌱 Eco-friendly</span>
-                  </div>
-                </div>
-              </div>
-            </div>
+
           </CardContent>
         </Card>
       </div>

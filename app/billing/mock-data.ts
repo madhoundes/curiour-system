@@ -9,7 +9,7 @@ export const mockPayments: Payment[] = [
     status: 'paid',
     method: 'Visa •••• 1234',
     invoiceId: 'inv-001',
-    downloadUrl: '#'
+    downloadUrl: '/api/payments/pmt-001/download'
   },
   {
     id: 'pmt-002',
@@ -19,7 +19,7 @@ export const mockPayments: Payment[] = [
     status: 'paid',
     method: 'ACH Transfer',
     invoiceId: 'inv-002',
-    downloadUrl: '#'
+    downloadUrl: '/api/payments/pmt-002/download'
   },
   {
     id: 'pmt-003',
@@ -29,7 +29,27 @@ export const mockPayments: Payment[] = [
     status: 'pending',
     method: 'PayPal',
     invoiceId: 'inv-003',
-    downloadUrl: '#'
+    downloadUrl: '/api/payments/pmt-003/download'
+  },
+  {
+    id: 'pmt-004',
+    date: '2023-12-01T10:00:00Z',
+    amount: 950.00,
+    currency: 'USD',
+    status: 'failed',
+    method: 'Mastercard •••• 5678',
+    invoiceId: 'inv-004',
+    downloadUrl: '/api/payments/pmt-004/download'
+  },
+  {
+    id: 'pmt-005',
+    date: '2023-11-15T10:00:00Z',
+    amount: 750.00,
+    currency: 'USD',
+    status: 'refunded',
+    method: 'Visa •••• 9012',
+    invoiceId: 'inv-005',
+    downloadUrl: '/api/payments/pmt-005/download'
   }
 ]
 
@@ -41,7 +61,7 @@ export const mockInvoices: Invoice[] = [
     amount: 3200.00,
     currency: 'USD',
     status: 'due',
-    downloadUrl: '#',
+    downloadUrl: '/api/invoices/inv-001/download',
     lineItems: [
       { description: 'Standard Delivery (50 packages)', amount: 2500.00 },
       { description: 'Express Delivery Surcharge', amount: 500.00 },
@@ -55,7 +75,7 @@ export const mockInvoices: Invoice[] = [
     amount: 2100.00,
     currency: 'USD',
     status: 'paid',
-    downloadUrl: '#',
+    downloadUrl: '/api/invoices/inv-002/download',
     lineItems: [
       { description: 'Standard Delivery (35 packages)', amount: 1750.00 },
       { description: 'Insurance', amount: 350.00 }
@@ -68,7 +88,7 @@ export const mockInvoices: Invoice[] = [
     amount: 1800.00,
     currency: 'USD',
     status: 'overdue',
-    downloadUrl: '#',
+    downloadUrl: '/api/invoices/inv-003/download',
     lineItems: [
       { description: 'Standard Delivery (30 packages)', amount: 1500.00 },
       { description: 'Insurance', amount: 300.00 }
@@ -103,21 +123,21 @@ export const mockTaxDocuments: TaxDocument[] = [
     id: 'tax-001',
     year: 2023,
     type: '1099-K',
-    downloadUrl: '#',
+    downloadUrl: '/api/tax-documents/tax-001/download',
     issuedDate: '2024-01-31T10:00:00Z'
   },
   {
     id: 'tax-002',
     year: 2023,
     type: 'Annual Statement',
-    downloadUrl: '#',
+    downloadUrl: '/api/tax-documents/tax-002/download',
     issuedDate: '2024-01-31T10:00:00Z'
   },
   {
     id: 'tax-003',
     year: 2022,
     type: '1099-K',
-    downloadUrl: '#',
+    downloadUrl: '/api/tax-documents/tax-003/download',
     issuedDate: '2023-01-31T10:00:00Z'
   }
 ]

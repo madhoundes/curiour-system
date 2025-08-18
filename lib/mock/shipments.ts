@@ -4,7 +4,8 @@ export type ShipmentStatus =
   | "IN_TRANSIT"
   | "OUT_FOR_DELIVERY"
   | "DELIVERED"
-  | "FAILED";
+  | "FAILED"
+  | "CANCELLED";
 
 export type Shipment = {
   id: string;
@@ -91,17 +92,19 @@ export const generateMockShipments = (count = 120, seed = 20250811): Shipment[] 
     // Weighted status: Delivered most frequent
     const r = rand();
     const status: ShipmentStatus =
-      r < 0.45
+      r < 0.40
         ? "DELIVERED"
-        : r < 0.65
+        : r < 0.60
           ? "IN_TRANSIT"
-          : r < 0.78
+          : r < 0.72
             ? "OUT_FOR_DELIVERY"
-            : r < 0.88
+            : r < 0.82
               ? "SCANNED"
-              : r < 0.97
+              : r < 0.92
                 ? "LABEL_CREATED"
-                : "FAILED";
+                : r < 0.97
+                  ? "FAILED"
+                  : "CANCELLED";
 
     const service = services[Math.floor(rand() * services.length)];
     const courier = couriers[Math.floor(rand() * couriers.length)];

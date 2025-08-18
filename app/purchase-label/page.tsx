@@ -13,6 +13,7 @@ import { createStepperSteps } from "@/components/ui/stepper";
 import { jsPDF } from "jspdf";
 import JsBarcode from "jsbarcode";
 import QRCode from "qrcode";
+import { loadLogoForPDF, addLogoToPDF } from "@/lib/utils";
 
 interface OrderData {
   recipientName: string;
@@ -156,11 +157,12 @@ export default function PurchaseLabelPage() {
     pdf.setLineWidth(2);
     pdf.rect(10, 10, 268, 412);
     
-    // Header - Company Logo/Name
-    pdf.setFontSize(18);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(0, 145, 245); // Blue color
-    pdf.text('PARCEGO', 144, 35, { align: 'center' });
+    // Load and add company logo with exact pixel dimensions to prevent distortion
+    const logoData = await loadLogoForPDF();
+    // Convert 157px × 33px to points for PDF (72 DPI)
+    const logoWidthPoints = 157;  // 157 points
+    const logoHeightPoints = 33;  // 33 points
+    addLogoToPDF(pdf, 94, 15, logoWidthPoints, logoHeightPoints, logoData);
     
     // Subtitle
     pdf.setFontSize(10);
@@ -349,12 +351,7 @@ export default function PurchaseLabelPage() {
     }
   };
 
-  const handlePrintLabel = () => {
-    // Simulate label printing
-    console.log('Printing label for tracking number:', trackingNumber);
-    // In real app, this would trigger print dialog
-    window.print();
-  };
+
 
   const handleGoToDashboard = () => {
     router.push('/dashboard');

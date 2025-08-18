@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
-import { ArrowLeft, Circle, FilePlus, Hand, Scan, ArrowRight, Truck, XCircle, CheckCircle, Undo2, Image, StickyNote, Dot, Pen, File, X, AlertCircle } from "lucide-react";
+import { Circle, FilePlus, Hand, Scan, ArrowRight, Truck, XCircle, CheckCircle, Undo2, Image, StickyNote, Dot, Pen, File, X, AlertCircle } from "lucide-react";
 import { useSearchParams, useRouter } from "next/navigation";
 import NextImage from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";

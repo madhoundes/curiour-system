@@ -62,6 +62,24 @@ export default function ShipmentDetailPage() {
             <Button variant="outline" onClick={() => alert("Printing (mock)…")} aria-label="Print">
               <Icon name="Printer" size={16} className="mr-2" /> Print
             </Button>
+            {shipment.status === "LABEL_CREATED" && (
+              <Button 
+                variant="destructive" 
+                onClick={() => {
+                  if (confirm(`Are you sure you want to cancel shipment ${shipment.id}? This action cannot be undone.`)) {
+                    // Update the shipment status to CANCELLED
+                    shipment.status = "CANCELLED";
+                    shipment.updatedAt = new Date().toISOString();
+                    alert(`Shipment ${shipment.id} has been cancelled successfully.`);
+                    // Redirect back to shipments list
+                    router.push("/shipments");
+                  }
+                }}
+                aria-label="Cancel shipment"
+              >
+                <Icon name="X" size={16} className="mr-2" /> Cancel Shipment
+              </Button>
+            )}
           </div>
         </div>
 

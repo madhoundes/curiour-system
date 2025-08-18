@@ -346,28 +346,7 @@
     background: linear-gradient(180deg, #ef4444, #f59e0b);
   }
   
-  /* Priority indicators */
-  .parcego-priority-urgent {
-    background: linear-gradient(135deg, #fee2e2, #fecaca);
-    border-color: #ef4444;
-    color: #991b1b;
-    font-weight: 700;
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.2);
-  }
-  
-  .parcego-priority-high {
-    background: linear-gradient(135deg, #fed7aa, #fef3c7);
-    border-color: #f59e0b;
-    color: #92400e;
-    font-weight: 600;
-  }
-  
-  .parcego-priority-medium {
-    background: linear-gradient(135deg, #dbeafe, #e0f2fe);
-    border-color: #3b82f6;
-    color: #1e40af;
-    font-weight: 500;
-  }
+
   
   /* Status indicators with enhanced visibility */
   .parcego-status-current {
@@ -478,4 +457,268 @@
     transform: translateY(-1px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
+}
+
+/* Invoice Print Styles */
+@media print {
+  /* Hide everything except invoice content when printing */
+  body * {
+    visibility: hidden !important;
+  }
+  
+  #parcego-invoice-content,
+  #parcego-invoice-content * {
+    visibility: visible !important;
+  }
+  
+  /* Hide all dialog elements, buttons, headers */
+  [data-slot="dialog-overlay"],
+  [data-slot="dialog-close"],
+  [data-slot="dialog-header"],
+  [data-slot="dialog-description"],
+  button,
+  .flex.justify-end.items-center.gap-3,
+  .grid.grid-cols-1.md\\:grid-cols-4 {
+    display: none !important;
+  }
+  
+  /* Position invoice content for print */
+  #parcego-invoice-content {
+    position: fixed !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 40px !important;
+    background: white !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    transform: none !important;
+  }
+  
+  /* Ensure proper page setup */
+  @page {
+    size: A4;
+    margin: 15mm;
+  }
+  
+  /* Typography optimization for print */
+  #parcego-invoice-content * {
+    font-family: Arial, sans-serif !important;
+  }
+  
+  #parcego-invoice-content h1,
+  #parcego-invoice-content h2,
+  #parcego-invoice-content h3,
+  #parcego-invoice-content h4 {
+    color: #000 !important;
+    font-weight: bold !important;
+    page-break-after: avoid;
+    break-after: avoid;
+  }
+  
+  #parcego-invoice-content p,
+  #parcego-invoice-content div,
+  #parcego-invoice-content span,
+  #parcego-invoice-content td,
+  #parcego-invoice-content th {
+    color: #000 !important;
+  }
+  
+  /* Logo styling for print */
+  #parcego-invoice-content img {
+    max-width: 100% !important;
+    height: auto !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Ensure logo background prints */
+  #parcego-invoice-content .bg-blue-600 {
+    background-color: #2563eb !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* White logo filter for print */
+  #parcego-invoice-content .filter.brightness-0.invert {
+    filter: brightness(0) invert(1) !important;
+    -webkit-filter: brightness(0) invert(1) !important;
+  }
+  
+  /* Table styling for print */
+  #parcego-invoice-content table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  
+  #parcego-invoice-content thead {
+    display: table-header-group;
+  }
+  
+  #parcego-invoice-content tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  
+  #parcego-invoice-content th,
+  #parcego-invoice-content td {
+    border: 1px solid #e5e7eb !important;
+    padding: 8px 12px !important;
+    text-align: left !important;
+  }
+  
+  #parcego-invoice-content th {
+    background-color: #f3f4f6 !important;
+    font-weight: bold !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Bill To section styling */
+  #parcego-invoice-content .bg-gray-50 {
+    background-color: #f9fafb !important;
+    border: 1px solid #e5e7eb !important;
+    padding: 16px !important;
+    border-radius: 8px !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Maintain proper spacing */
+  #parcego-invoice-content .mb-8 {
+    margin-bottom: 24px !important;
+  }
+  
+  #parcego-invoice-content .mt-12 {
+    margin-top: 36px !important;
+  }
+  
+  #parcego-invoice-content .pt-6 {
+    padding-top: 20px !important;
+  }
+  
+  /* Status badge styling for print */
+  #parcego-invoice-content [class*="badge"],
+  #parcego-invoice-content [class*="Badge"] {
+    display: inline-block !important;
+    padding: 2px 8px !important;
+    border-radius: 4px !important;
+    font-size: 10px !important;
+    font-weight: 600 !important;
+    border: 1px solid #000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Watermark styling */
+  #parcego-invoice-content .absolute.inset-0 {
+    position: absolute !important;
+    opacity: 0.08 !important;
+    z-index: 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Ensure relative positioning for container */
+  #parcego-invoice-content > .border.rounded-lg {
+    position: relative !important;
+    z-index: 1 !important;
+  }
+  
+  /* Font sizes for print */
+  #parcego-invoice-content {
+    font-size: 11px !important;
+    line-height: 1.5 !important;
+  }
+  
+  #parcego-invoice-content h1 {
+    font-size: 22px !important;
+    margin-bottom: 4px !important;
+  }
+  
+  #parcego-invoice-content h3 {
+    font-size: 14px !important;
+    margin-bottom: 8px !important;
+  }
+  
+  #parcego-invoice-content .text-2xl {
+    font-size: 20px !important;
+  }
+  
+  #parcego-invoice-content .text-lg {
+    font-size: 13px !important;
+  }
+  
+  #parcego-invoice-content .text-sm {
+    font-size: 10px !important;
+  }
+  
+  #parcego-invoice-content .text-xs {
+    font-size: 9px !important;
+  }
+  
+  /* Separator line styling */
+  #parcego-invoice-content hr,
+  #parcego-invoice-content [class*="border-t"] {
+    border-color: #e5e7eb !important;
+    margin: 12px 0 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Footer styling */
+  #parcego-invoice-content .border-t.border-gray-200 {
+    border-top: 1px solid #e5e7eb !important;
+    margin-top: 24px !important;
+    padding-top: 16px !important;
+  }
+  
+  /* Remove any transforms or transitions */
+  #parcego-invoice-content * {
+    transform: none !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Print button hover effects */
+#print-invoice-btn:hover {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.3);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Invoice content hover effects */
+#parcego-invoice-content {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#parcego-invoice-content:hover {
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+/* Payment method icon hover effects */
+.payment-method-icon {
+  transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.payment-method-icon:hover {
+  transform: scale(1.1);
+}
+
+/* Status badge hover effects */
+.status-badge {
+  /* Removed hover effects and shadows */
+}
+
+/* Table row hover effects */
+.table-row-hover {
+  /* Removed hover effects and shadows */
 }

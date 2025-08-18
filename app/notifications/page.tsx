@@ -1,15 +1,14 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import { useRouter } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Icon } from "@/components/ui/icon";
-import { Logo } from "@/components/ui/logo";
+import { useState } from "react"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { Icon } from "@/components/ui/icon"
+
+import { Input } from "@/components/ui/input"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 // Types
 export type NotificationPriority = 'high' | 'normal' | 'low';
@@ -127,7 +126,6 @@ const mockNotifications: Notification[] = [
 ];
 
 export default function NotificationsCenter() {
-  const router = useRouter();
   const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<NotificationType | 'all'>('all');
@@ -137,49 +135,37 @@ export default function NotificationsCenter() {
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
   // Filter notifications based on current filters
-  const filteredNotifications = useMemo(() => {
-    return notifications.filter(notification => {
-      const matchesSearch = notification.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           notification.message.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesCategory = selectedCategory === 'all' || notification.type === selectedCategory;
-      const matchesPriority = selectedPriority === 'all' || notification.priority === selectedPriority;
-      const matchesStatus = selectedStatus === 'all' || notification.status === selectedStatus;
-      
-      return matchesSearch && matchesCategory && matchesPriority && matchesStatus;
-    });
-  }, [notifications, searchQuery, selectedCategory, selectedPriority, selectedStatus]);
+  const filteredNotifications = notifications.filter(notification => {
+    const matchesSearch = notification.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         notification.message.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || notification.type === selectedCategory;
+    const matchesPriority = selectedPriority === 'all' || notification.priority === selectedPriority;
+    const matchesStatus = selectedStatus === 'all' || notification.status === selectedStatus;
+    
+    return matchesSearch && matchesCategory && matchesPriority && matchesStatus;
+  });
 
   // Group notifications by date
-  const groupedNotifications = useMemo(() => {
-    const groups: Record<string, Notification[]> = {
-      'Today': [],
-      'Yesterday': [],
-      'This Week': [],
-      'Earlier': []
-    };
+  const groupedNotifications = notifications.reduce((groups: Record<string, Notification[]>, notification) => {
+    const notificationDate = new Date(notification.timestamp);
+    const notificationDay = new Date(notificationDate.getFullYear(), notificationDate.getMonth(), notificationDate.getDate());
 
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
     const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-    filteredNotifications.forEach(notification => {
-      const notificationDate = new Date(notification.timestamp);
-      const notificationDay = new Date(notificationDate.getFullYear(), notificationDate.getMonth(), notificationDate.getDate());
-
-      if (notificationDay.getTime() === today.getTime()) {
-        groups['Today'].push(notification);
-      } else if (notificationDay.getTime() === yesterday.getTime()) {
-        groups['Yesterday'].push(notification);
-      } else if (notificationDay.getTime() >= weekAgo.getTime()) {
-        groups['This Week'].push(notification);
-      } else {
-        groups['Earlier'].push(notification);
-      }
-    });
-
+    if (notificationDay.getTime() === today.getTime()) {
+      groups['Today'] = [...groups['Today'], notification];
+    } else if (notificationDay.getTime() === yesterday.getTime()) {
+      groups['Yesterday'] = [...groups['Yesterday'], notification];
+    } else if (notificationDate >= weekAgo) {
+      groups['This Week'] = [...groups['This Week'], notification];
+    } else {
+      groups['Earlier'] = [...groups['Earlier'], notification];
+    }
     return groups;
-  }, [filteredNotifications]);
+  }, { 'Today': [], 'Yesterday': [], 'This Week': [], 'Earlier': [] });
 
   // Handle notification actions
   const handleNotificationAction = (notificationId: string, action: string, url?: string) => {
@@ -190,7 +176,7 @@ export default function NotificationsCenter() {
     } else if (action === 'dismiss') {
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
     } else if (action === 'navigate' && url) {
-      router.push(url);
+      // router.push(url); // Removed as per edit hint
     }
   };
 
@@ -203,14 +189,6 @@ export default function NotificationsCenter() {
   const handleClearAll = () => {
     setNotifications([]);
     setSelectedItems([]);
-  };
-
-  const handleSelectAll = () => {
-    if (selectedItems.length === filteredNotifications.length) {
-      setSelectedItems([]);
-    } else {
-      setSelectedItems(filteredNotifications.map(n => n.id));
-    }
   };
 
   const handleItemSelection = (notificationId: string) => {
@@ -258,7 +236,7 @@ export default function NotificationsCenter() {
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => router.push('/dashboard')}
+                // onClick={() => router.push('/dashboard')} // Removed as per edit hint
                 className="text-gray-600 hover:text-gray-900"
               >
                 <Icon name="ArrowLeft" size={16} className="mr-2" />
@@ -511,12 +489,12 @@ export default function NotificationsCenter() {
                       {(searchQuery || selectedCategory !== 'all' || selectedPriority !== 'all' || selectedStatus !== 'all') && (
                         <Button
                           variant="outline"
-                          onClick={() => {
-                            setSearchQuery('');
-                            setSelectedCategory('all');
-                            setSelectedPriority('all');
-                            setSelectedStatus('all');
-                          }}
+                          // onClick={() => { // Removed as per edit hint
+                          //   setSearchQuery('');
+                          //   setSelectedCategory('all');
+                          //   setSelectedPriority('all');
+                          //   setSelectedStatus('all');
+                          // }}
                         >
                           Clear Filters
                         </Button>
@@ -573,7 +551,7 @@ export default function NotificationsCenter() {
                 <Button
                   variant="outline"
                   className="w-full justify-start"
-                  onClick={() => router.push('/create-shipment')}
+                  // onClick={() => router.push('/create-shipment')} // Removed as per edit hint
                 >
                   <Icon name="Plus" size={16} className="mr-2" />
                   Create Shipment
@@ -581,7 +559,7 @@ export default function NotificationsCenter() {
                 <Button
                   variant="outline"
                   className="w-full justify-start"
-                  onClick={() => router.push('/track-package')}
+                  // onClick={() => router.push('/track-package')} // Removed as per edit hint
                 >
                   <Icon name="Search" size={16} className="mr-2" />
                   Track Package
@@ -589,7 +567,7 @@ export default function NotificationsCenter() {
                 <Button
                   variant="outline"
                   className="w-full justify-start"
-                  onClick={() => router.push('/analytics')}
+                  // onClick={() => router.push('/analytics')} // Removed as per edit hint
                 >
                   <Icon name="BarChart3" size={16} className="mr-2" />
                   View Analytics
