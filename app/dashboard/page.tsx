@@ -33,6 +33,66 @@ const mockStats = {
   revenue: 2450
 };
 
+// Shipping Tips Data
+const shippingTips = [
+  {
+    id: 1,
+    title: "Proper Packaging Prevents Damage",
+    description: "Use double-walled boxes for fragile items and fill empty spaces with bubble wrap or packing peanuts to prevent shifting during transit.",
+    category: "packaging",
+    icon: "Package",
+    priority: "high"
+  },
+  {
+    id: 2,
+    title: "Accurate Weight Saves Money",
+    description: "Always weigh your package after packaging to avoid additional charges. Include the weight of all packaging materials in your total.",
+    category: "cost",
+    icon: "Scale",
+    priority: "medium"
+  },
+  {
+    id: 3,
+    title: "Clear Labeling Ensures Delivery",
+    description: "Use clear, readable labels with complete addresses. Avoid abbreviations and ensure the recipient's phone number is visible.",
+    category: "delivery",
+    icon: "Tag",
+    priority: "high"
+  },
+  {
+    id: 4,
+    title: "Choose the Right Service Level",
+    description: "Match your service level to your timeline. Standard shipping is cost-effective for non-urgent items, while express options are best for time-sensitive deliveries.",
+    category: "service",
+    icon: "Clock",
+    priority: "medium"
+  },
+  {
+    id: 5,
+    title: "Insurance for Valuable Items",
+    description: "Always insure items worth more than $100. Document the item's condition with photos before shipping for claims purposes.",
+    category: "protection",
+    icon: "Shield",
+    priority: "high"
+  },
+  {
+    id: 6,
+    title: "Avoid Common Address Mistakes",
+    description: "Double-check postal codes and ensure street numbers are correct. Missing or incorrect information can cause significant delays.",
+    category: "delivery",
+    icon: "MapPin",
+    priority: "medium"
+  },
+  {
+    id: 7,
+    title: "Packaging Material Selection",
+    description: "Choose materials based on item fragility. Use corrugated cardboard for most items and specialty boxes for electronics or artwork.",
+    category: "packaging",
+    icon: "Box",
+    priority: "medium"
+  }
+];
+
 const mockRecentShipments = [
   {
     id: "SH001",
@@ -146,6 +206,7 @@ export default function MerchantDashboard() {
   const [trackingNumber, setTrackingNumber] = useState("");
   const [isTracking, setIsTracking] = useState(false);
   const [notifications, setNotifications] = useState(mockNotifications);
+  const [currentTipIndex, setCurrentTipIndex] = useState(0);
   
   // Quick Quote state
   const [quoteForm, setQuoteForm] = useState({
@@ -158,6 +219,17 @@ export default function MerchantDashboard() {
   
   // Calculate unread notifications count
   const unreadCount = notifications.filter(n => !n.isRead).length;
+
+  // Rotate shipping tips every 8 seconds
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentTipIndex((prevIndex) => 
+        prevIndex === shippingTips.length - 1 ? 0 : prevIndex + 1
+      );
+    }, 8000);
+
+    return () => clearInterval(interval);
+  }, []);
 
   const handleMarkAsRead = (id: string) => {
     setNotifications(prev => 
@@ -345,6 +417,102 @@ export default function MerchantDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Shipping Tips Feature - New section above Quick Actions */}
+        <Card className="mb-6 border-l-4 border-l-blue-500 bg-gradient-to-r from-blue-50 to-indigo-50">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <div className="bg-blue-100 rounded-lg p-2">
+                  <Icon name="Lightbulb" size={20} className="text-blue-600" />
+                </div>
+                <div>
+                  <CardTitle className="text-lg text-blue-900">Shipping Tips</CardTitle>
+                  <CardDescription className="text-blue-700">
+                    Expert advice to optimize your shipments and avoid common mistakes
+                  </CardDescription>
+                </div>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-blue-600/70 hover:text-blue-700/80 hover:bg-blue-100/50"
+                onClick={() => setCurrentTipIndex((prevIndex) => 
+                  prevIndex === shippingTips.length - 1 ? 0 : prevIndex + 1
+                )}
+                id="parcego-shipping-tips-next-btn"
+                aria-label="Next shipping tip"
+              >
+                <Icon name="ChevronRight" size={16} />
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="relative">
+              {/* Current Tip Display */}
+              <div className="flex items-start space-x-4 p-4 bg-white rounded-lg border border-blue-200 shadow-sm">
+                <div className="bg-blue-100 rounded-lg p-3 flex-shrink-0">
+                  <Icon 
+                    name={shippingTips[currentTipIndex].icon} 
+                    size={24} 
+                    className="text-blue-600" 
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="font-semibold text-gray-900 mb-1.5">
+                    {shippingTips[currentTipIndex].title}
+                  </h4>
+                  <p className="text-gray-700 text-sm leading-tight">
+                    {shippingTips[currentTipIndex].description}
+                  </p>
+                  <div className="flex items-center space-x-2 mt-2.5">
+                    <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                      shippingTips[currentTipIndex].priority === 'high' 
+                        ? 'bg-red-100 text-red-800' 
+                        : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {shippingTips[currentTipIndex].priority === 'high' ? 'High Priority' : 'Medium Priority'}
+                    </span>
+                    <span className="text-xs text-gray-500 capitalize">
+                      {shippingTips[currentTipIndex].category}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Navigation Dots */}
+              <div className="flex justify-center mt-4 space-x-2">
+                {shippingTips.map((tip, index) => (
+                  <button
+                    key={tip.id}
+                    onClick={() => setCurrentTipIndex(index)}
+                    className={`w-3 h-3 rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                      index === currentTipIndex 
+                        ? 'bg-blue-600 scale-110' 
+                        : 'bg-blue-300 hover:bg-blue-400'
+                    }`}
+                    aria-label={`Go to tip ${index + 1}: ${tip.title}`}
+                    id={`parcego-shipping-tips-dot-${index}`}
+                  />
+                ))}
+              </div>
+            </div>
+            
+            {/* Quick Actions for Tips */}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-blue-600/60 border-blue-200/60 hover:text-blue-700/70 hover:bg-blue-50/50 hover:border-blue-300/70"
+                onClick={() => router.push('/support')}
+                id="parcego-shipping-tips-support-btn"
+              >
+                <Icon name="help-circle" size={14} className="mr-2" />
+                More Tips
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Quick Actions - Separated into its own row section */}
         <Card className="mb-6">
@@ -549,6 +717,15 @@ export default function MerchantDashboard() {
               >
                 <Icon name="Shield" size={24} />
                 <span>File a Claim</span>
+              </Button>
+              <Button 
+                variant="outline" 
+                className="h-16 flex flex-col space-y-2"
+                onClick={() => router.push('/undeliverable')}
+                id="parcego-dashboard-undeliverable-btn"
+              >
+                <Icon name="PackageX" size={24} />
+                <span>Undeliverable Packages</span>
               </Button>
             </div>
           </CardContent>

@@ -1,0 +1,1401 @@
+---
+description: Comprehensive backend stack implementation rules for the Ashraf Courier Business Platform, covering database, API, authentication, and infrastructure.
+globs: ["**/*.ts", "**/*.js", "**/*.sql", "**/*.yaml", "**/*.yml"]
+alwaysApply: true
+---
+
+# Ashraf Courier Platform – Backend Stack Implementation Rule
+
+## 🎯 **Objective**
+
+Implement a robust, scalable backend infrastructure for the Ashraf Courier Business Platform using modern technologies and best practices. Focus on security, performance, and maintainability while supporting all frontend features identified in the UI implementation.
+
+---
+
+## 🏗️ **1. Technology Stack & Architecture**
+
+### **1.1 Core Backend Technologies**
+- **Runtime:** Node.js 20+ LTS with TypeScript
+- **Framework:** Express.js 4.x with TypeScript
+- **Database:** PostgreSQL 15+ with Supabase integration
+- **Authentication:** Supabase Auth + JWT tokens
+- **API Documentation:** OpenAPI 3.0 (Swagger UI)
+- **Validation:** Zod schema validation
+- **Testing:** Jest + Supertest for API testing
+
+### **1.2 Infrastructure & Deployment**
+- **Hosting:** Vercel Serverless Functions (preferred) or managed Node.js services
+- **Database Hosting:** Supabase (PostgreSQL)
+- **File Storage:** Supabase Storage + AWS S3 fallback
+- **Caching:** Redis for session and query caching
+- **Monitoring:** Sentry for error tracking, DataDog for performance
+- **CI/CD:** GitHub Actions with automated testing and deployment
+
+### **1.3 Security & Compliance**
+- **Authentication:** JWT + refresh tokens, 2FA support
+- **Authorization:** Role-based access control (RBAC)
+- **Data Protection:** GDPR compliance, data encryption at rest
+- **API Security:** Rate limiting, CORS, input validation, SQL injection prevention
+- **Payment Security:** PCI DSS compliance via Stripe integration
+
+---
+
+## 🗄️ **2. Database Schema Implementation**
+
+### **2.1 Core Tables (Phase 1)**
+```sql
+-- Users and Authentication
+CREATE TABLE users (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password_hash VARCHAR(255) NOT NULL,
+  role user_role NOT NULL,
+  status user_status DEFAULT 'pending',
+  email_verified BOOLEAN DEFAULT FALSE,
+  two_factor_enabled BOOLEAN DEFAULT FALSE,
+  two_factor_secret VARCHAR(255),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  last_login TIMESTAMP,
+  login_attempts INTEGER DEFAULT 0,
+  locked_until TIMESTAMP
+);
+
+-- User Profiles
+CREATE TABLE user_profiles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  business_name VARCHAR(255),
+  contact_name VARCHAR(255) NOT NULL,
+  phone VARCHAR(50),
+  address_line1 VARCHAR(255),
+  address_line2 VARCHAR(255),
+  city VARCHAR(100),
+  province VARCHAR(100),
+  postal_code VARCHAR(20),
+  country VARCHAR(100) DEFAULT 'CA',
+  tax_id VARCHAR(100),
+  business_type business_type,
+  verification_status verification_status DEFAULT 'pending',
+  documents JSONB,
+  preferences JSONB,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Shipments
+CREATE TABLE shipments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tracking_number VARCHAR(50) UNIQUE NOT NULL,
+  merchant_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  courier_id UUID REFERENCES users(id),
+  service_type service_type NOT NULL,
+  priority priority DEFAULT 'standard',
+  sender_name VARCHAR(255) NOT NULL,
+  sender_company VARCHAR(255),
+  sender_address JSONB NOT NULL,
+  sender_contact JSONB NOT NULL,
+  recipient_name VARCHAR(255) NOT NULL,
+  recipient_company VARCHAR(255),
+  recipient_address JSONB NOT NULL,
+  recipient_contact JSONB NOT NULL,
+  package_details JSONB NOT NULL,
+  special_instructions TEXT,
+  insurance_amount DECIMAL(10,2) DEFAULT 0,
+  base_cost DECIMAL(10,2) NOT NULL,
+  insurance_cost DECIMAL(10,2) DEFAULT 0,
+  tax_amount DECIMAL(10,2) DEFAULT 0,
+  total_cost DECIMAL(10,2) NOT NULL,
+  currency VARCHAR(3) DEFAULT 'CAD',
+  status shipment_status DEFAULT 'label_created',
+  current_location POINT,
+  estimated_delivery TIMESTAMP,
+  actual_delivery TIMESTAMP,
+  tags TEXT[],
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW(),
+  label_generated_at TIMESTAMP,
+  label_url VARCHAR(500)
+);
+
+-- Tracking Events
+CREATE TABLE tracking_events (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  shipment_id UUID REFERENCES shipments(id) ON DELETE CASCADE,
+  event_type tracking_event_type NOT NULL,
+  status_before shipment_status,
+  status_after shipment_status NOT NULL,
+  location VARCHAR(255),
+  coordinates POINT,
+  timestamp TIMESTAMP DEFAULT NOW(),
+  actor_id UUID REFERENCES users(id),
+  actor_type actor_type NOT NULL,
+  details TEXT,
+  attachments JSONB,
+  metadata JSONB
+);
+```
+
+### **2.2 Extended Tables (Phase 2)**
+```sql
+-- Notifications
+CREATE TABLE notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  type notification_type NOT NULL,
+  priority notification_priority DEFAULT 'normal',
+  status notification_status DEFAULT 'unread',
+  title VARCHAR(255) NOT NULL,
+  message TEXT NOT NULL,
+  category VARCHAR(100),
+  related_id UUID,
+  related_type VARCHAR(50),
+  actions JSONB,
+  metadata JSONB,
+  created_at TIMESTAMP DEFAULT NOW(),
+  read_at TIMESTAMP,
+  dismissed_at TIMESTAMP
+);
+
+-- Billing System
+CREATE TABLE invoices (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  invoice_number VARCHAR(50) UNIQUE NOT NULL,
+  status invoice_status DEFAULT 'due',
+  issue_date DATE NOT NULL,
+  due_date DATE NOT NULL,
+  amount DECIMAL(10,2) NOT NULL,
+  tax_amount DECIMAL(10,2) DEFAULT 0,
+  total_amount DECIMAL(10,2) NOT NULL,
+  currency VARCHAR(3) DEFAULT 'CAD',
+  line_items JSONB NOT NULL,
+  notes TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE payments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  invoice_id UUID REFERENCES invoices(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  amount DECIMAL(10,2) NOT NULL,
+  currency VARCHAR(3) DEFAULT 'CAD',
+  payment_method_id UUID,
+  payment_method_type payment_method_type NOT NULL,
+  status payment_status DEFAULT 'pending',
+  transaction_id VARCHAR(255),
+  processed_at TIMESTAMP,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+### **2.3 Custom Types and Enums**
+```sql
+-- User Types
+CREATE TYPE user_role AS ENUM (
+  'merchant', 'courier', 'admin', 'super_admin'
+);
+
+CREATE TYPE user_status AS ENUM (
+  'pending', 'active', 'suspended', 'banned'
+);
+
+CREATE TYPE business_type AS ENUM (
+  'individual', 'partnership', 'corporation', 'llc', 'other'
+);
+
+-- Shipment Types
+CREATE TYPE service_type AS ENUM (
+  'standard', 'express', 'same_day', 'overnight'
+);
+
+CREATE TYPE shipment_status AS ENUM (
+  'label_created', 'dropoff_confirmed', 'received_at_facility',
+  'in_transit', 'out_for_delivery', 'delivery_attempted',
+  'delivered', 'failed_delivery', 'returned_to_sender', 'cancelled'
+);
+
+-- Tracking Event Types
+CREATE TYPE tracking_event_type AS ENUM (
+  'LABEL_CREATED', 'DROP_OFF_CONFIRMED', 'SCANNED_AT_FACILITY',
+  'IN_TRANSIT_DEPARTED', 'IN_TRANSIT_ARRIVED', 'OUT_FOR_DELIVERY',
+  'DELIVERY_ATTEMPTED', 'DELIVERY_FAILED', 'DELIVERED',
+  'RETURNED_TO_SENDER', 'POD_UPLOADED', 'NOTE_ADDED'
+);
+```
+
+### **2.4 Performance Indexes**
+```sql
+-- Core Performance Indexes
+CREATE INDEX idx_shipments_tracking_number ON shipments(tracking_number);
+CREATE INDEX idx_shipments_merchant_id ON shipments(merchant_id);
+CREATE INDEX idx_shipments_courier_id ON shipments(courier_id);
+CREATE INDEX idx_shipments_status ON shipments(status);
+CREATE INDEX idx_shipments_created_at ON shipments(created_at);
+
+CREATE INDEX idx_tracking_events_shipment_id ON tracking_events(shipment_id);
+CREATE INDEX idx_tracking_events_timestamp ON tracking_events(timestamp);
+CREATE INDEX idx_tracking_events_event_type ON tracking_events(event_type);
+
+CREATE INDEX idx_notifications_user_id ON notifications(user_id);
+CREATE INDEX idx_notifications_status ON notifications(status);
+CREATE INDEX idx_notifications_created_at ON notifications(created_at);
+
+-- Full-text search indexes
+CREATE INDEX idx_help_articles_search ON help_articles USING gin(to_tsvector('english', title || ' ' || content));
+```
+
+---
+
+## 🔌 **3. API Architecture & Endpoints**
+
+### **3.1 RESTful API Structure**
+```typescript
+// API Base URL: /api/v1
+
+// Authentication Endpoints
+POST   /auth/register          // User registration
+POST   /auth/login             // User login
+POST   /auth/refresh           // Refresh JWT token
+POST   /auth/logout            // User logout
+POST   /auth/verify-email      // Email verification
+POST   /auth/forgot-password   // Password reset request
+POST   /auth/reset-password    // Password reset
+POST   /auth/2fa/enable        // Enable 2FA
+POST   /auth/2fa/verify        // Verify 2FA code
+
+// User Management
+GET    /users/profile          // Get user profile
+PUT    /users/profile          // Update user profile
+GET    /users/shipments        // Get user shipments
+GET    /users/notifications    // Get user notifications
+PUT    /users/notifications    // Update notification preferences
+
+// Shipment Management
+GET    /shipments              // List shipments (with filters)
+POST   /shipments              // Create new shipment
+GET    /shipments/:id          // Get shipment details
+PUT    /shipments/:id          // Update shipment
+DELETE /shipments/:id          // Cancel shipment
+POST   /shipments/:id/quote    // Get shipment quote
+POST   /shipments/:id/purchase // Purchase label
+
+// Tracking & Delivery
+GET    /tracking/:number       // Track shipment by number
+GET    /shipments/:id/tracking // Get tracking events
+POST   /shipments/:id/events   // Add tracking event
+GET    /shipments/:id/proof    // Get proof of delivery
+
+// Billing & Payments
+GET    /billing/invoices       // List invoices
+GET    /billing/invoices/:id   // Get invoice details
+GET    /billing/payments       // List payments
+POST   /billing/payments       // Process payment
+GET    /billing/methods        // List payment methods
+POST   /billing/methods        // Add payment method
+PUT    /billing/methods/:id    // Update payment method
+DELETE /billing/methods/:id    // Remove payment method
+
+// Admin Endpoints
+GET    /admin/dashboard        // Admin dashboard data
+GET    /admin/users            // List all users
+PUT    /admin/users/:id        // Update user status
+GET    /admin/shipments        // List all shipments
+GET    /admin/analytics        // Platform analytics
+GET    /admin/system-health    // System health status
+
+// Courier Endpoints
+GET    /courier/deliveries     // Get assigned deliveries
+PUT    /courier/deliveries/:id // Update delivery status
+POST   /courier/deliveries/:id/proof // Upload proof of delivery
+GET    /courier/performance    // Get performance metrics
+```
+
+### **3.2 API Response Standards**
+```typescript
+// Success Response Format
+interface ApiResponse<T> {
+  success: true;
+  data: T;
+  message?: string;
+  timestamp: string;
+  requestId: string;
+}
+
+// Error Response Format
+interface ApiError {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+    details?: Record<string, unknown>;
+  };
+  timestamp: string;
+  requestId: string;
+}
+
+// Pagination Format
+interface PaginatedResponse<T> {
+  data: T[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+```
+
+---
+
+## 🔐 **4. Authentication & Authorization**
+
+### **4.1 JWT Implementation**
+```typescript
+// JWT Token Structure
+interface JWTPayload {
+  userId: string;
+  email: string;
+  role: UserRole;
+  permissions: string[];
+  iat: number;
+  exp: number;
+  jti: string; // JWT ID for token revocation
+}
+
+// Token Management
+interface TokenPair {
+  accessToken: string;   // 15 minutes
+  refreshToken: string;  // 7 days
+}
+
+// Authentication Service
+class AuthService {
+  async generateTokens(user: User): Promise<TokenPair> {
+    const payload: JWTPayload = {
+      userId: user.id,
+      email: user.email,
+      role: user.role,
+      permissions: await this.getUserPermissions(user.id),
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + (15 * 60), // 15 minutes
+      jti: uuidv4()
+    };
+
+    const accessToken = jwt.sign(payload, process.env.JWT_SECRET!);
+    const refreshToken = jwt.sign(
+      { ...payload, exp: Math.floor(Date.now() / 1000) + (7 * 24 * 60 * 60) },
+      process.env.JWT_REFRESH_SECRET!
+    );
+
+    return { accessToken, refreshToken };
+  }
+
+  async verifyToken(token: string): Promise<JWTPayload> {
+    try {
+      const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload;
+      const isRevoked = await this.isTokenRevoked(decoded.jti);
+      
+      if (isRevoked) {
+        throw new Error('Token has been revoked');
+      }
+      
+      return decoded;
+    } catch (error) {
+      throw new Error('Invalid token');
+    }
+  }
+}
+```
+
+### **4.2 Role-Based Access Control (RBAC)**
+```typescript
+// Permission System
+enum Permission {
+  // Shipment permissions
+  SHIPMENT_CREATE = 'shipment:create',
+  SHIPMENT_READ = 'shipment:read',
+  SHIPMENT_UPDATE = 'shipment:update',
+  SHIPMENT_DELETE = 'shipment:delete',
+  
+  // User management permissions
+  USER_READ = 'user:read',
+  USER_UPDATE = 'user:update',
+  USER_DELETE = 'user:delete',
+  
+  // Admin permissions
+  ADMIN_DASHBOARD = 'admin:dashboard',
+  ADMIN_ANALYTICS = 'admin:analytics',
+  ADMIN_SYSTEM = 'admin:system'
+}
+
+// Role definitions
+const RolePermissions: Record<UserRole, Permission[]> = {
+  merchant: [
+    Permission.SHIPMENT_CREATE,
+    Permission.SHIPMENT_READ,
+    Permission.SHIPMENT_UPDATE
+  ],
+  courier: [
+    Permission.SHIPMENT_READ,
+    Permission.SHIPMENT_UPDATE
+  ],
+  admin: [
+    Permission.SHIPMENT_READ,
+    Permission.SHIPMENT_UPDATE,
+    Permission.USER_READ,
+    Permission.ADMIN_DASHBOARD
+  ],
+  super_admin: Object.values(Permission)
+};
+
+// Authorization middleware
+const requirePermission = (permission: Permission) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const userPermissions = req.user?.permissions || [];
+    
+    if (!userPermissions.includes(permission)) {
+      return res.status(403).json({
+        success: false,
+        error: {
+          code: 'INSUFFICIENT_PERMISSIONS',
+          message: 'You do not have permission to perform this action'
+        }
+      });
+    }
+    
+    next();
+  };
+};
+```
+
+---
+
+## 🚀 **5. Real-Time Features**
+
+### **5.1 WebSocket Implementation**
+```typescript
+// WebSocket Server Setup
+import { Server } from 'socket.io';
+import { createServer } from 'http';
+
+const httpServer = createServer();
+const io = new Server(httpServer, {
+  cors: {
+    origin: process.env.FRONTEND_URL,
+    methods: ['GET', 'POST']
+  }
+});
+
+// WebSocket Event Types
+interface WebSocketMessage {
+  type: 'shipment_update' | 'delivery_status' | 'location_update' | 'notification';
+  payload: Record<string, unknown>;
+  recipients: {
+    userIds?: string[];
+    roles?: UserRole[];
+    channels?: string[];
+  };
+}
+
+// Real-time tracking updates
+io.on('connection', (socket) => {
+  // Authenticate socket connection
+  socket.on('authenticate', async (token: string) => {
+    try {
+      const payload = await authService.verifyToken(token);
+      socket.userId = payload.userId;
+      socket.userRole = payload.role;
+      
+      // Join user-specific room
+      socket.join(`user:${payload.userId}`);
+      
+      // Join role-specific room
+      socket.join(`role:${payload.role}`);
+      
+      socket.emit('authenticated');
+    } catch (error) {
+      socket.emit('authentication_error', { message: 'Invalid token' });
+    }
+  });
+
+  // Handle disconnection
+  socket.on('disconnect', () => {
+    console.log(`User ${socket.userId} disconnected`);
+  });
+});
+
+// Broadcast tracking updates
+export const broadcastTrackingUpdate = (message: WebSocketMessage) => {
+  if (message.recipients.userIds) {
+    message.recipients.userIds.forEach(userId => {
+      io.to(`user:${userId}`).emit('tracking_update', message);
+    });
+  }
+  
+  if (message.recipients.roles) {
+    message.recipients.roles.forEach(role => {
+      io.to(`role:${role}`).emit('tracking_update', message);
+    });
+  }
+};
+```
+
+### **5.2 Push Notifications**
+```typescript
+// Push Notification Service
+class PushNotificationService {
+  async sendNotification(userId: string, notification: Notification) {
+    const user = await this.getUserWithDevices(userId);
+    
+    // Send to all user devices
+    for (const device of user.pushDevices) {
+      try {
+        await this.sendToDevice(device.token, notification);
+      } catch (error) {
+        console.error(`Failed to send push to device ${device.id}:`, error);
+      }
+    }
+  }
+
+  private async sendToDevice(token: string, notification: Notification) {
+    // Implementation for FCM, Expo, or other push services
+    const message = {
+      token,
+      notification: {
+        title: notification.title,
+        body: notification.message
+      },
+      data: {
+        type: notification.type,
+        relatedId: notification.relatedId,
+        action: 'open_app'
+      }
+    };
+
+    // Send via Firebase Cloud Messaging or similar
+    await admin.messaging().send(message);
+  }
+}
+```
+
+---
+
+## 📊 **6. Data Validation & Business Logic**
+
+### **6.1 Zod Schema Validation**
+```typescript
+// Shipment Creation Schema
+const CreateShipmentSchema = z.object({
+  serviceType: z.enum(['standard', 'express', 'same_day', 'overnight']),
+  priority: z.enum(['low', 'standard', 'high', 'urgent']).default('standard'),
+  
+  sender: z.object({
+    name: z.string().min(1, 'Sender name is required'),
+    company: z.string().optional(),
+    address: z.object({
+      line1: z.string().min(1, 'Address line 1 is required'),
+      line2: z.string().optional(),
+      city: z.string().min(1, 'City is required'),
+      province: z.string().min(1, 'Province is required'),
+      postalCode: z.string().min(1, 'Postal code is required'),
+      country: z.string().default('CA')
+    }),
+    contact: z.object({
+      phone: z.string().min(1, 'Phone number is required'),
+      email: z.string().email('Valid email is required')
+    })
+  }),
+  
+  recipient: z.object({
+    name: z.string().min(1, 'Recipient name is required'),
+    company: z.string().optional(),
+    address: z.object({
+      line1: z.string().min(1, 'Address line 1 is required'),
+      line2: z.string().optional(),
+      city: z.string().min(1, 'City is required'),
+      province: z.string().min(1, 'Province is required'),
+      postalCode: z.string().min(1, 'Postal code is required'),
+      country: z.string().default('CA')
+    }),
+    contact: z.object({
+      phone: z.string().min(1, 'Phone number is required'),
+      email: z.string().email('Valid email is required')
+    })
+  }),
+  
+  package: z.object({
+    type: z.enum(['box', 'envelope', 'pallet', 'other']),
+    weight: z.number().positive('Weight must be positive'),
+    weightUnit: z.enum(['kg', 'lbs']),
+    dimensions: z.object({
+      length: z.number().positive('Length must be positive'),
+      width: z.number().positive('Width must be positive'),
+      height: z.number().positive('Height must be positive'),
+      unit: z.enum(['cm', 'in'])
+    }),
+    fragile: z.boolean().default(false),
+    valuable: z.boolean().default(false),
+    insurance: z.boolean().default(false),
+    insuranceAmount: z.number().optional()
+  }),
+  
+  specialInstructions: z.string().optional(),
+  tags: z.array(z.string()).optional()
+});
+
+// Validation middleware
+const validateRequest = (schema: z.ZodSchema) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const validatedData = schema.parse(req.body);
+      req.validatedData = validatedData;
+      next();
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Request validation failed',
+            details: error.errors
+          }
+        });
+      }
+      next(error);
+    }
+  };
+};
+```
+
+### **6.2 Business Logic Services**
+```typescript
+// Shipment Service
+class ShipmentService {
+  async createShipment(data: CreateShipmentData, merchantId: string): Promise<Shipment> {
+    // Validate business rules
+    await this.validateBusinessRules(data, merchantId);
+    
+    // Calculate costs
+    const costs = await this.calculateShipmentCosts(data);
+    
+    // Generate tracking number
+    const trackingNumber = await this.generateUniqueTrackingNumber();
+    
+    // Create shipment record
+    const shipment = await this.shipmentRepository.create({
+      ...data,
+      merchantId,
+      trackingNumber,
+      ...costs,
+      status: 'label_created'
+    });
+    
+    // Create initial tracking event
+    await this.trackingService.createEvent({
+      shipmentId: shipment.id,
+      eventType: 'LABEL_CREATED',
+      statusAfter: 'label_created',
+      actorId: merchantId,
+      actorType: 'merchant'
+    });
+    
+    // Send notifications
+    await this.notificationService.notifyShipmentCreated(shipment);
+    
+    return shipment;
+  }
+
+  private async validateBusinessRules(data: CreateShipmentData, merchantId: string) {
+    // Check merchant status
+    const merchant = await this.userService.getUserById(merchantId);
+    if (merchant.status !== 'active') {
+      throw new Error('Merchant account is not active');
+    }
+    
+    // Check package weight limits
+    if (data.package.weight > 100) { // 100 kg limit
+      throw new Error('Package weight exceeds maximum limit');
+    }
+    
+    // Check destination restrictions
+    const restrictions = await this.getDestinationRestrictions(data.recipient.address);
+    if (restrictions.blocked) {
+      throw new Error('Destination is not supported');
+    }
+  }
+
+  private async calculateShipmentCosts(data: CreateShipmentData): Promise<ShipmentCosts> {
+    const baseRate = await this.getBaseRate(data.serviceType, data.package.weight);
+    const distanceMultiplier = await this.calculateDistanceMultiplier(data);
+    const priorityMultiplier = this.getPriorityMultiplier(data.priority);
+    const insuranceCost = data.package.insurance ? this.calculateInsuranceCost(data.package.insuranceAmount) : 0;
+    
+    const baseCost = baseRate * distanceMultiplier * priorityMultiplier;
+    const taxAmount = baseCost * 0.13; // 13% HST for Canada
+    
+    return {
+      baseCost,
+      insuranceCost,
+      taxAmount,
+      totalCost: baseCost + insuranceCost + taxAmount
+    };
+  }
+}
+```
+
+---
+
+## 🧪 **7. Testing Strategy**
+
+### **7.1 Unit Testing**
+```typescript
+// Shipment Service Tests
+describe('ShipmentService', () => {
+  let shipmentService: ShipmentService;
+  let mockShipmentRepository: jest.Mocked<ShipmentRepository>;
+  let mockTrackingService: jest.Mocked<TrackingService>;
+
+  beforeEach(() => {
+    mockShipmentRepository = createMockShipmentRepository();
+    mockTrackingService = createMockTrackingService();
+    shipmentService = new ShipmentService(mockShipmentRepository, mockTrackingService);
+  });
+
+  describe('createShipment', () => {
+    it('should create shipment with valid data', async () => {
+      // Arrange
+      const validData = createValidShipmentData();
+      const merchantId = 'merchant-123';
+      
+      mockShipmentRepository.create.mockResolvedValue(createMockShipment());
+      mockTrackingService.createEvent.mockResolvedValue(createMockTrackingEvent());
+      
+      // Act
+      const result = await shipmentService.createShipment(validData, merchantId);
+      
+      // Assert
+      expect(result).toBeDefined();
+      expect(mockShipmentRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          merchantId,
+          trackingNumber: expect.any(String),
+          status: 'label_created'
+        })
+      );
+    });
+
+    it('should throw error for inactive merchant', async () => {
+      // Arrange
+      const validData = createValidShipmentData();
+      const inactiveMerchantId = 'inactive-merchant-123';
+      
+      // Mock inactive merchant
+      jest.spyOn(userService, 'getUserById').mockResolvedValue({
+        id: inactiveMerchantId,
+        status: 'suspended'
+      } as User);
+      
+      // Act & Assert
+      await expect(
+        shipmentService.createShipment(validData, inactiveMerchantId)
+      ).rejects.toThrow('Merchant account is not active');
+    });
+  });
+});
+```
+
+### **7.2 Integration Testing**
+```typescript
+// API Integration Tests
+describe('Shipment API', () => {
+  let app: Express;
+  let authToken: string;
+
+  beforeAll(async () => {
+    app = createTestApp();
+    authToken = await createTestAuthToken();
+  });
+
+  describe('POST /api/v1/shipments', () => {
+    it('should create shipment with valid data', async () => {
+      // Arrange
+      const validShipmentData = createValidShipmentData();
+      
+      // Act
+      const response = await request(app)
+        .post('/api/v1/shipments')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(validShipmentData);
+      
+      // Assert
+      expect(response.status).toBe(201);
+      expect(response.body.success).toBe(true);
+      expect(response.body.data.trackingNumber).toBeDefined();
+      expect(response.body.data.status).toBe('label_created');
+    });
+
+    it('should return 400 for invalid data', async () => {
+      // Arrange
+      const invalidData = { invalid: 'data' };
+      
+      // Act
+      const response = await request(app)
+        .post('/api/v1/shipments')
+        .set('Authorization', `Bearer ${authToken}`)
+        .send(invalidData);
+      
+      // Assert
+      expect(response.status).toBe(400);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    });
+  });
+});
+```
+
+---
+
+## �� **8. Performance & Monitoring**
+
+### **8.1 Database Optimization**
+```typescript
+// Query Optimization
+class ShipmentRepository {
+  async getShipmentsWithFilters(filters: ShipmentFilters, pagination: PaginationOptions): Promise<PaginatedShipments> {
+    const query = `
+      SELECT 
+        s.*,
+        up_merchant.business_name as merchant_name,
+        up_courier.contact_name as courier_name,
+        COUNT(te.id) as event_count
+      FROM shipments s
+      LEFT JOIN user_profiles up_merchant ON s.merchant_id = up_merchant.user_id
+      LEFT JOIN user_profiles up_courier ON s.courier_id = up_courier.user_id
+      LEFT JOIN tracking_events te ON s.id = te.shipment_id
+      WHERE 1=1
+        ${filters.status ? 'AND s.status = $1' : ''}
+        ${filters.merchantId ? 'AND s.merchant_id = $2' : ''}
+        ${filters.dateFrom ? 'AND s.created_at >= $3' : ''}
+        ${filters.dateTo ? 'AND s.created_at <= $4' : ''}
+      GROUP BY s.id, up_merchant.business_name, up_courier.contact_name
+      ORDER BY s.created_at DESC
+      LIMIT $5 OFFSET $6
+    `;
+    
+    const params = this.buildQueryParams(filters, pagination);
+    const result = await this.db.query(query, params);
+    
+    return this.formatPaginatedResult(result, pagination);
+  }
+}
+```
+
+### **8.2 Caching Strategy**
+```typescript
+// Redis Caching Service
+class CacheService {
+  private redis: Redis;
+  private defaultTTL = 300; // 5 minutes
+
+  constructor() {
+    this.redis = new Redis(process.env.REDIS_URL);
+  }
+
+  async get<T>(key: string): Promise<T | null> {
+    try {
+      const value = await this.redis.get(key);
+      return value ? JSON.parse(value) : null;
+    } catch (error) {
+      console.error('Cache get error:', error);
+      return null;
+    }
+  }
+
+  async set(key: string, value: unknown, ttl: number = this.defaultTTL): Promise<void> {
+    try {
+      await this.redis.setex(key, ttl, JSON.stringify(value));
+    } catch (error) {
+      console.error('Cache set error:', error);
+    }
+  }
+
+  async invalidate(pattern: string): Promise<void> {
+    try {
+      const keys = await this.redis.keys(pattern);
+      if (keys.length > 0) {
+        await this.redis.del(...keys);
+      }
+    } catch (error) {
+      console.error('Cache invalidation error:', error);
+    }
+  }
+}
+
+// Cached Shipment Service
+class CachedShipmentService {
+  constructor(
+    private shipmentService: ShipmentService,
+    private cacheService: CacheService
+  ) {}
+
+  async getShipmentById(id: string): Promise<Shipment | null> {
+    const cacheKey = `shipment:${id}`;
+    
+    // Try cache first
+    let shipment = await this.cacheService.get<Shipment>(cacheKey);
+    if (shipment) {
+      return shipment;
+    }
+    
+    // Fetch from database
+    shipment = await this.shipmentService.getShipmentById(id);
+    if (shipment) {
+      // Cache for 5 minutes
+      await this.cacheService.set(cacheKey, shipment, 300);
+    }
+    
+    return shipment;
+  }
+}
+```
+
+---
+
+## 🔧 **9. Error Handling & Logging**
+
+### **9.1 Global Error Handler**
+```typescript
+// Error Handler Middleware
+const errorHandler = (error: Error, req: Request, res: Response, next: NextFunction) => {
+  // Log error
+  logger.error('Unhandled error:', {
+    error: error.message,
+    stack: error.stack,
+    url: req.url,
+    method: req.method,
+    userId: req.user?.id,
+    requestId: req.headers['x-request-id']
+  });
+
+  // Determine error type and response
+  if (error instanceof ValidationError) {
+    return res.status(400).json({
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Request validation failed',
+        details: error.details
+      }
+    });
+  }
+
+  if (error instanceof AuthenticationError) {
+    return res.status(401).json({
+      success: false,
+      error: {
+        code: 'AUTHENTICATION_ERROR',
+        message: 'Authentication required'
+      }
+    });
+  }
+
+  if (error instanceof AuthorizationError) {
+    return res.status(403).json({
+      success: false,
+      error: {
+        code: 'AUTHORIZATION_ERROR',
+        message: 'Insufficient permissions'
+      }
+    });
+  }
+
+  // Default server error
+  return res.status(500).json({
+    success: false,
+    error: {
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'An unexpected error occurred'
+    }
+  });
+};
+
+// Custom Error Classes
+class ValidationError extends Error {
+  constructor(public details: Record<string, unknown>) {
+    super('Validation failed');
+    this.name = 'ValidationError';
+  }
+}
+
+class AuthenticationError extends Error {
+  constructor(message: string = 'Authentication required') {
+    super(message);
+    this.name = 'AuthenticationError';
+  }
+}
+
+class AuthorizationError extends Error {
+  constructor(message: string = 'Insufficient permissions') {
+    super(message);
+    this.name = 'AuthorizationError';
+  }
+}
+```
+
+### **9.2 Structured Logging**
+```typescript
+// Winston Logger Configuration
+import winston from 'winston';
+
+const logger = winston.createLogger({
+  level: process.env.LOG_LEVEL || 'info',
+  format: winston.format.combine(
+    winston.format.timestamp(),
+    winston.format.errors({ stack: true }),
+    winston.format.json()
+  ),
+  defaultMeta: { service: 'ashraf-courier-api' },
+  transports: [
+    new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
+    new winston.transports.File({ filename: 'logs/combined.log' })
+  ]
+});
+
+// Add console transport in development
+if (process.env.NODE_ENV !== 'production') {
+  logger.add(new winston.transports.Console({
+    format: winston.format.simple()
+  }));
+}
+
+// Request logging middleware
+const requestLogger = (req: Request, res: Response, next: NextFunction) => {
+  const startTime = Date.now();
+  
+  res.on('finish', () => {
+    const duration = Date.now() - startTime;
+    
+    logger.info('HTTP Request', {
+      method: req.method,
+      url: req.url,
+      statusCode: res.statusCode,
+      duration,
+      userId: req.user?.id,
+      userAgent: req.get('User-Agent'),
+      ip: req.ip
+    });
+  });
+  
+  next();
+};
+```
+
+---
+
+## �� **10. Deployment & DevOps**
+
+### **10.1 Environment Configuration**
+```typescript
+// Environment Configuration
+interface EnvironmentConfig {
+  nodeEnv: 'development' | 'staging' | 'production';
+  port: number;
+  database: {
+    url: string;
+    ssl: boolean;
+    maxConnections: number;
+  };
+  redis: {
+    url: string;
+    ttl: number;
+  };
+  jwt: {
+    secret: string;
+    refreshSecret: string;
+    accessTokenExpiry: number;
+    refreshTokenExpiry: number;
+  };
+  stripe: {
+    secretKey: string;
+    webhookSecret: string;
+  };
+  supabase: {
+    url: string;
+    anonKey: string;
+    serviceKey: string;
+  };
+}
+
+const config: EnvironmentConfig = {
+  nodeEnv: (process.env.NODE_ENV as EnvironmentConfig['nodeEnv']) || 'development',
+  port: parseInt(process.env.PORT || '3001'),
+  database: {
+    url: process.env.DATABASE_URL!,
+    ssl: process.env.NODE_ENV === 'production',
+    maxConnections: parseInt(process.env.DB_MAX_CONNECTIONS || '20')
+  },
+  redis: {
+    url: process.env.REDIS_URL!,
+    ttl: parseInt(process.env.REDIS_TTL || '300')
+  },
+  jwt: {
+    secret: process.env.JWT_SECRET!,
+    refreshSecret: process.env.JWT_REFRESH_SECRET!,
+    accessTokenExpiry: parseInt(process.env.JWT_ACCESS_EXPIRY || '900'),
+    refreshTokenExpiry: parseInt(process.env.JWT_REFRESH_EXPIRY || '604800')
+  },
+  stripe: {
+    secretKey: process.env.STRIPE_SECRET_KEY!,
+    webhookSecret: process.env.STRIPE_WEBHOOK_SECRET!
+  },
+  supabase: {
+    url: process.env.SUPABASE_URL!,
+    anonKey: process.env.SUPABASE_ANON_KEY!,
+    serviceKey: process.env.SUPABASE_SERVICE_KEY!
+  }
+};
+```
+
+### **10.2 Docker Configuration**
+```dockerfile
+# Dockerfile
+FROM node:20-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Install dependencies based on the preferred package manager
+COPY package.json package-lock.json* ./
+RUN npm ci --only=production
+
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Build the application
+RUN npm run build
+
+# Production image, copy all the files and run the app
+FROM base AS runner
+WORKDIR /app
+
+ENV NODE_ENV=production
+
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/package.json ./package.json
+
+USER nextjs
+
+EXPOSE 3001
+
+ENV PORT=3001
+
+CMD ["npm", "start"]
+```
+
+### **10.3 GitHub Actions CI/CD**
+```yaml
+# .github/workflows/ci-cd.yml
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run tests
+      run: npm test
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        NODE_ENV: test
+    
+    - name: Run linting
+      run: npm run lint
+    
+    - name: Build application
+      run: npm run build
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Deploy to Vercel
+      uses: amondnet/vercel-action@v25
+      with:
+        vercel-token: ${{ secrets.VERCEL_TOKEN }}
+        vercel-org-id: ${{ secrets.ORG_ID }}
+        vercel-project-id: ${{ secrets.PROJECT_ID }}
+        vercel-args: '--prod'
+```
+
+---
+
+## 📚 **11. Documentation Standards**
+
+### **11.1 API Documentation**
+```typescript
+// OpenAPI 3.0 Specification
+/**
+ * @openapi
+ * /api/v1/shipments:
+ *   post:
+ *     summary: Create a new shipment
+ *     tags: [Shipments]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/CreateShipmentRequest'
+ *     responses:
+ *       201:
+ *         description: Shipment created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ShipmentResponse'
+ *       400:
+ *         description: Validation error
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ValidationError'
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: Insufficient permissions
+ */
+```
+
+### **11.2 Code Documentation**
+```typescript
+/**
+ * Creates a new shipment for a merchant
+ * 
+ * @param data - Shipment creation data including sender, recipient, and package details
+ * @param merchantId - ID of the merchant creating the shipment
+ * @returns Promise resolving to the created shipment
+ * 
+ * @throws {ValidationError} When business rules are violated
+ * @throws {AuthenticationError} When merchant is not authenticated
+ * @throws {AuthorizationError} When merchant lacks permission to create shipments
+ * 
+ * @example
+ * ```typescript
+ * const shipment = await shipmentService.createShipment({
+ *   serviceType: 'standard',
+ *   sender: { name: 'John Doe', address: {...} },
+ *   recipient: { name: 'Jane Smith', address: {...} },
+ *   package: { weight: 2.5, dimensions: {...} }
+ * }, 'merchant-123');
+ * ```
+ */
+async createShipment(data: CreateShipmentData, merchantId: string): Promise<Shipment>
+```
+
+---
+
+## 🎯 **12. Implementation Checklist**
+
+### **Phase 1: Core Infrastructure (Week 1-2)**
+- [ ] Set up Node.js/Express server with TypeScript
+- [ ] Configure PostgreSQL database with Supabase
+- [ ] Implement basic authentication with JWT
+- [ ] Set up project structure and middleware
+- [ ] Configure environment variables and validation
+
+### **Phase 2: Core API Development (Week 3-4)**
+- [ ] Implement user management endpoints
+- [ ] Build shipment creation and management APIs
+- [ ] Create tracking and delivery APIs
+- [ ] Implement basic CRUD operations
+- [ ] Add input validation with Zod
+
+### **Phase 3: Authentication & Security (Week 5-6)**
+- [ ] Complete JWT authentication system
+- [ ] Implement role-based access control
+- [ ] Add API rate limiting and security headers
+- [ ] Implement 2FA support
+- [ ] Add comprehensive error handling
+
+### **Phase 4: Real-time Features (Week 7-8)**
+- [ ] Set up WebSocket server
+- [ ] Implement real-time tracking updates
+- [ ] Build notification system
+- [ ] Add push notification support
+- [ ] Implement live dashboard updates
+
+### **Phase 5: Advanced Features (Week 9-10)**
+- [ ] Build analytics and reporting APIs
+- [ ] Implement billing and payment APIs
+- [ ] Add file upload and storage
+- [ ] Create admin management APIs
+- [ ] Implement search and filtering
+
+### **Phase 6: Testing & Optimization (Week 11-12)**
+- [ ] Write comprehensive unit tests
+- [ ] Implement integration tests
+- [ ] Add performance monitoring
+- [ ] Optimize database queries
+- [ ] Implement caching strategy
+
+### **Phase 7: Deployment & DevOps (Week 13-14)**
+- [ ] Set up CI/CD pipeline
+- [ ] Configure production environment
+- [ ] Implement monitoring and logging
+- [ ] Set up backup and recovery
+- [ ] Deploy to production
+
+---
+
+**This comprehensive ba

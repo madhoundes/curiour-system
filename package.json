@@ -4,9 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "dev:3003": "next dev -p 3003 -H localhost",
-    "dev:local": "next dev -p 3000 -H localhost",
-    "dev:lan": "next dev -p 3000 -H 0.0.0.0",
+    "dev:local": "next dev -H localhost -p 3000",
+    "dev:lan": "next dev -H 0.0.0.0 -p 3001",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -31,6 +30,7 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "framer-motion": "^12.23.12",
+    "html5-qrcode": "^2.3.8",
     "jsbarcode": "^3.12.1",
     "jspdf": "^3.0.1",
     "lucide-react": "^0.536.0",

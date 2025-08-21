@@ -83,7 +83,16 @@ const iconAliases: Record<string, IconName> = {
   // Calculator and math icons for Quick Quote widget
   "Calculator": "Calculator",
   "calculator": "Calculator",
-  "calc": "Calculator"
+  "calc": "Calculator",
+  // Undeliverable page icons
+  "PackageX": "PackageX",
+  "Eye": "Eye",
+  "Check": "Check",
+  "MessageSquare": "MessageSquare",
+  // Dashboard shipping tips icons
+  "Scale": "Scale",
+  "Tag": "Tag",
+  "Box": "Package"
 };
 
 // Centralized Lucide icon renderer to avoid scattered imports and runtime errors

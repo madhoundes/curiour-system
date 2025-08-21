@@ -1,13 +1,12 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-
 import { Icon } from "@/components/ui/icon";
 
 interface PackageData {
@@ -21,8 +20,6 @@ interface PackageData {
   estimatedDelivery: string;
 }
 
-
-
 // Mock package data
 const mockPackageData: PackageData = {
   trackingNumber: "PCG-2025-ABC123",
@@ -35,16 +32,10 @@ const mockPackageData: PackageData = {
   estimatedDelivery: "Today, 4:00 PM"
 };
 
-
-
 export default function CourierScanPackagePage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  // ZXing controls/readers (dynamic import)
-  const zxingReaderRef = useRef<unknown>(null);
-  const zxingControlsRef = useRef<unknown>(null);
+  const scannerContainerRef = useRef<HTMLDivElement>(null);
   
   // State management
   const [isScanning, setIsScanning] = useState(false);
@@ -53,8 +44,58 @@ export default function CourierScanPackagePage() {
   const [scannedPackage, setScannedPackage] = useState<PackageData | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [scanError, setScanError] = useState("");
+  const [scannerInstance, setScannerInstance] = useState<unknown>(null);
+  const [isMobile, setIsMobile] = useState(false);
 
+  // Check if device is mobile
+  useEffect(() => {
+    const checkMobile = () => {
+      const userAgent = navigator.userAgent || navigator.vendor;
+      const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+      setIsMobile(isMobileDevice);
+    };
+    
+    checkMobile();
+  }, []);
 
+  // Get current location info safely
+  const getLocationInfo = () => {
+    try {
+      if (typeof window !== 'undefined' && window.location) {
+        return {
+          protocol: window.location.protocol,
+          hostname: window.location.hostname,
+          port: window.location.port,
+          href: window.location.href
+        };
+      }
+      return {
+        protocol: 'http:',
+        hostname: 'localhost',
+        port: '3000',
+        href: 'http://localhost:3000'
+      };
+    } catch (error) {
+      console.log('Location access error:', error);
+      return {
+        protocol: 'http:',
+        hostname: 'localhost',
+        port: '3000',
+        href: 'http://localhost:3000'
+      };
+    }
+  };
+
+  // Check camera permissions
+  const checkCameraPermissions = async (): Promise<boolean> => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      stream.getTracks().forEach(track => track.stop());
+      return true;
+    } catch {
+      return false;
+    }
+  };
 
   const handleBackToCourier = () => {
     if (isCameraActive) {
@@ -67,101 +108,142 @@ export default function CourierScanPackagePage() {
     try {
       setScanError("");
       setIsScanning(true);
+      
+      // Check if getUserMedia is supported
       if (!navigator?.mediaDevices?.getUserMedia) {
-        throw new Error("getUserMedia is not supported in this browser");
+        throw new Error("Camera access is not supported in this browser");
       }
 
-      // Dynamically load @zxing/browser to avoid SSR issues
-      const ZXing = await import("@zxing/browser");
-
-      // Create a multi-format reader (QR + 1D barcodes)
-      zxingReaderRef.current = new ZXing.BrowserMultiFormatReader();
-
-      // Try to pick a rear/environment camera when available
-      const devices = await ZXing.BrowserCodeReader.listVideoInputDevices();
-      let selectedDeviceId: string | undefined = undefined;
-      if (devices && devices.length > 0) {
-        const rear = devices.find((d: MediaDeviceInfo) => /back|rear|environment/i.test(d.label));
-        selectedDeviceId = (rear || devices[devices.length - 1]).deviceId;
+      // Check if we're on HTTPS or localhost (required for camera access)
+      const { protocol, hostname } = getLocationInfo();
+      if (protocol !== 'https:' && hostname !== 'localhost') {
+        throw new Error("Camera access requires HTTPS or localhost");
       }
 
-      // Start decoding from the chosen device into our <video> element
-      zxingControlsRef.current = await (zxingReaderRef.current as { decodeFromVideoDevice: (...args: unknown[]) => Promise<unknown> }).decodeFromVideoDevice(
-        selectedDeviceId,
-        videoRef.current!,
-        (result: unknown, error: unknown, controls: unknown) => {
-          if (result) {
-            const text = typeof (result as { getText?: () => string; text?: string }).getText === "function" 
-              ? (result as { getText: () => string }).getText() 
-              : (result as { text: string }).text;
-            handleScanSuccess(text);
-            // Stop immediately after a successful detection
-            try { (controls as { stop: () => void }).stop(); } catch {}
-          }
-          // Ignore NotFound errors which occur on frames without codes
-          if (error && (error as { name?: string }).name && (error as { name: string }).name !== "NotFoundException") {
-            // Non-fatal scanning error; surface as a hint without breaking the flow
-            // setScanError("Scanning issue detected. Try to steady the camera or improve lighting.");
+      // Check camera permissions first
+      const hasPermissions = await checkCameraPermissions();
+      if (!hasPermissions) {
+        throw new Error("Camera access denied. Please allow camera permissions in your browser settings.");
+      }
+
+      // Dynamically import HTML5 QR Code library
+      const { Html5QrcodeScanner, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
+      
+      // Create scanner instance with mobile-optimized settings
+      const scanner = new Html5QrcodeScanner(
+        "scanner-container",
+        {
+          fps: isMobile ? 8 : 10, // Lower FPS on mobile for better performance
+          qrbox: { width: 250, height: 250 },
+          rememberLastUsedCamera: true,
+          showTorchButtonIfSupported: true,
+          // Support both QR codes and common barcode formats
+          formatsToSupport: [
+            Html5QrcodeSupportedFormats.QR_CODE,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.CODABAR
+          ],
+          aspectRatio: isMobile ? 1.0 : 1.777778 // 1:1 for mobile, 16:9 for desktop
+        },
+        false // verbose = false
+      );
+
+      // Store scanner instance
+      setScannerInstance(scanner);
+      
+      // Render scanner with success and error callbacks
+      scanner.render(
+        (decodedText: string) => {
+          // Success callback - stop scanning and process result
+          handleScanSuccess(decodedText);
+        },
+        (errorMessage: string) => {
+          // Error callback - only log non-fatal errors
+          if (errorMessage !== "QR code not found") {
+            console.log("Scan error:", errorMessage);
           }
         }
       );
 
-      // Mark as active once stream is attached to video
       setIsCameraActive(true);
       setIsScanning(false);
+      
     } catch (err: unknown) {
-      const message =
-        err instanceof Error
-          ? err.message
-          : "Camera access denied or unavailable";
-      setScanError(
-        `${message}. Please allow camera permissions when prompted. If the camera does not open, check browser/site settings to enable camera access, ensure you're using HTTPS (or localhost), or use manual input below.`
-      );
+      const message = err instanceof Error ? err.message : "Unknown error occurred";
+      
+      // Provide helpful error message with fallback suggestion
+      if (message.includes("Camera access")) {
+        setScanError(
+          `${message}. Please check your browser settings and ensure camera permissions are granted. You can use the manual input below as an alternative.`
+        );
+      } else if (message.includes("HTTPS")) {
+        setScanError(
+          `${message}. Camera access requires a secure connection. Please use HTTPS or localhost. You can use the manual input below as an alternative.`
+        );
+      } else if (message.includes("permissions")) {
+        setScanError(
+          `${message}. Please refresh the page and try again, or use the manual input below as an alternative.`
+        );
+      } else {
+        setScanError(
+          `${message}. Please try refreshing the page or use the manual input below as an alternative.`
+        );
+      }
+      
       setIsScanning(false);
     }
   };
 
-  const stopCamera = () => {
-    // Stop ZXing decoding
+  const stopCamera = useCallback(() => {
     try {
-      if (zxingControlsRef.current) {
-        (zxingControlsRef.current as { stop: () => void }).stop();
+      if (scannerInstance && typeof scannerInstance === 'object' && scannerInstance !== null) {
+        const scanner = scannerInstance as { clear: () => void };
+        scanner.clear();
+        setScannerInstance(null);
       }
-    } catch {}
-    zxingControlsRef.current = null;
-    try {
-      if (zxingReaderRef.current && typeof (zxingReaderRef.current as { reset?: () => void }).reset === "function") {
-        (zxingReaderRef.current as { reset: () => void }).reset();
-      }
-    } catch {}
-    zxingReaderRef.current = null;
-
-    // Stop any active MediaStream tracks
-    const attached = (videoRef.current?.srcObject ?? null) as MediaStream | null;
-    const stream = attached || mediaStreamRef.current;
-    if (stream) {
-      try { stream.getTracks().forEach((t) => t.stop()); } catch {}
+    } catch (error) {
+      console.log("Error stopping camera:", error);
     }
-    mediaStreamRef.current = null;
-    if (videoRef.current) {
-      try { (videoRef.current as HTMLVideoElement).srcObject = null; } catch {}
-    }
+    
     setIsCameraActive(false);
     setIsScanning(false);
-  };
+  }, [scannerInstance]);
 
   const handleScanSuccess = (trackingNumber: string) => {
+    // Stop camera immediately after successful scan
     stopCamera();
+    
+    // Provide haptic feedback on mobile devices
+    if (isMobile && 'vibrate' in navigator) {
+      navigator.vibrate(200); // Short vibration for success
+    }
+    
+    // Set the scanned package data
     setScannedPackage(mockPackageData);
     setManualInput(trackingNumber);
+    
+    // Clear any previous errors
+    setScanError("");
+    
+    // Show success message
+    console.log(`Successfully scanned: ${trackingNumber}`);
   };
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      try { stopCamera(); } catch {}
+      try {
+        stopCamera();
+      } catch (error) {
+        console.log("Cleanup error:", error);
+      }
     };
-  }, []);
+  }, [stopCamera]);
 
   const handleManualSubmit = () => {
     if (!manualInput.trim()) {
@@ -193,8 +275,6 @@ export default function CourierScanPackagePage() {
     }, 1500);
   };
 
-
-
   const getStatusColor = (status: PackageData["currentStatus"]) => {
     const statusConfig = {
       pending: "bg-yellow-100 text-yellow-800",
@@ -214,13 +294,6 @@ export default function CourierScanPackagePage() {
     };
     return statusText[status];
   };
-
-  // Cleanup stream on unmount
-  useEffect(() => {
-    return () => {
-      stopCamera();
-    };
-  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50" id="parcego-scan-container">
@@ -262,25 +335,12 @@ export default function CourierScanPackagePage() {
             <div className="relative bg-black rounded-lg overflow-hidden mb-4" id="parcego-scan-viewfinder">
               {isCameraActive ? (
                 <div className="parcego-scan__viewfinder parcego-scan__viewfinder--active">
-                  <video
-                    ref={videoRef}
-                    className="w-full h-48 object-cover"
-                    autoPlay
-                    playsInline
-                    muted
-                    id="parcego-scan-video"
+                  {/* Scanner container - HTML5 QR Code will render here */}
+                  <div 
+                    id="scanner-container" 
+                    ref={scannerContainerRef}
+                    className="w-full h-48"
                   />
-                  {/* Scan overlay */}
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="parcego-scan__overlay">
-                      <div className="w-48 h-32 border-2 border-white border-dashed rounded-lg flex items-center justify-center">
-                        <div className="text-white text-center">
-                          <Icon name="Scan" size={32} className="mx-auto mb-2 animate-pulse" />
-                          <p className="text-sm">Scanning...</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               ) : (
                 <div className="parcego-scan__viewfinder parcego-scan__viewfinder--inactive h-48 flex items-center justify-center bg-gray-800">
@@ -303,8 +363,16 @@ export default function CourierScanPackagePage() {
                     <ol className="list-decimal list-inside space-y-1 text-xs">
                       <li>Tap &apos;Start Scan&apos; to activate your device&apos;s camera</li>
                       <li>If prompted, please allow camera access</li>
-                      <li>If camera doesn&apos;t open, check browser settings for camera permissions</li>
-                      <li>Try refreshing the page if issues persist</li>
+                      <li>Point camera at barcode/QR code</li>
+                      <li>Camera will automatically close after successful scan</li>
+                      {isMobile && (
+                        <>
+                          <li className="font-medium text-blue-900">📱 Mobile Tips:</li>
+                          <li className="ml-4">• Hold device steady for better scanning</li>
+                          <li className="ml-4">• Ensure good lighting conditions</li>
+                          <li className="ml-4">• Keep barcode/QR code within the scanning box</li>
+                        </>
+                      )}
                     </ol>
                   </div>
                 </div>
@@ -322,7 +390,7 @@ export default function CourierScanPackagePage() {
                   {isScanning ? (
                     <>
                       <Icon name="Loader2" size={20} className="mr-2 animate-spin" />
-                      Starting Camera...
+                      {isMobile ? "Initializing Camera..." : "Starting Camera..."}
                     </>
                   ) : (
                     <>
@@ -350,7 +418,7 @@ export default function CourierScanPackagePage() {
         <Card id="parcego-scan-manual-card" className="parcego-scan__manual-card">
           <CardHeader className="pb-3">
             <CardTitle className="text-base flex items-center">
-                              <Icon name="Edit" size={20} className="mr-2" />
+              <Icon name="Edit" size={20} className="mr-2" />
               Manual Entry
             </CardTitle>
             <CardDescription>
@@ -415,6 +483,7 @@ export default function CourierScanPackagePage() {
                       <li>Check if another app is using your camera</li>
                       <li>Ensure you&apos;re using HTTPS (camera requires secure connection)</li>
                       <li>Try using the manual input below as an alternative</li>
+                      <li>Check browser settings for camera permissions</li>
                     </ul>
                   </div>
                 )}
@@ -602,8 +671,6 @@ export default function CourierScanPackagePage() {
           </>
         )}
 
-
-
         {/* Secondary Action - View Route */}
         {scannedPackage && scannedPackage.currentStatus !== "delivered" && (
           <div className="mt-4">
@@ -617,6 +684,24 @@ export default function CourierScanPackagePage() {
               View Route & Navigation
             </Button>
           </div>
+        )}
+
+        {/* Debug Information (Development Only) */}
+        {process.env.NODE_ENV === 'development' && (
+          <Card className="border-orange-200 bg-orange-50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-orange-800">Debug Info</CardTitle>
+            </CardHeader>
+            <CardContent className="text-xs text-orange-700 space-y-1">
+              <p>Device: {isMobile ? 'Mobile' : 'Desktop'}</p>
+              <p>Protocol: {getLocationInfo().protocol}</p>
+              <p>Hostname: {getLocationInfo().hostname}</p>
+              <p>Camera Active: {isCameraActive ? 'Yes' : 'No'}</p>
+              <p>Scanning: {isScanning ? 'Yes' : 'No'}</p>
+              <p>Scanner Instance: {scannerInstance ? 'Active' : 'None'}</p>
+              <p>getUserMedia Support: {typeof navigator?.mediaDevices?.getUserMedia === 'function' ? 'Available' : 'Not Available'}</p>
+            </CardContent>
+          </Card>
         )}
       </div>
 

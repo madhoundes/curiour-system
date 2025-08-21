@@ -767,36 +767,64 @@ export default function ClaimsPage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 pt-4">
                   <Card>
                     <CardContent className="p-3 md:p-4">
-                      <div className="text-xl md:text-2xl font-bold text-green-600">
-                        ${mockClaimsHistory.filter(c => c.status === 'approved').reduce((sum, c) => 
-                          sum + parseFloat(c.payoutAmount.replace('$', '')), 0
-                        ).toFixed(2)}
+                      <div className="flex items-center space-x-3">
+                        <div className="bg-green-100 rounded-lg p-2 flex-shrink-0">
+                          <DollarSign className="h-6 w-6 text-green-600" />
+                        </div>
+                        <div>
+                          <div className="text-xl md:text-2xl font-bold text-green-600">
+                            ${mockClaimsHistory.filter(c => c.status === 'approved').reduce((sum, c) => 
+                              sum + parseFloat(c.payoutAmount.replace('$', '')), 0
+                            ).toFixed(2)}
+                          </div>
+                          <div className="text-xs md:text-sm text-gray-600">Total Approved Payouts</div>
+                        </div>
                       </div>
-                      <div className="text-xs md:text-sm text-gray-600">Total Approved Payouts</div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-3 md:p-4">
-                      <div className="text-xl md:text-2xl font-bold text-blue-600">
-                        {mockClaimsHistory.filter(c => c.status === 'pending_review' || c.status === 'under_investigation').length}
+                      <div className="flex items-center space-x-3">
+                        <div className="bg-blue-100 rounded-lg p-2 flex-shrink-0">
+                          <Clock className="h-6 w-6 text-blue-600" />
+                        </div>
+                        <div>
+                          <div className="text-xl md:text-2xl font-bold text-blue-600">
+                            {mockClaimsHistory.filter(c => c.status === 'pending_review' || c.status === 'under_investigation').length}
+                          </div>
+                          <div className="text-xs md:text-sm text-gray-600">Claims In Progress</div>
+                        </div>
                       </div>
-                      <div className="text-xs md:text-sm text-gray-600">Claims In Progress</div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-3 md:p-4">
-                      <div className="text-xl md:text-2xl font-bold text-green-600">
-                        {mockClaimsHistory.filter(c => c.status === 'approved').length}
+                      <div className="flex items-center space-x-3">
+                        <div className="bg-green-100 rounded-lg p-2 flex-shrink-0">
+                          <CheckCircle className="h-6 w-6 text-green-600" />
+                        </div>
+                        <div>
+                          <div className="text-xl md:text-2xl font-bold text-green-600">
+                            {mockClaimsHistory.filter(c => c.status === 'approved').length}
+                          </div>
+                          <div className="text-xs md:text-sm text-gray-600">Claims Approved</div>
+                        </div>
                       </div>
-                      <div className="text-xs md:text-sm text-gray-600">Claims Approved</div>
                     </CardContent>
                   </Card>
                   <Card>
                     <CardContent className="p-3 md:p-4">
-                      <div className="text-xl md:text-2xl font-bold text-red-600">
-                        {mockClaimsHistory.filter(c => c.status === 'rejected').length}
+                      <div className="flex items-center space-x-3">
+                        <div className="bg-red-100 rounded-lg p-2 flex-shrink-0">
+                          <XCircle className="h-6 w-6 text-red-600" />
+                        </div>
+                        <div>
+                          <div className="text-xl md:text-2xl font-bold text-red-600">
+                            {mockClaimsHistory.filter(c => c.status === 'rejected').length}
+                          </div>
+                          <div className="text-xs md:text-sm text-gray-600">Claims Rejected</div>
+                        </div>
                       </div>
-                      <div className="text-xs md:text-sm text-gray-600">Claims Rejected</div>
                     </CardContent>
                   </Card>
                 </div>

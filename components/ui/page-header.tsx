@@ -22,11 +22,11 @@ export function PageHeader({
 }: PageHeaderProps) {
   return (
     <div className={cn("bg-white shadow-sm border-b border-gray-200", className)}>
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col space-y-6 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex flex-col space-y-8 py-8">
           {/* Top Row: Title */}
           <div className="flex justify-center">
-            <h1 className="text-xl font-semibold text-gray-900 tracking-tight">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 tracking-tight text-center">
               {title}
             </h1>
           </div>

@@ -1,22 +1,16 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  eslint: {
-    // Enable ESLint during builds for better code quality
-    ignoreDuringBuilds: false,
+  // Move from experimental to root level (Next.js 15 change)
+  serverExternalPackages: ["@prisma/client"],
+  // Allow external network access during development
+  allowedDevOrigins: ['10.0.0.66', '*.10.0.0.66', 'localhost', '127.0.0.1'],
+  // Enable logging for debugging network issues
+  logging: {
+    fetches: {
+      fullUrl: true,
+    },
   },
-  images: {
-    dangerouslyAllowSVG: true,
-    contentDispositionType: 'attachment',
-    contentSecurityPolicy: "default-src 'self'; script-src 'none'; sandbox;",
-  },
-  // Modern Next.js 15+ configuration - no deprecated experimental options
-  // Use modern serverExternalPackages instead of deprecated serverComponentsExternalPackages
-  serverExternalPackages: [],
-  // Disable static optimization for development
-  ...(process.env.NODE_ENV === 'development' && {
-    staticPageGenerationTimeout: 120,
-  }),
 };
 
 export default nextConfig;

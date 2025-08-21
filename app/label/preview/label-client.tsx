@@ -3,6 +3,7 @@
 import React, { useMemo } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import Image from "next/image";
 
 // This page implements the label-preview.mdc rule:
 // - Client-only page
@@ -336,11 +337,11 @@ const LabelPreviewPage: React.FC = () => {
                   style={{ opacity: 0.03 }}
                   aria-hidden="true"
                 >
-                  <img 
+                  <Image 
                     src="/Logo/Horizontal-logo.png"
                     alt="Parcego Logo Watermark"
-                    width="3.2in"
-                    height="0.67in"
+                    width={307}
+                    height={64}
                     className="print:block"
                     style={{ 
                       printColorAdjust: 'exact',
@@ -352,11 +353,11 @@ const LabelPreviewPage: React.FC = () => {
                 {/* Header */}
                 <div className="flex items-center justify-between px-3 pt-3">
                   <div className="flex items-center gap-2">
-                    <img 
+                    <Image 
                       src="/Logo/Horizontal-logo.png"
                       alt="Parcego Logo"
-                      width="157"
-                      height="33"
+                      width={157}
+                      height={33}
                       className="flex-shrink-0 print:block"
                       style={{ 
                         printColorAdjust: 'exact',
