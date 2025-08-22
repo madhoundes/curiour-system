@@ -59,6 +59,8 @@ export default function ProofOfDelivery() {
 
   // Get current location and timestamp (mock)
   useEffect(() => {
+    if (typeof window === 'undefined') return; // SSR safety
+    
     setCurrentLocation(deliveryData.gpsLocation.address);
     setTimestamp(new Date().toLocaleString());
     if (!clientDeliveryTime) {

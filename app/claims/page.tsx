@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -180,6 +180,13 @@ export default function ClaimsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [isClaimsHistoryOpen, setIsClaimsHistoryOpen] = useState(false);
+  const [claimNumber, setClaimNumber] = useState<string>("");
+
+  useEffect(() => {
+    if (!claimNumber) {
+      setClaimNumber(`CLM-${Date.now().toString().slice(-8)}`);
+    }
+  }, [claimNumber]);
 
   // Handle form data updates
   const handleInputChange = (field: keyof ClaimFormData, value: string | File[]) => {
@@ -613,7 +620,7 @@ export default function ClaimsPage() {
           <CardContent className="text-center space-y-4">
             <div className="bg-white rounded-lg p-4 border border-green-200">
               <p className="text-sm text-gray-600">Claim Reference Number</p>
-              <p className="text-lg font-mono font-bold text-green-800">CLM-{Date.now().toString().slice(-8)}</p>
+              <p className="text-lg font-mono font-bold text-green-800">{claimNumber}</p>
             </div>
             <p className="text-green-700">
                                     We&apos;ll review your claim within 5-7 business days and contact you with updates. 

@@ -106,11 +106,14 @@ export function createStepperSteps(currentStep: number): StepperStep[] {
     { id: "purchase-label", title: "Purchase Label" },
   ];
 
+  // Ensure currentStep is within valid range
+  const validStep = Math.min(Math.max(currentStep, 1), stepDefinitions.length);
+
   return stepDefinitions.map((step, index) => ({
     ...step,
     status: 
-      index < currentStep - 1 ? "completed" :
-      index === currentStep - 1 ? "current" : 
+      index < validStep - 1 ? "completed" :
+      index === validStep - 1 ? "current" : 
       "upcoming"
   }));
 }

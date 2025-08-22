@@ -47,6 +47,8 @@ const LabelPreviewPage: React.FC = () => {
     router.push(`/track-package?tracking=${encodeURIComponent(trackingParam)}`);
   };
 
+
+
   return (
     <div className="min-h-screen bg-gray-50 print:bg-white">
       {/* Print-specific CSS to ensure consistency */}
@@ -352,20 +354,17 @@ const LabelPreviewPage: React.FC = () => {
                 
                 {/* Header */}
                 <div className="flex items-center justify-between px-3 pt-3">
-                  <div className="flex items-center gap-2">
-                    <Image 
-                      src="/Logo/Horizontal-logo.png"
-                      alt="Parcego Logo"
-                      width={157}
-                      height={33}
-                      className="flex-shrink-0 print:block"
-                      style={{ 
-                        printColorAdjust: 'exact',
-                        WebkitPrintColorAdjust: 'exact'
-                      }}
-                    />
-                    <span className="font-semibold text-sm">Parcego</span>
-                  </div>
+                  <Image 
+                    src="/Logo/Horizontal-logo.png"
+                    alt="Parcego Logo"
+                    width={157}
+                    height={33}
+                    className="flex-shrink-0 print:block"
+                    style={{ 
+                      printColorAdjust: 'exact',
+                      WebkitPrintColorAdjust: 'exact'
+                    }}
+                  />
                   <div className="text-sm font-mono" id="parcego-label-tracking">
                     {trackingParam}
                   </div>

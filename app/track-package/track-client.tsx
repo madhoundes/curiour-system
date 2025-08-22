@@ -93,25 +93,75 @@ const iconForEvent = (eventType: string) => {
   return iconMap[eventType] ?? <Dot size={16} />;
 };
 
-const mockTrackingData = (trackingNumber: string): { summary: ShipmentSummary; events: TrackingEvent[] } => {
-  const now = new Date();
-  const toISO = (d: Date) => d.toISOString();
+const mockTrackingData = (trackingNumber: string) => {
+  // Use a fixed date for consistent SSR/CSR rendering
+  const baseDate = new Date('2025-01-15T10:30:00Z');
+  
   const events: TrackingEvent[] = [
-    { id: "evt-10", timestamp: toISO(new Date(now.getTime() - 1000 * 60 * 60 * 26)), type: "LABEL_CREATED", statusAfter: "LabelCreated", location: "Merchant Portal", actor: "merchant", details: "Label created and awaiting drop-off" },
-    { id: "evt-20", timestamp: toISO(new Date(now.getTime() - 1000 * 60 * 60 * 22)), type: "DROP_OFF_CONFIRMED", statusAfter: "DropoffConfirmed", location: "Local Drop-off Point", actor: "courier", details: "Package received at drop-off location" },
-    { id: "evt-30", timestamp: toISO(new Date(now.getTime() - 1000 * 60 * 60 * 19)), type: "SCANNED_AT_FACILITY", statusAfter: "ReceivedAtFacility", location: "Central Facility", actor: "system", details: "Package scanned into facility" },
-    { id: "evt-40", timestamp: toISO(new Date(now.getTime() - 1000 * 60 * 60 * 15)), type: "IN_TRANSIT_DEPARTED", statusAfter: "InTransit", location: "Central Facility", actor: "system", details: "Departed facility en route" },
-    { id: "evt-50", timestamp: toISO(new Date(now.getTime() - 1000 * 60 * 60 * 6)), type: "OUT_FOR_DELIVERY", statusAfter: "OutForDelivery", location: "Destination City", actor: "system", details: "Courier has the package" },
+    {
+      id: "evt-001",
+      type: "LABEL_CREATED",
+      statusAfter: "LabelCreated",
+      timestamp: baseDate.toISOString(),
+      location: "Toronto, ON",
+      actor: "merchant",
+      details: "Label generated for package"
+    },
+    {
+      id: "evt-002", 
+      type: "DROP_OFF_CONFIRMED",
+      statusAfter: "DropoffConfirmed",
+      timestamp: new Date(baseDate.getTime() + 2 * 60 * 60 * 1000).toISOString(), // +2 hours
+      location: "Toronto Drop-off Center",
+      actor: "courier",
+      details: "Package received at drop-off location"
+    },
+    {
+      id: "evt-003",
+      type: "SCANNED_AT_FACILITY", 
+      statusAfter: "ReceivedAtFacility",
+      timestamp: new Date(baseDate.getTime() + 4 * 60 * 60 * 1000).toISOString(), // +4 hours
+      location: "Toronto Sorting Facility",
+      actor: "system",
+      details: "Package entered sorting system"
+    },
+    {
+      id: "evt-004",
+      type: "IN_TRANSIT_DEPARTED",
+      statusAfter: "InTransit",
+      timestamp: new Date(baseDate.getTime() + 6 * 60 * 60 * 1000).toISOString(), // +6 hours
+      location: "Toronto Hub",
+      actor: "system",
+      details: "Package en route to destination"
+    },
+    {
+      id: "evt-005",
+      type: "IN_TRANSIT_ARRIVED",
+      statusAfter: "InTransit",
+      timestamp: new Date(baseDate.getTime() + 18 * 60 * 60 * 1000).toISOString(), // +18 hours
+      location: "Vancouver Hub",
+      actor: "system", 
+      details: "Package arrived at final sorting facility"
+    },
+    {
+      id: "evt-006",
+      type: "OUT_FOR_DELIVERY",
+      statusAfter: "OutForDelivery",
+      timestamp: new Date(baseDate.getTime() + 20 * 60 * 60 * 1000).toISOString(), // +20 hours
+      location: "Vancouver, BC",
+      actor: "courier",
+      details: "Courier picked up package for final delivery"
+    }
   ];
 
   const summary: ShipmentSummary = {
     trackingNumber,
     status: "OutForDelivery",
-    origin: "San Francisco, CA",
-    destination: "New York, NY",
-    eta: new Date(now.getTime() + 1000 * 60 * 60 * 4).toISOString(),
+    origin: "Toronto, ON",
+    destination: "Vancouver, BC",
+    eta: new Date(baseDate.getTime() + 24 * 60 * 60 * 1000).toISOString(), // +24 hours
     carrier: "Parcego",
-    lastUpdate: events[events.length - 1]?.timestamp ?? now.toISOString(),
+    lastUpdate: new Date(baseDate.getTime() + 20 * 60 * 60 * 1000).toISOString(), // +20 hours
     hasPOD: false,
   };
 

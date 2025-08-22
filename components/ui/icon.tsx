@@ -44,30 +44,34 @@ const iconAliases: Record<string, IconName> = {
   "file-text": "FileText",
   "video": "Video",
   "x": "X",
-  // Add missing Clock alias
+  // Clock aliases
   "Clock": "Clock",
   "clock": "Clock",
-  // Add other missing icons
+  // Arrow aliases
   "ArrowRight": "ArrowRight",
+  "ArrowLeft": "ArrowLeft",
+  // Package and shipping icons
   "MapPin": "MapPin",
   "Package": "Package",
   "Shield": "Shield",
+  // Chart icons
   "ChartColumn": "ChartColumn",
   "ChartBar": "ChartBar",
   "ChartLine": "ChartLine",
   "ChartPie": "ChartPie",
+  // Circle icons
   "CircleCheck": "CircleCheck",
   "CircleAlert": "CircleAlert",
   "CircleX": "CircleX",
+  "CircleQuestionMark": "CircleQuestionMark",
+  // Other UI icons
   "TriangleAlert": "TriangleAlert",
   "Pencil": "Pencil",
-  "CircleQuestionMark": "CircleQuestionMark",
   "User": "User",
   "Settings": "Settings",
   "Search": "Search",
   "Mail": "Mail",
   "MessageCircle": "MessageCircle",
-  "ArrowLeft": "ArrowLeft",
   "Plus": "Plus",
   "Bookmark": "Bookmark",
   "BookmarkPlus": "BookmarkPlus",
@@ -92,7 +96,13 @@ const iconAliases: Record<string, IconName> = {
   // Dashboard shipping tips icons
   "Scale": "Scale",
   "Tag": "Tag",
-  "Box": "Package"
+  "Box": "Package",
+  // Purchase label page icons
+  "CreditCard": "CreditCard",
+  "Info": "Info",
+  "Download": "Download",
+  "ScanBarcode": "ScanBarcode",
+  "Printer": "Printer"
 };
 
 // Centralized Lucide icon renderer to avoid scattered imports and runtime errors

@@ -722,3 +722,59 @@
 .table-row-hover {
   /* Removed hover effects and shadows */
 }
+
+/* Print Styles for Shipping Labels */
+@media print {
+  /* Hide non-essential elements when printing */
+  .print-hide {
+    display: none !important;
+  }
+  
+  /* Ensure proper page sizing for 4x6 labels */
+  @page {
+    size: 4in 6in;
+    margin: 0.1in;
+  }
+  
+  /* Optimize colors and backgrounds for printing */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Ensure labels don't break across pages */
+  .label-container {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+  
+  /* Optimize text rendering for print */
+  body {
+    font-size: 12pt;
+    line-height: 1.2;
+    color: #000 !important;
+    background: #fff !important;
+  }
+  
+  /* Ensure proper spacing for print */
+  .print-optimized {
+    margin: 0 !important;
+    padding: 0.1in !important;
+  }
+}
+
+/* Print-specific utility classes */
+.print-only {
+  display: none;
+}
+
+@media print {
+  .print-only {
+    display: block !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+}
