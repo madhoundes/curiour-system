@@ -233,7 +233,6 @@ const PolishedShippingLabel: React.FC<PolishedShippingLabelProps> = ({ data }) =
               <Image
                 src={data.logoUrl}
                 style={styles.logo}
-                alt="Company Logo"
               />
             )}
           </View>

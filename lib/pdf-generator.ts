@@ -16,7 +16,8 @@ export async function generatePolishedShippingLabel(data: ShippingLabelData): Pr
     const MyDocument = React.createElement(PolishedShippingLabel, { data });
     
     // Generate blob
-    const blob = await pdf(MyDocument).toBlob();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const blob = await pdf(MyDocument as any).toBlob();
     
     // Create download link
     const url = URL.createObjectURL(blob);
@@ -49,7 +50,8 @@ export async function generateShippingLabelBlob(data: ShippingLabelData): Promis
     const { default: PolishedShippingLabel } = await import('@/components/pdf/polished-shipping-label');
     
     const doc = React.createElement(PolishedShippingLabel, { data });
-    return await pdf(doc).toBlob();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return await pdf(doc as any).toBlob();
   } catch (error) {
     console.error('Error generating PDF blob:', error);
     throw new Error('Failed to generate PDF blob.');
@@ -67,6 +69,8 @@ export const sampleShippingData: ShippingLabelData = {
     city: 'New York',
     state: 'NY',
     postalCode: '10001',
+    phone: '(555) 123-4567',
+    email: 'john@electronics.com',
   },
   recipient: {
     name: 'Sarah Johnson',
@@ -88,5 +92,5 @@ export const sampleShippingData: ShippingLabelData = {
     type: 'box',
   },
   shipDate: '8/25/2025',
-  logoUrl: '/logo-horizontal.png', // Adjust path as needed
+  logoUrl: '/Logo/Horizontal-logo.png', // Updated path to match project structure
 };
