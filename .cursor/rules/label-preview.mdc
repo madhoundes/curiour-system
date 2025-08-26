@@ -1,0 +1,110 @@
+---
+alwaysApply: false
+---
+
+# Label Preview (4x6) – UI Implementation Rule
+
+## Objective
+Provide a client-rendered, print-ready 4x6 shipping label preview, accessible from the purchase success screen, using only mocked data and following the project’s naming and accessibility standards.
+
+## Technology & Design
+- Framework: Next.js App Router (client component)
+- Language: TypeScript
+- UI: Tailwind CSS + shadcn/ui Button
+- Accessibility: Keyboard + ARIA; controls hidden in print
+- Naming & Scoping: Follow `@naming-and-scoping.mdc` strictly
+- Animations: Minimal; avoid layout shift
+
+## Route & Params
+- Path: `/label/preview`
+- Param: `tracking` (query)
+- Default tracking fallback: `PCG-TEST-000001`
+
+## Requirements
+- Print-ready canvas sized exactly 4x6 inches on paper
+- On-screen preview centered with subtle container styling
+- Elements:
+  - Header with brand and tracking
+  - From/To blocks
+  - Service badge + ETA line (mock)
+  - Barcode (mock deterministic bars by tracking)
+  - QR placeholder
+  - Footer notes
+- Controls:
+  - Back, View Tracking, Print
+  - Hide all controls in print view
+- Success screen integration: “Open Label Preview” button routing with tracking number
+
+## Acceptance Criteria
+- Page loads with or without `tracking`; fallback applied without errors
+- Print shows only the label content; no extra UI
+- All interactive controls have accessible names and keyboard support
+- All IDs unique and prefixed with `parcego-`
+- No backend calls; fully mocked content
+
+## Naming
+- IDs: `parcego-label-preview-container`, `parcego-label-tracking`, `parcego-label-barcode`, `parcego-label-qr`, `parcego-label-preview-print-btn`, `parcego-label-open-preview-btn`
+- Classes: `parcego-label__barcode`, `parcego-label__meta` (as needed), alongside Tailwind utility classes
+
+## Out of Scope
+- Real barcode/QR generation
+- PDF generation
+- Live merchant or recipient lookup
+
+---
+description:
+globs:
+alwaysApply: false
+---
+---
+alwaysApply: false
+---
+
+# Label Preview (4x6) – UI Implementation Rule
+
+## Objective
+Provide a client-rendered, print-ready 4x6 shipping label preview, accessible from the purchase success screen, using only mocked data and following the project’s naming and accessibility standards.
+
+## Technology & Design
+- Framework: Next.js App Router (client component)
+- Language: TypeScript
+- UI: Tailwind CSS + shadcn/ui Button
+- Accessibility: Keyboard + ARIA; controls hidden in print
+- Naming & Scoping: Follow `@naming-and-scoping.mdc` strictly
+- Animations: Minimal; avoid layout shift
+
+## Route & Params
+- Path: `/label/preview`
+- Param: `tracking` (query)
+- Default tracking fallback: `PCG-TEST-000001`
+
+## Requirements
+- Print-ready canvas sized exactly 4x6 inches on paper
+- On-screen preview centered with subtle container styling
+- Elements:
+  - Header with brand and tracking
+  - From/To blocks
+  - Service badge + ETA line (mock)
+  - Barcode (mock deterministic bars by tracking)
+  - QR placeholder
+  - Footer notes
+- Controls:
+  - Back, View Tracking, Print
+  - Hide all controls in print view
+- Success screen integration: “Open Label Preview” button routing with tracking number
+
+## Acceptance Criteria
+- Page loads with or without `tracking`; fallback applied without errors
+- Print shows only the label content; no extra UI
+- All interactive controls have accessible names and keyboard support
+- All IDs unique and prefixed with `parcego-`
+- No backend calls; fully mocked content
+
+## Naming
+- IDs: `parcego-label-preview-container`, `parcego-label-tracking`, `parcego-label-barcode`, `parcego-label-qr`, `parcego-label-preview-print-btn`, `parcego-label-open-preview-btn`
+- Classes: `parcego-label__barcode`, `parcego-label__meta` (as needed), alongside Tailwind utility classes
+
+## Out of Scope
+- Real barcode/QR generation
+- PDF generation
+- Live merchant or recipient lookup

@@ -1,0 +1,113 @@
+# Proof of Delivery UI – Cursor Rule
+
+## Objective
+
+Build a pixel-perfect, accessible, and modern Proof of Delivery UI for the Parcego Courier workflow.  
+**Focus:** Mobile-first, smooth UX for couriers to capture and upload delivery proof (photo, signature, notes, etc.), ready for future backend/API integration.
+
+---
+
+## 1. Technology & Design System
+
+- **Framework:** Next.js 14+ (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS only
+- **UI Components:** shadcn/ui (https://ui.shadcn.com/)
+- **State Management:** Zustand (if needed)
+- **Transitions:** Use premium, subtle transitions as per `@premium-transitions-and-effects.mdc`
+- **Accessibility:** All UI must be accessible (ARIA, keyboard navigation, color contrast)
+- **Naming/Scoping:**  
+  - All IDs and class names must strictly follow `@naming-and-scoping.mdc`:
+    - IDs: `parcego-[component]-[purpose]-[unique-identifier]`
+    - Classes: `parcego-[block]__[element]--[modifier]`
+- **Icons:**  
+  - All icons must use the kebab-case span structure (`iconify lucide-icon`), with `data-icon` attributes and inline styles.
+  - Icon sizes must be visually balanced:  
+    - Main actions: **24–32px**  
+    - Status/secondary: **16–20px**
+  - No direct Lucide React components in JSX.
+
+---
+
+## 2. Scope & Requirements
+
+### Proof of Delivery UI Features (All UI, No Backend)
+- **Photo Capture/Upload:**  
+  - Prominent button to capture/upload photo (mobile camera or file picker).
+  - Show photo preview with option to retake/remove.
+- **GPS & Timestamp:**  
+  - Display current location (mocked) and timestamp.
+  - Use location/map icon (24px).
+- **Digital Signature:**  
+  - Canvas or input for courier/customer to sign.
+  - Clear and Save buttons.
+- **Notes/Comments:**  
+  - Textarea for optional delivery notes.
+- **Upload Button:**  
+  - Large, visually distinct button to "Upload Proof" (with loading/feedback state).
+- **Feedback & Confirmation:**  
+  - Show success/failure feedback with premium transitions.
+  - Option to return to dashboard or next delivery.
+- **Navigation:**  
+  - Back button (with icon, 20–24px).
+- **Accessibility:**  
+  - All elements must be keyboard accessible, have ARIA labels, and meet color contrast standards.
+- **Responsiveness:**  
+  - Mobile-first, fully responsive layout.
+- **Transitions:**  
+  - Use fade/slide-in for content, button feedback, and modal overlays.
+- **Error Handling:**  
+  - Show clear error messages for missing photo/signature, upload failure, etc.
+
+---
+
+## 3. UX Best Practices
+
+- **Mobile-First:**  
+  - Large touch targets, minimal input steps, clear feedback.
+- **Instant Feedback:**  
+  - Show loading spinners, success checkmarks, and error states.
+- **Accessible:**  
+  - ARIA labels, focus states, and keyboard navigation for all actions.
+- **Visual Hierarchy:**  
+  - Use card layouts, clear section headings, and spacing.
+- **Premium Transitions:**  
+  - Subtle, non-distracting animations for all interactive elements.
+- **Consistent Icon Sizes:**  
+  - Main actions: 28–32px; secondary/status: 16–20px.
+- **Clear Call-to-Action:**  
+  - Upload button is always visible and prominent.
+- **Error Prevention:**  
+  - Disable upload until all required fields are complete.
+
+---
+
+## 4. Code Quality & Structure
+
+- Use TypeScript everywhere.
+- Functional components only.
+- Early returns, no dead code, no TODOs.
+- Descriptive naming and clear structure.
+- All forms, buttons, and flows must be visually complete and accessible.
+- All IDs and class names must strictly follow `@naming-and-scoping.mdc`.
+- All icons must follow the kebab-case span structure rule.
+
+---
+
+## 5. Deliverables
+
+- Proof of Delivery page and all required UI components.
+- Fully navigable UI demo (no backend).
+- README update with instructions for running the demo.
+
+---
+
+## 6. Enforcement
+
+- Code reviews must verify adherence to this rule file and referenced standards.
+- Any deviation must be documented and approved by project lead.
+
+---
+
+**File name:**  
+`.cursor/rules/proof-of-delivery.mdc`

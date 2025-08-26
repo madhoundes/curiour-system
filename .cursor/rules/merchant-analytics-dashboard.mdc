@@ -1,0 +1,299 @@
+# Merchant Dashboard – Analytics (UI-Only) – Cursor Rule
+
+## Objective
+Build an accessible, polished Analytics Dashboard at `/analytics` for merchants. UI-only: mocked data, no API calls. Provide KPIs, charts, shipment analytics, filters (date range), and export actions.
+
+## Tech & Standards
+- Framework: Next.js 14+ (App Router)
+- Language: TypeScript
+- Styling: Tailwind CSS only
+- UI Components: shadcn/ui (Cards, Tabs, DropdownMenu, Select, Calendar/Date Range, Dialog, Skeleton, Badge)
+- Charts: Recharts or Chart.js (mocked data; choose one – Recharts recommended)
+- Forms: React Hook Form + Zod (filters/export)
+- State: Local state (optional Zustand for persistence)
+- Accessibility: ARIA, keyboard, WCAG contrast, reduced motion
+- Premium Transitions: Fade/scale/opacity only; no translateY(-2px) on hover
+
+## Route
+- `/analytics` → Merchant Analytics Dashboard
+- Navigation back: `router.push('/dashboard')` via back button with id `parcego-analytics-back-btn`
+
+## Scope & Features
+- KPIs (Cards)
+  - Total Shipments, Delivered, Failed, On-time %, Avg Delivery Time
+  - Revenue MTD/YTD, AOV
+- Filters
+  - Date range picker with presets (Last 7/30/90 days, MTD, YTD, Custom)
+  - Optional filters: Service Type, Status, Region
+  - Persist selected filters to `localStorage`
+- Charts (mock)
+  - Shipments Over Time (Area/Line)
+  - Revenue Over Time (Area/Bar)
+  - Status Distribution (Bar/Pie)
+  - Service Type Mix (Donut)
+- Tables & Insights (mock)
+  - Top Routes/Lanes (origin → destination) by volume/revenue
+  - Exceptions: delayed/failed shipments summary
+- Export (mock)
+  - Export CSV (timeseries + table)
+  - Export PNG (chart snapshot – mocked)
+  - Export PDF (report bundle – mocked)
+  - Export confirmation `Dialog`
+- Empty/Skeleton States
+  - Skeleton on initial mount; empty state with helpful copy when no data in range
+- Performance
+  - Virtualized table not required; small mock sets
+- No Shopify UI/logic
+
+## Naming & IDs
+- Prefix all IDs with `parcego-` and ensure global uniqueness
+  - `parcego-analytics-back-btn`, `parcego-analytics-filters`, `parcego-analytics-export-menu`
+  - `parcego-analytics-kpi-total-shipments`, etc.
+
+## Accessibility
+- Keyboard traversable filters and menus
+- Labels for all inputs; `aria-live="polite"` for toast/alerts
+- Respect `prefers-reduced-motion` → disable entrance animations
+
+## Data & Validation (Zod)
+- All data mocked; generate once per mount based on current filter range
+
+Schemas:
+```ts
+import { z } from "zod";
+
+export const DateRangeSchema = z.object({
+  from: z.date(),
+  to: z.date(),
+});
+
+export const FiltersSchema = z.object({
+  range: DateRangeSchema,
+  preset: z.enum(["last7", "last30", "last90", "mtd", "ytd", "custom"]),
+  serviceType: z.enum(["all", "standard", "express", "overnight"]).default("all"),
+  status: z.enum(["all", "pending", "in_transit", "delivered", "failed"]).default("all"),
+  region: z.enum(["all", "na", "eu", "mea", "apac", "latam"]).default("all"),
+});
+
+export const TimeSeriesPointSchema = z.object({
+  date: z.string(),        // ISO date
+  shipments: z.number(),
+  revenue: z.number(),     // USD
+  delivered: z.number(),
+  failed: z.number(),
+});
+
+export const KpiSchema = z.object({
+  totalShipments: z.number(),
+  delivered: z.number(),
+  failed: z.number(),
+  onTimePct: z.number(),        // 0..100
+  avgDeliveryDays: z.number(),  // float
+  revenueMTD: z.number(),
+  revenueYTD: z.number(),
+  aov: z.number(),
+});
+
+export const ExportRequestSchema = z.object({
+  type: z.enum(["csv", "png", "pdf"]),
+  includeCharts: z.boolean().default(true),
+  includeTables: z.boolean().default(true),
+  includeKpis: z.boolean().default(true),
+});
+```
+
+## UI Components (shadcn/ui)
+- Layout: `Card`, grid sections
+- Filters: `Calendar` (date range), `Select`, `DropdownMenu` (presets)
+- Actions: `Button`, `DropdownMenu` for Export, `Dialog` for confirm
+- Feedback: `Alert`, `Skeleton`, optional `Badge` tags
+- Tabs (optional): Overview | Shipments | Revenue
+
+## Premium Transitions
+- Page/container: fade-in + slight slide via opacity/transform only
+- Hover states: subtle shadow/color; avoid translateY(-2px) on hover
+- Reduced motion: disable animations
+
+## State & Persistence
+- Keep `FiltersSchema` in component state; serialize to `localStorage` under `parcego_analytics_filters`
+- Recompute mocked dataset when filters change; keep CPU light
+
+## Pseudocode – Implementation Plan
+1. Header
+   - Back button → `/dashboard`, title “Analytics”, short description
+2. Filters Bar
+   - Date range picker + presets dropdown
+   - Selects: Service Type, Status, Region
+   - “Apply” and “Reset” buttons; persist to localStorage
+3. KPI Row
+   - 6–8 cards with key metrics (ids per KPI)
+4. Charts Grid
+   - Shipments Over Time (Area), Revenue Over Time (Bar/Area)
+   - Status Distribution (Pie/Bar), Service Mix (Donut)
+5. Insights/Table
+   - Top Routes table; Exceptions summary list
+6. Export
+   - Export button → dropdown (CSV, PNG, PDF) → confirmation dialog (mock)
+   - Show `Alert` after “exported” (mock)
+7. Skeleton/Empty
+   - Show skeletons on mount; empty copy if no data in range
+8. Accessibility & Reduced Motion
+   - aria-* everywhere, keyboard-friendly, no gratuitous motion
+
+## Example Skeleton – `/app/analytics/page.tsx` (UI-only)
+```tsx
+"use client";
+
+import React, { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { z } from "zod";
+import {
+  Card, CardHeader, CardTitle, CardDescription, CardContent
+} from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Select } from "@/components/ui/select";        // ensure present; or swap to native <select>
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
+import { Skeleton } from "@/components/ui/skeleton";    // ensure present; if not, use placeholder divs
+import { Label } from "@/components/ui/label";
+
+const FiltersSchema = z.object({
+  // match the rule schema (simplified here)
+  preset: z.enum(["last7","last30","last90","mtd","ytd","custom"]).default("last30"),
+  serviceType: z.enum(["all","standard","express","overnight"]).default("all"),
+  status: z.enum(["all","pending","in_transit","delivered","failed"]).default("all"),
+  region: z.enum(["all","na","eu","mea","apac","latam"]).default("all"),
+});
+
+export default function AnalyticsPage() {
+  const router = useRouter();
+  const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const [loading, setLoading] = useState(true);
+  const [exportMsg, setExportMsg] = useState<string | null>(null);
+  const [filters, setFilters] = useState<z.infer<typeof FiltersSchema>>({
+    preset: "last30",
+    serviceType: "all",
+    status: "all",
+    region: "all",
+  });
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("parcego_analytics_filters");
+      if (raw) setFilters({ ...filters, ...JSON.parse(raw) });
+    } catch {}
+    const t = setTimeout(() => setLoading(false), 400);
+    return () => clearTimeout(t);
+  }, []); // eslint-disable-line
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("parcego_analytics_filters", JSON.stringify(filters));
+    } catch {}
+  }, [filters]);
+
+  const handleBack = () => router.push("/dashboard");
+
+  const handleExport = (type: "csv"|"png"|"pdf") => {
+    setExportMsg(`Exported ${type.toUpperCase()} (mock)`);
+    setTimeout(() => setExportMsg(null), 1500);
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="bg-white border-b shadow-sm">
+        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+          <div className="flex h-16 items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button id="parcego-analytics-back-btn" variant="ghost" size="sm" onClick={handleBack} aria-label="Back to Dashboard">
+                <span aria-hidden className="mr-2">←</span> Back to Dashboard
+              </Button>
+              <div className="h-6 border-l" />
+              <div>
+                <h1 className="text-xl font-semibold text-gray-900">Analytics</h1>
+                <p className="text-sm text-gray-500">Performance metrics, revenue charts, and shipment analytics.</p>
+              </div>
+            </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button id="parcego-analytics-export-menu" variant="outline">Export</Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleExport("csv")}>Export CSV</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("png")}>Export PNG</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleExport("pdf")}>Export PDF</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+      </div>
+
+      <main className={`mx-auto max-w-6xl p-4 sm:p-6 lg:p-8 ${prefersReducedMotion ? "" : "animate-in fade-in slide-in-from-bottom-1 duration-300"}`}>
+        {exportMsg && (
+          <Alert className="mb-4" role="status" aria-live="polite">
+            <AlertTitle>Export</AlertTitle>
+            <AlertDescription>{exportMsg}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Filters Bar */}
+        <Card id="parcego-analytics-filters" className="mb-4">
+          <CardHeader>
+            <CardTitle>Filters</CardTitle>
+            <CardDescription>Adjust the date range and dimensions to analyze.</CardDescription>
+          </CardHeader>
+          <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            {/* Replace with shadcn Selects if present in your components */}
+            <div>
+              <Label htmlFor="preset">Preset</Label>
+              <select id="preset" className="mt-1 w-full rounded-md border px-3 py-2 text-sm" value={filters.preset} onChange={(e) => setFilters({ ...filters, preset: e.target.value as any })}>
+                <option value="last7">Last 7 days</option>
+                <option value="last30">Last 30 days</option>
+                <option value="last90">Last 90 days</option>
+                <option value="mtd">MTD</option>
+                <option value="ytd">YTD</option>
+                <option value="custom">Custom</option>
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="serviceType">Service</Label>
+              <select id="serviceType" className="mt-1 w-full rounded-md border px-3 py-2 text-sm" value={filters.serviceType} onChange={(e) => setFilters({ ...filters, serviceType: e.target.value as any })}>
+                <option value="all">All</option>
+                <option value="standard">Standard</option>
+                <option value="express">Express</option>
+                <option value="overnight">Overnight</option>
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="status">Status</Label>
+              <select id="status" className="mt-1 w-full rounded-md border px-3 py-2 text-sm" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value as any })}>
+                <option value="all">All</option>
+                <option value="pending">Pending</option>
+                <option value="in_transit">In Transit</option>
+                <option value="delivered">Delivered</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="region">Region</Label>
+              <select id="region" className="mt-1 w-full rounded-md border px-3 py-2 text-sm" value={filters.region} onChange={(e) => setFilters({ ...filters, region: e.target.value as any })}>
+                <option value="all">All</option>
+                <option value="na">North America</option>
+                <option value="eu">Europe</option>
+                <option value="mea">Middle East & Africa</option>
+                <option value="apac">APAC</option>
+                <option value="latam">LATAM</option>
+              </select>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* KPI Row */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {["total-shipments","delivered","failed","on-time","avg-days","revenue-mtd","revenue-ytd","aov"].slice(0,4).map((key) => (
+            <Card key={key} id={`parcego-analytics-kpi-${key}`}>
+              <CardHeader>
+                <CardTitle className="text-sm">KPI</CardTitle>
+                <CardDescription>Mock metric</

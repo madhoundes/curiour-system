@@ -1,0 +1,115 @@
+ ⚠ Warning: Found multiple lockfiles. Selecting /Volumes/Ahmed/Development/Curiour-new/package-lock.json.
+   Consider removing the lockfiles at:
+   * /Volumes/Ahmed/Development/Curiour-new/curiour-new/package-lock.json
+
+   ▲ Next.js 15.4.5
+   - Local:        http://localhost:3001
+   - Network:      http://10.0.0.66:3001
+
+ ✓ Starting...
+ ✓ Ready in 3.2s
+ ○ Compiling / ...
+ ✓ Compiled / in 4.5s (643 modules)
+ HEAD / 200 in 4973ms
+ ○ Compiling /courier/performance ...
+ ✓ Compiled /courier/performance in 1817ms (634 modules)
+ HEAD /courier/performance 200 in 2041ms
+ ✓ Compiled /courier/proof in 424ms (631 modules)
+ HEAD /courier/proof 200 in 567ms
+ ○ Compiling /dropoff-confirmation ...
+ ✓ Compiled /dropoff-confirmation in 582ms (638 modules)
+ HEAD /dropoff-confirmation 200 in 768ms
+ GET / 200 in 291ms
+ ✓ Compiled /_not-found in 557ms (643 modules)
+ GET /@react-refresh 404 in 1033ms
+ GET /src/main.jsx 404 in 1016ms
+ GET /node_modules/vite/dist/client/env.mjs 404 in 1006ms
+ GET /src/components/ui/ErrorBoundary.jsx 404 in 1017ms
+ GET /src/Entry.jsx 404 in 1001ms
+ GET /@vite/client 404 in 1027ms
+ GET /src/styles/layout.css 404 in 152ms
+ GET /src/styles/prompt.css 404 in 154ms
+ GET /src/styles/user-profile-section.css 404 in 154ms
+ GET /src/utils/mobileZoomManager.js 404 in 156ms
+ GET /src/styles/dashboard.css 404 in 155ms
+ GET /src/styles/confirmation-modal.css 404 in 157ms
+ GET /src/styles/face-upload-section.css 404 in 137ms
+ GET /src/styles/app-modal-styles.css 404 in 140ms
+ GET /src/styles/global-tooltips.css 404 in 138ms
+ GET /src/styles/auth-buttons.css 404 in 138ms
+ GET /src/styles/dashboard-premium-transitions.css 404 in 139ms
+ GET /src/styles/registration-success.css 404 in 136ms
+ GET /src/utils/supabase.mjs 404 in 119ms
+ GET /src/styles/image-requirements-carousel.css 404 in 122ms
+ GET /src/pages/SignUp.jsx 404 in 121ms
+ GET /src/pages/ForgotPassword.jsx 404 in 120ms
+ GET /src/contexts/ToastContext.jsx 404 in 120ms
+ GET /src/pages/Welcome.jsx 404 in 125ms
+ GET /src/components/ui/ThumbnailPreviewModal.jsx 404 in 104ms
+ GET /src/components/ui/ConfirmationModal.jsx 404 in 112ms
+ GET /src/utils/textSanitizer.js 404 in 109ms
+ GET /config.js 404 in 105ms
+ GET /src/components/ui/SubscriptionCheckoutModal.jsx 404 in 99ms
+ GET /src/components/ui/ImageRequirementsCarousel.jsx 404 in 99ms
+ GET /src/utils/textUtils.js 404 in 97ms
+ GET /src/utils/typewriterSuggestions.js 404 in 94ms
+ GET /src/utils/promptEnhancer.js 404 in 93ms
+ GET /src/utils/openaiPromptEnhancer.js 404 in 94ms
+ GET /src/utils/smartTextAnalyzer.js 404 in 94ms
+ GET /src/utils/emergencyCleanup.js 404 in 95ms
+ GET /src/components/NotificationSystem.jsx 404 in 90ms
+ GET /src/utils/imageUtils.js 404 in 94ms
+ GET /Templates/Tech.js 404 in 87ms
+ GET /src/utils/supabaseHistoryManager.js 404 in 94ms
+ GET /src/components/TemplatePreviewImage.jsx 404 in 89ms
+ GET /src/components/ui/AuthThemeToggle.jsx 404 in 87ms
+ GET /src/config/supabase.mjs 404 in 243ms
+ GET /src/components/ui/CollapsibleSection.jsx 404 in 244ms
+ GET /Templates/fitness.js 404 in 245ms
+ GET /src/components/person/GenderSelector.jsx 404 in 245ms
+ GET /src/utils/colorUtils.js 404 in 217ms
+ GET /src/components/UserDashboard.jsx 404 in 200ms
+ GET /src/utils/brandLogos.js 404 in 92ms
+ GET /src/utils/contextAwareClassifier.js 404 in 92ms
+ GET /src/components/ui/GenerationDetailsModal.jsx 404 in 92ms
+ GET /src/utils/iconClassifier.js 404 in 92ms
+ GET /src/components/ui/SearchableCountrySelect.jsx 404 in 56ms
+ GET /src/components/ui/AvatarUploadModal.jsx 404 in 41ms
+ GET /src/utils/promptFormatter.js 404 in 99ms
+ GET /src/utils/promptUniquenessTracker.js 404 in 99ms
+ GET /src/utils/localStorageManager.js 404 in 99ms
+ GET /src/utils/templateImageUtils.js 404 in 94ms
+ GET /src/utils/openmojiMapping.js 404 in 61ms
+ GET /src/utils/passwordRateLimit.js 404 in 62ms
+ GET /src/utils/imgbbUploader.js 404 in 44ms
+ GET /src/utils/imageUrlValidator.js 404 in 44ms
+ ○ Compiling /dashboard ...
+ ✓ Compiled /dashboard in 577ms (627 modules)
+ GET /dashboard 200 in 746ms
+ ✓ Compiled /find-dropoff in 328ms (634 modules)
+ GET /find-dropoff 200 in 410ms
+ GET /dashboard 200 in 65ms
+ ○ Compiling /courier ...
+ ✓ Compiled /courier in 1232ms (652 modules)
+ GET /courier 200 in 1324ms
+ ○ Compiling /courier/route ...
+ ✓ Compiled /courier/route in 511ms (659 modules)
+ GET /courier/route 200 in 600ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 591ms (664 modules)
+ GET /courier/scan/PCG-DEL-001 404 in 660ms
+ GET /courier/scan/PCG-DEL-001 404 in 83ms
+ GET /courier/route 200 in 141ms
+ ✓ Compiled /courier/performance in 313ms (390 modules)
+ GET /courier/performance 200 in 433ms
+ GET /courier/route 200 in 83ms
+ GET /courier/profile 404 in 107ms
+ GET /courier/profile 404 in 289ms
+ GET / 200 in 241ms
+ GET /dashboard 200 in 100ms
+ GET /find-dropoff 200 in 99ms
+ ○ Compiling /admin ...
+ ✓ Compiled /admin in 888ms (728 modules)
+ GET /admin 200 in 985ms
+ GET / 200 in 72ms
+ GET /dashboard 200 in 55ms

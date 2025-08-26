@@ -1,0 +1,228 @@
+# Courier – Out for Delivery (OFD) UI Rule
+
+## Objective
+Implement the full courier Out-for-Delivery (OFD) flow UI using Next.js App Router, TypeScript, Tailwind, and shadcn/ui. UI-only with mocked data; no API calls. Follow `@naming-and-scoping.mdc` for IDs and class naming.
+
+## Tech & Sources
+- Stack: Next.js 14+, TypeScript, Tailwind, shadcn/ui components already in repo (`Button`, `Card`, `Badge`, `Tabs`, `Input`, `Textarea`, `Avatar`, `Alert`).
+- Dialog/Modal: use shadcn/ui Dialog pattern (Context7 guidance: accessible Dialog). Toasts may use existing lightweight banners or Sonner-like pattern; prefer the existing in-repo toast style.
+- Animations: transform/opacity only, 200–250ms, respect `prefers-reduced-motion`.
+- Accessibility: keyboard support, ARIA roles, focus-visible. No keyboard traps.
+
+## Files to Add
+- `app/courier/out-for-delivery/page.tsx` (main page)
+- Optional composables under `app/courier/out-for-delivery/`:
+  - `StopsList.tsx` – list of assigned stops
+  - `CurrentStopCard.tsx` – details of selected stop
+  - `AttemptDialogs.tsx` – delivered/failed modal UIs
+
+## Mock Data Model (local constants)
+```
+type StopStatus = "pending" | "en_route" | "delivered" | "failed";
+type Stop = {
+  id: string;            // unique
+  sequence: number;      // 1..N
+  name: string;          // recipient
+  address: string;
+  eta: string;           // e.g., "14:10–14:30"
+  status: StopStatus;
+  phone?: string;
+  notes?: string;
+};
+```
+
+## Page Layout
+- Header (`parcego-ofd-header`)
+  - Back ghost icon button `parcego-ofd-back-btn` (`ArrowLeft`), routes to `/courier`.
+  - Title: “Out for Delivery”.
+  - Status `Badge` (In Progress/Paused) `parcego-ofd-status-badge`.
+
+- Summary Card (`parcego-ofd-summary-card`)
+  - Stats: total, remaining, delivered count, simple progress bar.
+  - Actions: `Pause`/`Resume`, `Refresh` (UI only) with subtle transitions.
+
+- Main Content (responsive)
+  - Desktop ≥lg: 12-col grid → Stops list (lg:col-span-5) + Current stop (lg:col-span-7).
+  - Mobile: Column stack; sticky action bar persists.
+
+- Stops List (`parcego-ofd-stops-list`)
+  - Each stop row: sequence chip, recipient, address, ETA, status badge.
+  - Row CTA icons: `Navigation` (deeplink placeholder), `Phone`, `MessageSquare`, `Scan`.
+  - Selection: click/Enter toggles current stop; selected row has border+bg emphasis and `aria-pressed=true`.
+
+- Current Stop Card (`parcego-ofd-current-card`)
+  - Recipient, phone, delivery notes, small map placeholder (Card with `MapPin`).
+  - Primary CTAs: `Attempt Delivery` (opens dialog), `Pre-drop Scan` (opens scan dialog).
+
+- Attempt Delivery Dialog (`parcego-ofd-attempt-dialog`)
+  - Tabs or segmented control: Delivered | Failed.
+  - Delivered: photo placeholder, optional “Require signature” checkbox; Confirm button `parcego-ofd-delivered-confirm-btn` → sets status `delivered`, toast success, auto-advance to next pending.
+  - Failed: reason radios (No answer, Incorrect address, Access blocked, Other), optional notes + photo placeholder; Confirm button `parcego-ofd-failed-confirm-btn` → sets status `failed`, toast warning; remains on stop.
+
+- Sticky Action Bar (`parcego-ofd-stickybar`)
+  - Left: “Stop X of N • Remaining Y”.
+  - Right: `Navigate`, `Call`, `Attempt Delivery` (primary). Sticks bottom on mobile; edge-shadow.
+
+- Offline Banner (`parcego-ofd-offline-banner`)
+  - Appears at top when `isOffline=true`. Text about queued actions; `Retry` button (UI only).
+
+## Status Badges (Tailwind color tokens)
+- delivered: `bg-green-100 text-green-800 border-green-200`
+- failed: `bg-red-100 text-red-800 border-red-200`
+- en_route: `bg-blue-100 text-blue-800 border-blue-200`
+- pending: `bg-gray-100 text-gray-800 border-gray-200`
+
+## IDs & Naming (must be unique)
+- Prefix all IDs with `parcego-` and describe component/purpose: e.g., `parcego-ofd-stop-item-{id}`, `parcego-ofd-attempt-dialog`, `parcego-ofd-scan-dialog`.
+- Follow `@naming-and-scoping.mdc` for uniqueness and clarity.
+
+## Interactions (UI-only state)
+- Selecting a stop sets `selectedStopId` and highlights row.
+- Attempt Delivery dialog controls mutate local `stops` state only.
+- “Resume/Pause/Refresh” affect labels and show a toast; no network.
+- Navigation/Call/Message actions are placeholders; do not leave app.
+- Progress bar recalculates on any status change.
+
+## Accessibility
+- List rows are buttons: `role="button"`, `tabIndex=0`, keyboard activate on Enter/Space.
+- Dialogs: `role="dialog" aria-modal="true"`, focus sent to first actionable element; escape and overlay close.
+- Toasts/banners: `aria-live="polite"`.
+- Ensure sufficient color contrast and focus-visible rings.
+
+## Responsive Rules
+- Mobile: list stacks under current card, sticky bar always visible.
+- Tablet: two columns; reduce gaps; CTA text truncates with `min-w-0`/`truncate`.
+- Desktop: grid split 5/7; hover states add subtle shadow + `scale-[.98]` on active.
+
+## Acceptance Criteria
+- Summary, list, current card render with mocked data; no API.
+- Delivered/Failed flows update status badges immediately and adjust progress.
+- Pre-drop scan dialog opens and shows mock success on submit.
+- Sticky action bar works at all sizes; offline banner toggles via flag.
+- All IDs follow `parcego-...` and are unique.
+- No layout shift; only transform/opacity animations.
+
+## Build Notes
+- Reuse existing `Icon` names in repo (`MapPin`, `Navigation`, `Phone`, `MessageSquare`, `ScanBarcode`, `CheckCircle`, `AlertCircle`).
+- Keep components small and pure; no dead code or TODOs.
+- Do not import external SDKs (maps, camera). Use placeholders.
+
+## Implementation Checklist
+1) Create page at `app/courier/out-for-delivery/page.tsx` with header, summary, grid shell.
+2) Add mocked `stops: Stop[]` and derive counts/progress via memo.
+3) Implement `StopsList` with selectable rows and status badges.
+4) Implement `CurrentStopCard` with CTAs and map placeholder.
+5) Implement `AttemptDialogs` with Delivered/Failed tabs and confirm actions.
+6) Add sticky bar and offline banner; ensure a11y on dialogs/controls.
+7) Verify IDs, responsiveness, reduced-motion, and keyboard paths.
+
+# Courier – Out for Delivery (OFD) UI Rule
+
+## Objective
+Deliver a clean, responsive, and fully navigable UI for the courier “Out for Delivery” flow using shadcn/ui, Tailwind, and the project’s naming-and-scoping rules. UI only; all data mocked.
+
+## Tech & Conventions
+- Next.js App Router, TypeScript, Tailwind, shadcn/ui.
+- Components: `Button`, `Card`, `Badge`, `Tabs`, `Input`, `Textarea`, `Avatar`, `Alert` (as available in repo).
+- IDs must follow project pattern with `parcego-` prefix, unique and descriptive. See `@naming-and-scoping.mdc`.
+- Transitions: subtle only (opacity/transform), respect `prefers-reduced-motion`.
+- Accessibility: keyboard, roles, aria, focus-visible; no keyboard traps.
+
+## Files
+- Add: `app/courier/out-for-delivery/page.tsx`
+- Optional shared UI:
+  - `app/courier/out-for-delivery/StopsList.tsx`
+  - `app/courier/out-for-delivery/CurrentStopCard.tsx`
+  - `app/courier/out-for-delivery/AttemptDialogs.tsx`
+- Mock data: inline constants in page; no API calls.
+
+## Page Layout
+- Header
+  - Back: ghost icon button (`ArrowLeft`) id `parcego-ofd-back-btn`
+  - Title: “Out for Delivery”
+  - Status badge: `In Progress` or `Paused`
+- Route Summary Card
+  - Stats: total stops, remaining, ETA window
+  - Progress bar (simple div-based)
+  - Actions: `Pause`, `Resume`, `Refresh`
+- Stops List
+  - Each stop item shows sequence number, recipient, address, ETA badge, status chip
+  - Item actions: `Navigate` (maps deeplink), `Call`, `Message`, `Scan`
+  - Clicking item selects it as current stop (highlights row)
+- Current Stop Card
+  - Recipient details, phone, instructions
+  - Map placeholder (static image or empty card with `MapPin` icon)
+  - CTAs:
+    - Primary: `Attempt Delivery`
+    - Secondary: `Pre-drop Scan`
+- Attempt Delivery Flow (UI only)
+  - Dialog: select “Delivered” or “Failed”
+  - Delivered sub-flow:
+    - Photo capture placeholder + optional signature checkbox
+    - Button: `Confirm Delivery` → show success toast
+  - Failed sub-flow:
+    - Reason radio list (No answer, Incorrect address, Access blocked, Other)
+    - Optional notes + photo placeholder
+    - Button: `Record Failed Attempt` → show warning toast
+- Bottom Sticky Bar
+  - Left: current stop index/remaining
+  - Right actions: `Navigate`, `Call`, `Attempt Delivery`
+- Offline Banner
+  - Appears at top when offline; explains queued actions; `Retry` button
+
+## Interactions & State (mocked)
+- Mock stops array with fields:
+  - `id`, `sequence`, `name`, `address`, `eta`, `status: "pending"|"en_route"|"delivered"|"failed"`, `phone`, `notes`
+- Selected stop via local state; clicking list item updates selection and scrolls into view.
+- “Attempt Delivery” opens a modal with delivered/failed tabs.
+- On “Confirm Delivery”: set stop.status to `delivered`, show toast, advance to next pending stop.
+- On “Record Failed Attempt”: set stop.status to `failed`, show toast, keep selection.
+- “Pre-drop Scan”: opens lightweight dialog with input or mock scanner placeholder; on success, show toast.
+- Offline banner toggled by a boolean; queued actions show a static count.
+
+## IDs (examples)
+- Header: `parcego-ofd-header`
+- Route summary: `parcego-ofd-summary-card`
+- Stops list: `parcego-ofd-stops-list`
+- Stop item: `parcego-ofd-stop-item-{id}`
+- Current stop card: `parcego-ofd-current-card`
+- Attempt modal: `parcego-ofd-attempt-dialog`
+- Delivered confirm: `parcego-ofd-delivered-confirm-btn`
+- Failed confirm: `parcego-ofd-failed-confirm-btn`
+- Sticky bar: `parcego-ofd-stickybar`
+- Offline banner: `parcego-ofd-offline-banner`
+
+## Accessibility
+- List items are buttons with `role="button"`, `tabIndex=0`, `aria-pressed` when selected.
+- Dialogs use proper roles: `role="dialog" aria-modal="true"`; focus trap and escape close.
+- Buttons have `aria-label` as needed; toasts `aria-live="polite"`.
+
+## Visual/Styling
+- Minimal, high-contrast, readable sizes.
+- Use `Badge` for statuses:
+  - delivered: `bg-green-100 text-green-800`
+  - failed: `bg-red-100 text-red-800`
+  - en_route: `bg-blue-100 text-blue-800`
+  - pending: `bg-gray-100 text-gray-800`
+- Hover/active: light shadow and 98% scale; transitions 200–250ms.
+
+## Acceptance Criteria
+- Renders route summary, stops list, and current stop sections without API.
+- Selecting a stop highlights it and updates current stop card.
+- Delivered/Failed flows update the list pill badges immediately.
+- Pre-drop scan dialog opens and shows success toast on mock submit.
+- Sticky bar visible on mobile and desktop; responsive layout:
+  - Mobile: list collapses under current card; sticky bar always visible.
+  - Desktop: two-column layout (list left, current card right).
+- All IDs follow `parcego-...` pattern; no duplicate IDs.
+- No CLS; animations use transform/opacity only.
+
+## Suggested Component Skeletons (TypeScript)
+- Page exports default `OutForDeliveryPage` at `app/courier/out-for-delivery/page.tsx`.
+- Keep components small and composable; no TODOs or dead code.
+- Use `Icon` component names already present (e.g., `MapPin`, `Phone`, `Navigation`, `Camera`, `CheckCircle`, `AlertCircle`).
+
+## Notes
+- Do not integrate maps SDKs; use placeholders.
+- Phone actions are UI-only; use `href="tel:..."` when needed but keep within UI-only constraints.
+- Ensure reduced-motion users get instant state changes without animation.

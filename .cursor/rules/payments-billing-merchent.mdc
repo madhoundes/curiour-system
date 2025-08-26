@@ -1,0 +1,194 @@
+# Parcego Billing & Payments – UI Implementation Rule
+
+## Objective
+
+Build the Billing & Payments page (`/billing`) for the Ashraf Courier Business Platform, providing merchants with a comprehensive, accessible, and modern interface for managing payment history, invoices, payment methods, billing preferences, tax documents, and financial reporting.  
+**No backend logic or API integration—focus is on layout, navigation, and user experience.**
+
+---
+
+## 1. Technology & Design System
+
+- **Framework:** Next.js 14+ (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS only
+- **UI Components:** shadcn/ui (https://ui.shadcn.com/)
+- **State Management:** Zustand (for client-side state, if needed)
+- **Transitions:** Use premium, subtle transitions as per premium-transitions-and-effects.mdc
+- **Accessibility:** All UI must be accessible (ARIA, keyboard navigation, color contrast)
+
+---
+
+## 2. Scope & Requirements
+
+### Billing & Payments Features (All UI, No Backend)
+- **Payment History:** Table/list of past payments, status, amount, date, invoice link, downloadable PDF.
+- **Invoice Management:** View, download, and filter invoices; status badges (Paid, Due, Overdue); invoice details modal.
+- **Payment Methods:** List, add, edit, and remove payment methods (credit card, ACH, etc.); set default method.
+- **Billing Preferences:** Editable billing address, contact info, notification preferences.
+- **Tax Documents:** List and download tax forms (mock data, e.g., 1099, VAT invoices).
+- **Financial Reporting:** Downloadable/exportable reports (CSV, PDF); summary cards for totals, outstanding, etc.
+- **Notifications:** Banner for overdue invoices, expiring payment methods, or billing issues.
+- **Responsive Design:** Fully responsive for mobile, tablet, and desktop.
+
+---
+
+## 3. Page Structure & Layout
+
+### Header Section
+- **Page Title:** "Billing & Payments" with icon (`parcego-billing-header-title`)
+- **Summary Cards:** Outstanding balance, last payment, next invoice, total paid YTD (`parcego-billing-summary-card-{type}`)
+- **Action Buttons:** Add Payment Method, Download Report (`parcego-billing-add-method-btn`, `parcego-billing-download-report-btn`)
+
+### Main Content Area
+- **Tabs/Sections:** Payment History, Invoices, Payment Methods, Tax Documents, Preferences (`parcego-billing-tabs`)
+- **Table/List:** For payment history and invoices, with sorting, filtering, and pagination (`parcego-billing-table-{section}`)
+- **Details Modal:** For invoice/payment details, with download/print options (`parcego-billing-modal-{purpose}`)
+- **Forms:** For adding/editing payment methods and billing preferences (`parcego-billing-form-{purpose}`)
+
+### Sidebar (Optional)
+- **Quick Links:** Download all invoices, view tax documents, update billing info
+- **Help/Support:** Link to billing FAQ or support
+
+---
+
+## 4. Data Structure & Mock Data
+
+### Payment Object
+```typescript
+export type PaymentStatus = 'paid' | 'pending' | 'failed' | 'refunded';
+export interface Payment {
+  id: string;
+  date: string; // ISO string
+  amount: number;
+  currency: string;
+  status: PaymentStatus;
+  method: string; // e.g., 'Visa •••• 1234'
+  invoiceId: string;
+  downloadUrl: string;
+}
+```
+
+### Invoice Object
+```typescript
+export type InvoiceStatus = 'paid' | 'due' | 'overdue';
+export interface Invoice {
+  id: string;
+  date: string; // ISO string
+  dueDate: string; // ISO string
+  amount: number;
+  currency: string;
+  status: InvoiceStatus;
+  downloadUrl: string;
+  lineItems: Array<{ description: string; amount: number; }>;
+}
+```
+
+### Payment Method Object
+```typescript
+export type PaymentMethodType = 'card' | 'ach' | 'paypal';
+export interface PaymentMethod {
+  id: string;
+  type: PaymentMethodType;
+  label: string; // e.g., 'Visa •••• 1234'
+  isDefault: boolean;
+  expiry?: string; // MM/YY for cards
+}
+```
+
+### Tax Document Object
+```typescript
+export interface TaxDocument {
+  id: string;
+  year: number;
+  type: string; // e.g., '1099', 'VAT'
+  downloadUrl: string;
+  issuedDate: string; // ISO string
+}
+```
+
+---
+
+## 5. State Management
+
+- **Local State:** Current tab/section, selected items, filters, modals, form data
+- **Mock Data:** Use static arrays for all lists and details
+- **No API calls or backend logic**
+
+---
+
+## 6. User Interactions & Behaviors
+
+- **Tab Navigation:** Switch between Payment History, Invoices, Payment Methods, Tax Documents, Preferences
+- **Table Sorting/Filtering:** By date, status, amount, etc.
+- **Download/Print:** Invoices, tax documents, reports
+- **Add/Edit/Delete:** Payment methods, billing info
+- **Set Default:** Payment method
+- **Responsive:** All features accessible on mobile and desktop
+- **Accessibility:** ARIA labels, keyboard navigation, screen reader support
+
+---
+
+## 7. UI Components & IDs
+
+- **Main Container:** `parcego-billing-container`
+- **Header:** `parcego-billing-header-title`
+- **Summary Cards:** `parcego-billing-summary-card-{type}`
+- **Tabs:** `parcego-billing-tabs`
+- **Table/List:** `parcego-billing-table-{section}`
+- **Row Items:** `parcego-billing-row-{id}`
+- **Action Buttons:** `parcego-billing-add-method-btn`, `parcego-billing-download-report-btn`
+- **Modals:** `parcego-billing-modal-{purpose}`
+- **Forms:** `parcego-billing-form-{purpose}`
+- **Empty States:** `parcego-billing-empty-state-{section}`
+- **Loading State:** `parcego-billing-loading-skeleton`
+
+---
+
+## 8. Accessibility Requirements
+
+- **ARIA Labels:** All interactive elements
+- **Keyboard Navigation:** Logical tab order, focus states
+- **Screen Reader Support:** Announce status changes, errors, and confirmations
+- **Color Contrast:** WCAG AA compliance
+
+---
+
+## 9. Performance & UX
+
+- **Loading States:** Skeletons for tables and cards
+- **Transitions:** Smooth tab/content transitions, subtle hover/active effects
+- **Pagination/Virtualization:** For large payment/invoice lists
+- **Error Handling:** Friendly error and empty states
+
+---
+
+## 10. Implementation Checklist
+
+- [ ] Page structure with header, summary, and tabs
+- [ ] Payment history and invoice tables with mock data
+- [ ] Payment methods management UI
+- [ ] Billing preferences form
+- [ ] Tax documents list and download
+- [ ] Financial reporting (summary, export)
+- [ ] Responsive and accessible design
+- [ ] All required IDs and class names per naming rules
+- [ ] Premium transitions and effects
+- [ ] No backend logic, all data mocked
+
+---
+
+## 11. Future Enhancements (Phase 2+)
+
+- **API Integration:** Real payment and invoice data
+- **Stripe/ACH Integration:** Add, verify, and manage payment methods
+- **Automated Tax Document Generation**
+- **Advanced Reporting:** Custom date ranges, charts, analytics
+- **Notifications:** Real-time billing alerts
+
+---
+
+**Goal:**  
+Deliver a pixel-perfect, accessible, and modern Billing & Payments UI, ready for future backend/API integration and financial operations.
+
+---

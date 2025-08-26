@@ -1,0 +1,105 @@
+# Parcego Merchant Dashboard – Sidebar Layout & Navigation Rule
+
+## Objective
+
+Standardize the Merchant Dashboard UI to use a modern sidebar navigation layout, improving usability, clarity, and scalability for future features.
+
+---
+
+## 1. Sidebar Navigation
+
+- **Persistent Sidebar:**  
+  - Fixed on the left, always visible on desktop/tablet, collapsible on mobile.
+  - Contains navigation buttons for all merchant-accessible pages and subpages.
+  - Group navigation items under clear section headings (e.g., "Shipments", "Analytics", "Billing", "Support").
+  - Use shadcn/ui components for all navigation elements.
+  - Each button must have a unique ID: `parcego-dashboard-nav-btn-[page]`.
+  - Section containers must have IDs: `parcego-dashboard-nav-section-[section]`.
+
+- **Role-Based Visibility:**  
+  - Only show merchant-relevant navigation items for merchant users.
+  - Hide super admin and courier options from the sidebar, but allow direct URL access.
+  - Sidebar must be easily extensible for future roles/pages.
+
+- **Accessibility:**  
+  - All navigation buttons must be keyboard accessible (tab, enter/space).
+  - Use `aria-label` for all nav buttons and section headings.
+  - Indicate the current/active page visually and with `aria-current="page"`.
+
+---
+
+## 2. Main Content Area
+
+- **Fluid Container:**  
+  - Main content area should fill remaining space, responsive to sidebar state.
+  - Use smooth transitions (fade/slide) when switching pages.
+  - Container ID: `parcego-dashboard-main-container`.
+
+- **Page Rendering:**  
+  - Only one page/component is visible at a time.
+  - No full page reloads; use Next.js App Router for navigation.
+  - All content must be accessible and responsive.
+
+---
+
+## 3. UI & Styling
+
+- **Design System:**  
+  - Use only Tailwind CSS and shadcn/ui components.
+  - No custom CSS unless absolutely necessary.
+  - Follow project-wide naming conventions for IDs and classes (see Naming & Scoping Rules).
+
+- **Transitions:**  
+  - Apply premium, subtle transitions for sidebar, nav buttons, and content area.
+  - Respect `prefers-reduced-motion` for accessibility.
+
+- **Responsiveness:**  
+  - Sidebar collapses to a drawer or icon-only mode on mobile.
+  - All layouts must be fully responsive and accessible.
+
+---
+
+## 4. Implementation & Refactoring
+
+- **Incremental Refactor:**  
+  - Update dashboard pages one by one to fit the new layout.
+  - Remove any legacy navigation or layout code.
+  - Ensure all navigation flows are tested and accessible.
+
+- **No Backend Changes:**  
+  - This rule applies to UI only. Do not modify backend logic, API calls, or business logic.
+
+---
+
+## 5. Example Structure
+
+```jsx
+<div id="parcego-dashboard-sidebar" className="...">
+  <nav>
+    <div id="parcego-dashboard-nav-section-shipments" aria-label="Shipments">
+      <button id="parcego-dashboard-nav-btn-shipments" aria-label="Shipments" ...>Shipments</button>
+      <button id="parcego-dashboard-nav-btn-create-shipment" aria-label="Create Shipment" ...>Create Shipment</button>
+    </div>
+    <div id="parcego-dashboard-nav-section-analytics" aria-label="Analytics">
+      <button id="parcego-dashboard-nav-btn-analytics" ...>Analytics</button>
+    </div>
+    <!-- More sections... -->
+  </nav>
+</div>
+<div id="parcego-dashboard-main-container" className="...">
+  {/* Render selected page here */}
+</div>
+```
+
+---
+
+## 6. Enforcement
+
+- All dashboard pages must use this sidebar layout.
+- All navigation must be accessible, responsive, and follow naming conventions.
+- Any deviation must be documented and approved by the project lead.
+
+---
+
+**Goal:**  
+Deliver a modern, accessible, and scalable Merchant Dashboard UI with clear, role-based sidebar navigation and a fluid main content area, ready for future enhancements.

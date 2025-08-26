@@ -1,0 +1,104 @@
+---
+alwaysApply: false
+---
+
+# Create New Shipment & Package Details – UI Implementation Rule
+
+## Objective
+
+Build the complete UI flow for creating a new shipment, including package details and real-time quote preview, strictly following the provided user flowchart and design system.  
+**No backend logic or API integration—focus is on layout, navigation, and user experience.**
+
+---
+
+## 1. Technology & Design System
+
+- **Framework:** Next.js 14+ (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS only
+- **UI Components:** shadcn/ui (https://ui.shadcn.com/)
+- **State Management:** Zustand (for client-side state, if needed)
+- **Transitions:** Use premium, subtle transitions as per premium-transitions-and-effects.mdc
+- **Accessibility:** All UI must be accessible (ARIA, keyboard navigation, color contrast)
+- **Naming & Scoping:** All new UI features, pages, and components **must** follow the rules in `@naming-and-scoping.mdc` for unique IDs, class names, and structure. This is required for easy inspection and debugging.
+
+---
+
+## 2. Scope & Requirements
+
+### Shipment Creation Flow (All UI, No Backend)
+- **Create New Shipment Page:**  
+  - Sender info (pre-filled, read-only)
+  - Recipient info (name, address, phone)
+  - Package details (weight, dimensions, type)
+  - Service selection (standard, express, overnight)
+  - Special instructions/notes
+
+- **Package Details Page:**  
+  - Dimensions (length, width, height)
+  - Weight and unit selection
+  - Package type (box only - default selection)
+  - Fragile/valuable item flags
+  - Custom packaging requirements
+
+- **Real-time Quote Preview:**  
+  - Mock quote calculation based on form data
+  - Show multiple service options with pricing
+  - Estimated delivery times
+  - Insurance options
+
+- **Label Purchase Flow:**  
+  - Mock payment UI (Stripe-style)
+  - Order summary and confirmation
+  - Payment method selection
+  - Receipt/confirmation screen
+
+---
+
+## 3. Navigation
+
+- Use Next.js App Router for all navigation.
+- All flows must match the provided user flowchart.
+- All navigation and state changes handled client-side (no server calls).
+- "Create New Shipment" button on dashboard must route to this flow.
+
+---
+
+## 4. Data & Logic
+
+- All data is static, mocked, or placeholder.
+- No API calls, no backend logic, no authentication.
+- Use mock data for quotes, service options, and confirmation.
+
+---
+
+## 5. Code Quality & Structure
+
+- Use TypeScript everywhere.
+- Functional components only.
+- Early returns, no dead code, no TODOs.
+- Descriptive naming and clear structure.
+- All forms, buttons, and flows must be visually complete and accessible.
+- **All new UI features, pages, and components must follow the rules in `@naming-and-scoping.mdc` for IDs and class names.**
+
+---
+
+## 6. Deliverables
+
+- All pages and components for the shipment creation flow.
+- Fully navigable UI demo (no backend).
+- README update with instructions for running and testing the shipment flow.
+
+---
+
+## 7. Enforcement
+
+- Code reviews must verify adherence to this rule file, `@naming-and-scoping.mdc`, and all referenced standards.
+- Any deviation must be documented and approved by the project lead.
+
+---
+
+**Goal:**  
+Deliver a pixel-perfect, accessible, and modern shipment creation UI, ready for future backend/API integration.
+
+---

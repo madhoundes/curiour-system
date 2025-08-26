@@ -1,0 +1,134 @@
+# Merchant Dashboard – Profile & Account (UI-Only) – Cursor Rule
+
+## Objective
+Design and implement the Merchant Profile & Account UI at `/profile` using Next.js App Router, TypeScript, Tailwind CSS, and shadcn/ui. No backend or API calls. All data is mocked and stored client-side. Deliver an accessible, polished, and navigable page with tabs for:
+- Business Information
+- Account Settings
+- Notification Preferences
+- API Keys & Integrations
+
+## Tech & Standards
+- Framework: Next.js 14+ (App Router)
+- Language: TypeScript
+- UI: shadcn/ui
+- Styling: Tailwind CSS only
+- Forms: React Hook Form + Zod
+- State: Local component state (and optional Zustand for local-only persistence)
+- Transitions: Follow Premium Transitions Rule; subtle, accessible animations
+- Accessibility: Keyboard navigable, ARIA, color contrast, reduced motion support
+- No Shopify UI or logic in this phase
+
+## Routes
+- `/profile` → Primary page with tabs and sub-sections
+- All navigation is client-side; use `router.push('/dashboard')` for back
+
+## Navigation & Layout
+- Page header: back button, page title “Profile & Account”, short description
+- Tabs (shadcn/ui `Tabs`): 
+  - `business`
+  - `settings`
+  - `notifications`
+  - `api`
+- Each tab is a Card layout with semantic sections, forms, and primary/secondary actions
+
+## Data & Validation (Zod)
+Define schemas to validate and mock UI fields:
+- BusinessInfoSchema:
+  - businessName: string().min(2)
+  - contactName: string().min(2)
+  - email: string().email()
+  - phone: string().min(7)
+  - addressLine1: string().min(2)
+  - addressLine2: string().optional()
+  - city: string().min(2)
+  - state: string().min(2)
+  - zip: string().min(3)
+  - country: string().min(2)
+- AccountSettingsSchema:
+  - language: enum(['en', 'fr'])
+  - timezone: string().min(2)
+  - dateFormat: enum(['MM/DD/YYYY', 'DD/MM/YYYY', 'YYYY-MM-DD'])
+  - twoFactorEnabled: boolean()
+- NotificationPrefsSchema:
+  - emailUpdates: boolean()
+  - smsUpdates: boolean()
+  - pushUpdates: boolean()
+  - deliveryAlerts: boolean()
+  - weeklySummary: boolean()
+- ApiKeysSchema:
+  - primaryKey: string()
+  - sandboxKey: string()
+  - webhookUrl: string().url().optional()
+  - ipAllowlist: array(string()).optional()
+
+Mock data is loaded on mount and saved to `localStorage` on submit. No server calls.
+
+## Event Handling
+- Use const handlers: `const handleSubmitBusiness = () => {}`, etc.
+- Show success/error toasts on Save/Reset
+- Early returns for invalid state or disabled actions
+- Keep handlers pure; no side-effects outside UI/localStorage
+
+## Accessibility
+- All actionable elements: `aria-label`, focus states, and keyboard handlers
+- Tabs must be keyboard navigable and labeled
+- Inputs with associated `Label` and `aria-describedby` for errors
+- Respect `prefers-reduced-motion`: disable non-essential motion
+
+## Premium Transitions
+- Apply subtle hover/focus transitions using `transition-all duration-200 ease-[var(--easing-smooth)]`
+- On active: `scale-95` for tactile feedback (avoid `translateY(-2px)` on hover by default)
+- Animate entrance with fade/slide (opacity/transform only)
+- Provide reduced motion guard
+
+## Naming & IDs
+- Use project prefix `parcego-` for IDs
+- Examples:
+  - `parcego-profile-back-btn`
+  - `parcego-profile-tabs`
+  - `parcego-profile-business-form`
+- Ensure IDs are globally unique
+
+## UI Structure (per tab)
+
+### Business Information
+- Fields: Business/Contact names, Email, Phone, Address (L1, L2), City, State, Zip, Country
+- Actions: Save changes, Reset
+- Display a compact summary card header with avatar and merchant name
+
+### Account Settings
+- Fields: Language, Timezone, Date format, Toggle 2FA (UI-only)
+- Actions: Save changes, Reset
+
+### Notification Preferences
+- Toggles: Email, SMS, Push, Delivery Alerts, Weekly Summary
+- Actions: Save changes, Reset
+
+### API Keys & Integrations
+- Show masked keys with copy buttons
+- Regenerate (UI-only; confirm dialog)
+- Webhook URL input, IP allowlist multiline input (comma or newline separated)
+- Actions: Save changes, Reset
+
+## Pseudocode – Implementation Plan
+1. Create `/profile` page with header:
+   - Back button → `/dashboard`
+   - Title, description
+2. Add `Tabs` with values: business, settings, notifications, api
+3. For each tab:
+   - Wrap content in `Card`
+   - Build `Form` using RHF + Zod resolver
+   - Preload mock data from `localStorage` (fallback to seeded defaults)
+   - On Save:
+     - Validate with Zod
+     - Save to `localStorage`
+     - Show success toast
+   - On Reset:
+     - Restore defaults
+     - Show neutral toast
+4. Accessibility:
+   - Proper `aria-*` on tabs, forms, buttons
+   - Label every input
+   - Keyboard support (Enter to submit; Esc to cancel where relevant)
+5. Transitions:
+   - Fade-in page container
