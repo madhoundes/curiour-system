@@ -11,6 +11,13 @@ import { Label } from "@/components/ui/label";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { Stepper, createStepperSteps } from "@/components/ui/stepper";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 export default function PackageDetailsPage() {
   const router = useRouter();
@@ -146,9 +153,9 @@ export default function PackageDetailsPage() {
               {/* Weight Section */}
               <div className="space-y-4">
                 <Label className="text-base font-medium">Package Weight</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="space-y-2">
-                    <Label htmlFor="parcego-package-weight">Weight *</Label>
+                    <Label htmlFor="parcego-package-weight" className="h-6 flex items-center  ">Weight *</Label>
                     <Input
                       id="parcego-package-weight"
                       type="number"
@@ -157,23 +164,23 @@ export default function PackageDetailsPage() {
                       placeholder="2.5"
                       value={formData.weight}
                       onChange={(e) => handleInputChange('weight', e.target.value)}
-                      className="parcego-form__input"
+                      className="parcego-form__input w-1/2"
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="parcego-package-weight-unit">Unit</Label>
-                    <select
-                      id="parcego-package-weight-unit"
-                      value={formData.weightUnit}
-                      onChange={(e) => handleInputChange('weightUnit', e.target.value)}
-                      className="parcego-form__select w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="lbs">Pounds (lbs)</option>
-                      <option value="kg">Kilograms (kg)</option>
-                      <option value="oz">Ounces (oz)</option>
-                      <option value="g">Grams (g)</option>
-                    </select>
+                    <Label htmlFor="parcego-package-weight-unit" className="h-6 flex items-center">Unit</Label>
+                    <Select value={formData.weightUnit} onValueChange={(v) => handleInputChange('weightUnit', v)}>
+                      <SelectTrigger id="parcego-package-weight-unit" className="w-[45%]">
+                        <SelectValue placeholder="Select unit" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="lbs">Pounds (lbs)</SelectItem>
+                        <SelectItem value="kg">Kilograms (kg)</SelectItem>
+                        <SelectItem value="oz">Ounces (oz)</SelectItem>
+                        <SelectItem value="g">Grams (g)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -181,9 +188,9 @@ export default function PackageDetailsPage() {
               {/* Dimensions Section */}
               <div className="space-y-4">
                 <Label className="text-base font-medium">Package Dimensions</Label>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <div className="space-y-2">
-                    <Label htmlFor="parcego-package-length">Length *</Label>
+                    <Label htmlFor="parcego-package-length" className="h-6 flex items-center">Length *</Label>
                     <Input
                       id="parcego-package-length"
                       type="number"
@@ -192,12 +199,12 @@ export default function PackageDetailsPage() {
                       placeholder="12"
                       value={formData.length}
                       onChange={(e) => handleInputChange('length', e.target.value)}
-                      className="parcego-form__input"
+                      className="parcego-form__input w-1/1"
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="parcego-package-width">Width *</Label>
+                    <Label htmlFor="parcego-package-width" className="h-6 flex items-center">Width *</Label>
                     <Input
                       id="parcego-package-width"
                       type="number"
@@ -206,12 +213,12 @@ export default function PackageDetailsPage() {
                       placeholder="8"
                       value={formData.width}
                       onChange={(e) => handleInputChange('width', e.target.value)}
-                      className="parcego-form__input"
+                      className="parcego-form__input w-1/1"
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="parcego-package-height">Height *</Label>
+                    <Label htmlFor="parcego-package-height" className="h-6 flex items-center">Height *</Label>
                     <Input
                       id="parcego-package-height"
                       type="number"
@@ -220,23 +227,23 @@ export default function PackageDetailsPage() {
                       placeholder="6"
                       value={formData.height}
                       onChange={(e) => handleInputChange('height', e.target.value)}
-                      className="parcego-form__input"
+                      className="parcego-form__input w-1/1"
                       required
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="parcego-package-dimension-unit">Unit</Label>
-                    <select
-                      id="parcego-package-dimension-unit"
-                      value={formData.dimensionUnit}
-                      onChange={(e) => handleInputChange('dimensionUnit', e.target.value)}
-                      className="parcego-form__select w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    >
-                      <option value="in">Inches (in)</option>
-                      <option value="cm">Centimeters (cm)</option>
-                      <option value="ft">Feet (ft)</option>
-                      <option value="m">Meters (m)</option>
-                    </select>
+                    <Label htmlFor="parcego-package-dimension-unit" className="h-6 flex items-center">Unit</Label>
+                    <Select value={formData.dimensionUnit} onValueChange={(v) => handleInputChange('dimensionUnit', v)}>
+                      <SelectTrigger id="parcego-package-dimension-unit" className="w-1/1">
+                        <SelectValue placeholder="Select unit" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="in">Inches (in)</SelectItem>
+                        <SelectItem value="cm">Centimeters (cm)</SelectItem>
+                        <SelectItem value="ft">Feet (ft)</SelectItem>
+                        <SelectItem value="m">Meters (m)</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
