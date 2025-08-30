@@ -106,15 +106,15 @@ const mockQuickActions = [
 const getStatusColor = (status: string) => {
   switch (status) {
     case "ready_for_pickup":
-      return "bg-blue-500";
+      return "bg-blue-600";
     case "in_transit":
-      return "bg-yellow-500";
+      return "bg-amber-600";
     case "delivered":
-      return "bg-green-500";
+      return "bg-emerald-600";
     case "assigned":
-      return "bg-gray-500";
+      return "bg-slate-600";
     default:
-      return "bg-gray-500";
+      return "bg-slate-600";
   }
 };
 
@@ -136,13 +136,13 @@ const getStatusText = (status: string) => {
 const getPriorityColor = (priority: string) => {
   switch (priority) {
     case "high":
-      return "bg-red-500";
+      return "bg-red-600";
     case "medium":
-      return "bg-yellow-500";
+      return "bg-amber-600";
     case "low":
-      return "bg-green-500";
+      return "bg-emerald-600";
     default:
-      return "bg-gray-500";
+      return "bg-slate-600";
   }
 };
 
@@ -209,7 +209,7 @@ export default function CourierDashboard() {
             </Avatar>
             <div>
               <h1 
-                className="text-xl font-semibold text-gray-900"
+                className="text-xl font-semibold text-gray-900 -mt-4"
                 id="parcego-courier-welcome-title"
               >
                 Welcome back, {mockCourierData.name}

@@ -94,181 +94,207 @@ export default function UndeliverablePage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50" id="parcego-undeliverable-page-container">
+    <div className="space-y-6" id="parcego-undeliverable-page-container">
       <PageHeader
         title="Undeliverable Packages"
-        onBack={() => router.push('/dashboard')}
-        backLabel="Back to Dashboard"
+        description="Manage and resolve undeliverable package issues"
       />
 
-      <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
-        {/* Stats Overview with Icons */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card className="hover:shadow-md transition-shadow duration-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="bg-red-100 rounded-lg p-3 flex-shrink-0">
-                    <Icon name="AlertTriangle" size={24} className="text-red-600" />
-                  </div>
-                  <div>
-                    <p className="text-base font-normal text-muted-foreground">Total Issues</p>
-                    <p className="text-3xl font-bold text-red-600">{stats.total}</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="hover:shadow-md transition-shadow duration-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="bg-orange-100 rounded-lg p-3 flex-shrink-0">
-                    <Icon name="Clock" size={24} className="text-orange-600" />
-                  </div>
-                  <div>
-                    <p className="text-base font-normal text-muted-foreground">Pending Review</p>
-                    <p className="text-3xl font-bold text-orange-600">{stats.pending}</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="hover:shadow-md transition-shadow duration-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="bg-blue-100 rounded-lg p-3 flex-shrink-0">
-                    <Icon name="Loader2" size={24} className="text-blue-600" />
-                  </div>
-                  <div>
-                    <p className="text-base font-normal text-muted-foreground">In Progress</p>
-                    <p className="text-3xl font-bold text-blue-600">{stats.inProgress}</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="hover:shadow-md transition-shadow duration-200">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="bg-green-100 rounded-lg p-3 flex-shrink-0">
-                    <Icon name="CheckCircle" size={24} className="text-green-600" />
-                  </div>
-                  <div>
-                    <p className="text-base font-normal text-muted-foreground">Resolved</p>
-                    <p className="text-3xl font-bold text-green-600">{stats.resolved}</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Search and Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Icon name="Search" size={20} className="text-gray-600" />
-              <span>Search & Filters</span>
+      {/* Stats Overview - Match Dashboard Style */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card className="hover:shadow-md transition-shadow duration-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-semibold text-gray-600">
+              Total Issues
             </CardTitle>
-            <CardDescription>Find specific packages or filter by status</CardDescription>
+            <div className="p-2 rounded-lg bg-red-50">
+              <Icon 
+                name="AlertTriangle" 
+                size={24} 
+                className="text-red-600" 
+              />
+            </div>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <Label htmlFor="parcego-undeliverable-search">Search Packages</Label>
-                <Input
-                  id="parcego-undeliverable-search"
-                  placeholder="Search by tracking number, recipient, or address..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="mt-1"
-                />
-              </div>
-              <div className="sm:w-48">
-                <Label htmlFor="parcego-undeliverable-status-filter">Status Filter</Label>
-                <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as Status | "all")}>
-                  <SelectTrigger id="parcego-undeliverable-status-filter" className="mt-1">
-                    <SelectValue placeholder="All Statuses" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Statuses</SelectItem>
-                    <SelectItem value="pending">Pending Review</SelectItem>
-                    <SelectItem value="in_progress">In Progress</SelectItem>
-                    <SelectItem value="resolved">Resolved</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="text-3xl font-bold text-gray-900">
+              {stats.total}
             </div>
           </CardContent>
         </Card>
 
-        {/* Main Content Tabs */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Icon name="PackageX" size={20} className="text-gray-600" />
-              <span>Package Management</span>
+        <Card className="hover:shadow-md transition-shadow duration-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-semibold text-gray-600">
+              Pending Review
             </CardTitle>
-            <CardDescription>Review and resolve delivery issues</CardDescription>
+            <div className="p-2 rounded-lg bg-orange-50">
+              <Icon 
+                name="Clock" 
+                size={24} 
+                className="text-orange-600" 
+              />
+            </div>
           </CardHeader>
           <CardContent>
-            <Tabs defaultValue="all" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="all">All Packages ({filteredPackages.length})</TabsTrigger>
-                <TabsTrigger value="pending">Pending ({stats.pending})</TabsTrigger>
-                <TabsTrigger value="in_progress">In Progress ({stats.inProgress})</TabsTrigger>
-                <TabsTrigger value="resolved">Resolved ({stats.resolved})</TabsTrigger>
-              </TabsList>
+            <div className="text-3xl font-bold text-gray-900">
+              {stats.pending}
+            </div>
+          </CardContent>
+        </Card>
 
-              <TabsContent value="all" className="mt-6">
-                <PackageList
-                  packages={filteredPackages}
-                  onPackageSelect={handlePackageSelect}
-                  onStatusUpdate={handleStatusUpdate}
-                  getStatusBadge={getStatusBadge}
-                  getPriorityBadge={getPriorityBadge}
-                />
-              </TabsContent>
+        <Card className="hover:shadow-md transition-shadow duration-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-semibold text-gray-600">
+              In Progress
+            </CardTitle>
+            <div className="p-2 rounded-lg bg-blue-50">
+              <Icon 
+                name="Loader2" 
+                size={24} 
+                className="text-blue-600" 
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-gray-900">
+              {stats.inProgress}
+            </div>
+          </CardContent>
+        </Card>
 
-              <TabsContent value="pending" className="mt-6">
-                <PackageList
-                  packages={packages.filter(p => p.status === "pending")}
-                  onPackageSelect={handlePackageSelect}
-                  onStatusUpdate={handleStatusUpdate}
-                  getStatusBadge={getStatusBadge}
-                  getPriorityBadge={getPriorityBadge}
-                />
-              </TabsContent>
-
-              <TabsContent value="in_progress" className="mt-6">
-                <PackageList
-                  packages={packages.filter(p => p.status === "in_progress")}
-                  onPackageSelect={handlePackageSelect}
-                  onStatusUpdate={handleStatusUpdate}
-                  getStatusBadge={getStatusBadge}
-                  getPriorityBadge={getPriorityBadge}
-                />
-              </TabsContent>
-
-              <TabsContent value="resolved" className="mt-6">
-                <PackageList
-                  packages={packages.filter(p => p.status === "resolved")}
-                  onPackageSelect={handlePackageSelect}
-                  onStatusUpdate={handleStatusUpdate}
-                  getStatusBadge={getStatusBadge}
-                  getPriorityBadge={getPriorityBadge}
-                />
-              </TabsContent>
-            </Tabs>
+        <Card className="hover:shadow-md transition-shadow duration-200">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-lg font-semibold text-gray-600">
+              Resolved
+            </CardTitle>
+            <div className="p-2 rounded-lg bg-green-50">
+              <Icon 
+                name="CheckCircle" 
+                size={24} 
+                className="text-green-600" 
+              />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-gray-900">
+              {stats.resolved}
+            </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Search & Filter (aligned with other pages) */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold">Search & Filter</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <Input
+                id="parcego-undeliverable-search-input"
+                placeholder="Search by tracking number, recipient, or address..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full"
+              />
+            </div>
+            <div className="w-full sm:w-48">
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as Status | "all")}>
+                <SelectTrigger>
+                  <SelectValue placeholder="All Statuses" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="pending">Pending Review</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="resolved">Resolved</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Main Content Tabs */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg font-semibold">Package Management</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Tabs defaultValue="all" className="w-full" id="parcego-undeliverable-tabs">
+            <TabsList
+              className="flex w-full h-9 sm:h-10 p-1 bg-gray-100 rounded-lg overflow-hidden justify-start"
+              style={{ padding: '1.68rem .75rem' }}
+            >
+              <TabsTrigger 
+                value="all" 
+                className="h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md flex-shrink-0"
+              >
+                All Packages ({filteredPackages.length})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="pending" 
+                className="h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md flex-shrink-0"
+              >
+                Pending ({stats.pending})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="in_progress" 
+                className="h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md flex-shrink-0"
+              >
+                In Progress ({stats.inProgress})
+              </TabsTrigger>
+              <TabsTrigger 
+                value="resolved" 
+                className="h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md flex-shrink-0"
+              >
+                Resolved ({stats.resolved})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="all">
+              <PackageList
+                packages={filteredPackages}
+                onPackageSelect={handlePackageSelect}
+                onStatusUpdate={handleStatusUpdate}
+                getStatusBadge={getStatusBadge}
+                getPriorityBadge={getPriorityBadge}
+              />
+            </TabsContent>
+
+            <TabsContent value="pending">
+              <PackageList
+                packages={packages.filter(p => p.status === "pending")}
+                onPackageSelect={handlePackageSelect}
+                onStatusUpdate={handleStatusUpdate}
+                getStatusBadge={getStatusBadge}
+                getPriorityBadge={getPriorityBadge}
+              />
+            </TabsContent>
+
+            <TabsContent value="in_progress">
+              <PackageList
+                packages={packages.filter(p => p.status === "in_progress")}
+                onPackageSelect={handlePackageSelect}
+                onStatusUpdate={handleStatusUpdate}
+                getStatusBadge={getStatusBadge}
+                getPriorityBadge={getPriorityBadge}
+              />
+            </TabsContent>
+
+            <TabsContent value="resolved">
+              <PackageList
+                packages={packages.filter(p => p.status === "resolved")}
+                onPackageSelect={handlePackageSelect}
+                onStatusUpdate={handleStatusUpdate}
+                getStatusBadge={getStatusBadge}
+                getPriorityBadge={getPriorityBadge}
+              />
+            </TabsContent>
+          </Tabs>
+        </CardContent>
+      </Card>
 
       {/* Package Details Modal */}
       {showDetailsModal && selectedPackage && (
@@ -310,15 +336,15 @@ function PackageList({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {packages.map((pkg) => (
-        <Card key={pkg.id} className="hover:shadow-md transition-shadow duration-200">
-          <CardContent className="p-4">
+        <Card key={pkg.id}>
+          <CardContent className="p-3">
             <div className="flex items-start justify-between">
-              <div className="flex-1 space-y-3">
+              <div className="flex-1 space-y-2">
                 <div className="flex items-center space-x-3">
                   <div className="flex-1">
-                    <div className="flex items-center space-x-2 mb-1">
+                    <div className="flex items-center space-x-2 mb-0.5">
                       <span className="font-medium text-gray-900">
                         {pkg.trackingNumber}
                       </span>
@@ -334,14 +360,14 @@ function PackageList({
                   </div>
                 </div>
                 
-                <div className="flex items-center space-x-4 text-sm text-gray-500">
+                <div className="flex items-center space-x-3 text-sm text-gray-500">
                   <span>Issue: {pkg.issueType}</span>
                   <span>Created: {new Date(pkg.createdAt).toLocaleDateString()}</span>
                   <span>Last Updated: {new Date(pkg.updatedAt).toLocaleDateString()}</span>
                 </div>
 
                 {pkg.notes && (
-                  <div className="bg-gray-50 p-3 rounded-md">
+                  <div className="bg-gray-50 p-2 rounded-md">
                     <p className="text-sm text-gray-700">
                       <strong>Notes:</strong> {pkg.notes}
                     </p>
@@ -349,7 +375,7 @@ function PackageList({
                 )}
               </div>
 
-              <div className="flex flex-col space-y-2 ml-4">
+              <div className="flex flex-col space-y-1 ml-4">
                 <Button
                   variant="outline"
                   size="sm"

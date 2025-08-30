@@ -162,6 +162,7 @@ const iconAliases: Record<string, IconName> = {
   // Dashboard shipping tips icons
   "Scale": "Scale",
   "Tag": "Tag",
+  "tag": "Tag",
   "Box": "Package",
   // Purchase label page icons
   "CreditCard": "CreditCard",
@@ -170,7 +171,12 @@ const iconAliases: Record<string, IconName> = {
   "Printer": "Printer",
   // Header icons
   "Menu": "Menu",
-  "menu": "Menu"
+  "menu": "Menu",
+  // More menu icons
+  "MoreVertical": "EllipsisVertical",
+  "more-vertical": "EllipsisVertical",
+  "EllipsisVertical": "EllipsisVertical",
+  "ellipsis-vertical": "EllipsisVertical"
 };
 
 // Centralized Lucide icon renderer to avoid scattered imports and runtime errors

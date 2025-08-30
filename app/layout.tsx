@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { ShipmentProvider } from "@/lib/shipment-context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -42,13 +43,44 @@ export default function RootLayout({
           name="format-detection"
           content="telephone=no, date=no, email=no, address=no"
         />
+        {/* Prevent browser extensions from causing hydration mismatches */}
+        <meta name="chrome-extension-blocker" content="true" />
+        <style suppressHydrationWarning>{`
+          /* Suppress browser extension attributes that cause hydration mismatch */
+          body[cz-shortcut-listen] { 
+            /* ColorZilla extension fix */
+          }
+        `}</style>
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        suppressHydrationWarning
       >
         {/* Iconify script removed to prevent DOM mutation side-effects during fast refresh.
             Use static icons, emojis, or a React icon library instead. */}
-        {children}
+        <ShipmentProvider>
+          {children}
+        </ShipmentProvider>
+        
+        {/* Browser extension compatibility script */}
+        <script
+          suppressHydrationWarning
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Remove browser extension attributes that cause hydration mismatch
+              if (typeof window !== 'undefined') {
+                // Wait for extensions to load
+                setTimeout(() => {
+                  const body = document.body;
+                  if (body.hasAttribute('cz-shortcut-listen')) {
+                    console.log('[Parcego] Detected ColorZilla extension, handling hydration compatibility');
+                  }
+                  // Don't remove the attribute, just ensure React knows about it
+                }, 100);
+              }
+            `
+          }}
+        />
       </body>
     </html>
   );

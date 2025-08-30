@@ -23,6 +23,9 @@ export function UnifiedHeader({ onSidebarToggle }: UnifiedHeaderProps) {
   const unreadCount = notifications.filter(n => n.unread).length;
 
   const handleLogout = () => {
+    // Clear the mock authentication cookie
+    document.cookie = "mock-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    
     // Mock logout - in real app this would clear auth tokens
     router.push('/login');
   };
@@ -31,9 +34,7 @@ export function UnifiedHeader({ onSidebarToggle }: UnifiedHeaderProps) {
     router.push('/profile');
   };
 
-  const handleSettingsClick = () => {
-    router.push('/profile');
-  };
+
 
   const handleHelpClick = () => {
     router.push('/support');
@@ -180,10 +181,7 @@ export function UnifiedHeader({ onSidebarToggle }: UnifiedHeaderProps) {
                 <Icon name="User" size={16} className="mr-2" />
                 <span>Profile</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleSettingsClick} className="cursor-pointer">
-                <Icon name="Settings" size={16} className="mr-2" />
-                <span>Settings</span>
-              </DropdownMenuItem>
+
               <DropdownMenuItem onClick={handleHelpClick} className="cursor-pointer">
                 <Icon name="HelpCircle" size={16} className="mr-2" />
                 <span>Help & Support</span>

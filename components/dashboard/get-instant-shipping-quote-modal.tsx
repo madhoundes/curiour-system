@@ -94,7 +94,7 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md bg-white">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Icon name="Calculator" size={20} className="text-blue-600" />
@@ -160,12 +160,12 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
 
           {/* Estimated Cost Display */}
           {quoteGenerated && estimatedCost && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <div className="bg-white border border-green-200 rounded-lg p-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-green-800">Estimated Shipping Cost:</span>
-                <span className="text-2xl font-bold text-green-600">${estimatedCost}</span>
+                <span className="text-sm font-semibold text-green-800">Estimated Shipping Cost:</span>
+                <span className="text-3xl font-extrabold text-green-700">${estimatedCost}</span>
               </div>
-              <p className="text-xs text-green-700 mt-1">
+              <p className="text-xs font-medium text-green-700 mt-1">
                 Price includes base rate, weight surcharge, and distance factor
               </p>
             </div>

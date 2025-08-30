@@ -191,25 +191,48 @@ export default function ProfileAccountPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-6">
         {/* Page Header */}
         <PageHeader
           title="Profile & Account"
           description="Manage business details, preferences, notifications, and API settings"
-          icon="User"
         />
 
+        {/* Tabs - Below PageHeader as intended */}
         <div
           className={`${
             prefersReducedMotion ? "" : "animate-in fade-in slide-in-from-bottom-1 duration-300"
           }`}
         >
-          <Tabs defaultValue="business" id="parcego-profile-tabs" className="w-full">
-            <TabsList className="mb-4">
-              <TabsTrigger value="business">Business</TabsTrigger>
-              <TabsTrigger value="settings">Settings</TabsTrigger>
-              <TabsTrigger value="notifications">Notifications</TabsTrigger>
-              <TabsTrigger value="api">Shopify Integration</TabsTrigger>
+          <Tabs defaultValue="business" id="parcego-profile-tabs" className="w-full mb-8">
+            <TabsList 
+              className="flex w-full h-9 sm:h-10 p-1 bg-gray-100 rounded-lg overflow-hidden justify-between"
+              style={{ padding: '1.68rem .75rem' }}
+            >
+              <TabsTrigger 
+                value="business" 
+                className="flex-1 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md"
+              >
+                Business
+              </TabsTrigger>
+              <TabsTrigger 
+                value="settings" 
+                className="flex-1 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md"
+              >
+                Settings
+              </TabsTrigger>
+              <TabsTrigger 
+                value="notifications" 
+                className="flex-1 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md"
+              >
+                Notifications
+              </TabsTrigger>
+              <TabsTrigger 
+                value="api" 
+                className="flex-1 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md"
+              >
+                Shopify Integration
+              </TabsTrigger>
             </TabsList>
 
             {/* Business */}

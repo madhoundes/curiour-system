@@ -16,7 +16,7 @@ export function WelcomeBanner() {
           {/* Left side - Content */}
           <div className="flex-1 pr-8">
             <div className="mb-4">
-              <h1 className="text-2xl font-bold text-gray-900">
+              <h1 className="text-2xl font-bold text-gray-900 -mt-4">
                 Welcome back, {merchantInfo.name.split(' ')[0]}!
               </h1>
               <p className="text-gray-600 mt-1">

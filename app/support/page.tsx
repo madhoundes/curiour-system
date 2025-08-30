@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,6 +22,7 @@ import { mockFAQs, mockHelpArticles, mockVideoTutorials, helpCategories } from '
 // Mock data is now imported from the support library
 
 export default function SupportHelpCenter() {
+  const router = useRouter();
   const [activeCategory, setActiveCategory] = useState<FAQCategory | 'all'>('all');
   const [bookmarkedItems, setBookmarkedItems] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState('overview');
@@ -65,6 +67,11 @@ export default function SupportHelpCenter() {
     );
   };
 
+  const handleReadArticle = (articleId: string) => {
+    // Navigate to the dedicated article page
+    router.push(`/support/article/${articleId}`);
+  };
+
   const handleContactSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     // Mock submission - in real app, this would send to backend
@@ -76,39 +83,40 @@ export default function SupportHelpCenter() {
   };
 
   return (
-    <div id="parcego-support-center-container" className="min-h-screen bg-gray-50">
+    <div id="parcego-support-center-container" className="min-h-screen">
       {/* Page Header */}
       <PageHeader
         title="Support & Help Center"
         description="Find answers, learn best practices, and get the help you need"
-        icon="HelpCircle"
       />
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mt-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 parcego-tabs-enhanced">
-          <TabsList className="parcego-tabs-list grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-4">
+          <TabsList 
+            className="flex w-full h-auto py-1.5 px-1.5 bg-gray-100 rounded-lg overflow-hidden justify-between"
+          >
             <TabsTrigger 
               value="overview" 
-              className="parcego-tabs-trigger data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-gray-200 text-gray-600 hover:text-gray-800"
+              className="flex-1 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md"
             >
               Overview
             </TabsTrigger>
             <TabsTrigger 
               value="faqs"
-              className="parcego-tabs-trigger data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-gray-200 text-gray-600 hover:text-gray-800"
+              className="flex-1 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md"
             >
               FAQs
             </TabsTrigger>
             <TabsTrigger 
               value="articles"
-              className="parcego-tabs-trigger data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-gray-200 text-gray-600 hover:text-gray-800"
+              className="flex-1 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md"
             >
               Articles
             </TabsTrigger>
             <TabsTrigger 
               value="videos"
-              className="parcego-tabs-trigger data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm data-[state=active]:border data-[state=active]:border-gray-200 text-gray-600 hover:text-gray-800"
+              className="flex-1 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md"
             >
               Video Tutorials
             </TabsTrigger>
@@ -117,24 +125,24 @@ export default function SupportHelpCenter() {
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
             {/* Hero Section */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl p-8 text-white">
-              <h2 className="text-xl font-bold mb-4">Welcome to Your Help Center</h2>
-              <p className="text-blue-100 mb-6 max-w-2xl">
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl p-4 sm:p-6 text-white">
+              <h2 className="text-2xl font-bold mb-3">Welcome to Your Help Center</h2>
+              <p className="text-blue-100 mb-6 max-w-2xl leading-relaxed">
                 Everything you need to succeed with our courier platform. From getting started to advanced features, 
                 we&apos;ve got you covered with comprehensive guides, tutorials, and support.
               </p>
-              <div className="flex flex-wrap gap-3">
+              <div className="flex flex-wrap gap-4">
                 <Button 
                   variant="outline" 
                   onClick={() => setShowContactForm(true)}
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/30 transition-all duration-200"
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/30 hover:text-white transition-all duration-200"
                 >
                   Contact Support
                 </Button>
                 <Button 
                   variant="outline" 
                   onClick={() => alert('Live chat feature coming soon!')}
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/30 transition-all duration-200"
+                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/30 hover:text-white transition-all duration-200"
                 >
                   Live Chat
                 </Button>
@@ -143,8 +151,8 @@ export default function SupportHelpCenter() {
 
             {/* Category Grid */}
             <div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Help Categories</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <h3 className="text-2xl font-semibold text-gray-900 mb-4">Help Categories</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {helpCategories.map((category) => (
                   <Card
                     key={category.id}
@@ -152,20 +160,20 @@ export default function SupportHelpCenter() {
                     className="hover:shadow-md transition-shadow cursor-pointer border rounded-xl overflow-hidden group"
                     onClick={() => setActiveTab('faqs')}
                   >
-                    <CardHeader className="px-8 py-6">
+                    <CardHeader className="px-4 py-3.5">
                       <div className="flex items-center space-x-4">
                         <div className={`w-12 h-12 rounded-xl ${category.color} flex items-center justify-center group-hover:scale-110 transition-transform duration-200`}>
                           <Icon name={category.icon} className="h-6 w-6 text-white" />
                         </div>
                         <div className="flex-1">
-                          <CardTitle className="text-lg mb-2">{category.name}</CardTitle>
+                          <CardTitle className="text-lg mb-1.5">{category.name}</CardTitle>
                           <CardDescription className="text-sm text-gray-600">{category.count} articles & guides</CardDescription>
                         </div>
                       </div>
                     </CardHeader>
-                    <CardContent className="px-8 pb-6">
-                      <p className="text-sm text-gray-600 leading-relaxed">{category.description}</p>
-                      <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">
+                    <CardContent className="px-4 pb-3.5">
+                      <p className="text-sm text-gray-600 leading-relaxed mb-3">{category.description}</p>
+                      <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                         <span className="text-xs text-gray-500">Click to explore</span>
                         <Icon name="arrow-right" className="h-4 w-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
                       </div>
@@ -175,61 +183,16 @@ export default function SupportHelpCenter() {
               </div>
             </div>
 
-            {/* Featured Content */}
-            <div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Featured Content</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {mockHelpArticles.slice(0, 2).map((article) => (
-                  <Card key={article.id} className="hover:shadow-md transition-shadow border rounded-xl overflow-hidden">
-                    <CardHeader className="px-8 py-6">
-                      <div className="flex items-center justify-between mb-4">
-                        <Badge variant="outline">{article.category}</Badge>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleBookmarkToggle(article.id)}
-                          className="h-8 w-8 p-0"
-                        >
-                          <Icon 
-                            name={bookmarkedItems.includes(article.id) ? "bookmark" : "bookmark-plus"} 
-                            className="h-4 w-4" 
-                          />
-                        </Button>
-                      </div>
-                      <CardTitle className="text-xl mb-3 leading-tight">{article.title}</CardTitle>
-                      <CardDescription className="text-base text-gray-600 leading-relaxed">{article.excerpt}</CardDescription>
-                    </CardHeader>
-                    <CardContent className="px-8 pb-6">
-                      <div className="flex items-center justify-between text-sm text-gray-500 mb-4">
-                        <span className="flex items-center gap-1">
-                          <Icon name="clock" className="h-4 w-4" />
-                          {article.readTime} min read
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Icon name="user" className="h-4 w-4" />
-                          By {article.author}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <Badge variant="secondary">{article.difficulty}</Badge>
-                        <Button variant="outline" size="sm" className="px-4 py-2">
-                          Read Article
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
+
           </TabsContent>
 
           {/* FAQs Tab - Redesigned with Accordion */}
           <TabsContent value="faqs" className="space-y-6">
             <div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Frequently Asked Questions</h3>
+              <h3 className="text-2xl font-semibold text-gray-900 mb-4">Frequently Asked Questions</h3>
               
               {/* Category Filter */}
-              <div className="mb-6">
+              <div className="mb-4">
                 <div className="flex flex-wrap gap-2" role="tablist" aria-label="FAQ categories">
                   <Button
                     variant="ghost"
@@ -240,7 +203,7 @@ export default function SupportHelpCenter() {
                     aria-label="Show all FAQ categories"
                     className={`px-4 py-2 text-sm font-medium transition-all duration-200 ${
                       activeCategory === 'all'
-                        ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm'
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
                         : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50 border border-transparent hover:border-gray-200'
                     }`}
                   >
@@ -257,7 +220,7 @@ export default function SupportHelpCenter() {
                       aria-label={`Show ${category} FAQs`}
                       className={`px-4 py-2 text-sm font-medium transition-all duration-200 ${
                         activeCategory === category
-                          ? 'bg-blue-50 text-blue-700 border border-blue-200 shadow-sm'
+                          ? 'bg-blue-50 text-blue-700 border border-blue-200'
                           : 'text-gray-600 hover:text-gray-800 hover:bg-gray-50 border border-transparent hover:border-gray-200'
                       }`}
                     >
@@ -281,9 +244,9 @@ export default function SupportHelpCenter() {
                         key={faq.id}
                         value={faq.id}
                         id={`parcego-support-faq-item-${faq.id}`}
-                        className="border rounded-xl shadow-sm hover:shadow-md transition-all duration-200 bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-opacity-50 overflow-hidden"
+                        className="border rounded-xl transition-all duration-200 bg-white focus-within:ring-2 focus-within:ring-blue-500 focus-within:ring-opacity-50 overflow-hidden"
                       >
-                        <AccordionTrigger className="px-8 py-6 hover:no-underline group data-[state=open]:bg-gray-50 data-[state=open]:border-b data-[state=open]:border-gray-200 transition-all duration-200">
+                        <AccordionTrigger className="px-4 py-4 hover:no-underline group data-[state=open]:bg-gray-50 data-[state=open]:border-b data-[state=open]:border-gray-200 transition-all duration-200">
                           <div className="flex items-start justify-between w-full">
                             <div className="flex-1 text-left pr-6">
                               <h4 className="text-lg font-semibold text-gray-900 group-hover:text-blue-600 transition-colors leading-relaxed">
@@ -293,38 +256,13 @@ export default function SupportHelpCenter() {
                                 <Badge variant="outline" className="text-xs font-medium">
                                   {faq.category.charAt(0).toUpperCase() + faq.category.slice(1)}
                                 </Badge>
-                                <Badge variant="secondary" className="text-xs font-medium">
-                                  {faq.difficulty}
-                                </Badge>
                               </div>
                             </div>
                           </div>
                         </AccordionTrigger>
-                        <AccordionContent className="px-8 py-8 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2 bg-gray-50">
+                        <AccordionContent className="px-4 py-4 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-top-2 bg-white">
                           <div className="prose prose-sm max-w-none text-gray-700 leading-relaxed">
                             <div dangerouslySetInnerHTML={{ __html: faq.answer }} />
-                            <div className="flex items-center justify-between mt-6 pt-4 border-t border-gray-200">
-                              <div className="flex items-center gap-4 text-sm text-gray-500">
-                                <span className="flex items-center gap-1">
-                                  <Icon name="thumbs-up" className="h-4 w-4" />
-                                  {faq.helpfulCount} found helpful
-                                </span>
-                                <span className="flex items-center gap-1">
-                                  <Icon name="thumbs-down" className="h-4 w-4" />
-                                  {faq.notHelpfulCount} not helpful
-                                </span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Button variant="outline" size="sm" className="text-xs">
-                                  <Icon name="message-circle" className="h-3 w-3 mr-1" />
-                                  Report Issue
-                                </Button>
-                                <Button variant="ghost" size="sm" className="text-xs">
-                                  <Icon name="share" className="h-3 w-3 mr-1" />
-                                  Share
-                                </Button>
-                              </div>
-                            </div>
                           </div>
                         </AccordionContent>
                       </AccordionItem>
@@ -349,8 +287,8 @@ export default function SupportHelpCenter() {
           {/* Articles Tab */}
           <TabsContent value="articles" className="space-y-6">
             <div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Help Articles</h3>
-              <div id="parcego-support-articles-list" className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <h3 className="text-2xl font-semibold text-gray-900 mb-4">Help Articles</h3>
+              <div id="parcego-support-articles-list" className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {filteredArticles.length > 0 ? (
                   filteredArticles.map((article) => (
                     <Card
@@ -358,44 +296,25 @@ export default function SupportHelpCenter() {
                       id={`parcego-support-article-${article.id}`}
                       className="hover:shadow-md transition-shadow border rounded-xl overflow-hidden"
                     >
-                      <CardHeader className="px-8 py-6">
-                        <div className="flex items-center justify-between mb-4">
+                      <CardHeader className="px-4 py-4">
+                        <div className="flex items-center justify-between mb-3">
                           <Badge variant="outline">{article.category}</Badge>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleBookmarkToggle(article.id)}
-                            className="h-8 w-8 p-0"
-                          >
-                            <Icon 
-                              name={bookmarkedItems.includes(article.id) ? "bookmark" : "bookmark-plus"} 
-                              className="h-4 w-4" 
-                            />
-                          </Button>
                         </div>
                         <CardTitle className="text-xl mb-3 leading-tight">{article.title}</CardTitle>
                         <CardDescription className="text-base text-gray-600 leading-relaxed">{article.excerpt}</CardDescription>
                       </CardHeader>
-                      <CardContent className="px-8 pb-6">
-                        <div className="flex items-center justify-between text-sm text-gray-500 mb-6">
-                          <span className="flex items-center gap-1">
+                      <CardContent className="px-4 pb-4">
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-1 text-sm text-gray-500">
                             <Icon name="clock" className="h-4 w-4" />
                             {article.readTime} min read
                           </span>
-                          <span className="flex items-center gap-1">
-                            <Icon name="user" className="h-4 w-4" />
-                            By {article.author}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <Badge variant="secondary">{article.difficulty}</Badge>
-                            <span className="text-sm text-gray-500 flex items-center gap-1">
-                              <Icon name="thumbs-up" className="h-4 w-4" />
-                              {article.helpfulCount} found helpful
-                            </span>
-                          </div>
-                          <Button variant="outline" size="sm" className="px-4 py-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="px-4 py-2"
+                            onClick={() => handleReadArticle(article.id)}
+                          >
                             Read Article
                           </Button>
                         </div>
@@ -421,8 +340,8 @@ export default function SupportHelpCenter() {
           {/* Videos Tab */}
           <TabsContent value="videos" className="space-y-6">
             <div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-4">Video Tutorials</h3>
-              <div id="parcego-support-video-section" className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <h3 className="text-2xl font-semibold text-gray-900 mb-4">Video Tutorials</h3>
+              <div id="parcego-support-video-section" className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {filteredVideos.length > 0 ? (
                   filteredVideos.map((video) => (
                     <Card
@@ -430,8 +349,8 @@ export default function SupportHelpCenter() {
                       id={`parcego-support-video-${video.id}`}
                       className="hover:shadow-md transition-shadow border rounded-xl overflow-hidden"
                     >
-                      <CardHeader className="px-8 py-6">
-                        <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden mb-6">
+                      <CardHeader className="px-4 py-4">
+                        <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden mb-4">
                           <iframe
                             src={video.videoUrl}
                             title={video.title}
@@ -441,43 +360,11 @@ export default function SupportHelpCenter() {
                             allowFullScreen
                           />
                         </div>
-                        <CardTitle className="text-xl mb-4 leading-tight">{video.title}</CardTitle>
-                        <CardDescription className="text-base text-gray-600 leading-relaxed mb-4">
+                        <CardTitle className="text-xl mb-3 leading-tight">{video.title}</CardTitle>
+                        <CardDescription className="text-base text-gray-600 leading-relaxed">
                           {video.description}
                         </CardDescription>
-                        <div className="flex items-center gap-4 text-sm text-gray-500">
-                          <span className="flex items-center gap-1">
-                            <Icon name="clock" className="h-4 w-4" />
-                            {Math.floor(video.duration / 60)}:{(video.duration % 60).toString().padStart(2, '0')}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Icon name="tag" className="h-4 w-4" />
-                            {video.category.charAt(0).toUpperCase() + video.category.slice(1)}
-                          </span>
-                          <span className="flex items-center gap-1">
-                            <Icon name="bar-chart" className="h-4 w-4" />
-                            {video.difficulty}
-                          </span>
-                        </div>
                       </CardHeader>
-                      <CardContent className="px-8 pb-6">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Button variant="outline" size="sm" className="px-4 py-2">
-                              <Icon name="play" className="h-4 w-4 mr-2" />
-                              Watch Now
-                            </Button>
-                            <Button variant="ghost" size="sm" className="px-4 py-2">
-                              <Icon name="bookmark-plus" className="h-4 w-4 mr-2" />
-                              Save
-                            </Button>
-                          </div>
-                          <Button variant="ghost" size="sm" className="px-4 py-2">
-                            <Icon name="share" className="h-4 w-4 mr-2" />
-                            Share
-                          </Button>
-                        </div>
-                      </CardContent>
                     </Card>
                   ))
                 ) : (
@@ -500,17 +387,17 @@ export default function SupportHelpCenter() {
 
       {/* Contact Support Dialog */}
       <Dialog open={showContactForm} onOpenChange={setShowContactForm}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl bg-white">
           <DialogHeader>
             <DialogTitle>Contact Support</DialogTitle>
             <DialogDescription>
               Need help? Fill out the form below and we&apos;ll get back to you within 24 hours.
             </DialogDescription>
           </DialogHeader>
-          <form id="parcego-support-contact-form" onSubmit={handleContactSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="name">Name</Label>
+          <form id="parcego-support-contact-form" onSubmit={handleContactSubmit} className="space-y-6">
+            <div className="grid grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-sm font-medium text-gray-700">Name</Label>
                 <Input
                   id="name"
                   value={contactForm.name}
@@ -518,8 +405,8 @@ export default function SupportHelpCenter() {
                   required
                 />
               </div>
-              <div>
-                <Label htmlFor="email">Email</Label>
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email</Label>
                 <Input
                   id="email"
                   type="email"
@@ -529,8 +416,8 @@ export default function SupportHelpCenter() {
                 />
               </div>
             </div>
-            <div>
-              <Label htmlFor="subject">Subject</Label>
+            <div className="space-y-2">
+              <Label htmlFor="subject" className="text-sm font-medium text-gray-700">Subject</Label>
               <Input
                 id="subject"
                 value={contactForm.subject}
@@ -538,8 +425,8 @@ export default function SupportHelpCenter() {
                 required
               />
             </div>
-            <div>
-              <Label htmlFor="priority">Priority</Label>
+            <div className="space-y-2">
+              <Label htmlFor="priority" className="text-sm font-medium text-gray-700">Priority</Label>
               <Select
                 value={contactForm.priority}
                 onValueChange={(value) => setContactForm(prev => ({ ...prev, priority: value }))}
@@ -555,8 +442,8 @@ export default function SupportHelpCenter() {
                 </SelectContent>
               </Select>
             </div>
-            <div>
-              <Label htmlFor="message">Message</Label>
+            <div className="space-y-2">
+              <Label htmlFor="message" className="text-sm font-medium text-gray-700">Message</Label>
               <Textarea
                 id="message"
                 rows={4}

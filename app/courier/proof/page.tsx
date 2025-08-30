@@ -277,7 +277,7 @@ export default function ProofOfDelivery() {
               <Icon name="ArrowLeft" size={20} className="mr-2" />
               Back
             </Button>
-            <h1 className="text-lg font-semibold">Proof of Delivery</h1>
+            <h1 className="text-lg font-semibold -mt-4">Proof of Delivery</h1>
             <div className="w-20"></div>
           </div>
         </div>

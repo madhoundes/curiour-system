@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useMemo, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useWizardBack } from "@/lib/wizard";
+import { useShipment } from "@/lib/shipment-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { createStepperSteps, Stepper } from "@/components/ui/stepper";
+import { generateShippingLabelBlob } from "@/lib/pdf-generator";
+import { Badge } from "@/components/ui/badge";
 
 // Mock merchant data - in real app this would come from auth context
 const mockMerchantData = {
@@ -23,43 +26,305 @@ const mockMerchantData = {
   email: "john@electronicsstore.com"
 };
 
+// Enhanced Shipment Summary Component with Reorder Info
+const ShipmentSummary = () => {
+  const { formData, generateTrackingNumber, updateMultipleFields } = useShipment();
+  const searchParams = useSearchParams();
+  const [isReorderMode, setIsReorderMode] = useState(false);
+  const [reorderSource, setReorderSource] = useState<string | null>(null);
+  
+  // State to track if we're on the client
+  const [isClient, setIsClient] = useState(false);
+  
+  // Set client flag after hydration
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // Handle reorder data from URL parameters
+  useEffect(() => {
+    const fromShipment = searchParams.get('from');
+    if (fromShipment) {
+      setIsReorderMode(true);
+      setReorderSource(fromShipment);
+      
+      // Pre-fill form with reorder data
+      const reorderData: any = {};
+      
+      if (searchParams.get('recipient')) {
+        reorderData.recipientName = searchParams.get('recipient');
+      }
+      if (searchParams.get('address')) {
+        reorderData.recipientAddress = searchParams.get('address');
+      }
+      if (searchParams.get('city')) {
+        reorderData.recipientCity = searchParams.get('city');
+      }
+      if (searchParams.get('province')) {
+        reorderData.recipientProvince = searchParams.get('province');
+      }
+      if (searchParams.get('postalCode')) {
+        reorderData.recipientPostalCode = searchParams.get('postalCode');
+      }
+      if (searchParams.get('service')) {
+        reorderData.serviceType = searchParams.get('service')?.toLowerCase() || 'standard';
+      }
+      if (searchParams.get('weight')) {
+        reorderData.weight = searchParams.get('weight');
+      }
+      if (searchParams.get('notes')) {
+        reorderData.specialInstructions = searchParams.get('notes');
+      }
+      
+      // Update form with reorder data
+      if (Object.keys(reorderData).length > 0) {
+        updateMultipleFields(reorderData);
+      }
+    }
+  }, [searchParams, updateMultipleFields]);
+  
+  // Memoize tracking number to prevent regeneration on every render
+  const trackingNumber = useMemo(() => {
+    // During SSR or before hydration, return a stable fallback
+    if (!isClient) {
+      return 'ASH-0000000000-XXXXXX';
+    }
+    return generateTrackingNumber();
+  }, [generateTrackingNumber, isClient]);
+  
+  // Memoize current date to prevent recalculation on every render
+  const currentDate = useMemo(() => {
+    // During SSR, return a stable date
+    if (!isClient) {
+      return 'Loading...';
+    }
+    return new Date().toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }, [isClient]);
+
+  // Memoize the completion status check to prevent unnecessary re-renders
+  const isRecipientComplete = useMemo(() => {
+    return !!(
+      formData.recipientName && 
+      formData.recipientAddress && 
+      formData.recipientCity && 
+      formData.recipientProvince && 
+      formData.recipientPostalCode && 
+      formData.recipientPhone
+    );
+  }, [
+    formData.recipientName,
+    formData.recipientAddress,
+    formData.recipientCity,
+    formData.recipientProvince,
+    formData.recipientPostalCode,
+    formData.recipientPhone
+  ]);
+
+  return (
+    <Card className="parcego-card parcego-card--summary border-blue-200 bg-blue-50">
+      <CardHeader>
+        <CardTitle className="flex items-center space-x-2 text-blue-800">
+          <Icon name="Eye" size={20} className="text-blue-600" />
+          <span>Live Shipment Summary</span>
+          {isReorderMode && (
+            <Badge variant="secondary" className="ml-2 bg-green-100 text-green-800 border-green-200">
+              <Icon name="Repeat" size={14} className="mr-1" />
+              Reorder Mode
+            </Badge>
+          )}
+        </CardTitle>
+        <CardDescription className="text-blue-700">
+          {isReorderMode 
+            ? `Reordering from shipment ${reorderSource} - details pre-filled for faster ordering`
+            : "Preview your shipment details in real-time as you type"
+          }
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Reorder Info Banner */}
+        {isReorderMode && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <div className="flex items-start space-x-3">
+              <Icon name="Info" size={20} className="text-green-600 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-semibold text-green-900 mb-1">Reorder from Previous Shipment</h4>
+                <p className="text-green-700 text-sm mb-2">
+                  We've pre-filled the recipient details and package information from your previous shipment. 
+                  You can modify any fields as needed.
+                </p>
+                <div className="text-xs text-green-600">
+                  <strong>Source:</strong> {reorderSource} • <strong>Recipient:</strong> {formData.recipientName}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tracking & Date Info */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 bg-white rounded-lg border border-blue-200">
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold text-blue-600 uppercase tracking-wide">
+              Tracking Number
+            </Label>
+            <p className="text-lg font-mono font-bold text-blue-800" suppressHydrationWarning>
+              {trackingNumber}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold text-blue-600 uppercase tracking-wide">
+              Date
+            </Label>
+            <p className="text-lg font-semibold text-blue-800" suppressHydrationWarning>
+              {currentDate}
+            </p>
+          </div>
+        </div>
+
+        {/* Recipient Completion Status */}
+        <div className="p-3 bg-white rounded-lg border border-blue-200">
+          <div className="flex items-center justify-between mb-2">
+            <Label className="text-sm font-semibold text-blue-600">
+              Recipient Information
+            </Label>
+            <div className="flex items-center space-x-2">
+              {isRecipientComplete ? (
+                <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
+                  <Icon name="CheckCircle" size={14} className="mr-1" />
+                  Complete
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-amber-600 border-amber-300">
+                  <Icon name="AlertCircle" size={14} className="mr-1" />
+                  Incomplete
+                </Badge>
+              )}
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="flex items-center space-x-2">
+              <Icon 
+                name={formData.recipientName ? "Check" : "X"} 
+                size={12} 
+                className={formData.recipientName ? "text-green-500" : "text-red-500"} 
+              />
+              <span className={formData.recipientName ? "text-green-700" : "text-red-700"}>
+                Name
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Icon 
+                name={formData.recipientAddress ? "Check" : "X"} 
+                size={12} 
+                className={formData.recipientAddress ? "text-green-500" : "text-red-500"} 
+              />
+              <span className={formData.recipientAddress ? "text-green-700" : "text-red-700"}>
+                Address
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Icon 
+                name={formData.recipientCity ? "Check" : "X"} 
+                size={12} 
+                className={formData.recipientCity ? "text-green-500" : "text-red-500"} 
+              />
+              <span className={formData.recipientCity ? "text-green-700" : "text-red-700"}>
+                City
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Icon 
+                name={formData.recipientProvince ? "Check" : "X"} 
+                size={12} 
+                className={formData.recipientProvince ? "text-green-500" : "text-red-500"} 
+              />
+              <span className={formData.recipientProvince ? "text-green-700" : "text-red-700"}>
+                Province
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Icon 
+                name={formData.recipientPostalCode ? "Check" : "X"} 
+                size={12} 
+                className={formData.recipientPostalCode ? "text-green-500" : "text-red-500"} 
+              />
+              <span className={formData.recipientPostalCode ? "text-green-700" : "text-red-700"}>
+                Postal Code
+              </span>
+            </div>
+            <div className="flex items-center space-x-2">
+              <Icon 
+                name={formData.recipientPhone ? "Check" : "X"} 
+                size={12} 
+                className={formData.recipientPhone ? "text-green-500" : "text-red-500"} 
+              />
+              <span className={formData.recipientPhone ? "text-green-700" : "text-red-700"}>
+                Phone
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Package Details Summary */}
+        <div className="p-3 bg-white rounded-lg border border-blue-200">
+          <Label className="text-sm font-semibold text-blue-600 mb-2 block">
+            Package Details
+          </Label>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div>
+              <span className="text-gray-600">Weight:</span>{" "}
+              <span className="font-medium">{formData.weight} {formData.weightUnit}</span>
+            </div>
+            <div>
+              <span className="text-gray-600">Service:</span>{" "}
+              <span className="font-medium capitalize">{formData.serviceType}</span>
+            </div>
+            <div>
+              <span className="text-gray-600">Type:</span>{" "}
+              <span className="font-medium capitalize">{formData.packageType}</span>
+            </div>
+            <div>
+              <span className="text-gray-600">Dimensions:</span>{" "}
+              <span className="font-medium">
+                {formData.length}" × {formData.width}" × {formData.height}"
+              </span>
+            </div>
+          </div>
+          
+          {/* Special Instructions */}
+          {formData.specialInstructions && (
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <span className="text-gray-600 text-sm">Special Instructions:</span>{" "}
+              <span className="font-medium text-sm">{formData.specialInstructions}</span>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};
+
 export default function CreateShipmentPage() {
   const router = useRouter();
   const wizardBack = useWizardBack();
+  const { 
+    formData, 
+    updateFormField, 
+    isFormValid, 
+    getShippingLabelData,
+    generateTrackingNumber 
+  } = useShipment();
+  
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    // Recipient data (prefilled for quick testing)
-    recipientName: "Sarah Johnson",
-    recipientCompany: "ABC Corp",
-    recipientAddress: "456 Customer Ave, Apt 2B",
-    recipientCity: "Toronto",
-    recipientProvince: "ON",
-    recipientPostalCode: "M5V3A8",
-    recipientPhone: "(555) 987-6543",
-    recipientEmail: "customer@email.com",
-    
-    // Package basics
-    packageType: "box",
-    serviceType: "standard",
-    specialInstructions: "Handle with care – demo run",
-    
-    // Package details (prefilled so next step is enabled immediately)
-    weight: "2.5",
-    weightUnit: "lbs",
-    length: "12",
-    width: "8",
-    height: "6",
-    dimensionUnit: "in",
-    fragile: false,
-    valuable: false,
-    insurance: false
-  });
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
   const handleInputChange = (field: string, value: string | boolean) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: value
-    }));
+    updateFormField(field as keyof typeof formData, value);
   };
 
   const handleContinueToPackageDetails = () => {
@@ -68,14 +333,298 @@ export default function CreateShipmentPage() {
     // Simulate validation and processing
     setTimeout(() => {
       setIsLoading(false);
-      // Store form data in localStorage for next step (in real app, use state management)
-      localStorage.setItem('shipmentFormData', JSON.stringify(formData));
       router.push('/package-details');
     }, 1000);
   };
 
   const handleBackToDashboard = () => {
     wizardBack();
+  };
+
+  const handlePreviewPDF = async () => {
+    if (!isFormValid()) {
+      alert('Please fill in all required fields before previewing the PDF.');
+      return;
+    }
+
+    setIsPreviewLoading(true);
+    try {
+      const shippingData = getShippingLabelData();
+      const blob = await generateShippingLabelBlob(shippingData);
+      
+      // Create preview URL
+      const url = URL.createObjectURL(blob);
+      
+      // Open in new tab for preview
+      window.open(url, '_blank');
+      
+      // Cleanup URL after a delay
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      
+    } catch (error) {
+      console.error('Error generating PDF preview:', error);
+      alert('Failed to generate PDF preview. Please try again.');
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!isFormValid()) {
+      alert('Please fill in all required fields before downloading the PDF.');
+      return;
+    }
+
+    setIsPreviewLoading(true);
+    try {
+      const shippingData = getShippingLabelData();
+      const blob = await generateShippingLabelBlob(shippingData);
+      
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `shipping-label-${shippingData.trackingNumber}.pdf`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      alert('Failed to download PDF. Please try again.');
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
+
+  const handlePreviewAndPrint = async () => {
+    if (!isFormValid()) {
+      alert('Please fill in all required fields before printing the PDF.');
+      return;
+    }
+
+    console.log('Preview & Print Label clicked - starting process...');
+    setIsPreviewLoading(true);
+
+    try {
+      console.log('Generating PDF for preview and print...');
+      const shippingData = getShippingLabelData();
+      const { generateShippingLabelBlob } = await import('@/lib/pdf-generator');
+      const pdfBlob = await generateShippingLabelBlob(shippingData);
+      
+      if (!pdfBlob || pdfBlob.size === 0) {
+        throw new Error('Generated PDF blob is empty or invalid');
+      }
+
+      console.log('PDF blob generated successfully, size:', pdfBlob.size);
+      
+      // Create object URL for the PDF
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      console.log('PDF object URL created:', pdfUrl);
+      
+      // Method 1: Try direct browser print using iframe (preferred)
+      const printWithIframe = () => {
+        return new Promise<boolean>((resolve) => {
+          const iframe = document.createElement('iframe');
+          iframe.style.position = 'fixed';
+          iframe.style.right = '0';
+          iframe.style.bottom = '0';
+          iframe.style.width = '0';
+          iframe.style.height = '0';
+          iframe.style.border = 'none';
+          iframe.src = pdfUrl;
+          
+          let hasLoaded = false;
+          let hasPrinted = false;
+          
+          iframe.onload = () => {
+            if (hasLoaded) return;
+            hasLoaded = true;
+            
+            console.log('PDF loaded in iframe, attempting to print...');
+            
+            try {
+              // Method 1a: Try printing through iframe's content window
+              if (iframe.contentWindow) {
+                setTimeout(() => {
+                  try {
+                    iframe.contentWindow?.print();
+                    console.log('Print dialog triggered successfully');
+                    hasPrinted = true;
+                    
+                    // Wait for print dialog to close before resolving
+                    setTimeout(() => {
+                      resolve(true);
+                    }, 2000);
+                  } catch (printError) {
+                    console.warn('Iframe print failed:', printError);
+                    resolve(false);
+                  }
+                }, 1000);
+              } else {
+                console.warn('Iframe contentWindow not accessible');
+                resolve(false);
+              }
+            } catch (error) {
+              console.warn('Error accessing iframe for printing:', error);
+              resolve(false);
+            }
+          };
+
+          iframe.onerror = () => {
+            console.warn('Iframe failed to load PDF');
+            resolve(false);
+          };
+
+          // Cleanup timeout - increased to allow print dialog to complete
+          setTimeout(() => {
+            if (!hasPrinted) {
+              console.warn('Print iframe timeout');
+              resolve(false);
+            }
+          }, 15000); // Increased from 5000 to 15000
+
+          // Add iframe to DOM
+          document.body.appendChild(iframe);
+          
+          // Cleanup function - increased delay to prevent premature removal
+          setTimeout(() => {
+            try {
+              if (iframe.parentNode) {
+                document.body.removeChild(iframe);
+              }
+            } catch (cleanupError) {
+              console.warn('Cleanup error:', cleanupError);
+            }
+          }, 30000); // Increased from 10000 to 30000
+        });
+      };
+
+      // Method 2: Fallback - Open in new tab and trigger print
+      const printWithNewTab = () => {
+        return new Promise<boolean>((resolve) => {
+          console.log('Attempting print via new tab...');
+          
+          try {
+            const printWindow = window.open(pdfUrl, '_blank');
+            
+            if (!printWindow) {
+              console.warn('Popup blocked or failed to open');
+              resolve(false);
+              return;
+            }
+
+            // Wait for the document to load, then trigger print
+            printWindow.onload = () => {
+              setTimeout(() => {
+                try {
+                  printWindow.print();
+                  console.log('Print dialog triggered via new tab');
+                  
+                  // Wait for print dialog to close before resolving
+                  setTimeout(() => {
+                    resolve(true);
+                  }, 2000);
+                } catch (printError) {
+                  console.warn('New tab print failed:', printError);
+                  resolve(false);
+                }
+              }, 1000);
+            };
+
+            // Fallback timeout - increased to allow print dialog to complete
+            setTimeout(() => {
+              try {
+                printWindow.print();
+                setTimeout(() => {
+                  resolve(true);
+                }, 2000);
+              } catch (error) {
+                console.warn('New tab print timeout:', error);
+                resolve(false);
+              }
+            }, 5000); // Increased from 3000 to 5000
+
+          } catch (error) {
+            console.warn('New tab method failed:', error);
+            resolve(false);
+          }
+        });
+      };
+
+      // Method 3: Final fallback - Download the PDF
+      const downloadAsFallback = () => {
+        console.log('Using download as final fallback...');
+        
+        const link = document.createElement('a');
+        link.href = pdfUrl;
+        link.download = `shipping-label-${shippingData.trackingNumber}.pdf`;
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        alert('Automatic printing is not available in your browser. The PDF has been downloaded instead. Please open and print manually.');
+        return true;
+      };
+
+      // Try methods in sequence
+      console.log('Attempting iframe print method...');
+      const iframePrintSuccess = await printWithIframe();
+      
+      if (!iframePrintSuccess) {
+        console.log('Iframe print failed, trying new tab method...');
+        const newTabPrintSuccess = await printWithNewTab();
+        
+        if (!newTabPrintSuccess) {
+          console.log('New tab print failed, falling back to download...');
+          downloadAsFallback();
+        }
+      } else {
+        // If iframe print was successful, show success message
+        console.log('Print dialog completed successfully');
+        // Give user feedback that printing was initiated
+        setTimeout(() => {
+          alert('Print dialog opened successfully! If the print dialog closed quickly, please check your browser\'s print settings or try the "Preview PDF" option instead.');
+        }, 1000);
+      }
+
+      // Cleanup URL after delay
+      setTimeout(() => {
+        try {
+          URL.revokeObjectURL(pdfUrl);
+        } catch (error) {
+          console.warn('URL cleanup error:', error);
+        }
+      }, 30000);
+
+    } catch (error) {
+      console.error('Error in preview and print:', error);
+      
+      // Provide user-friendly error messages
+      let errorMessage = 'Failed to generate or print PDF. ';
+      
+      if (error instanceof Error) {
+        if (error.message.includes('blocked') || error.message.includes('popup')) {
+          errorMessage += 'Please allow popups for this site and try again.';
+        } else if (error.message.includes('permission') || error.message.includes('security')) {
+          errorMessage += 'Browser security settings are preventing printing. Try downloading the PDF instead.';
+        } else {
+          errorMessage += 'Please try again or download the PDF manually.';
+        }
+      } else {
+        errorMessage += 'Please try again.';
+      }
+      
+      alert(errorMessage);
+    } finally {
+      setIsPreviewLoading(false);
+    }
   };
 
   const stepperSteps = createStepperSteps(1);
@@ -87,7 +636,6 @@ export default function CreateShipmentPage() {
         <PageHeader
           title="Create New Shipment"
           description="Fill in the details below to create your shipment"
-          icon="Package"
         />
 
         {/* Stepper Component - Added here */}
@@ -322,6 +870,9 @@ export default function CreateShipmentPage() {
             </CardContent>
           </Card>
 
+          {/* Real-time Shipment Summary - Hidden */}
+          {/* <ShipmentSummary /> */}
+
           {/* Package & Service Information */}
           <Card className="parcego-card parcego-card--package">
             <CardHeader>
@@ -390,6 +941,106 @@ export default function CreateShipmentPage() {
             </CardContent>
           </Card>
 
+          {/* PDF Preview & Download Section */}
+          <Card className="parcego-card parcego-card--pdf-preview">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Icon name="FileText" size={20} className="text-orange-600" />
+                <span>Shipping Label Preview</span>
+              </CardTitle>
+              <CardDescription>
+                Preview, print, or download your shipping label PDF before continuing
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <div className="flex items-center space-x-2 mb-3">
+                  <Icon name="Info" size={16} className="text-blue-600" />
+                  <span className="text-sm font-medium text-blue-800">
+                    Form Data Saved Locally
+                  </span>
+                </div>
+                <p className="text-sm text-blue-700">
+                  Your form data is automatically saved as you type. Use "Preview & Print Label" for direct printing, 
+                  "Preview PDF" to view in a new tab, or "Download PDF" to save locally.
+                </p>
+              </div>
+              
+              <div className="flex flex-wrap gap-3">
+                <Button
+                  variant="default"
+                  onClick={handlePreviewAndPrint}
+                  disabled={isPreviewLoading || !isFormValid()}
+                  className="parcego-pdf-preview-print-btn bg-blue-600 hover:bg-blue-700 text-white"
+                  id="parcego-preview-print-pdf-btn"
+                >
+                  {isPreviewLoading ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                      <span>Processing...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Icon name="Printer" size={16} className="mr-2" />
+                      Preview & Print Label
+                    </>
+                  )}
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={handlePreviewPDF}
+                  disabled={isPreviewLoading || !isFormValid()}
+                  className="parcego-pdf-preview-btn"
+                  id="parcego-preview-pdf-btn"
+                >
+                  {isPreviewLoading ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
+                      <span>Generating...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Icon name="Eye" size={16} className="mr-2" />
+                      Preview PDF
+                    </>
+                  )}
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={handleDownloadPDF}
+                  disabled={isPreviewLoading || !isFormValid()}
+                  className="parcego-pdf-download-btn"
+                  id="parcego-download-pdf-btn"
+                >
+                  {isPreviewLoading ? (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
+                      <span>Generating...</span>
+                    </div>
+                  ) : (
+                    <>
+                      <Icon name="Download" size={16} className="mr-2" />
+                      Download PDF
+                    </>
+                  )}
+                </Button>
+              </div>
+              
+              {isFormValid() && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <div className="flex items-center space-x-2">
+                    <Icon name="CheckCircle" size={16} className="text-green-600" />
+                    <span className="text-sm font-medium text-green-800">
+                      Form Complete - Ready for PDF Generation
+                    </span>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Action Buttons */}
           <div className="flex justify-between items-center pt-6 border-t border-gray-200">
             <Button
@@ -403,7 +1054,7 @@ export default function CreateShipmentPage() {
             
             <Button
               onClick={handleContinueToPackageDetails}
-              disabled={isLoading || !formData.recipientName || !formData.recipientAddress || !formData.recipientCity || !formData.recipientProvince || !formData.recipientPostalCode || !formData.recipientPhone}
+              disabled={isLoading || !isFormValid()}
               className="parcego-action-btn parcego-action-btn--continue bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 h-12 text-base font-medium transition-all duration-300 ease-out hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               id="parcego-continue-package-details-btn"
             >

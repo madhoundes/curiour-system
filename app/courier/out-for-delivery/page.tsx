@@ -161,7 +161,7 @@ export default function OutForDeliveryPage() {
           <div className="flex items-center gap-3">
             <Button id="parcego-ofd-back-btn" variant="ghost" size="icon" onClick={handleBack} aria-label="Go back" className="p-3"><Icon name="ArrowLeft" size={22} className="text-gray-700" /></Button>
             <div>
-              <h1 className="text-xl font-semibold">Out for Delivery</h1>
+              <h1 className="text-xl font-semibold -mt-4">Out for Delivery</h1>
               <p className="text-sm text-muted-foreground">Manage your active route and attempts (UI only).</p>
             </div>
           </div>

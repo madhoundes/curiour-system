@@ -148,7 +148,6 @@ export default function QuotePreviewPage() {
         <PageHeader
           title="Shipping Quote"
           description="Review your shipping options and costs"
-          icon="Truck"
           onBack={handleBackToPackageDetails}
           backLabel=""
         />

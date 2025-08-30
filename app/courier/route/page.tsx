@@ -97,15 +97,15 @@ const mockDirections = [
 const getStatusColor = (status: string) => {
   switch (status) {
     case "current":
-      return "bg-blue-500 text-white";
+      return "bg-blue-600 text-white border-blue-700";
     case "next":
-      return "bg-yellow-500 text-white";
+      return "bg-amber-600 text-white border-amber-700";
     case "pending":
-      return "bg-gray-500 text-white";
+      return "bg-slate-600 text-white border-slate-700";
     case "completed":
-      return "bg-green-500 text-white";
+      return "bg-emerald-600 text-white border-emerald-700";
     default:
-      return "bg-gray-500 text-white";
+      return "bg-slate-600 text-white border-slate-700";
   }
 };
 
@@ -283,7 +283,7 @@ export default function AIRouteOptimization() {
             </Button>
             <div>
               <h1 
-                className="text-xl font-semibold"
+                className="text-xl font-semibold -mt-4"
                 id="parcego-route-title"
               >
                 AI Route Optimization

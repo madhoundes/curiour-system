@@ -260,7 +260,7 @@ export function PackageDetailsModal({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-[85%] md:max-w-[75%] lg:max-w-[60%] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[85%] md:max-w-[75%] lg:max-w-[60%] max-h-[90vh] overflow-y-auto bg-white">
           <DialogHeader>
             <DialogTitle className="flex items-center space-x-2">
               <Icon name="PackageX" size={20} className="text-red-600" />
@@ -273,7 +273,7 @@ export function PackageDetailsModal({
 
           <div className="space-y-6 py-4 md:py-6 lg:py-8 px-4 md:px-6 lg:px-8">
             {/* Header Information - Enhanced Layout */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 md:p-6 bg-gray-50 rounded-lg">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 p-4 md:p-6 bg-white border border-gray-200 rounded-lg">
               <div>
                 <Label className="text-sm font-medium text-gray-600">Tracking Number</Label>
                 <p className="text-lg font-mono font-semibold text-blue-600">{pkg.trackingNumber}</p>
@@ -298,7 +298,7 @@ export function PackageDetailsModal({
                 <Icon name="AlertTriangle" size={20} className="text-red-600" />
                 <span>Issue Description</span>
               </h3>
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="p-4 bg-white border border-red-200 rounded-lg">
                 <p className="text-gray-900">{pkg.issueDescription}</p>
                 <div className="mt-2 flex items-center space-x-4 text-sm text-gray-600">
                   <span>Reported by: {pkg.reportedBy}</span>
@@ -315,7 +315,7 @@ export function PackageDetailsModal({
                   <Icon name="User" size={20} className="text-blue-600" />
                   <span>Sender Information</span>
                 </h3>
-                <div className="space-y-3 p-4 bg-blue-50 rounded-lg">
+                <div className="space-y-3 p-4 bg-white border border-blue-200 rounded-lg">
                   <div>
                     <Label className="text-sm font-medium text-gray-600">Name</Label>
                     <p className="text-gray-900 font-medium">{pkg.sender.name}</p>
@@ -342,7 +342,7 @@ export function PackageDetailsModal({
                   <Icon name="MapPin" size={20} className="text-green-600" />
                   <span>Recipient Information</span>
                 </h3>
-                <div className="space-y-3 p-4 bg-green-50 rounded-lg">
+                <div className="space-y-3 p-4 bg-white border border-green-200 rounded-lg">
                   <div>
                     <Label className="text-sm font-medium text-gray-600">Name</Label>
                     <p className="text-gray-900 font-medium">{pkg.recipient.name}</p>

@@ -277,10 +277,10 @@ export default function CourierScanPackagePage() {
 
   const getStatusColor = (status: PackageData["currentStatus"]) => {
     const statusConfig = {
-      pending: "bg-yellow-100 text-yellow-800",
-      picked_up: "bg-blue-100 text-blue-800",
-      in_transit: "bg-purple-100 text-purple-800",
-      delivered: "bg-green-100 text-green-800"
+      pending: "bg-amber-50 text-amber-800 border-amber-200",
+      picked_up: "bg-blue-50 text-blue-800 border-blue-200",
+      in_transit: "bg-indigo-50 text-indigo-800 border-indigo-200",
+      delivered: "bg-emerald-50 text-emerald-800 border-emerald-200"
     };
     return statusConfig[status];
   };
@@ -312,7 +312,7 @@ export default function CourierScanPackagePage() {
               <Icon name="ArrowLeft" size={20} className="mr-2" />
               Back
             </Button>
-            <h1 className="text-lg font-semibold">Scan Package</h1>
+            <h1 className="text-lg font-semibold -mt-4">Scan Package</h1>
             <div className="w-16"></div>
           </div>
         </div>

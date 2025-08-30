@@ -128,22 +128,18 @@ const mockNotifications: Notification[] = [
 
 export default function NotificationsCenter() {
   const [notifications, setNotifications] = useState<Notification[]>(mockNotifications);
-  const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<NotificationType | 'all'>('all');
   const [selectedPriority, setSelectedPriority] = useState<NotificationPriority | 'all'>('all');
   const [selectedStatus, setSelectedStatus] = useState<'all' | 'unread' | 'read'>('all');
-  const [viewMode, setViewMode] = useState<'list' | 'compact'>('list');
   const [selectedItems, setSelectedItems] = useState<string[]>([]);
 
   // Filter notifications based on current filters
   const filteredNotifications = notifications.filter(notification => {
-    const matchesSearch = notification.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         notification.message.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || notification.type === selectedCategory;
     const matchesPriority = selectedPriority === 'all' || notification.priority === selectedPriority;
     const matchesStatus = selectedStatus === 'all' || notification.status === selectedStatus;
     
-    return matchesSearch && matchesCategory && matchesPriority && matchesStatus;
+    return matchesCategory && matchesPriority && matchesStatus;
   });
 
   // Group notifications by date
@@ -232,7 +228,6 @@ export default function NotificationsCenter() {
       <PageHeader
         title="Notifications Center"
         description="Stay updated with your courier platform activities"
-        icon="Bell"
       >
         <div className="flex items-center space-x-3">
           <Badge 
@@ -269,27 +264,7 @@ export default function NotificationsCenter() {
             <Card>
               <CardContent className="pt-6">
                 <div className="space-y-4">
-                  {/* Search */}
-                  <div className="flex space-x-4">
-                    <div className="flex-1">
-                      <Input
-                        placeholder="Search notifications..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full"
-                        id="parcego-notifications-search-input"
-                      />
-                    </div>
-                    <Select value={viewMode} onValueChange={(value: 'list' | 'compact') => setViewMode(value)}>
-                      <SelectTrigger className="w-32">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="list">List View</SelectItem>
-                        <SelectItem value="compact">Compact</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+
 
                   {/* Filter Tabs */}
                   <Tabs 
@@ -298,12 +273,40 @@ export default function NotificationsCenter() {
                     className="w-full parcego-tabs-enhanced"
                     id="parcego-notifications-category-tabs"
                   >
-                    <TabsList className="parcego-tabs-list grid w-full grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
-                      <TabsTrigger value="all" className="parcego-tabs-trigger">All</TabsTrigger>
-                      <TabsTrigger value="shipment" className="parcego-tabs-trigger">Shipments</TabsTrigger>
-                      <TabsTrigger value="system" className="parcego-tabs-trigger">System</TabsTrigger>
-                      <TabsTrigger value="billing" className="parcego-tabs-trigger">Billing</TabsTrigger>
-                      <TabsTrigger value="announcement" className="parcego-tabs-trigger">Announcements</TabsTrigger>
+                    <TabsList 
+                      className="flex w-full h-9 sm:h-10 p-1 bg-gray-100 rounded-lg overflow-hidden justify-between"
+                      style={{ padding: '1.68rem .75rem' }}
+                    >
+                      <TabsTrigger 
+                        value="all" 
+                        className="flex-1 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md"
+                      >
+                        All
+                      </TabsTrigger>
+                      <TabsTrigger 
+                        value="shipment" 
+                        className="flex-1 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md"
+                      >
+                        Shipments
+                      </TabsTrigger>
+                      <TabsTrigger 
+                        value="system" 
+                        className="flex-1 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md"
+                      >
+                        System
+                      </TabsTrigger>
+                      <TabsTrigger 
+                        value="billing" 
+                        className="flex-1 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md"
+                      >
+                        Billing
+                      </TabsTrigger>
+                      <TabsTrigger 
+                        value="announcement" 
+                        className="flex-1 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md"
+                      >
+                        Announcements
+                      </TabsTrigger>
                     </TabsList>
                   </Tabs>
 
@@ -357,8 +360,6 @@ export default function NotificationsCenter() {
                               notification.status === 'unread' 
                                 ? 'bg-blue-50 border-blue-200 border-l-4 border-l-blue-500' 
                                 : 'bg-white border-gray-200'
-                            } ${
-                              viewMode === 'compact' ? 'py-3' : 'py-4'
                             }`}
                             id={`parcego-notifications-item-${notification.id}`}
                           >
@@ -449,26 +450,25 @@ export default function NotificationsCenter() {
                     <div id="parcego-notifications-empty-state">
                       <Icon name="Bell" size={48} className="mx-auto text-gray-400 mb-4" />
                       <h3 className="text-lg font-medium text-gray-900 mb-2">
-                        {searchQuery || selectedCategory !== 'all' || selectedPriority !== 'all' || selectedStatus !== 'all'
+                        {selectedCategory !== 'all' || selectedPriority !== 'all' || selectedStatus !== 'all'
                           ? 'No notifications found'
                           : 'No notifications yet'
                         }
                       </h3>
                       <p className="text-gray-500 mb-4">
-                        {searchQuery || selectedCategory !== 'all' || selectedPriority !== 'all' || selectedStatus !== 'all'
-                          ? 'Try adjusting your search or filters to find what you\'re looking for.'
+                        {selectedCategory !== 'all' || selectedPriority !== 'all' || selectedStatus !== 'all'
+                          ? 'Try adjusting your filters to find what you\'re looking for.'
                           : 'You\'ll see notifications here when you have shipment updates, system alerts, or important announcements.'
                         }
                       </p>
-                      {(searchQuery || selectedCategory !== 'all' || selectedPriority !== 'all' || selectedStatus !== 'all') && (
+                      {(selectedCategory !== 'all' || selectedPriority !== 'all' || selectedStatus !== 'all') && (
                         <Button
                           variant="outline"
-                          // onClick={() => { // Removed as per edit hint
-                          //   setSearchQuery('');
-                          //   setSelectedCategory('all');
-                          //   setSelectedPriority('all');
-                          //   setSelectedStatus('all');
-                          // }}
+                          onClick={() => {
+                            setSelectedCategory('all');
+                            setSelectedPriority('all');
+                            setSelectedStatus('all');
+                          }}
                         >
                           Clear Filters
                         </Button>

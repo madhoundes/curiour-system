@@ -291,7 +291,7 @@ export default function CourierProfilePage() {
               <Icon name="ArrowLeft" size={22} className="text-gray-700" />
             </Button>
             <div>
-              <h1 className="text-xl font-semibold">Account Profile</h1>
+              <h1 className="text-xl font-semibold -mt-4">Account Profile</h1>
               <p className="text-sm text-muted-foreground">Manage your courier account details, security, and preferences.</p>
             </div>
           </div>

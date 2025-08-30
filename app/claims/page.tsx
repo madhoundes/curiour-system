@@ -12,11 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Stepper, StepperStep } from "@/components/ui/stepper";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Shield, FileText, Upload, AlertTriangle, CheckCircle, Clock, DollarSign, Package, MapPin, XCircle } from "lucide-react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Filter, Eye, Download, ExternalLink } from "lucide-react";
+import { FileText, CheckCircle, Clock, AlertTriangle, XCircle, Calendar as CalendarIcon } from "lucide-react";
 
 // Types for the claims form
 interface ClaimFormData {
@@ -164,6 +163,7 @@ const claimTypeConfig = {
 export default function ClaimsPage() {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
+  const [calendarOpen, setCalendarOpen] = useState(false);
   const [formData, setFormData] = useState<ClaimFormData>({
     shipmentNumber: "",
     claimType: "",
@@ -299,7 +299,11 @@ export default function ClaimsPage() {
                 <Label htmlFor="parcego-claims-type">Type of Claim *</Label>
                 <Select value={formData.claimType} onValueChange={(value) => handleInputChange("claimType", value)}>
                   <SelectTrigger className="mt-2">
-                    <SelectValue placeholder="Select claim type" />
+                    <SelectValue placeholder="Select claim type">
+                      {formData.claimType ? (
+                        <span className="py-1">{claimTypes.find(t => t.value === formData.claimType)?.label}</span>
+                      ) : undefined}
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     {claimTypes.map((type) => (
@@ -316,7 +320,6 @@ export default function ClaimsPage() {
             </div>
 
             <Alert className="border-blue-200 bg-blue-50">
-              <Shield className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-blue-800">
                 <strong>Insurance Coverage:</strong> Your shipment is covered under our Premium Coverage plan. 
                 Maximum coverage: $2,500 with a $25 deductible.
@@ -331,13 +334,32 @@ export default function ClaimsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="parcego-claims-incident-date">Incident Date *</Label>
-                <Input
-                  id="parcego-claims-incident-date"
-                  type="date"
-                  value={formData.incidentDate}
-                  onChange={(e) => handleInputChange("incidentDate", e.target.value)}
-                  className="mt-2"
-                />
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      id="parcego-claims-incident-date"
+                      className="w-full justify-start text-left font-normal mt-2"
+                    >
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.incidentDate ? new Date(formData.incidentDate).toLocaleDateString() : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={formData.incidentDate ? new Date(formData.incidentDate) : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          handleInputChange("incidentDate", date.toISOString().split('T')[0]);
+                          setCalendarOpen(false); // Automatically close the popover
+                        }
+                      }}
+                      weekStartsOn={0}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               
               <div>
@@ -373,10 +395,14 @@ export default function ClaimsPage() {
                 onChange={(e) => handleInputChange("estimatedValue", e.target.value)}
                 className="mt-2"
               />
-              <p className="text-sm text-gray-500 mt-1">
-                Please provide the actual value of the lost or damaged items
-              </p>
             </div>
+
+            <Alert className="border-blue-200 bg-blue-50">
+              <AlertDescription className="text-blue-800">
+                <strong>Value Declaration:</strong> Please provide an accurate estimate of the item&apos;s value. 
+                This helps us process your claim efficiently and determine appropriate coverage.
+              </AlertDescription>
+            </Alert>
           </div>
         );
 
@@ -386,7 +412,6 @@ export default function ClaimsPage() {
             <div>
               <Label htmlFor="parcego-claims-documents">Upload Supporting Documents *</Label>
               <div className="mt-2 border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-                <Upload className="mx-auto h-12 w-12 text-gray-400" />
                 <div className="mt-4">
                   <label htmlFor="parcego-claims-file-upload" className="cursor-pointer">
                     <span className="text-sm font-medium text-blue-600 hover:text-blue-500">
@@ -415,7 +440,6 @@ export default function ClaimsPage() {
                 {formData.documents.map((file, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center space-x-3">
-                      <FileText className="h-5 w-5 text-gray-400" />
                       <div>
                         <p className="text-sm font-medium">{file.name}</p>
                         <p className="text-xs text-gray-500">
@@ -437,7 +461,6 @@ export default function ClaimsPage() {
             )}
 
             <Alert className="border-amber-200 bg-amber-50">
-              <AlertTriangle className="h-4 w-4 text-amber-600" />
               <AlertDescription className="text-amber-800">
                 <strong>Required Documents:</strong> Proof of value (receipt, invoice, appraisal), 
                 photos of damage (if applicable), and any other supporting evidence.
@@ -500,9 +523,8 @@ export default function ClaimsPage() {
             </div>
 
             <Alert className="border-green-200 bg-green-50">
-              <CheckCircle className="h-4 w-4 text-green-600" />
               <AlertDescription className="text-green-800">
-                                        <strong>Contact Information:</strong> We&apos;ll use this information to keep you updated 
+                <strong>Contact Information:</strong> We&apos;ll use this information to keep you updated 
                 on your claim status and request additional information if needed.
               </AlertDescription>
             </Alert>
@@ -535,10 +557,9 @@ export default function ClaimsPage() {
             </div>
 
             <Alert className="border-blue-200 bg-blue-50">
-              <Clock className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-blue-800">
                 <strong>Processing Time:</strong> Most claims are processed within 5-7 business days. 
-                                      You&apos;ll receive email updates throughout the process.
+                You&apos;ll receive email updates throughout the process.
               </AlertDescription>
             </Alert>
 
@@ -562,9 +583,8 @@ export default function ClaimsPage() {
       {Object.entries(insuranceCoverage).map(([key, coverage]) => (
         <Card key={key} className="border-2 border-gray-200 hover:border-blue-300 transition-colors">
           <CardHeader className="pb-3">
-            <CardTitle className="text-lg flex items-center space-x-2">
-              <Shield className="h-5 w-5 text-blue-600" />
-              <span>{coverage.name}</span>
+            <CardTitle className="text-lg">
+              {coverage.name}
             </CardTitle>
             <CardDescription>{coverage.description}</CardDescription>
           </CardHeader>
@@ -606,13 +626,13 @@ export default function ClaimsPage() {
 
   if (submitted) {
     return (
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="flex flex-1 flex-col">
         <Card className="border-green-200 bg-green-50">
           <CardHeader className="text-center">
             <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
               <CheckCircle className="h-8 w-8 text-green-600" />
             </div>
-                            <CardTitle className="text-xl text-green-800">Claim Submitted Successfully!</CardTitle>
+            <CardTitle className="text-xl text-green-800">Claim Submitted Successfully!</CardTitle>
             <CardDescription className="text-green-700">
               Your claim has been received and is now under review
             </CardDescription>
@@ -623,7 +643,7 @@ export default function ClaimsPage() {
               <p className="text-lg font-mono font-bold text-green-800">{claimNumber}</p>
             </div>
             <p className="text-green-700">
-                                    We&apos;ll review your claim within 5-7 business days and contact you with updates. 
+              We&apos;ll review your claim within 5-7 business days and contact you with updates. 
               You can track your claim status in the notifications section.
             </p>
             <Button onClick={() => window.location.href = '/dashboard'} className="bg-green-600 hover:bg-green-700">
@@ -636,226 +656,27 @@ export default function ClaimsPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-8">
+    <div className="flex flex-1 flex-col space-y-8">
       {/* Header */}
-      <div className="text-center space-y-4">
-        <div className="flex items-center justify-center space-x-3">
-          <Shield className="h-8 w-8 text-blue-600" />
-                          <h1 className="text-2xl font-bold text-gray-900">File an Insurance Claim</h1>
-        </div>
-                  <p className="text-lg text-gray-600 max-w-3xl mx-auto">
-            Ready to make a claim for an insured shipment? We&apos;ve got your back. Before you start, 
-            check out our insurance coverage details and claim requirements below. Have your shipment 
-            number, proof of value, and supporting documents handy.
-          </p>
-        <div className="flex justify-center">
-          <Dialog open={isClaimsHistoryOpen} onOpenChange={setIsClaimsHistoryOpen}>
-            <DialogTrigger asChild>
-              <Button
-                variant="outline"
-                onClick={handleClaimsHistoryOpen}
-                className="flex items-center space-x-2"
-                id="parcego-claims-view-history-btn"
-              >
-                <FileText className="h-4 w-4" />
-                <span>View Claims History</span>
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto sm:max-w-7xl lg:max-w-[85vw] xl:max-w-[80vw]">
-              <DialogHeader>
-                <DialogTitle className="flex items-center space-x-2">
-                  <FileText className="h-5 w-5 text-blue-600" />
-                  <span>Claims History</span>
-                </DialogTitle>
-                <DialogDescription>
-                  Track the status and progress of all your insurance claims. View supporting documents and payout information.
-                </DialogDescription>
-              </DialogHeader>
-              
-              {/* Claims History Table */}
-              <div className="space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                  <div className="text-sm text-gray-600">
-                    Showing {mockClaimsHistory.length} claims
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Input
-                      placeholder="Search claims..."
-                      className="w-full sm:w-64"
-                      id="parcego-claims-history-search"
-                    />
-                    <Button variant="outline" size="sm">
-                      <Filter className="h-4 w-4 mr-2" />
-                      Filter
-                    </Button>
-                  </div>
-                </div>
-
-                {/* Responsive Table Container with Horizontal Scroll */}
-                <div className="border rounded-lg overflow-hidden">
-                  <div className="overflow-x-auto">
-                    <Table className="min-w-[800px] lg:min-w-[1000px] xl:min-w-[1200px]">
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead className="w-[120px] min-w-[120px]">Claim ID</TableHead>
-                          <TableHead className="w-[180px] min-w-[180px]">Shipment</TableHead>
-                          <TableHead className="w-[100px] min-w-[100px]">Type</TableHead>
-                          <TableHead className="w-[140px] min-w-[140px]">Status</TableHead>
-                          <TableHead className="w-[100px] min-w-[100px]">Amount</TableHead>
-                          <TableHead className="w-[100px] min-w-[100px]">Payout</TableHead>
-                          <TableHead className="w-[120px] min-w-[120px]">Submitted</TableHead>
-                          <TableHead className="w-[120px] min-w-[120px]">Processing</TableHead>
-                          <TableHead className="w-[140px] min-w-[140px]">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {mockClaimsHistory.map((claim) => {
-                          const statusConfig = getClaimStatusConfig(claim.status);
-                          const typeConfig = getClaimTypeConfig(claim.claimType);
-                          const StatusIcon = statusConfig.icon;
-                          
-                          return (
-                            <TableRow key={claim.id} className="hover:bg-gray-50">
-                              <TableCell className="font-mono font-medium whitespace-nowrap">{claim.id}</TableCell>
-                              <TableCell className="font-mono whitespace-nowrap">{claim.shipmentNumber}</TableCell>
-                              <TableCell className="whitespace-nowrap">
-                                <Badge className={typeConfig.color}>
-                                  {typeConfig.label}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="whitespace-nowrap">
-                                <Badge className={`${statusConfig.color} border`}>
-                                  <StatusIcon className="h-3 w-3 mr-1" />
-                                  {statusConfig.label}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="font-medium whitespace-nowrap">{claim.amount}</TableCell>
-                              <TableCell className="font-medium whitespace-nowrap">
-                                <span className={claim.payoutAmount === "Pending" ? "text-yellow-600" : 
-                                                 claim.payoutAmount === "$0.00" ? "text-red-600" : "text-green-600"}>
-                                  {claim.payoutAmount}
-                                </span>
-                              </TableCell>
-                              <TableCell className="whitespace-nowrap">{new Date(claim.submittedDate).toLocaleDateString()}</TableCell>
-                              <TableCell className="whitespace-nowrap">
-                                {getClaimProcessingTime(claim.submittedDate, claim.resolvedDate)}
-                              </TableCell>
-                              <TableCell className="whitespace-nowrap">
-                                <div className="flex items-center space-x-1">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 w-8 p-0"
-                                    title="View Details"
-                                    id={`parcego-claims-history-view-${claim.id}`}
-                                  >
-                                    <Eye className="h-4 w-4" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="h-8 w-8 p-0"
-                                    title="Download Documents"
-                                    id={`parcego-claims-history-download-${claim.id}`}
-                                  >
-                                    <Download className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </div>
-
-                {/* Summary Statistics - Responsive Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 pt-4">
-                  <Card>
-                    <CardContent className="p-3 md:p-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="bg-green-100 rounded-lg p-2 flex-shrink-0">
-                          <DollarSign className="h-6 w-6 text-green-600" />
-                        </div>
-                        <div>
-                          <div className="text-xl md:text-3xl font-bold text-green-600">
-                            ${mockClaimsHistory.filter(c => c.status === 'approved').reduce((sum, c) => 
-                              sum + parseFloat(c.payoutAmount.replace('$', '')), 0
-                            ).toFixed(2)}
-                          </div>
-                          <div className="text-sm md:text-base font-normal text-gray-600">Total Approved Payouts</div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-3 md:p-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="bg-blue-100 rounded-lg p-2 flex-shrink-0">
-                          <Clock className="h-6 w-6 text-blue-600" />
-                        </div>
-                        <div>
-                          <div className="text-xl md:text-3xl font-bold text-blue-600">
-                            {mockClaimsHistory.filter(c => c.status === 'pending_review' || c.status === 'under_investigation').length}
-                          </div>
-                          <div className="text-sm md:text-base font-normal text-gray-600">Claims In Progress</div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-3 md:p-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="bg-green-100 rounded-lg p-2 flex-shrink-0">
-                          <CheckCircle className="h-6 w-6 text-green-600" />
-                        </div>
-                        <div>
-                          <div className="text-xl md:text-3xl font-bold text-green-600">
-                            {mockClaimsHistory.filter(c => c.status === 'approved').length}
-                          </div>
-                          <div className="text-sm md:text-base font-normal text-gray-600">Claims Approved</div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                  <Card>
-                    <CardContent className="p-3 md:p-4">
-                      <div className="flex items-center space-x-3">
-                        <div className="bg-red-100 rounded-lg p-2 flex-shrink-0">
-                          <XCircle className="h-6 w-6 text-red-600" />
-                        </div>
-                        <div>
-                          <div className="text-xl md:text-3xl font-bold text-red-600">
-                            {mockClaimsHistory.filter(c => c.status === 'rejected').length}
-                          </div>
-                          <div className="text-sm md:text-base font-normal text-gray-600">Claims Rejected</div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </div>
-
-                {/* Action Buttons - Responsive Layout */}
-                <div className="flex flex-col sm:flex-row sm:justify-end gap-3 pt-4 border-t">
-                  <Button
-                    variant="outline"
-                    onClick={() => router.push('/claims/history')}
-                    className="flex items-center justify-center space-x-2 w-full sm:w-auto"
-                  >
-                    <ExternalLink className="h-4 w-4" />
-                    <span>View Full History</span>
-                  </Button>
-                  <Button
-                    onClick={handleClaimsHistoryClose}
-                    className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
-                  >
-                    Close
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+      <div className="mb-8">
+        <div className="flex items-start gap-3">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-xl md:text-2xl font-bold text-gray-900 tracking-tight">
+              File an Insurance Claim
+            </h1>
+            <p className="mt-2 text-base text-gray-600 max-w-3xl">
+              Ready to claim an insured shipment? We&apos;ve got your back.
+            </p>
+          </div>
+          <div className="flex-shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => router.push('/claims/history')}
+              id="parcego-claims-view-history-btn"
+            >
+              View Claims History
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -868,10 +689,7 @@ export default function ClaimsPage() {
       {/* Claims Form */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <FileText className="h-5 w-5" />
-            <span>Claim Form</span>
-          </CardTitle>
+          <CardTitle>Claim Form</CardTitle>
           <CardDescription>
             Complete all steps to submit your claim. Required fields are marked with an asterisk (*).
           </CardDescription>
@@ -941,9 +759,8 @@ export default function ClaimsPage() {
       {/* Additional Information */}
       <Card className="border-blue-200 bg-blue-50">
         <CardHeader>
-          <CardTitle className="text-blue-900 flex items-center space-x-2">
-            <AlertTriangle className="h-5 w-5" />
-            <span>Important Information</span>
+          <CardTitle className="text-blue-900">
+            Important Information
           </CardTitle>
         </CardHeader>
         <CardContent className="text-blue-800">
@@ -951,35 +768,17 @@ export default function ClaimsPage() {
             <div className="space-y-3">
               <h4 className="font-semibold">What You Need:</h4>
               <ul className="space-y-2 text-sm">
-                <li className="flex items-start space-x-2">
-                  <Package className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <span>Shipment tracking number</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <DollarSign className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <span>Proof of value (receipt, invoice, appraisal)</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <FileText className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <span>Supporting documentation and photos</span>
-                </li>
+                <li>Shipment tracking number</li>
+                <li>Proof of value (receipt, invoice, appraisal)</li>
+                <li>Supporting documentation and photos</li>
               </ul>
             </div>
             <div className="space-y-3">
               <h4 className="font-semibold">Process Timeline:</h4>
               <ul className="space-y-2 text-sm">
-                <li className="flex items-start space-x-2">
-                  <Clock className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <span>Initial review: 1-2 business days</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <MapPin className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <span>Investigation: 3-5 business days</span>
-                </li>
-                <li className="flex items-start space-x-2">
-                  <CheckCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <span>Final decision: 5-7 business days</span>
-                </li>
+                <li>Initial review: 1-2 business days</li>
+                <li>Investigation: 3-5 business days</li>
+                <li>Final decision: 5-7 business days</li>
               </ul>
             </div>
           </div>

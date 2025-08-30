@@ -22,7 +22,8 @@ const styles = StyleSheet.create({
     padding: 16,
     backgroundColor: '#ffffff',
     fontFamily: 'Helvetica',
-    fontSize: 10,
+    // Decrease global font size by ~10%
+    fontSize: 9,
     lineHeight: 1.4,
   },
   
@@ -37,13 +38,15 @@ const styles = StyleSheet.create({
   },
   
   logo: {
-    width: 80,
-    height: 24,
+    // Reduce logo by ~15%
+    width: 68,
+    height: 15,
   },
   
   trackingNumber: {
-    fontSize: 14,
-    fontWeight: 700,
+    // Halve original size (14 -> 7)
+    fontSize: 7,
+    fontWeight: 400,
     color: '#1f2937',
     letterSpacing: '0.5pt',
   },
@@ -54,7 +57,8 @@ const styles = StyleSheet.create({
   },
   
   sectionTitle: {
-    fontSize: 11,
+    // ~10% smaller
+    fontSize: 10,
     fontWeight: 700,
     color: '#374151',
     marginBottom: 6,
@@ -68,7 +72,7 @@ const styles = StyleSheet.create({
   
   // Text styles
   primaryText: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: 400,
     color: '#1f2937',
     marginBottom: 3,
@@ -76,7 +80,7 @@ const styles = StyleSheet.create({
   },
   
   secondaryText: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: 400,
     color: '#4b5563',
     marginBottom: 2,
@@ -84,7 +88,7 @@ const styles = StyleSheet.create({
   },
   
   labelText: {
-    fontSize: 8,
+    fontSize: 7,
     fontWeight: 600,
     color: '#6b7280',
     marginBottom: 1,
@@ -107,7 +111,7 @@ const styles = StyleSheet.create({
   },
   
   serviceType: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: 700,
     color: '#1f2937',
     textAlign: 'center',
@@ -115,7 +119,7 @@ const styles = StyleSheet.create({
   },
   
   serviceDescription: {
-    fontSize: 7,
+    fontSize: 6,
     fontWeight: 400,
     color: '#4b5563',
     textAlign: 'center',
@@ -133,7 +137,7 @@ const styles = StyleSheet.create({
   },
   
   detailLabel: {
-    fontSize: 8,
+    fontSize: 7,
     fontWeight: 600,
     color: '#6b7280',
     width: 60,
@@ -142,7 +146,7 @@ const styles = StyleSheet.create({
   },
   
   detailValue: {
-    fontSize: 9,
+    fontSize: 8,
     fontWeight: 400,
     color: '#1f2937',
     flex: 1,
@@ -159,7 +163,7 @@ const styles = StyleSheet.create({
   },
   
   footerText: {
-    fontSize: 7,
+    fontSize: 6,
     fontWeight: 400,
     color: '#9ca3af',
     textAlign: 'center',
@@ -180,6 +184,33 @@ const styles = StyleSheet.create({
   // Contact info
   contactInfo: {
     marginTop: 4,
+  },
+
+  // Package info consolidated box (bottom-right)
+  packageBox: {
+    position: 'absolute',
+    bottom: 68,
+    right: 16,
+    border: '1pt solid #1f2937',
+    borderRadius: 4,
+    padding: 6,
+    width: 120,
+    backgroundColor: '#ffffff',
+  },
+  packageRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+  },
+  packageLabel: {
+    fontSize: 7,
+    fontWeight: 600,
+    color: '#6b7280',
+  },
+  packageValue: {
+    fontSize: 8,
+    fontWeight: 400,
+    color: '#1f2937',
   },
 });
 
@@ -293,19 +324,19 @@ const PolishedShippingLabel: React.FC<PolishedShippingLabelProps> = ({ data }) =
           </View>
         </View>
 
-        {/* Package Details */}
-        <View style={styles.detailsContainer}>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Weight:</Text>
-            <Text style={styles.detailValue}>{data.package.weight}</Text>
+        {/* Consolidated Package Details Box (bottom-right) */}
+        <View style={styles.packageBox}>
+          <View style={styles.packageRow}>
+            <Text style={styles.packageLabel}>Weight</Text>
+            <Text style={styles.packageValue}>{data.package.weight}</Text>
           </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Dimensions:</Text>
-            <Text style={styles.detailValue}>{data.package.dimensions}</Text>
+          <View style={styles.packageRow}>
+            <Text style={styles.packageLabel}>Dimensions</Text>
+            <Text style={styles.packageValue}>{data.package.dimensions}</Text>
           </View>
-          <View style={styles.detailRow}>
-            <Text style={styles.detailLabel}>Package:</Text>
-            <Text style={styles.detailValue}>{data.package.type}</Text>
+          <View style={styles.packageRow}>
+            <Text style={styles.packageLabel}>Type</Text>
+            <Text style={styles.packageValue}>{data.package.type}</Text>
           </View>
         </View>
 

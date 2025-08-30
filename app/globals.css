@@ -318,8 +318,42 @@ body {
     transition: all var(--transition-normal) var(--easing-smooth);
   }
 
-  .parcego-map-card:hover {
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+  /* Enhanced Dropdown Hover Effects */
+  .parcego-dropdown-enhanced [data-radix-dropdown-menu-item],
+  .parcego-dropdown-enhanced [data-radix-select-item],
+  .parcego-dropdown-enhanced [cmdk-item] {
+    transition: all var(--transition-quick) var(--easing-smooth);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .parcego-dropdown-enhanced [data-radix-dropdown-menu-item]:hover,
+  .parcego-dropdown-enhanced [data-radix-select-item]:hover,
+  .parcego-dropdown-enhanced [cmdk-item]:hover {
+    transform: translateX(2px);
+    background-color: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+  }
+
+  /* Premium dropdown item animations */
+  .parcego-dropdown-enhanced [data-radix-dropdown-menu-item]::before,
+  .parcego-dropdown-enhanced [data-radix-select-item]::before,
+  .parcego-dropdown-enhanced [cmdk-item]::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    height: 100%;
+    width: 0;
+    background: linear-gradient(90deg, transparent, hsl(var(--accent)), transparent);
+    transition: width var(--transition-normal) var(--easing-premium);
+    opacity: 0.6;
+  }
+
+  .parcego-dropdown-enhanced [data-radix-dropdown-menu-item]:hover::before,
+  .parcego-dropdown-enhanced [data-radix-select-item]:hover::before,
+  .parcego-dropdown-enhanced [cmdk-item]:hover::before {
+    width: 100%;
   }
 
     /* Enhanced delivery action buttons */
@@ -340,53 +374,72 @@ body {
     transform: translateY(0) scale(0.98);
   }
 
-  /* Enhanced Tablist Spacing - Billing Page Optimized */
+  /* Enhanced Tablist Spacing - Mobile First Optimized */
   .parcego-tabs-enhanced {
-    --tab-padding-x: 16px;
+    --tab-padding-x: 12px;
     --tab-padding-y: 6px;
-    --tab-gap: 4px;
-    --tab-height: 32px;
-    --tab-max-width: 55rem;
-    --tab-min-height: 2.5rem;
+    --tab-gap: 2px;
+    --tab-height: 36px;
+    --tab-max-width: 100%;
+    --tab-min-height: 2rem;
+    --tab-border-radius: 6px;
+    position: relative;
+    z-index: 20;
+    isolation: isolate;
   }
 
   .parcego-tabs-enhanced .parcego-tabs-list {
     background-color: hsl(var(--muted));
-    border-radius: 8px;
+    border-radius: var(--tab-border-radius);
     padding: var(--tab-gap);
     gap: var(--tab-gap);
-    height: var(--tab-height);
+    height: auto;
+    min-height: var(--tab-height);
     max-width: var(--tab-max-width);
     width: 100%;
     margin: 0 auto;
-    display: grid;
+    display: flex;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    position: relative;
+    z-index: 30;
+    isolation: isolate;
+  }
+  
+  .parcego-tabs-enhanced .parcego-tabs-list::-webkit-scrollbar {
+    display: none;
   }
 
   .parcego-tabs-enhanced .parcego-tabs-trigger {
     padding: var(--tab-padding-y) var(--tab-padding-x);
-    border-radius: 6px;
+    border-radius: calc(var(--tab-border-radius) - 2px);
     font-weight: 500;
     transition: all var(--transition-quick) var(--easing-smooth);
     min-height: var(--tab-min-height);
-    height: calc(var(--tab-height) - (var(--tab-gap) * 2));
+    height: auto;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     white-space: nowrap;
     text-align: center;
-    line-height: 1.2;
+    line-height: 1.3;
+    flex-shrink: 0;
+    font-size: 0.875rem;
+    position: relative;
+    z-index: 1;
   }
 
   .parcego-tabs-enhanced .parcego-tabs-trigger[data-state="active"] {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 0 0 1px rgba(255, 255, 255, 0.05);
     border: 1px solid hsl(var(--border));
-    font-weight: 900;
+    font-weight: 600;
     min-height: var(--tab-min-height);
-    height: calc(var(--tab-height) - (var(--tab-gap) * 2));
+    z-index: 2;
   }
 
   .parcego-tabs-enhanced .parcego-tabs-trigger:hover:not([data-state="active"]) {
@@ -394,66 +447,231 @@ body {
     color: hsl(var(--accent-foreground));
   }
 
-  /* Responsive tab adjustments - Billing Page Optimized */
-  @media (max-width: 640px) {
+  /* Mobile portrait optimizations with visibility fixes */
+  @media (max-width: 480px) {
     .parcego-tabs-enhanced {
-      --tab-padding-x: 12px;
+      --tab-padding-x: 8px;
       --tab-padding-y: 4px;
-      --tab-height: 28px;
-      --tab-min-height: 2rem;
+      --tab-min-height: 1.75rem;
+      --tab-gap: 1px;
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      isolation: isolate;
     }
     
     .parcego-tabs-enhanced .parcego-tabs-list {
-      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-      gap: 2px;
       padding: 2px;
+      gap: 1px;
+      position: relative;
+      z-index: 51;
+      background-color: hsl(var(--muted) / 0.98);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid hsl(var(--border) / 0.2);
+    }
+    
+    .parcego-tabs-enhanced .parcego-tabs-trigger {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      min-height: 1.75rem;
+      position: relative;
+      z-index: 1;
+    }
+    
+    .parcego-tabs-enhanced .parcego-tabs-trigger[data-state="active"] {
+      background-color: hsl(var(--background) / 0.95);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      z-index: 2;
+    }
+  }
+  
+  /* Mobile landscape and small tablets with visibility fixes */
+  @media (max-width: 640px) and (min-width: 481px) {
+    .parcego-tabs-enhanced {
+      --tab-padding-x: 10px;
+      --tab-padding-y: 5px;
+      --tab-min-height: 1.875rem;
+      position: sticky;
+      top: 0;
+      z-index: 45;
+    }
+    
+    .parcego-tabs-enhanced .parcego-tabs-list {
+      position: relative;
+      z-index: 46;
+      background-color: hsl(var(--muted) / 0.95);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+    
+    .parcego-tabs-enhanced .parcego-tabs-trigger {
+      font-size: 0.8125rem;
+    }
+  }
+
+  /* Tablet styles with visibility optimization */
+  @media (min-width: 641px) and (max-width: 1023px) {
+    .parcego-tabs-enhanced {
+      --tab-padding-x: 14px;
+      --tab-padding-y: 6px;
+      --tab-min-height: 2.25rem;
+      position: relative;
+      z-index: 25;
+    }
+    
+    .parcego-tabs-enhanced .parcego-tabs-list {
+      gap: 3px;
+      padding: 3px;
+      position: relative;
+      z-index: 26;
     }
     
     .parcego-tabs-enhanced .parcego-tabs-trigger {
       font-size: 0.875rem;
-      min-height: var(--tab-min-height);
-      height: calc(var(--tab-height) - 4px);
     }
   }
 
-  @media (min-width: 641px) and (max-width: 1023px) {
-    .parcego-tabs-enhanced .parcego-tabs-list {
-      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-      gap: 6px;
-      padding: 6px;
-    }
-  }
-
+  /* Desktop styles with optimal visibility */
   @media (min-width: 1024px) {
     .parcego-tabs-enhanced {
-      --tab-padding-x: 20px;
+      --tab-padding-x: 16px;
       --tab-padding-y: 8px;
-      --tab-height: 36px;
       --tab-min-height: 2.5rem;
+      position: relative;
+      z-index: 20;
     }
     
     .parcego-tabs-enhanced .parcego-tabs-list {
-      gap: 8px;
-      padding: 8px;
-    }
-  }
-
-  /* Ensure perfect mobile alignment - Billing Page Optimized */
-  @media (max-width: 480px) {
-    .parcego-tabs-enhanced .parcego-tabs-list {
-      grid-template-columns: 1fr;
-      gap: 3px;
-      padding: 3px;
+      gap: 4px;
+      padding: 4px;
+      position: relative;
+      z-index: 21;
     }
     
     .parcego-tabs-enhanced .parcego-tabs-trigger {
-      justify-content: center;
-      text-align: center;
-      width: 100%;
-      min-height: var(--tab-min-height);
+      font-size: 0.875rem;
     }
   }
 
+  /* Compact horizontal style for all screen sizes */
+  .parcego-tabs-enhanced.compact-horizontal {
+    position: relative;
+    z-index: 35;
+  }
+  
+  .parcego-tabs-enhanced.compact-horizontal .parcego-tabs-list {
+    background-color: transparent;
+    padding: 0;
+    gap: 8px;
+    border-bottom: 1px solid hsl(var(--border));
+    border-radius: 0;
+    position: relative;
+    z-index: 36;
+  }
+  
+  .parcego-tabs-enhanced.compact-horizontal .parcego-tabs-trigger {
+    background-color: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    border-radius: 0;
+    padding: 8px 12px;
+    font-weight: 500;
+    color: hsl(var(--muted-foreground));
+    position: relative;
+    z-index: 1;
+  }
+  
+  .parcego-tabs-enhanced.compact-horizontal .parcego-tabs-trigger[data-state="active"] {
+    background-color: transparent;
+    color: hsl(var(--foreground));
+    border-bottom-color: hsl(var(--primary));
+    box-shadow: none;
+    border: none;
+    border-bottom: 2px solid hsl(var(--primary));
+    font-weight: 600;
+    z-index: 2;
+  }
+  
+  .parcego-tabs-enhanced.compact-horizontal .parcego-tabs-trigger:hover:not([data-state="active"]) {
+    background-color: hsl(var(--accent));
+    color: hsl(var(--accent-foreground));
+    border-radius: 4px;
+  }
+
+  /* Additional mobile optimizations and visibility fixes */
+  @media (max-width: 768px) {
+    .parcego-tabs-enhanced {
+      position: sticky;
+      top: 0;
+      z-index: 40;
+    }
+    
+    .parcego-tabs-enhanced .parcego-tabs-list {
+      justify-content: flex-start;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      position: relative;
+      z-index: 41;
+      background-color: hsl(var(--muted) / 0.95);
+      backdrop-filter: blur(8px);
+    }
+    
+    .parcego-tabs-enhanced .parcego-tabs-trigger {
+      min-width: max-content;
+    }
+  }
+  
+  /* Ensure tabs are always visible above content */
+  .parcego-tabs-enhanced {
+    contain: layout style;
+  }
+  
+  /* Prevent scrollable content from overlapping tabs */
+  [data-scroll-container],
+  .overflow-auto,
+  .overflow-x-auto,
+  .overflow-y-auto {
+    position: relative;
+    z-index: 10;
+  }
+  
+  /* Special handling for nested scroll containers */
+  .parcego-tabs-enhanced + [data-scroll-container],
+  .parcego-tabs-enhanced + .overflow-auto,
+  .parcego-tabs-enhanced + .overflow-x-auto,
+  .parcego-tabs-enhanced + .overflow-y-auto {
+    margin-top: 1px;
+    z-index: 5;
+  }
+  
+  /* Fix for horizontal scrollers overlapping tabs */
+  [data-radix-scroll-area-viewport],
+  .horizontal-scroll,
+  .scroll-container-horizontal {
+    position: relative;
+    z-index: 8;
+  }
+  
+  /* Ensure tab content doesn't interfere with tab navigation */
+  .parcego-tabs-enhanced [role="tabpanel"] {
+    position: relative;
+    z-index: 15;
+    margin-top: 2px;
+  }
+  
+  /* Override any conflicting z-index on parent containers */
+  .parcego-tabs-enhanced {
+    transform: translateZ(0); /* Create new stacking context */
+  }
+  
+  /* Specific fixes for common layout patterns */
+  .parcego-tabs-enhanced .parcego-tabs-list {
+    will-change: scroll-position;
+    transform: translate3d(0, 0, 0); /* Hardware acceleration */
+  }
+  
   /* Drag and drop animations */
   .parcego-delivery-item[draggable="true"] {
     transition: all var(--transition-normal) var(--easing-premium);
@@ -937,9 +1155,17 @@ body {
   transform: scale(1.1);
 }
 
-/* Status badge hover effects */
+/* Status badge styling - no hover effects */
 .status-badge {
-  /* Removed hover effects and shadows */
+  /* Clean status badge styling without hover effects */
+  transition: none;
+}
+
+/* Remove any hover effects from status badges */
+[class*="badge"]:hover,
+[class*="Badge"]:hover {
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 /* Table row hover effects */
@@ -1023,5 +1249,54 @@ body {
   
   .analytics-insights-grid .quick-actions-card {
     grid-column: span 2;
+  }
+}
+
+/* Print Styles for Shipment Details */
+@media print {
+  /* Hide non-printable elements */
+  .no-print {
+    display: none !important;
+  }
+  
+  /* Ensure proper page layout for shipment details */
+  @page {
+    size: A4;
+    margin: 20mm;
+  }
+  
+  /* Reset body styles for printing */
+  body {
+    background: white !important;
+    color: black !important;
+    font-size: 12pt;
+    line-height: 1.4;
+  }
+  
+  /* Ensure content fits on page */
+  .print-content {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* Remove shadows and borders for clean print */
+  * {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+  
+  /* Ensure proper text contrast */
+  .text-gray-600,
+  .text-gray-500,
+  .text-gray-700 {
+    color: black !important;
+  }
+  
+  /* Make sure badges and status indicators are visible */
+  .badge {
+    border: 1px solid black !important;
+    background: white !important;
+    color: black !important;
   }
 }

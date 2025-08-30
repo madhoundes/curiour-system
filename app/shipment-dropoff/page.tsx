@@ -199,7 +199,7 @@ export default function ShipmentDropoffPage() {
                 Back to Purchase
               </Button>
               <div className="h-6 border-l border-gray-300"></div>
-              <h1 className="text-xl font-semibold text-gray-900">Select Drop-off Location</h1>
+              <h1 className="text-xl font-semibold text-gray-900 -mt-4">Select Drop-off Location</h1>
             </div>
             
             <div className="flex items-center space-x-3">

@@ -553,34 +553,50 @@ const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Icon name="Printer" size={20} />
-            Print Labels ({selectedShipments.length} selected)
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white border-0 shadow-2xl">
+        <DialogHeader className="pb-4 border-b border-gray-100">
+          <DialogTitle className="flex items-center gap-3 text-gray-900 text-xl font-semibold">
+            <div className="p-2 bg-blue-50 rounded-lg">
+              <Icon name="Printer" size={24} className="text-blue-600" />
+            </div>
+            <span>Print Labels ({selectedShipments.length} selected)</span>
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
-          {/* Selected Shipments Summary */}
-          <div>
-            <h3 className="text-lg font-semibold mb-3">Selected Shipments</h3>
-            <div className="grid gap-3 max-h-40 overflow-y-auto">
-              {selectedShipments.map((shipment) => (
-                <Card key={shipment.id} className="p-3">
-                  <CardContent className="p-0">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="font-medium text-sm">{shipment.trackingNumber}</div>
-                        <div className="text-xs text-gray-600">
+        <div className="space-y-4 py-2">
+          {/* Selected Shipments Summary - Enhanced Layout */}
+          <div className="space-y-3">
+            <h3 className="text-lg font-semibold text-gray-900 mb-3">Selected Shipments</h3>
+            <div className="grid gap-3 max-h-48 overflow-y-auto pr-2">
+              {selectedShipments.map((shipment, index) => (
+                <Card 
+                  key={shipment.id} 
+                  className="parcego-shipment-card border border-gray-200 bg-gradient-to-r from-gray-50 to-white hover:from-blue-50 hover:to-blue-50 transition-all duration-200 ease-in-out"
+                >
+                  <CardContent className="py-1 px-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 space-y-1.5">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0"></div>
+                          <div className="font-mono font-semibold text-gray-900 text-sm">
+                            {shipment.trackingNumber}
+                          </div>
+                        </div>
+                        <div className="text-sm text-gray-700 font-medium">
                           To: {shipment.recipient.name} • {shipment.recipient.city}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs">
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <Badge 
+                          variant="outline" 
+                          className="parcego-service-badge bg-blue-50 text-blue-700 border-blue-200 text-xs font-medium px-3 py-1"
+                        >
                           {shipment.service}
                         </Badge>
-                        <Badge variant="outline" className="text-xs">
+                        <Badge 
+                          variant="outline" 
+                          className="parcego-weight-badge bg-green-50 text-green-700 border-green-200 text-xs font-medium px-3 py-1"
+                        >
                           {shipment.weightKg.toFixed(2)} kg
                         </Badge>
                       </div>
@@ -591,86 +607,134 @@ const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({
             </div>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-3">
+          {/* Action Buttons - Enhanced CTA Consistency */}
+          <div className="flex items-center justify-center">
             <Button
               onClick={generateLabelsPDF}
               disabled={isGenerating || selectedShipments.length === 0}
-              className="flex-1"
+              className="parcego-generate-labels-btn w-full max-w-md h-12 text-base font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200 ease-in-out focus:ring-4 focus:ring-blue-200"
+              id="parcego-generate-labels-btn"
             >
-              <Icon name="FileText" size={16} className="mr-2" />
-              {isGenerating ? 'Generating...' : 'Generate Labels'}
+              <Icon name="FileText" size={20} className="mr-3" />
+              {isGenerating ? 'Generating Labels...' : 'Generate Labels'}
             </Button>
           </div>
 
-          {/* Generated PDF Preview */}
+          {/* Generated PDF Preview - Enhanced Success State */}
           {generatedPdfUrl && (
-            <div className="space-y-4">
-              <div className="border rounded-lg p-4 bg-gray-50">
-                <h4 className="font-medium mb-2">Labels Generated Successfully!</h4>
-                <p className="text-sm text-gray-600 mb-3">
-                  {selectedShipments.length} label{selectedShipments.length > 1 ? 's' : ''} ready for printing
-                </p>
-                
-                <div className="flex items-center gap-3">
-                  <Button onClick={handlePrint} variant="default">
-                    <Icon name="Printer" size={16} className="mr-2" />
-                    Print Now
-                  </Button>
-                  <Button onClick={handleDownload} variant="outline">
-                    <Icon name="Download" size={16} className="mr-2" />
-                    Download PDF
-                  </Button>
-                </div>
-              </div>
+            <div className="space-y-6">
+              <Card className="parcego-success-card border-2 border-green-200 bg-gradient-to-r from-green-50 to-emerald-50">
+                <CardContent className="p-2">
+                  <div className="flex items-start space-x-4">
+                    <div className="p-3 bg-green-100 rounded-full">
+                      <Icon name="CheckCircle" size={24} className="text-green-600" />
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-bold text-green-900 text-lg mb-1">
+                        Labels Generated Successfully!
+                      </h4>
+                      <p className="text-green-700 mb-4 text-sm">
+                        {selectedShipments.length} label{selectedShipments.length > 1 ? 's' : ''} ready for printing
+                      </p>
+                      
+                      <div className="flex items-center gap-4">
+                        <Button 
+                          onClick={handlePrint} 
+                          variant="default"
+                          className="parcego-print-now-btn bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 transition-all duration-200 ease-in-out focus:ring-4 focus:ring-blue-200"
+                          id="parcego-print-now-btn"
+                        >
+                          <Icon name="Printer" size={18} className="mr-2" />
+                          Print Now
+                        </Button>
+                        <Button 
+                          onClick={handleDownload} 
+                          variant="outline"
+                          className="parcego-download-pdf-btn border-2 border-gray-300 bg-white text-gray-700 hover:bg-gray-50 hover:border-gray-400 font-semibold px-6 py-3 transition-all duration-200 ease-in-out focus:ring-4 focus:ring-gray-200"
+                          id="parcego-download-pdf-btn"
+                        >
+                          <Icon name="Download" size={18} className="mr-2" />
+                          Download PDF
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-              {/* PDF Preview */}
-              <div className="border rounded-lg overflow-hidden">
+              {/* PDF Preview - Enhanced Controls */}
+              <div className="border border-gray-200 rounded-lg overflow-hidden bg-white">
+                <div className="bg-gray-900 px-4 py-3 flex items-center justify-between">
+                  <div className="flex items-center space-x-4 text-white text-sm">
+                    <span className="font-mono">1 / {selectedShipments.length}</span>
+                    <span className="text-gray-300">•</span>
+                    <span>Label Preview</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button size="sm" variant="ghost" className="text-gray-300 hover:text-white hover:bg-gray-800">
+                      <Icon name="ZoomOut" size={16} />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="text-gray-300 hover:text-white hover:bg-gray-800">
+                      <Icon name="ZoomIn" size={16} />
+                    </Button>
+                    <Button size="sm" variant="ghost" className="text-gray-300 hover:text-white hover:bg-gray-800">
+                      <Icon name="RotateCw" size={16} />
+                    </Button>
+                  </div>
+                </div>
                 <iframe
                   src={generatedPdfUrl}
-                  className="w-full h-96"
+                  className="w-full h-96 border-0"
                   title="Generated Labels Preview"
                 />
               </div>
             </div>
           )}
 
-          {/* Instructions */}
-          <div className="text-sm text-gray-600 bg-blue-50 p-3 rounded-lg">
-            <h4 className="font-medium text-blue-900 mb-2">Printing Instructions:</h4>
-            <ul className="list-disc list-inside space-y-1 text-blue-800">
-              <li>Ensure your printer supports 4x6 inch labels</li>
-              <li>Use high-quality label paper for best results</li>
-              <li>Test print on regular paper first</li>
-              <li>Labels are optimized for thermal printers</li>
-            </ul>
-          </div>
-
-          {/* Print Settings Guide */}
-          <div className="text-sm text-gray-600 bg-green-50 p-3 rounded-lg border border-green-200">
-            <h4 className="font-medium text-green-900 mb-2">🎯 Optimal Print Settings:</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-green-800">
-              <div>
-                <strong>Page Setup:</strong>
-                <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li>Paper Size: 4×6 inches</li>
-                  <li>Orientation: Portrait</li>
-                  <li>Margins: 0.1 inches</li>
-                  <li>Scale: 100% (no scaling)</li>
-                </ul>
-              </div>
-              <div>
-                <strong>Print Quality:</strong>
-                <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li>Resolution: 300 DPI or higher</li>
-                  <li>Color: Black & White or Color</li>
-                  <li>Paper Type: Label paper</li>
-                  <li>Print Mode: Normal</li>
-                </ul>
-              </div>
+          {/* Instructions - Enhanced Visual Hierarchy */}
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h4 className="font-semibold text-blue-900 mb-3 flex items-center">
+                <Icon name="Info" size={18} className="mr-2 text-blue-600" />
+                Printing Instructions
+              </h4>
+              <ul className="list-disc list-inside space-y-2 text-blue-800 text-sm">
+                <li>Ensure your printer supports 4x6 inch labels</li>
+                <li>Use high-quality label paper for best results</li>
+                <li>Test print on regular paper first</li>
+                <li>Labels are optimized for thermal printers</li>
+              </ul>
             </div>
-            <div className="mt-3 p-2 bg-green-100 rounded text-green-900 text-xs">
-              <strong>💡 Tip:</strong> The print preview will open in a new window with these settings automatically configured.
+
+            {/* Print Settings Guide - Enhanced Layout */}
+            <div className="bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-lg p-4">
+              <h4 className="font-semibold text-green-900 mb-3 flex items-center">
+                <Icon name="Settings" size={18} className="mr-2 text-green-600" />
+                🎯 Optimal Print Settings
+              </h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-green-800 text-sm">
+                <div>
+                  <strong className="text-green-900">Page Setup:</strong>
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>Paper Size: 4×6 inches</li>
+                    <li>Orientation: Portrait</li>
+                    <li>Margins: 0.1 inches</li>
+                    <li>Scale: 100% (no scaling)</li>
+                  </ul>
+                </div>
+                <div>
+                  <strong className="text-green-900">Print Quality:</strong>
+                  <ul className="list-disc list-inside mt-2 space-y-1">
+                    <li>Resolution: 300 DPI or higher</li>
+                    <li>Color: Black & White or Color</li>
+                    <li>Paper Type: Label paper</li>
+                    <li>Print Mode: Normal</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="mt-4 p-3 bg-green-100 rounded-lg text-green-900 text-xs">
+                <strong>💡 Tip:</strong> The print preview will open in a new window with these settings automatically configured.
+              </div>
             </div>
           </div>
         </div>

@@ -124,7 +124,7 @@ export default function TestPDFPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-8">
       <div className="max-w-2xl mx-auto">
-                        <h1 className="text-2xl font-bold text-gray-900 mb-6">PDF Generation Test</h1>
+                        <h1 className="text-2xl font-bold text-gray-900 mb-6 -mt-4">PDF Generation Test</h1>
         
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-xl font-semibold text-gray-800 mb-4">Test PDF Generation</h2>

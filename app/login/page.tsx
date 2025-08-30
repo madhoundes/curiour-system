@@ -57,14 +57,24 @@ const Login03Page = () => {
     resolver: zodResolver(signupFormSchema),
   });
 
+  // Function to set mock authentication cookie and redirect
+  const handleSuccessfulAuth = () => {
+    // Set a mock authentication cookie
+    document.cookie = "mock-auth=true; path=/; max-age=86400"; // 24 hours
+    
+    // Redirect to dashboard
+    router.push("/dashboard");
+  };
+
   const onLoginSubmit = async (data: z.infer<typeof loginFormSchema>) => {
     setIsLoading(true);
     console.log("Login data:", data);
     
+    // Simulate API call delay
     setTimeout(() => {
       setIsLoading(false);
       console.log("Login successful - redirect to dashboard");
-      router.push("/dashboard");
+      handleSuccessfulAuth();
     }, 2000);
   };
 
@@ -72,25 +82,28 @@ const Login03Page = () => {
     setIsLoading(true);
     console.log("Signup data:", data);
     
+    // Simulate API call delay
     setTimeout(() => {
       setIsLoading(false);
       console.log("Signup successful - redirect to dashboard");
-      router.push("/dashboard");
+      handleSuccessfulAuth();
     }, 2000);
   };
 
   const handleGuestLogin = () => {
     setIsLoading(true);
+    
+    // Simulate API call delay
     setTimeout(() => {
       setIsLoading(false);
       console.log("Guest login successful - redirect to dashboard");
-      router.push("/dashboard");
+      handleSuccessfulAuth();
     }, 2000);
   };
 
   return (
-    <div className="h-screen flex items-center justify-center bg-white">
-      <div className="w-full h-full grid lg:grid-cols-2">
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="w-full grid lg:grid-cols-2 min-h-screen">
         {/* Left Side - Login Form */}
         <div className="max-w-md m-auto w-full flex flex-col items-center px-6">
           {/* Logo and Brand */}
@@ -106,17 +119,33 @@ const Login03Page = () => {
           </div>
 
           {/* Sample Credentials */}
-          <div className="mb-6 p-3 rounded-md bg-gray-50 border border-gray-200 text-left text-xs text-gray-600 w-full">
-            <span className="font-semibold">Sample Credentials:</span><br />
-            Email: <span className="select-all">merchant@business.com</span><br />
-            Password: <span className="select-all">password123</span>
-          </div>
+          {/* <div className="mb-5 w-full rounded-lg border border-border bg-muted/50 p-4 text-left text-sm text-muted-foreground">
+            <p className="mb-1 font-medium text-foreground">Sample Credentials</p>
+            <p>
+              Email: <span className="select-all font-medium text-foreground">merchant@business.com</span>
+            </p>
+            <p>
+              Password: <span className="select-all font-medium text-foreground">password123</span>
+            </p>
+          </div> */}
 
           {/* Tabs for Login/Signup */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6">
-              <TabsTrigger value="login">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Create Account</TabsTrigger>
+            <TabsList className="mb-4 grid w-full grid-cols-2 gap-2 bg-transparent p-0 overflow-hidden">
+              <TabsTrigger
+                value="login"
+                aria-label="Sign in tab"
+                className="h-10 rounded-md bg-accent text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                Sign In
+              </TabsTrigger>
+              <TabsTrigger
+                value="signup"
+                aria-label="Create account tab"
+                className="h-10 rounded-md bg-accent text-foreground data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
+              >
+                Create Account
+              </TabsTrigger>
             </TabsList>
 
             {/* Login Tab */}
@@ -136,7 +165,7 @@ const Login03Page = () => {
                           <Input
                             type="email"
                             placeholder="merchant@business.com"
-                            className="w-full"
+                            className="w-full h-11"
                             {...field}
                           />
                         </FormControl>
@@ -154,7 +183,7 @@ const Login03Page = () => {
                           <Input
                             type="password"
                             placeholder="••••••••"
-                            className="w-full"
+                            className="w-full h-11"
                             {...field}
                           />
                         </FormControl>
@@ -164,7 +193,7 @@ const Login03Page = () => {
                   />
                   <Button 
                     type="submit" 
-                    className="mt-4 w-full"
+                    className="mt-2 h-11 w-full"
                     disabled={isLoading}
                   >
                     {isLoading ? "Signing In..." : "Sign In Securely"}
@@ -173,8 +202,8 @@ const Login03Page = () => {
                   {/* Guest Login Button */}
                   <Button
                     type="button"
-                    variant="outline"
-                    className="w-full"
+                    variant="secondary"
+                    className="h-11 w-full"
                     disabled={isLoading}
                     onClick={handleGuestLogin}
                   >
@@ -183,7 +212,7 @@ const Login03Page = () => {
                 </form>
               </Form>
 
-              <div className="space-y-3">
+              <div className="mt-3 space-y-2">
                 <Link
                   href="#"
                   className="text-sm block underline text-muted-foreground text-center"
@@ -218,7 +247,7 @@ const Login03Page = () => {
                         <FormItem>
                           <FormLabel>First Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="John" className="w-full" {...field} />
+                            <Input placeholder="John" className="w-full h-11" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -231,7 +260,7 @@ const Login03Page = () => {
                         <FormItem>
                           <FormLabel>Last Name</FormLabel>
                           <FormControl>
-                            <Input placeholder="Doe" className="w-full" {...field} />
+                            <Input placeholder="Doe" className="w-full h-11" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -246,7 +275,7 @@ const Login03Page = () => {
                       <FormItem>
                         <FormLabel>Business Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Your Business LLC" className="w-full" {...field} />
+                          <Input placeholder="Your Business LLC" className="w-full h-11" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -263,7 +292,7 @@ const Login03Page = () => {
                           <Input
                             type="email"
                             placeholder="merchant@business.com"
-                            className="w-full"
+                            className="w-full h-11"
                             {...field}
                           />
                         </FormControl>
@@ -282,7 +311,7 @@ const Login03Page = () => {
                           <Input
                             type="password"
                             placeholder="••••••••"
-                            className="w-full"
+                            className="w-full h-11"
                             {...field}
                           />
                         </FormControl>
@@ -293,7 +322,7 @@ const Login03Page = () => {
                   
                   <Button 
                     type="submit" 
-                    className="w-full"
+                    className="h-11 w-full"
                     disabled={isLoading}
                   >
                     {isLoading ? "Creating Account..." : "Create Account"}
@@ -318,31 +347,31 @@ const Login03Page = () => {
         </div>
 
         {/* Right Side - Background/Info */}
-        <div className="bg-muted hidden lg:block relative">
+        <div className="bg-muted hidden lg:flex relative min-h-screen items-center justify-center">
           <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-indigo-700 opacity-90"></div>
-          <div className="relative z-10 h-full flex flex-col justify-center items-center text-white p-12">
+          <div className="relative z-10 flex flex-col justify-center items-center text-white p-12">
             <div className="text-center max-w-md">
               {/* Removed box icon above headline */}
               <h2 className="text-2xl font-bold mb-4">
                 Streamline Your Shipping Operations
               </h2>
               <p className="text-lg text-blue-100 mb-8">
-                Create shipments, track deliveries, and grow your business with our comprehensive courier platform.
+                Create shipments, track deliveries, and grow your business with Parcego.
               </p>
               
               {/* Trust Indicators */}
-              <div className="space-y-4 flex flex-col">
-                <div className="flex items-center justify-center space-x-2">
-                  <Icon name="Shield" size={20} className="text-blue-200" />
-                  <span className="text-sm">SSL Encrypted</span>
+              <div className="flex flex-row justify-center items-center space-x-6 text-center">
+                <div className="flex flex-col items-center space-y-1">
+                  <Icon name="Shield" size={24} className="text-blue-200" />
+                  <span className="text-base">SSL Encrypted</span>
                 </div>
-                <div className="flex items-center justify-center space-x-2">
-                  <Icon name="Clock" size={20} className="text-blue-200" />
-                  <span className="text-sm">24/7 Support</span>
+                <div className="flex flex-col items-center space-y-1">
+                  <Icon name="Clock" size={24} className="text-blue-200" />
+                  <span className="text-base">24/7 Support</span>
                 </div>
-                <div className="flex items-center justify-center space-x-2">
-                  <Icon name="Package" size={20} className="text-blue-200" />
-                  <span className="text-sm">99.9% Uptime</span>
+                <div className="flex flex-col items-center space-y-1">
+                  <Icon name="Package" size={24} className="text-blue-200" />
+                  <span className="text-base">99.9% Uptime</span>
                 </div>
               </div>
             </div>

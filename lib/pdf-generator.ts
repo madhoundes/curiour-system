@@ -44,17 +44,58 @@ export async function generatePolishedShippingLabel(data: ShippingLabelData): Pr
  * Generate shipping label blob for preview or external use
  */
 export async function generateShippingLabelBlob(data: ShippingLabelData): Promise<Blob> {
+  console.log('generateShippingLabelBlob: Starting PDF generation with data:', data);
+  
   try {
+    console.log('generateShippingLabelBlob: Importing React-PDF modules...');
+    
     // Dynamically import React-PDF to avoid SSR issues and chunk loading problems
     const { pdf } = await import('@react-pdf/renderer');
     const { default: PolishedShippingLabel } = await import('@/components/pdf/polished-shipping-label');
     
+    console.log('generateShippingLabelBlob: Modules imported successfully');
+    
+    // Validate required data
+    if (!data.trackingNumber) {
+      throw new Error('Tracking number is required');
+    }
+    if (!data.sender?.name) {
+      throw new Error('Sender information is incomplete');
+    }
+    if (!data.recipient?.name) {
+      throw new Error('Recipient information is incomplete');
+    }
+    
+    console.log('generateShippingLabelBlob: Data validation passed');
+    
     const doc = React.createElement(PolishedShippingLabel, { data });
+    console.log('generateShippingLabelBlob: React element created');
+    
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return await pdf(doc as any).toBlob();
+    const blob = await pdf(doc as any).toBlob();
+    
+    console.log('generateShippingLabelBlob: PDF blob generated, size:', blob?.size || 'unknown');
+    
+    if (!blob || blob.size === 0) {
+      throw new Error('Generated PDF blob is empty');
+    }
+    
+    return blob;
   } catch (error) {
     console.error('Error generating PDF blob:', error);
-    throw new Error('Failed to generate PDF blob.');
+    
+    // Provide more specific error messages
+    if (error instanceof Error) {
+      if (error.message.includes('Cannot resolve module')) {
+        throw new Error('PDF generation dependencies not found. Please check your build configuration.');
+      }
+      if (error.message.includes('Font')) {
+        throw new Error('Font loading error. Please check your font configuration.');
+      }
+      throw new Error(`PDF generation failed: ${error.message}`);
+    }
+    
+    throw new Error('Failed to generate PDF blob due to unknown error.');
   }
 }
 
@@ -92,5 +133,5 @@ export const sampleShippingData: ShippingLabelData = {
     type: 'box',
   },
   shipDate: '8/25/2025',
-  logoUrl: '/Logo/Horizontal-logo.png', // Updated path to match project structure
+  logoUrl: '/Logo/Horizontal-logo.svg', // Updated to use custom SVG logo
 };

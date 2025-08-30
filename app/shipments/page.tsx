@@ -25,6 +25,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
 import type { Shipment, ShipmentStatus } from "@/lib/mock/shipments";
 import { formatCurrency, generateMockShipments } from "@/lib/mock/shipments";
 import PrintLabelsModal from "./print-labels-modal";
@@ -37,43 +44,43 @@ const getStatusBadge = (status: ShipmentStatus) => {
   const statusConfig = {
     DELIVERED: {
       variant: "default" as const,
-      className: "bg-green-50 text-green-700 border-green-200 hover:bg-green-100 transition-colors",
+      className: "bg-emerald-50 text-emerald-800 border-emerald-200",
       label: "Delivered",
       icon: "CheckCircle"
     },
     IN_TRANSIT: {
       variant: "secondary" as const,
-      className: "bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100 transition-colors",
+      className: "bg-blue-50 text-blue-800 border-blue-200",
       label: "In Transit",
       icon: "Truck"
     },
     LABEL_CREATED: {
       variant: "outline" as const,
-      className: "bg-blue-50 text-blue-700 border-blue-200 hover:bg-green-100 transition-colors",
+      className: "bg-slate-50 text-slate-700 border-slate-300",
       label: "Label Created",
       icon: "FileText"
     },
     SCANNED: {
       variant: "outline" as const,
-      className: "bg-purple-50 text-purple-700 border-purple-200 hover:bg-green-100 transition-colors",
+      className: "bg-indigo-50 text-indigo-800 border-indigo-200",
       label: "Scanned",
       icon: "Scan"
     },
     OUT_FOR_DELIVERY: {
       variant: "secondary" as const,
-      className: "bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-green-100 transition-colors",
+      className: "bg-amber-50 text-amber-800 border-amber-200",
       label: "Out for Delivery",
       icon: "Package"
     },
     FAILED: {
       variant: "destructive" as const,
-      className: "bg-red-50 text-red-700 border-red-200 hover:bg-green-100 transition-colors",
+      className: "bg-red-50 text-red-800 border-red-200",
       label: "Failed",
       icon: "XCircle"
     },
     CANCELLED: {
       variant: "destructive" as const,
-      className: "bg-gray-50 text-gray-700 border-gray-200 hover:bg-green-100 transition-colors",
+      className: "bg-gray-50 text-gray-700 border-gray-300",
       label: "Cancelled",
       icon: "X"
     }
@@ -104,6 +111,9 @@ export default function ShipmentsPage() {
   const [showPrintLabelsModal, setShowPrintLabelsModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [shipmentToCancel, setShipmentToCancel] = useState<{ id: string; trackingNumber: string } | null>(null);
+  const [showReorderDialog, setShowReorderDialog] = useState(false);
+  const [shipmentToReorder, setShipmentToReorder] = useState<Shipment | null>(null);
+  const [isReordering, setIsReordering] = useState(false);
 
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pageSize, setPageSize] = useState<number>(25);
@@ -156,6 +166,49 @@ export default function ShipmentsPage() {
   const openCancelDialog = (shipment: Shipment) => {
     setShipmentToCancel({ id: shipment.id, trackingNumber: shipment.trackingNumber });
     setShowCancelDialog(true);
+  };
+
+  // Enhanced reorder functionality with better UX
+  const handleReorderShipment = async (shipment: Shipment) => {
+    setShipmentToReorder(shipment);
+    setShowReorderDialog(true);
+  };
+
+  const confirmReorder = async () => {
+    if (!shipmentToReorder) return;
+
+    setIsReordering(true);
+    
+    try {
+      // Simulate API call delay for better UX
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Navigate to create shipment with pre-filled data
+      const queryParams = new URLSearchParams({
+        from: shipmentToReorder.id,
+        recipient: shipmentToReorder.recipient.name,
+        address: shipmentToReorder.recipient.address1,
+        city: shipmentToReorder.recipient.city,
+        province: shipmentToReorder.recipient.province || '',
+        postalCode: shipmentToReorder.recipient.postalCode,
+        country: shipmentToReorder.recipient.country,
+        service: shipmentToReorder.service,
+        weight: shipmentToReorder.weightKg.toString(),
+        notes: `Reordered from shipment ${shipmentToReorder.trackingNumber}`
+      });
+
+      router.push(`/create-shipment?${queryParams.toString()}`);
+      
+      // Close dialog and reset state
+      setShowReorderDialog(false);
+      setShipmentToReorder(null);
+      
+    } catch (error) {
+      console.error("Failed to reorder shipment:", error);
+      alert("Failed to reorder shipment. Please try again.");
+    } finally {
+      setIsReordering(false);
+    }
   };
 
   const handleExportCsv = () => {
@@ -279,7 +332,6 @@ export default function ShipmentsPage() {
       <PageHeader
         title="Shipments"
         description="Manage and track all your shipments in one place"
-        icon="Package"
       />
 
       {/* Search and Filters */}
@@ -389,7 +441,7 @@ export default function ShipmentsPage() {
                 {paged.map((s) => {
                   const isSelected = selectedIds.has(s.id);
                   return (
-                    <tr key={s.id} className="border-t">
+                    <tr key={s.id} className="border-t hover:bg-gray-50 transition-colors duration-150">
                       <td className="px-3 py-2">
                         <input
                           id={`parcego-shipments-rowchk-${s.id}`}
@@ -423,42 +475,55 @@ export default function ShipmentsPage() {
                       <td className="px-3 py-2">{formatCurrency(s.cost)}</td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            id={`parcego-shipments-rowactions-${s.id}`}
-                            onClick={() => router.push(`/shipments/${encodeURIComponent(s.id)}`)}
-                            aria-label={`View details for ${s.id}`}
-                          >
-                            <Icon name="Eye" size={16} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => router.push(`/create-shipment?from=${encodeURIComponent(s.id)}`)}
-                            aria-label={`Re-ship ${s.id}`}
-                          >
-                            <Icon name="Repeat" size={16} />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => alert("Printing label (mock)…")}
-                            aria-label={`Print label for ${s.id}`}
-                          >
-                            <Icon name="Printer" size={16} />
-                          </Button>
-                          {s.status === "LABEL_CREATED" && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => openCancelDialog(s)}
-                              aria-label={`Cancel shipment ${s.id}`}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            >
-                              <Icon name="X" size={16} />
-                            </Button>
-                          )}
+                          {/* View Details Button */}
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  id={`parcego-shipments-view-${s.id}`}
+                                  onClick={() => router.push(`/shipments/${encodeURIComponent(s.id)}`)}
+                                  aria-label={`View details for ${s.id}`}
+                                  className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-150"
+                                >
+                                  <Icon name="Eye" size={16} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="bg-black text-white border-black [&>svg]:fill-black [&>svg]:stroke-black">
+                                <p>View shipment details</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+
+                          {/* Enhanced Reorder/Resend Button */}
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  id={`parcego-shipments-reorder-${s.id}`}
+                                  onClick={() => handleReorderShipment(s)}
+                                  aria-label={`Reorder/resend ${s.id}`}
+                                  className="h-8 w-8 p-0 hover:bg-green-50 hover:text-green-600 transition-colors duration-150"
+                                  disabled={s.status === "CANCELLED"}
+                                >
+                                  <Icon name="Repeat" size={16} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="bg-black text-white border-black [&>svg]:fill-black [&>svg]:stroke-black">
+                                <p>
+                                  {s.status === "CANCELLED" 
+                                    ? "Cannot reorder cancelled shipments" 
+                                    : "Reorder/Resend this shipment"
+                                  }
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+
+
                         </div>
                       </td>
                     </tr>
@@ -554,6 +619,65 @@ export default function ShipmentsPage() {
             >
               <Icon name="Trash2" size={16} className="mr-2" />
               Delete Shipments
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Enhanced Reorder Confirmation Dialog */}
+      <AlertDialog open={showReorderDialog} onOpenChange={setShowReorderDialog}>
+        <AlertDialogContent id="parcego-reorder-shipment-dialog" className="max-w-md bg-white">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Icon name="Repeat" size={20} className="text-green-600" />
+              Reorder Shipment
+            </AlertDialogTitle>
+            <div className="text-left">
+              {shipmentToReorder && (
+                <div className="space-y-3">
+                  <p>
+                    Create a new shipment based on <strong>{shipmentToReorder.trackingNumber}</strong>?
+                  </p>
+                  <div className="bg-white/40 p-3 rounded-lg space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Recipient:</span>
+                      <span className="font-medium">{shipmentToReorder.recipient.name}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Service:</span>
+                      <span className="font-medium">{shipmentToReorder.service}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Weight:</span>
+                      <span className="font-medium">{shipmentToReorder.weightKg.toFixed(2)} kg</span>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500">
+                    All recipient details will be pre-filled for faster ordering.
+                  </p>
+                </div>
+              )}
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel id="parcego-reorder-shipment-cancel-btn">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmReorder}
+              id="parcego-reorder-shipment-confirm-btn"
+              className="bg-green-600 hover:bg-green-700 focus:ring-green-500"
+              disabled={isReordering}
+            >
+              {isReordering ? (
+                <>
+                  <Icon name="Loader2" size={16} className="mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Icon name="Repeat" size={16} className="mr-2" />
+                  Create New Shipment
+                </>
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

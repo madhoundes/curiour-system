@@ -150,14 +150,14 @@ export default function SuperAdminDashboard() {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "active":
-        return <Badge className="bg-green-100 text-green-800" id={`parcego-status-badge-${status}`}>Active</Badge>;
+        return <Badge className="bg-emerald-50 text-emerald-800 border-emerald-200" id={`parcego-status-badge-${status}`}>Active</Badge>;
       case "pending":
-        return <Badge className="bg-yellow-100 text-yellow-800" id={`parcego-status-badge-${status}`}>Pending</Badge>;
+        return <Badge className="bg-amber-50 text-amber-800 border-amber-200" id={`parcego-status-badge-${status}`}>Pending</Badge>;
       case "suspended":
       case "inactive":
-        return <Badge className="bg-red-100 text-red-800" id={`parcego-status-badge-${status}`}>Suspended</Badge>;
+        return <Badge className="bg-red-50 text-red-800 border-red-200" id={`parcego-status-badge-${status}`}>Suspended</Badge>;
       default:
-        return <Badge id={`parcego-status-badge-${status}`}>{status}</Badge>;
+        return <Badge className="bg-slate-50 text-slate-700 border-slate-300" id={`parcego-status-badge-${status}`}>{status}</Badge>;
     }
   };
 

@@ -20,6 +20,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 // Mock data for charts
 const shipmentOverTimeData = [
@@ -63,20 +70,41 @@ const revenueData = [
   { month: "Dec", revenue: 10500, cost: 7875 }
 ];
 
-// Key metrics calculations
-const currentMonth = shipmentOverTimeData[shipmentOverTimeData.length - 1];
-const previousMonth = shipmentOverTimeData[shipmentOverTimeData.length - 2];
-const totalShipments = shipmentOverTimeData.reduce((sum, item) => sum + item.shipments, 0);
-const totalRevenue = shipmentOverTimeData.reduce((sum, item) => sum + item.revenue, 0);
-const totalDelivered = shipmentOverTimeData.reduce((sum, item) => sum + item.delivered, 0);
-const onTimePercentage = Math.round((totalDelivered / totalShipments) * 100);
-
-// Calculate growth percentages
-const shipmentsGrowth = Math.round(((currentMonth.shipments - previousMonth.shipments) / previousMonth.shipments) * 100);
-const revenueGrowth = Math.round(((currentMonth.revenue - previousMonth.revenue) / previousMonth.revenue) * 100);
+// Note: All key metrics are recalculated from filtered data inside the component
 
 export default function AnalyticsPage() {
   const [timeRange, setTimeRange] = useState("12months");
+
+  // derive filtered datasets from selected range (mock logic based on months)
+  const getMonthsCount = (range: string) => {
+    if (range === "3months") return 3;
+    if (range === "6months") return 6;
+    if (range === "12months") return 12;
+    // Approximate 7d/30d to last 1 month for this mock
+    return 1; // "7days" | "30days"
+  };
+
+  const monthsCount = getMonthsCount(timeRange);
+  const filteredShipmentOverTimeData = shipmentOverTimeData.slice(-monthsCount);
+  const filteredRevenueData = revenueData.slice(-monthsCount);
+
+  // Recompute key metrics from filtered data
+  const currentPeriod = filteredShipmentOverTimeData[filteredShipmentOverTimeData.length - 1];
+  const previousPeriod = filteredShipmentOverTimeData.length > 1
+    ? filteredShipmentOverTimeData[filteredShipmentOverTimeData.length - 2]
+    : undefined;
+
+  const totalShipments = filteredShipmentOverTimeData.reduce((sum, item) => sum + item.shipments, 0);
+  const totalRevenue = filteredRevenueData.reduce((sum, item) => sum + item.revenue, 0);
+  const totalDelivered = filteredShipmentOverTimeData.reduce((sum, item) => sum + item.delivered, 0);
+  const onTimePercentage = totalShipments > 0 ? Math.round((totalDelivered / totalShipments) * 100) : 0;
+
+  const shipmentsGrowth = previousPeriod && previousPeriod.shipments > 0
+    ? Math.round(((currentPeriod.shipments - previousPeriod.shipments) / previousPeriod.shipments) * 100)
+    : 0;
+  const revenueGrowth = previousPeriod && previousPeriod.revenue > 0
+    ? Math.round(((currentPeriod.revenue - previousPeriod.revenue) / previousPeriod.revenue) * 100)
+    : 0;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -108,6 +136,50 @@ export default function AnalyticsPage() {
     return null;
   };
 
+  const handleExportClick = () => {
+    // Build CSV for the filtered period
+    const byMonth: Record<string, {
+      month: string;
+      shipments?: number;
+      delivered?: number;
+      revenue?: number;
+      cost?: number;
+    }> = {};
+
+    filteredShipmentOverTimeData.forEach((d) => {
+      byMonth[d.month] = { month: d.month, shipments: d.shipments, delivered: d.delivered };
+    });
+    filteredRevenueData.forEach((d) => {
+      byMonth[d.month] = {
+        ...(byMonth[d.month] || { month: d.month }),
+        revenue: d.revenue,
+        cost: d.cost
+      };
+    });
+
+    const rows = [
+      ["Month", "Shipments", "Delivered", "Revenue", "Cost"],
+      ...Object.values(byMonth).map((r) => [
+        r.month,
+        String(r.shipments ?? 0),
+        String(r.delivered ?? 0),
+        String(r.revenue ?? 0),
+        String(r.cost ?? 0),
+      ])
+    ];
+
+    const csv = rows.map((r) => r.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `analytics-${timeRange}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
@@ -115,23 +187,23 @@ export default function AnalyticsPage() {
         <PageHeader
           title="Analytics Dashboard"
           description="Performance insights and shipping analytics"
-          icon="BarChart3"
         />
 
         {/* Time Range Controls */}
         <div className="flex justify-end items-center gap-2 mb-6">
-          <select
-            value={timeRange}
-            onChange={(e) => setTimeRange(e.target.value)}
-            className="px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="7days">Last 7 days</option>
-            <option value="30days">Last 30 days</option>
-            <option value="3months">Last 3 months</option>
-            <option value="6months">Last 6 months</option>
-            <option value="12months">Last 12 months</option>
-          </select>
-          <Button variant="outline" size="sm">
+          <Select value={timeRange} onValueChange={setTimeRange}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Select time range" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="7days">Last 7 days</SelectItem>
+              <SelectItem value="30days">Last 30 days</SelectItem>
+              <SelectItem value="3months">Last 3 months</SelectItem>
+              <SelectItem value="6months">Last 6 months</SelectItem>
+              <SelectItem value="12months">Last 12 months</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="sm" onClick={handleExportClick} aria-label="Export analytics to CSV">
             <Icon name="Download" size={16} className="mr-2" />
             Export
           </Button>
@@ -242,7 +314,7 @@ export default function AnalyticsPage() {
             <CardContent>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={shipmentOverTimeData}>
+                  <LineChart data={filteredShipmentOverTimeData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis 
                       dataKey="month" 
@@ -289,7 +361,7 @@ export default function AnalyticsPage() {
             <CardContent>
               <div className="h-80">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={revenueData}>
+                  <AreaChart data={filteredRevenueData}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis 
                       dataKey="month" 
@@ -493,96 +565,98 @@ export default function AnalyticsPage() {
             </CardContent>
           </Card>
 
-          {/* Quick Actions */}
-          <Card id="parcego-analytics-quick-actions-card" className="quick-actions-card">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Icon name="Zap" size={20} className="text-cyan-600" />
-                Quick Actions
-              </CardTitle>
-              <CardDescription>Common analytics tasks and reports</CardDescription>
-            </CardHeader>
-            <CardContent className="p-6">
-              <div className="grid grid-cols-2 gap-3 h-full">
-                {/* Large button - spans 2 columns */}
-                <Button 
-                  id="parcego-analytics-generate-report-btn"
-                  variant="outline" 
-                  className="col-span-2 h-16 justify-start text-left p-4 hover:bg-blue-50 hover:border-blue-200 transition-all duration-200 group"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="bg-blue-100 rounded-lg p-2 group-hover:bg-blue-200 transition-colors duration-200">
-                      <Icon name="FileText" size={20} className="text-blue-600" />
+          {/* Quick Actions - hidden */}
+          {false && (
+            <Card id="parcego-analytics-quick-actions-card" className="quick-actions-card">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Icon name="Zap" size={20} className="text-cyan-600" />
+                  Quick Actions
+                </CardTitle>
+                <CardDescription>Common analytics tasks and reports</CardDescription>
+              </CardHeader>
+              <CardContent className="p-6">
+                <div className="grid grid-cols-2 gap-3 h-full">
+                  {/* Large button - spans 2 columns */}
+                  <Button 
+                    id="parcego-analytics-generate-report-btn"
+                    variant="outline" 
+                    className="col-span-2 h-16 justify-start text-left p-4 hover:bg-blue-50 hover:border-blue-200 transition-all duration-200 group"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="bg-blue-100 rounded-lg p-2 group-hover:bg-blue-200 transition-colors duration-200">
+                        <Icon name="FileText" size={20} className="text-blue-600" />
+                      </div>
+                      <div>
+                        <div className="font-medium text-gray-900">Generate Monthly Report</div>
+                        <div className="text-xs text-gray-500">Create comprehensive analytics report</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="font-medium text-gray-900">Generate Monthly Report</div>
-                      <div className="text-xs text-gray-500">Create comprehensive analytics report</div>
-                    </div>
-                  </div>
-                </Button>
+                  </Button>
 
-                {/* Medium buttons - single column each */}
-                <Button 
-                  id="parcego-analytics-export-data-btn"
-                  variant="outline" 
-                  className="h-14 justify-start text-left p-3 hover:bg-green-50 hover:border-green-200 transition-all duration-200 group"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="bg-green-100 rounded-lg p-1.5 group-hover:bg-green-200 transition-colors duration-200">
-                      <Icon name="Download" size={16} className="text-green-600" />
+                  {/* Medium buttons - single column each */}
+                  <Button 
+                    id="parcego-analytics-export-data-btn"
+                    variant="outline" 
+                    className="h-14 justify-start text-left p-3 hover:bg-green-50 hover:border-green-200 transition-all duration-200 group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="bg-green-100 rounded-lg p-1.5 group-hover:bg-green-200 transition-colors duration-200">
+                        <Icon name="Download" size={16} className="text-green-600" />
+                      </div>
+                      <div>
+                        <div className="font-medium text-gray-900 text-sm">Export Data</div>
+                        <div className="text-xs text-gray-500">CSV format</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="font-medium text-gray-900 text-sm">Export Data</div>
-                      <div className="text-xs text-gray-500">CSV format</div>
-                    </div>
-                  </div>
-                </Button>
+                  </Button>
 
-                <Button 
-                  id="parcego-analytics-custom-dashboard-btn"
-                  variant="outline" 
-                  className="h-14 justify-start text-left p-3 hover:bg-purple-50 hover:border-purple-200 transition-all duration-200 group"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="bg-purple-100 rounded-lg p-1.5 group-hover:bg-purple-200 transition-colors duration-200">
-                      <Icon name="BarChart3" size={16} className="text-purple-600" />
+                  <Button 
+                    id="parcego-analytics-custom-dashboard-btn"
+                    variant="outline" 
+                    className="h-14 justify-start text-left p-3 hover:bg-purple-50 hover:border-purple-200 transition-all duration-200 group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="bg-purple-100 rounded-lg p-1.5 group-hover:bg-purple-200 transition-colors duration-200">
+                        <Icon name="BarChart3" size={16} className="text-purple-600" />
+                      </div>
+                      <div>
+                        <div className="font-medium text-gray-900 text-sm">Dashboard</div>
+                        <div className="text-xs text-gray-500">Customize</div>
+                      </div>
                     </div>
-                    <div>
-                      <div className="font-medium text-gray-900 text-sm">Dashboard</div>
-                      <div className="text-xs text-gray-500">Customize</div>
-                    </div>
-                  </div>
-                </Button>
+                  </Button>
 
-                {/* Small buttons - single column each */}
-                <Button 
-                  id="parcego-analytics-configure-alerts-btn"
-                  variant="outline" 
-                  className="h-12 justify-start text-left p-3 hover:bg-orange-50 hover:border-orange-200 transition-all duration-200 group"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="bg-orange-100 rounded-lg p-1 group-hover:bg-orange-200 transition-colors duration-200">
-                      <Icon name="Settings" size={14} className="text-orange-600" />
+                  {/* Small buttons - single column each */}
+                  <Button 
+                    id="parcego-analytics-configure-alerts-btn"
+                    variant="outline" 
+                    className="h-12 justify-start text-left p-3 hover:bg-orange-50 hover:border-orange-200 transition-all duration-200 group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="bg-orange-100 rounded-lg p-1 group-hover:bg-orange-200 transition-colors duration-200">
+                        <Icon name="Settings" size={14} className="text-orange-600" />
+                      </div>
+                      <div className="font-medium text-gray-900 text-sm">Configure Alerts</div>
                     </div>
-                    <div className="font-medium text-gray-900 text-sm">Configure Alerts</div>
-                  </div>
-                </Button>
+                  </Button>
 
-                <Button 
-                  id="parcego-analytics-share-report-btn"
-                  variant="outline" 
-                  className="h-12 justify-start text-left p-3 hover:bg-indigo-50 hover:border-indigo-200 transition-all duration-200 group"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="bg-indigo-100 rounded-lg p-1 group-hover:bg-indigo-200 transition-colors duration-200">
-                      <Icon name="Share" size={14} className="text-indigo-600" />
+                  <Button 
+                    id="parcego-analytics-share-report-btn"
+                    variant="outline" 
+                    className="h-12 justify-start text-left p-3 hover:bg-indigo-50 hover:border-indigo-200 transition-all duration-200 group"
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="bg-indigo-100 rounded-lg p-1 group-hover:bg-indigo-200 transition-colors duration-200">
+                        <Icon name="Share" size={14} className="text-indigo-600" />
+                      </div>
+                      <div className="font-medium text-gray-900 text-sm">Share Report</div>
                     </div>
-                    <div className="font-medium text-gray-900 text-sm">Share Report</div>
-                  </div>
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
     </div>

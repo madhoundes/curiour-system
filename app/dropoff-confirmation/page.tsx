@@ -131,7 +131,7 @@ export default function DropoffConfirmationPage() {
                   <CheckCircle size={32} className="text-green-600" />
                 </div>
               </div>
-                              <h1 className="text-xl font-bold">Drop-off Location Confirmed!</h1>
+                              <h1 className="text-xl font-bold -mt-4">Drop-off Location Confirmed!</h1>
               <p className="text-green-100 mt-2">Your package is ready to be dropped off at the selected location.</p>
             </div>
           </div>
@@ -249,7 +249,7 @@ export default function DropoffConfirmationPage() {
                 Back to Locations
               </Button>
               <div className="h-6 border-l border-gray-300"></div>
-              <h1 className="text-xl font-semibold text-gray-900">Confirm Drop-off Location</h1>
+              <h1 className="text-xl font-semibold text-gray-900 -mt-4">Confirm Drop-off Location</h1>
             </div>
           </div>
         </div>

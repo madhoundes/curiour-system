@@ -77,7 +77,21 @@ export function MerchantDashboardLayout({ children }: MerchantDashboardLayoutPro
     if (href === "/dashboard") {
       return pathname === "/dashboard";
     }
-    return pathname.startsWith(href);
+    
+    // For nested routes, use exact matching for specific paths
+    if (href === "/claims" && pathname === "/claims") {
+      return true;
+    }
+    if (href === "/claims/history" && pathname === "/claims/history") {
+      return true;
+    }
+    
+    // For other routes, use startsWith but exclude nested matches
+    if (href !== "/claims" && pathname.startsWith(href)) {
+      return true;
+    }
+    
+    return false;
   };
 
   // Handle navigation
@@ -168,38 +182,7 @@ export function MerchantDashboardLayout({ children }: MerchantDashboardLayoutPro
               </div>
             ))}
 
-            {/* Development Pages Section */}
-            <div className="border-t border-gray-200 pt-4 mt-6">
-              <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 py-2">
-                Development Preview
-              </h3>
-              <div className="space-y-1">
-                <button
-                  id="parcego-dashboard-nav-btn-courier"
-                  onClick={() => handleNavigate('/courier')}
-                  className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  aria-label="Courier Dashboard - Development preview"
-                  tabIndex={0}
-                >
-                  <Icon name="Truck" size={18} className="mr-3 text-gray-400" />
-                  <div className="flex-1 text-left">
-                    <div className="font-medium">Courier Dashboard</div>
-                  </div>
-                </button>
-                <button
-                  id="parcego-dashboard-nav-btn-admin"
-                  onClick={() => handleNavigate('/admin')}
-                  className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                  aria-label="Admin Dashboard - Development preview"
-                  tabIndex={0}
-                >
-                  <Icon name="Settings" size={18} className="mr-3 text-gray-400" />
-                  <div className="flex-1 text-left">
-                    <div className="font-medium">Admin Dashboard</div>
-                  </div>
-                </button>
-              </div>
-            </div>
+
           </nav>
         </div>
 

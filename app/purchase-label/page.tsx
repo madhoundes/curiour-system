@@ -53,7 +53,6 @@ export default function PurchaseLabelPage() {
   // Enhanced state management
   const [isProcessing, setIsProcessing] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
-  const [showPreviewModal, setShowPreviewModal] = useState(false);
   // Generate tracking number (deferred to client to avoid SSR hydration mismatch)
   const [trackingNumber, setTrackingNumber] = useState<string>("");
 
@@ -157,7 +156,7 @@ export default function PurchaseLabelPage() {
           type: mockOrderData.packageType,
         },
         shipDate: new Date().toLocaleDateString(),
-        logoUrl: '/logo-horizontal.png', // Adjust path as needed
+        logoUrl: '/Logo/Horizontal-logo.svg', // Updated to use custom logo
       };
 
       // Dynamically import and generate the polished PDF to avoid chunk loading issues
@@ -170,21 +169,183 @@ export default function PurchaseLabelPage() {
     }
   };
   
-  // Handle preview and print label
-  const handlePreviewAndPrint = () => {
-    setShowPreviewModal(true);
-  };
-  
-  // Handle print from preview modal
-  const handlePrintFromPreview = () => {
-    // Close modal first
-    setShowPreviewModal(false);
+  // Handle preview and print label with improved error handling and browser compatibility
+  const handlePreviewAndPrint = async () => {
+    console.log('Preview & Print Label clicked - starting process...');
     
-    // Small delay to ensure modal is closed before printing
-    setTimeout(() => {
-      // Navigate to the label preview page for printing
-      router.push(`/label/preview?tracking=${encodeURIComponent(trackingNumber)}`);
-    }, 100);
+    try {
+      // Show loading state
+      const buttonElement = document.getElementById('parcego-payment-preview-print-btn');
+      if (buttonElement) {
+        buttonElement.textContent = 'Generating PDF...';
+        buttonElement.setAttribute('disabled', 'true');
+      }
+
+      // Prepare data for the polished shipping label
+      const shippingData: ShippingLabelData = {
+        trackingNumber: trackingNumber,
+        sender: {
+          name: "John's Electronics Store",
+          address: '123 Business St, Suite 100',
+          city: 'New York',
+          state: 'NY',
+          postalCode: '10001',
+        },
+        recipient: {
+          name: mockOrderData.recipientName,
+          company: mockOrderData.recipientCompany,
+          address: mockOrderData.recipientAddress,
+          city: mockOrderData.recipientCity,
+          state: mockOrderData.recipientProvince,
+          postalCode: mockOrderData.recipientPostalCode,
+          phone: mockOrderData.recipientPhone,
+          email: mockOrderData.recipientEmail,
+        },
+        service: {
+          type: mockOrderData.serviceType.toUpperCase(),
+          description: mockOrderData.selectedQuote.deliveryTime,
+        },
+        package: {
+          weight: `${mockOrderData.weight} ${mockOrderData.weightUnit}`,
+          dimensions: `${mockOrderData.length}" × ${mockOrderData.width}" × ${mockOrderData.height}" ${mockOrderData.dimensionUnit}`,
+          type: mockOrderData.packageType,
+        },
+        shipDate: new Date().toLocaleDateString(),
+        logoUrl: '/Logo/Horizontal-logo.svg', // Updated to use custom logo
+      };
+
+      console.log('Generating PDF blob with data:', shippingData);
+
+      // Generate PDF blob with better error handling
+      const { generateShippingLabelBlob } = await import('@/lib/pdf-generator');
+      const pdfBlob = await generateShippingLabelBlob(shippingData);
+      
+      if (!pdfBlob || pdfBlob.size === 0) {
+        throw new Error('Generated PDF blob is empty or invalid');
+      }
+
+      console.log('PDF blob generated successfully, size:', pdfBlob.size);
+      
+      // Create object URL for the PDF
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      console.log('PDF object URL created:', pdfUrl);
+      
+      // Method 1: Try direct browser print using iframe (preferred)
+      const printWithIframe = () => {
+        return new Promise<boolean>((resolve) => {
+          const iframe = document.createElement('iframe');
+          iframe.style.position = 'fixed';
+          iframe.style.right = '0';
+          iframe.style.bottom = '0';
+          iframe.style.width = '0';
+          iframe.style.height = '0';
+          iframe.style.border = 'none';
+          iframe.src = pdfUrl;
+          
+          let hasLoaded = false;
+          let hasPrinted = false;
+          
+          iframe.onload = () => {
+            if (hasLoaded) return;
+            hasLoaded = true;
+            
+            console.log('PDF loaded in iframe, attempting to print...');
+            
+            setTimeout(() => {
+              try {
+                if (iframe.contentWindow) {
+                  iframe.contentWindow.focus();
+                  iframe.contentWindow.print();
+                  hasPrinted = true;
+                  console.log('Print dialog triggered successfully');
+                  resolve(true);
+                } else {
+                  console.log('iframe.contentWindow not available');
+                  resolve(false);
+                }
+              } catch (error) {
+                console.error('Error calling iframe print:', error);
+                resolve(false);
+              }
+              
+              // Cleanup after delay
+              setTimeout(() => {
+                try {
+                  if (document.body.contains(iframe)) {
+                    document.body.removeChild(iframe);
+                  }
+                  URL.revokeObjectURL(pdfUrl);
+                } catch (cleanupError) {
+                  console.error('Cleanup error:', cleanupError);
+                }
+              }, 2000);
+            }, 500); // Give iframe time to fully load
+          };
+          
+          iframe.onerror = () => {
+            console.error('Error loading PDF in iframe');
+            resolve(false);
+          };
+          
+          // Timeout fallback
+          setTimeout(() => {
+            if (!hasPrinted) {
+              console.log('Print timeout reached, falling back');
+              resolve(false);
+            }
+          }, 5000);
+          
+          document.body.appendChild(iframe);
+        });
+      };
+
+      // Method 2: Fallback - open in new tab
+      const printWithNewTab = () => {
+        console.log('Using fallback method: opening PDF in new tab');
+        const newWindow = window.open(pdfUrl, '_blank');
+        if (newWindow) {
+          newWindow.addEventListener('load', () => {
+            newWindow.focus();
+            // Give the PDF time to load fully before printing
+            setTimeout(() => {
+              try {
+                newWindow.print();
+              } catch (error) {
+                console.error('Error printing in new tab:', error);
+              }
+            }, 1000);
+          });
+          return true;
+        }
+        return false;
+      };
+
+      // Try iframe method first, fallback to new tab if it fails
+      const iframePrintSuccess = await printWithIframe();
+      
+      if (!iframePrintSuccess) {
+        console.log('Iframe print failed, trying new tab method...');
+        const newTabSuccess = printWithNewTab();
+        
+        if (!newTabSuccess) {
+          // Final fallback - just open the PDF
+          console.log('Both print methods failed, opening PDF for manual printing');
+          window.open(pdfUrl, '_blank');
+          alert('PDF opened in new tab. Please use your browser\'s print function (Ctrl+P) to print the label.');
+        }
+      }
+      
+    } catch (error) {
+      console.error('Error in handlePreviewAndPrint:', error);
+      alert(`Failed to generate or print PDF. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      // Reset button state
+      const buttonElement = document.getElementById('parcego-payment-preview-print-btn');
+      if (buttonElement) {
+        buttonElement.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>Preview & Print Label';
+        buttonElement.removeAttribute('disabled');
+      }
+    }
   };
   
   return (
@@ -194,7 +355,6 @@ export default function PurchaseLabelPage() {
         <PageHeader
           title="Complete Purchase"
           description="Complete your payment to generate your shipping label"
-          icon="CreditCard"
           onBack={() => router.push('/quote-preview')}
           backLabel=""
         />
@@ -436,7 +596,7 @@ export default function PurchaseLabelPage() {
 
       {/* Payment Success Confirmation Dialog */}
       <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl bg-white">
           <DialogHeader className="text-center">
             <DialogTitle className="text-xl font-bold text-gray-900 mb-2">
               Payment Successful! 🎉
@@ -455,7 +615,7 @@ export default function PurchaseLabelPage() {
             </div>
             
             {/* Order Details */}
-            <div className="bg-gray-100 rounded-lg p-6 border border-gray-200">
+            <div className="bg-white rounded-lg p-6 border border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900 text-center mb-4">Order Details</h3>
               
               <div className="grid grid-cols-2 gap-4 text-sm">
@@ -534,149 +694,7 @@ export default function PurchaseLabelPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Label Preview Modal */}
-      <Dialog open={showPreviewModal} onOpenChange={setShowPreviewModal}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="text-center">
-            <DialogTitle className="text-2xl font-bold text-gray-900 mb-2">
-              Shipping Label Preview
-            </DialogTitle>
-            <p className="text-gray-600">
-              Review your label before printing
-            </p>
-          </DialogHeader>
-          
-          <div className="space-y-6">
-            {/* Label Preview */}
-            <div className="flex justify-center">
-              <div className="bg-white border-2 border-gray-300 rounded-lg p-4 shadow-lg">
-                <div 
-                  className="relative bg-white text-black border border-black"
-                  style={{ width: "4in", height: "6in" }}
-                >
-                  {/* Large Watermark Logo */}
-                  <div 
-                    className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-5"
-                    aria-hidden="true"
-                  >
-                    <div className="text-6xl font-bold text-gray-200">PARCEGO</div>
-                  </div>
-                  
-                  {/* Header */}
-                  <div className="flex items-center justify-between px-3 pt-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 h-8 bg-blue-600 text-white text-xs font-bold flex items-center justify-center rounded">
-                        PARCEGO
-                      </div>
-                      <span className="font-semibold text-sm">Parcego</span>
-                    </div>
-                    <div className="text-sm font-mono">{trackingNumber}</div>
-                  </div>
-
-                  <div className="my-2 h-px bg-black" />
-
-                  {/* From / To blocks */}
-                  <div className="px-3 space-y-2">
-                    <div>
-                      <div className="text-xs font-semibold">FROM</div>
-                      <div className="text-sm leading-tight">
-                        John&apos;s Electronics Store<br />
-                        123 Business St, Suite 100<br />
-                        New York, NY 10001
-                      </div>
-                    </div>
-                    <div className="h-px bg-black/60" />
-                    <div>
-                      <div className="text-xs font-semibold">TO</div>
-                      <div className="text-sm leading-tight">
-                        {mockOrderData.recipientName}<br />
-                        {mockOrderData.recipientCompany && <>{mockOrderData.recipientCompany}<br /></>}
-                        {mockOrderData.recipientAddress}<br />
-                        {mockOrderData.recipientCity}, {mockOrderData.recipientProvince} {mockOrderData.recipientPostalCode}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Service badge */}
-                  <div className="px-3 mt-3">
-                    <div className="border border-black px-2 py-1 rounded-sm">
-                      <div className="text-sm font-bold tracking-wide">{mockOrderData.serviceType.toUpperCase()}</div>
-                      <div className="text-xs">{mockOrderData.selectedQuote.deliveryTime}</div>
-                    </div>
-                  </div>
-
-                  {/* Mock barcode */}
-                  <div className="px-3 mt-4">
-                    <div className="flex items-end gap-[2px] h-14">
-                      {Array.from({ length: 32 }).map((_, i) => (
-                        <div 
-                          key={i}
-                          className="bg-black h-full" 
-                          style={{ 
-                            width: Math.random() * 3 + 1,
-                            minWidth: 1
-                          }} 
-                        />
-                      ))}
-                    </div>
-                    <div className="mt-1 text-center text-sm font-mono tracking-wider">{trackingNumber}</div>
-                  </div>
-
-                  {/* Package details */}
-                  <div className="px-3 mt-4">
-                    <div className="text-xs space-y-1">
-                      <div>Weight: {mockOrderData.weight} {mockOrderData.weightUnit} • Dim: {mockOrderData.length}&quot;×{mockOrderData.width}&quot;×{mockOrderData.height}&quot; {mockOrderData.dimensionUnit}</div>
-                      <div>Ref: WEB-ORDER-12345</div>
-                      <div>Carrier: Parcego</div>
-                    </div>
-                  </div>
-
-                  {/* Footer notes */}
-                  <div className="absolute bottom-2 left-3 right-3 text-xs text-black/70">
-                    Ship by: {new Date().toLocaleDateString()} • Non-hazardous • No signature required
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            {/* Print Instructions */}
-            <div className="bg-blue-50 rounded-lg p-4">
-              <h4 className="font-medium text-blue-900 mb-3">Printing Instructions:</h4>
-              <ul className="text-sm text-blue-800 space-y-2">
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-2">•</span>
-                  Use 4x6 inch paper or label stock
-                </li>
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-2">•</span>
-                  Set print scale to 100% (no scaling)
-                </li>
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-2">•</span>
-                  Set margins to minimum or 0
-                </li>
-                <li className="flex items-start">
-                  <span className="text-blue-600 mr-2">•</span>
-                  Ensure the label fits completely on the page
-                </li>
-              </ul>
-            </div>
-            
-            {/* Action Button - Only Print Button */}
-            <div className="flex justify-center pt-2">
-              <Button
-                onClick={handlePrintFromPreview}
-                size="lg"
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 h-12 text-base font-medium"
-                id="parcego-preview-print-btn"
-              >
-                <Icon name="Printer" size={20} className="mr-2" />
-                Print Label
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Preview modal removed - direct print functionality implemented */}
     </div>
   );
 }

@@ -26,7 +26,7 @@ export function PageHeader({
     <div className={cn("mb-8", className)}>
       <div className="flex items-start gap-3">
         {icon && (
-          <div className="flex-shrink-0 mt-1">
+          <div className="flex-shrink-0 flex items-center">
             <Icon 
               name={icon} 
               size={iconSize} 

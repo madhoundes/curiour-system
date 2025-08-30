@@ -52,7 +52,6 @@ export default function FindDropoffPage() {
         <PageHeader
           title="Drop-off Location"
           description="Visit our main business hub for convenient package drop-off and comprehensive courier services"
-          icon="MapPin"
         />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

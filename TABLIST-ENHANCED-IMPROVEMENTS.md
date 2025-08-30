@@ -198,7 +198,7 @@ function TabsTrigger({
 - Responsive padding: `px-3 sm:px-4`
 - Better spacing for long labels
 
-## 📊 **Mobile-First Design Strategy**
+jjh , ## 📊 **Mobile-First Design Strategy**
 
 ### 1. **Single Column Layout (< 480px)**
 - **Rationale**: Mobile portrait screens need full-width tabs for touch interaction
