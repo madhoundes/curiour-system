@@ -70,9 +70,9 @@ export function UnifiedHeader({ onSidebarToggle }: UnifiedHeaderProps) {
             <Image
               src="/Logo/Horizontal-logo.svg"
               alt="Parcego Logo"
-              width={120}
-              height={24}
-              className="h-6 w-auto"
+              width={150}
+              height={30}
+              className="h-8 w-auto"
               unoptimized
               priority
             />
