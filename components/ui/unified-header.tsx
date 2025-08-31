@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -65,25 +66,16 @@ export function UnifiedHeader({ onSidebarToggle }: UnifiedHeaderProps) {
           </Button>
 
           {/* Logo */}
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
-              <svg 
-                width="20" 
-                height="20" 
-                viewBox="0 0 24 24" 
-                fill="none" 
-                xmlns="http://www.w3.org/2000/svg"
-                className="text-white"
-              >
-                <path d="M12 2L2 7L12 12L22 7L12 2Z" fill="currentColor"/>
-                <path d="M2 17L12 22L22 17" fill="currentColor" fillOpacity="0.7"/>
-                <path d="M2 12L12 17L22 12" fill="currentColor" fillOpacity="0.5"/>
-              </svg>
-            </div>
-            <div className="hidden sm:block">
-              <h1 className="text-xl font-bold text-gray-900">Parcego</h1>
-              <p className="text-xs text-gray-500">Courier Business Platform</p>
-            </div>
+          <div className="flex items-center">
+            <Image
+              src="/Logo/Horizontal-logo.svg"
+              alt="Parcego Logo"
+              width={120}
+              height={24}
+              className="h-6 w-auto"
+              unoptimized
+              priority
+            />
           </div>
         </div>
 
