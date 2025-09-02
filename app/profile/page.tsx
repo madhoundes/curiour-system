@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Form,
   FormControl,
@@ -479,13 +480,11 @@ export default function ProfileAccountPage() {
                         render={({ field }) => (
                           <FormItem>
                             <div className="flex items-center gap-2">
-                              <input
+                              <Checkbox
                                 id="parcego-profile-2fa-toggle"
-                                type="checkbox"
                                 checked={field.value}
-                                onChange={field.onChange}
+                                onCheckedChange={(v) => field.onChange(!!v)}
                                 aria-label="Enable two-factor authentication"
-                                className="h-4 w-4 rounded border"
                               />
                               <Label htmlFor="parcego-profile-2fa-toggle">Enable 2FA</Label>
                             </div>
@@ -558,13 +557,11 @@ export default function ProfileAccountPage() {
                           render={({ field }) => (
                             <FormItem>
                               <div className="flex items-center gap-2">
-                                <input
+                                <Checkbox
                                   id={`parcego-profile-notif-${key}`}
-                                  type="checkbox"
                                   checked={field.value as boolean}
-                                  onChange={field.onChange}
+                                  onCheckedChange={(v) => field.onChange(!!v)}
                                   aria-label={text as string}
-                                  className="h-4 w-4 rounded border"
                                 />
                                 <Label htmlFor={`parcego-profile-notif-${key}`}>{text as string}</Label>
                               </div>

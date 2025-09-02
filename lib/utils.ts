@@ -357,7 +357,7 @@ export const generatePdfInvoice = async (invoiceData: {
     let logoData: string;
     try {
       logoData = await loadSvgAsCanvasDataUrl('/Logo/Horizontal-logo.svg');
-    } catch (error) {
+    } catch {
       logoData = 'PARCEGO'; // Fallback
     }
 
@@ -403,7 +403,7 @@ export const generatePdfInvoice = async (invoiceData: {
       'www.parcego.com'
     ];
     
-    let companyYPos = yPosition;
+    const companyYPos = yPosition;
     companyInfo.forEach((line, index) => {
       doc.text(line, pageWidth - margin - 50, companyYPos + (index * 4) + 6);
     });
@@ -426,7 +426,7 @@ export const generatePdfInvoice = async (invoiceData: {
       ...(invoiceData.status ? [`Status: ${invoiceData.status.toUpperCase()}`] : [])
     ];
 
-    let detailsYPos = yPosition - 15;
+    const detailsYPos = yPosition - 15;
     invoiceDetails.forEach((line, index) => {
       doc.text(line, pageWidth - margin - 50, detailsYPos + (index * 5) + 5);
     });
@@ -494,7 +494,7 @@ export const generatePdfInvoice = async (invoiceData: {
       `${invoiceData.currency} ${item.amount.toFixed(2)}`
     ]);
 
-    (doc as any).autoTable({
+    (doc as Record<string, unknown>).autoTable({
       head: [['Description', 'Qty', 'Unit Price', 'Amount']],
       body: tableData,
       startY: yPosition,
@@ -522,7 +522,7 @@ export const generatePdfInvoice = async (invoiceData: {
     });
 
     // Get final Y position from table
-    yPosition = (doc as any).lastAutoTable.finalY + 15;
+    yPosition = (doc as Record<string, unknown>).lastAutoTable.finalY + 15;
 
     // Summary section
     const summaryX = pageWidth - margin - 60;

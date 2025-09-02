@@ -41,7 +41,7 @@ interface ShipmentContextType {
   getFormData: () => ShipmentFormData;
   isFormValid: () => boolean;
   generateTrackingNumber: () => string;
-  getShippingLabelData: () => any; // For PDF generation
+  getShippingLabelData: () => Record<string, unknown>; // For PDF generation
 }
 
 // Create context
@@ -195,8 +195,7 @@ export const ShipmentProvider: React.FC<{ children: ReactNode }> = ({ children }
         dimensions: `${formData.length}" × ${formData.width}" × ${formData.height}" ${formData.dimensionUnit}`,
         type: formData.packageType
       },
-      shipDate: currentDate,
-      logoUrl: '/Logo/Horizontal-logo.png'
+      shipDate: currentDate
     };
   }, [formData, generateTrackingNumber]);
 

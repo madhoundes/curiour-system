@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
-import type { ShippingLabelData } from "@/components/pdf/polished-shipping-label";
+// import type { ShippingLabelData } from "@/components/pdf/polished-shipping-label";
 
 interface LabelGenerationSuccessContentProps {
   trackingNumber: string;
@@ -48,45 +48,34 @@ const LabelGenerationSuccessContent: React.FC<LabelGenerationSuccessContentProps
     }, 100);
   };
 
-  // Generate and download PDF label using the polished React-PDF version
+  // Generate and download PDF label using the unified shipping label service
   const handleDownloadLabel = async () => {
     try {
-      // Prepare data for the polished shipping label
-      const shippingData: ShippingLabelData = {
+      // Use the unified shipping label service
+      const { createShippingLabelFromOrderData, generateAndDownloadLabel } = await import('@/lib/shipping-label-service');
+      
+      const shippingData = createShippingLabelFromOrderData({
         trackingNumber,
-        sender: {
-          name: "John's Electronics Store",
-          address: '123 Business St, Suite 100',
-          city: 'New York',
-          state: 'NY',
-          postalCode: '10001',
-        },
-        recipient: {
-          name: mockOrderData.recipientName,
-          company: mockOrderData.recipientCompany,
-          address: mockOrderData.recipientAddress,
-          city: mockOrderData.recipientCity,
-          state: mockOrderData.recipientProvince,
-          postalCode: mockOrderData.recipientPostalCode,
-          phone: mockOrderData.recipientPhone,
-          email: mockOrderData.recipientEmail,
-        },
-        service: {
-          type: mockOrderData.serviceType.toUpperCase(),
-          description: mockOrderData.selectedQuote.deliveryTime,
-        },
-        package: {
-          weight: "2.5 lbs",
-          dimensions: '12" × 8" × 6" in',
-          type: "box",
-        },
-        shipDate: new Date().toLocaleDateString(),
-        logoUrl: '/Logo/Horizontal-logo.svg',
-      };
+        recipientName: mockOrderData.recipientName,
+        recipientCompany: mockOrderData.recipientCompany,
+        recipientAddress: mockOrderData.recipientAddress,
+        recipientCity: mockOrderData.recipientCity,
+        recipientProvince: mockOrderData.recipientProvince,
+        recipientPostalCode: mockOrderData.recipientPostalCode,
+        recipientPhone: mockOrderData.recipientPhone,
+        recipientEmail: mockOrderData.recipientEmail,
+        serviceType: mockOrderData.serviceType,
+        selectedQuote: mockOrderData.selectedQuote,
+        weight: "2.5",
+        weightUnit: "lbs",
+        length: "12",
+        width: "8",
+        height: "6",
+        dimensionUnit: "in",
+        packageType: "box"
+      });
 
-      // Dynamically import and generate the polished PDF to avoid chunk loading issues
-      const { generatePolishedShippingLabel } = await import('@/lib/pdf-generator');
-      await generatePolishedShippingLabel(shippingData);
+      await generateAndDownloadLabel(shippingData);
       
     } catch (error) {
       console.error('Error generating PDF:', error);

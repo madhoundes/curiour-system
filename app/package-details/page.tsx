@@ -25,13 +25,10 @@ export default function PackageDetailsPage() {
   const { 
     formData, 
     updateFormField, 
-    isFormValid, 
-    getShippingLabelData,
-    generateTrackingNumber 
+    isFormValid
   } = useShipment();
   
   const [isLoading, setIsLoading] = useState(false);
-  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     updateFormField(field as keyof typeof formData, value);
@@ -51,70 +48,7 @@ export default function PackageDetailsPage() {
     }, 1000);
   };
 
-  const handlePreviewPDF = async () => {
-    if (!isFormValid()) {
-      alert('Please fill in all required package details before previewing the PDF.');
-      return;
-    }
 
-    setIsPreviewLoading(true);
-    try {
-      const shippingData = getShippingLabelData();
-      // Import dynamically to avoid SSR issues
-      const { generateShippingLabelBlob } = await import('@/lib/pdf-generator');
-      const blob = await generateShippingLabelBlob(shippingData);
-      
-      // Create preview URL
-      const url = URL.createObjectURL(blob);
-      
-      // Open in new tab for preview
-      window.open(url, '_blank');
-      
-      // Cleanup URL after a delay
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-      
-    } catch (error) {
-      console.error('Error generating PDF preview:', error);
-      alert('Failed to generate PDF preview. Please try again.');
-    } finally {
-      setIsPreviewLoading(false);
-    }
-  };
-
-  const handleDownloadPDF = async () => {
-    if (!isFormValid()) {
-      alert('Please fill in all required package details before downloading the PDF.');
-      return;
-    }
-
-    setIsPreviewLoading(true);
-    try {
-      const shippingData = getShippingLabelData();
-      // Import dynamically to avoid SSR issues
-      const { generateShippingLabelBlob } = await import('@/lib/pdf-generator');
-      const blob = await generateShippingLabelBlob(shippingData);
-      
-      // Create download link
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `shipping-label-${shippingData.trackingNumber}.pdf`;
-      
-      // Trigger download
-      document.body.appendChild(link);
-      link.click();
-      
-      // Cleanup
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-    } catch (error) {
-      console.error('Error downloading PDF:', error);
-      alert('Failed to download PDF. Please try again.');
-    } finally {
-      setIsPreviewLoading(false);
-    }
-  };
 
   const stepperSteps = createStepperSteps(2);
 
@@ -326,83 +260,30 @@ export default function PackageDetailsPage() {
             </CardContent>
           </Card>
 
-          {/* PDF Preview & Download Section */}
-          <Card className="parcego-card parcego-card--pdf-preview">
+          {/* Package Status */}
+          <Card className="parcego-card parcego-card--package-status">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
-                <Icon name="FileText" size={20} className="text-orange-600" />
-                <span>Updated Shipping Label Preview</span>
+                <Icon name="CheckCircle" size={20} className="text-green-600" />
+                <span>Package Details Completed</span>
               </CardTitle>
               <CardDescription>
-                Preview and download your shipping label PDF with complete package details
+                Your package specifications have been recorded and will be included in the final shipping label
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-3">
-                  <Icon name="Info" size={16} className="text-blue-600" />
-                  <span className="text-sm font-medium text-blue-800">
-                    Package Details Added
+            <CardContent>
+              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Icon name="Package" size={16} className="text-green-600" />
+                  <span className="text-sm font-medium text-green-800">
+                    Package Information Saved
                   </span>
                 </div>
-                <p className="text-sm text-blue-700">
-                  Your package details have been added to the shipping label. You can now preview 
-                  the complete label with dimensions, weight, and handling instructions.
+                <p className="text-sm text-green-700">
+                  All package details including dimensions, weight, and handling requirements have been saved. 
+                  The complete shipping label with all information will be available in the next step.
                 </p>
               </div>
-              
-              <div className="flex flex-wrap gap-3">
-                <Button
-                  variant="outline"
-                  onClick={handlePreviewPDF}
-                  disabled={isPreviewLoading || !isFormValid()}
-                  className="parcego-pdf-preview-btn"
-                  id="parcego-preview-pdf-btn"
-                >
-                  {isPreviewLoading ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
-                      <span>Generating...</span>
-                    </div>
-                  ) : (
-                    <>
-                      <Icon name="Eye" size={16} className="mr-2" />
-                      Preview PDF
-                    </>
-                  )}
-                </Button>
-                
-                <Button
-                  variant="outline"
-                  onClick={handleDownloadPDF}
-                  disabled={isPreviewLoading || !isFormValid()}
-                  className="parcego-pdf-download-btn"
-                  id="parcego-download-pdf-btn"
-                >
-                  {isPreviewLoading ? (
-                    <div className="flex items-center space-x-2">
-                      <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-600 border-t-transparent"></div>
-                      <span>Generating...</span>
-                    </div>
-                  ) : (
-                    <>
-                      <Icon name="Download" size={16} className="mr-2" />
-                      Download PDF
-                    </>
-                  )}
-                </Button>
-              </div>
-              
-              {isFormValid() && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                  <div className="flex items-center space-x-2">
-                    <Icon name="CheckCircle" size={16} className="text-green-600" />
-                    <span className="text-sm font-medium text-green-800">
-                      Package Details Complete - Ready for PDF Generation
-                    </span>
-                  </div>
-                </div>
-              )}
             </CardContent>
           </Card>
 

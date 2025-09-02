@@ -8,8 +8,9 @@ import { Badge } from "@/components/ui/badge"
 import { Icon } from "@/components/ui/icon"
 import { PageHeader } from "@/components/ui/page-header"
 
-import { Input } from "@/components/ui/input"
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Checkbox } from "@/components/ui/checkbox"
 
 // Types
 export type NotificationPriority = 'high' | 'normal' | 'low';
@@ -365,11 +366,11 @@ export default function NotificationsCenter() {
                           >
                             <div className="flex items-start space-x-3">
                               {/* Checkbox for bulk selection */}
-                              <input
-                                type="checkbox"
+                              <Checkbox
                                 checked={selectedItems.includes(notification.id)}
-                                onChange={() => handleItemSelection(notification.id)}
-                                className="mt-1 h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                onCheckedChange={() => handleItemSelection(notification.id)}
+                                aria-label="Select notification"
+                                className="mt-0.5"
                               />
                               
                               {/* Type Icon */}

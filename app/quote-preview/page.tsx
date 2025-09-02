@@ -1,10 +1,12 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, useMemo } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useWizardBack } from "@/lib/wizard";
+import { useShipment } from "@/lib/shipment-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { createStepperSteps, Stepper } from "@/components/ui/stepper";
@@ -41,6 +43,399 @@ interface QuoteOption {
   features: string[];
   recommended?: boolean;
 }
+
+// Mock merchant data - in real app this would come from auth context
+const mockMerchantData = {
+  businessName: "John's Electronics Store",
+  contactName: "John Merchant",
+  address: "123 Business St, Suite 100",
+  city: "Toronto",
+  province: "ON",
+  postalCode: "M5V3A8",
+  phone: "(555) 123-4567",
+  email: "john@electronicsstore.com"
+};
+
+// Enhanced Shipment Summary Component with Reorder Info and Shipping Label Preview
+const ShipmentSummary = ({ formData }: { formData: ShipmentData }) => {
+  const { generateTrackingNumber, updateMultipleFields, getShippingLabelData, isFormValid } = useShipment();
+  const searchParams = useSearchParams();
+  const [isReorderMode, setIsReorderMode] = useState(false);
+  const [reorderSource, setReorderSource] = useState<string | null>(null);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  
+  // State to track if we're on the client
+  const [isClient, setIsClient] = useState(false);
+  
+  // Set client flag after hydration
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  // Handle reorder data from URL parameters
+  useEffect(() => {
+    const fromShipment = searchParams.get('from');
+    if (fromShipment) {
+      setIsReorderMode(true);
+      setReorderSource(fromShipment);
+      
+      // Pre-fill form with reorder data
+      const reorderData: Record<string, string> = {};
+      
+      if (searchParams.get('recipient')) {
+        reorderData.recipientName = searchParams.get('recipient');
+      }
+      if (searchParams.get('address')) {
+        reorderData.recipientAddress = searchParams.get('address');
+      }
+      if (searchParams.get('city')) {
+        reorderData.recipientCity = searchParams.get('city');
+      }
+      if (searchParams.get('province')) {
+        reorderData.recipientProvince = searchParams.get('province');
+      }
+      if (searchParams.get('postalCode')) {
+        reorderData.recipientPostalCode = searchParams.get('postalCode');
+      }
+      if (searchParams.get('service')) {
+        reorderData.serviceType = searchParams.get('service')?.toLowerCase() || 'standard';
+      }
+      if (searchParams.get('weight')) {
+        reorderData.weight = searchParams.get('weight');
+      }
+      if (searchParams.get('notes')) {
+        reorderData.specialInstructions = searchParams.get('notes');
+      }
+      
+      // Update form with reorder data
+      if (Object.keys(reorderData).length > 0) {
+        updateMultipleFields(reorderData);
+      }
+    }
+  }, [searchParams, updateMultipleFields]);
+  
+  // Memoize tracking number to prevent regeneration on every render
+  const trackingNumber = useMemo(() => {
+    // During SSR or before hydration, return a stable fallback
+    if (!isClient) {
+      return 'ASH-0000000000-XXXXXX';
+    }
+    return generateTrackingNumber();
+  }, [generateTrackingNumber, isClient]);
+  
+  // Memoize current date to prevent recalculation on every render
+  const currentDate = useMemo(() => {
+    // During SSR, return a stable date
+    if (!isClient) {
+      return 'Loading...';
+    }
+    return new Date().toLocaleDateString('en-CA', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  }, [isClient]);
+
+  // Calculate completion percentage (commented out as not currently used)
+  // const completionPercentage = useMemo(() => {
+  //   const requiredFields = [
+  //     'recipientName',
+  //     'recipientAddress',
+  //     'recipientCity',
+  //     'recipientProvince',
+  //     'recipientPostalCode',
+  //     'recipientPhone',
+  //     'recipientEmail'
+  //   ];
+  //   
+  //   const completedFields = requiredFields.filter(field => {
+  //     const value = formData[field as keyof typeof formData];
+  //     return value && value.toString().trim() !== '';
+  //   }).length;
+  //   
+  //   return Math.round((completedFields / requiredFields.length) * 100);
+  // }, [formData]);
+
+  const handlePreviewPDF = async () => {
+    if (!isFormValid()) {
+      alert('Please ensure all required shipment details are complete before previewing the PDF.');
+      return;
+    }
+
+    setIsPreviewLoading(true);
+    try {
+      const shippingData = getShippingLabelData();
+      // Import dynamically to avoid SSR issues
+      const { generateShippingLabelBlob } = await import('@/lib/pdf-generator');
+      const blob = await generateShippingLabelBlob(shippingData);
+      
+      // Create preview URL
+      const url = URL.createObjectURL(blob);
+      
+      // Open in new tab for preview
+      window.open(url, '_blank');
+      
+      // Cleanup URL after a delay
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      
+    } catch (error) {
+      console.error('Error generating PDF preview:', error);
+      alert('Failed to generate PDF preview. Please try again.');
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!isFormValid()) {
+      alert('Please ensure all required shipment details are complete before downloading the PDF.');
+      return;
+    }
+
+    setIsPreviewLoading(true);
+    try {
+      const shippingData = getShippingLabelData();
+      // Import dynamically to avoid SSR issues
+      const { generateShippingLabelBlob } = await import('@/lib/pdf-generator');
+      const blob = await generateShippingLabelBlob(shippingData);
+      
+      // Create download link
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `shipping-label-${shippingData.trackingNumber}.pdf`;
+      
+      // Trigger download
+      document.body.appendChild(link);
+      link.click();
+      
+      // Cleanup
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('Error downloading PDF:', error);
+      alert('Failed to download PDF. Please try again.');
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
+
+  return (
+    <Card className="parcego-card parcego-card--summary border-blue-200 bg-blue-50">
+      <CardHeader>
+        <CardTitle className="flex items-center space-x-2 text-blue-800">
+          <Icon name="Package" size={20} />
+          <span>Shipment Summary</span>
+        </CardTitle>
+        <CardDescription className="text-blue-600">
+          Review your complete shipment details and shipping label
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Reorder Info Banner */}
+        {isReorderMode && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+            <div className="flex items-start space-x-3">
+              <Icon name="Info" size={20} className="text-green-600 mt-0.5" />
+              <div className="flex-1">
+                <h4 className="font-semibold text-green-900 mb-1">Reorder from Previous Shipment</h4>
+                <p className="text-green-700 text-sm mb-2">
+                  We&apos;ve pre-filled the recipient details and package information from your previous shipment. 
+                  You can modify any fields as needed.
+                </p>
+                <div className="text-xs text-green-600">
+                  <strong>Source:</strong> {reorderSource} • <strong>Recipient:</strong> {formData.recipientName}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Tracking & Date Info */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-3 bg-white rounded-lg border border-blue-200">
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold text-blue-600 uppercase tracking-wide">
+              Tracking Number
+            </Label>
+            <p className="text-lg font-mono font-bold text-blue-800" suppressHydrationWarning>
+              {trackingNumber}
+            </p>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs font-semibold text-blue-600 uppercase tracking-wide">
+              Date
+            </Label>
+            <p className="text-lg font-semibold text-blue-800" suppressHydrationWarning>
+              {currentDate}
+            </p>
+          </div>
+        </div>
+
+        {/* From & To Section */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 p-3 bg-white rounded-lg border border-blue-200">
+          {/* From Section */}
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold text-blue-600 uppercase tracking-wide">
+              FROM
+            </Label>
+            <div className="space-y-1">
+              <p className="font-medium text-gray-900 text-sm">{mockMerchantData.businessName}</p>
+              <p className="text-xs text-gray-600">{mockMerchantData.address}</p>
+              <p className="text-xs text-gray-600">
+                {mockMerchantData.city}, {mockMerchantData.province} {mockMerchantData.postalCode}
+              </p>
+            </div>
+          </div>
+
+          {/* To Section */}
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold text-blue-600 uppercase tracking-wide">
+              TO
+            </Label>
+            <div className="space-y-1">
+              <p className="font-medium text-gray-900 text-sm">{formData.recipientName}</p>
+              {formData.recipientCompany && (
+                <p className="text-xs text-gray-600">{formData.recipientCompany}</p>
+              )}
+              <p className="text-xs text-gray-600">{formData.recipientAddress}</p>
+              <p className="text-xs text-gray-600">
+                {formData.recipientCity}, {formData.recipientProvince} {formData.recipientPostalCode}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Package Details Summary */}
+        <div className="p-3 bg-white rounded-lg border border-blue-200">
+          <Label className="text-sm font-semibold text-blue-600 mb-2 block">
+            Package Details
+          </Label>
+          <div className="grid grid-cols-2 gap-2 text-sm">
+            <div>
+              <span className="text-gray-600">Weight:</span>{" "}
+              <span className="font-medium">{formData.weight} {formData.weightUnit}</span>
+            </div>
+            <div>
+              <span className="text-gray-600">Service:</span>{" "}
+              <span className="font-medium capitalize">{formData.serviceType}</span>
+            </div>
+            <div>
+              <span className="text-gray-600">Type:</span>{" "}
+              <span className="font-medium capitalize">{formData.packageType}</span>
+            </div>
+            <div>
+              <span className="text-gray-600">Dimensions:</span>{" "}
+              <span className="font-medium">
+                {formData.length}&quot; × {formData.width}&quot; × {formData.height}&quot;
+              </span>
+            </div>
+          </div>
+          
+          {/* Special Handling */}
+          {(formData.fragile || formData.valuable || formData.insurance) && (
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <Label className="text-sm font-semibold text-gray-600 mb-1 block">Special Handling</Label>
+              <div className="flex flex-wrap gap-2">
+                {formData.fragile && (
+                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-800">
+                    Fragile
+                  </span>
+                )}
+                {formData.valuable && (
+                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                    High Value
+                  </span>
+                )}
+                {formData.insurance && (
+                  <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                    Insurance
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+          
+          {/* Special Instructions */}
+          {formData.specialInstructions && (
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <span className="text-gray-600 text-sm">Special Instructions:</span>{" "}
+              <span className="font-medium text-sm">{formData.specialInstructions}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Shipping Label Preview Section - Merged into Summary */}
+        <div className="bg-sky-50 border border-sky-200 rounded-lg p-4">
+          <div className="flex items-center space-x-2 mb-3">
+            <Icon name="FileText" size={18} className="text-sky-600" />
+            <span className="text-sm font-semibold text-sky-800">
+              Shipping Label Ready
+            </span>
+          </div>
+          <p className="text-sm text-sky-700 mb-4">
+            Your complete shipping label is ready for preview and download. All package details, 
+            addresses, and handling instructions are included.
+          </p>
+          
+          <div className="flex flex-wrap gap-3">
+            <Button
+              variant="outline"
+              onClick={handlePreviewPDF}
+              disabled={isPreviewLoading || !isFormValid()}
+              className="parcego-pdf-preview-btn bg-white hover:bg-sky-50 border-sky-300"
+              id="parcego-preview-pdf-btn"
+            >
+              {isPreviewLoading ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-sky-600 border-t-transparent"></div>
+                  <span>Generating...</span>
+                </div>
+              ) : (
+                <>
+                  <Icon name="Eye" size={16} className="mr-2" />
+                  Preview PDF
+                </>
+              )}
+            </Button>
+            
+            <Button
+              variant="outline"
+              onClick={handleDownloadPDF}
+              disabled={isPreviewLoading || !isFormValid()}
+              className="parcego-pdf-download-btn bg-white hover:bg-sky-50 border-sky-300"
+              id="parcego-download-pdf-btn"
+            >
+              {isPreviewLoading ? (
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-sky-600 border-t-transparent"></div>
+                  <span>Generating...</span>
+                </div>
+              ) : (
+                <>
+                  <Icon name="Download" size={16} className="mr-2" />
+                  Download PDF
+                </>
+              )}
+            </Button>
+          </div>
+          
+          {isFormValid() && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-3">
+              <div className="flex items-center space-x-2">
+                <Icon name="CheckCircle" size={16} className="text-green-600" />
+                <span className="text-sm font-medium text-green-800">
+                  All Details Complete - Ready for Label Generation
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+      </CardContent>
+    </Card>
+  );
+};
 
 export default function QuotePreviewPage() {
   const router = useRouter();
@@ -163,132 +558,8 @@ export default function QuotePreviewPage() {
 
         <div className="space-y-8">
 
-          {/* Shipment Summary */}
-          <Card className="parcego-card parcego-card--shipment-summary border-0 bg-gradient-to-br from-white to-gray-50/50">
-            <CardHeader className="pb-4">
-              <CardTitle className="text-lg font-semibold text-gray-900">
-                Shipment Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Top Row: From & To */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* From Section */}
-                <div className="space-y-2">
-                  <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                    FROM
-                  </h4>
-                  <div className="p-4 bg-white rounded-lg border border-gray-200 h-24 flex flex-col justify-center">
-                    <div className="space-y-1">
-                      <p className="font-medium text-gray-900 text-sm">John&apos;s Electronics Store</p>
-                      <p className="text-xs text-gray-600">123 Business St, Suite 100</p>
-                      <p className="text-xs text-gray-600">New York, NY 10001</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* To Section */}
-                <div className="space-y-2">
-                  <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                    TO
-                  </h4>
-                  <div className="p-4 bg-white rounded-lg border border-gray-200 h-24 flex flex-col justify-center">
-                    <div className="space-y-1">
-                      <p className="font-medium text-gray-900 text-sm">{formData.recipientName}</p>
-                      {formData.recipientCompany && (
-                        <p className="text-xs text-gray-600">{formData.recipientCompany}</p>
-                      )}
-                      <p className="text-xs text-gray-600">{formData.recipientAddress}</p>
-                      <p className="text-xs text-gray-600">
-                        {formData.recipientCity}, {formData.recipientProvince} {formData.recipientPostalCode}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Bottom Row: Package, Special Handling & Service */}
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* Package Details */}
-                <div className="space-y-2">
-                  <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                    PACKAGE
-                  </h4>
-                  <div className="p-4 bg-white rounded-lg border border-gray-200 h-24 flex flex-col justify-center">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-500 uppercase tracking-wide">Dimensions</span>
-                        <span className="text-xs font-medium text-gray-900">
-                          {formData.length}×{formData.width}×{formData.height} {formData.dimensionUnit}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-500 uppercase tracking-wide">Weight</span>
-                        <span className="text-xs font-medium text-gray-900">
-                          {formData.weight} {formData.weightUnit}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-500 uppercase tracking-wide">Type</span>
-                        <span className="text-xs font-medium text-gray-900 capitalize">{formData.packageType}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Special Handling */}
-                <div className="space-y-2">
-                  <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                    HANDLING
-                  </h4>
-                  <div className="p-4 bg-white rounded-lg border border-gray-200 h-24 flex flex-col justify-center">
-                    <div className="space-y-2">
-                      {formData.fragile || formData.valuable || formData.insurance ? (
-                        <div className="flex flex-col gap-1.5">
-                          {formData.fragile && (
-                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-800">
-                              Fragile
-                            </span>
-                          )}
-                          {formData.valuable && (
-                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
-                              High Value
-                            </span>
-                          )}
-                          {formData.insurance && (
-                            <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800">
-                              Insurance
-                            </span>
-                          )}
-                        </div>
-                      ) : (
-                        <p className="text-xs text-gray-500 italic">None required</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Shipping Service */}
-                <div className="space-y-2">
-                  <h4 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
-                    SERVICE
-                  </h4>
-                  <div className="p-4 bg-white rounded-lg border border-gray-200 h-24 flex flex-col justify-center">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-500 uppercase tracking-wide">Type</span>
-                        <span className="text-xs font-medium text-gray-900">Parcego Standard</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-500 uppercase tracking-wide">Delivery</span>
-                        <span className="text-xs font-medium text-gray-900">3-5 business days</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Enhanced Shipment Summary with Shipping Label Preview */}
+          <ShipmentSummary formData={formData} />
 
           {/* Quote Options */}
           <Card className="parcego-card parcego-card--quote-options">

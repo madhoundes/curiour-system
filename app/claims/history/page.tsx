@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
+
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { 
   FileText, 
@@ -19,18 +19,20 @@ import {
   CheckCircle, 
   XCircle,
   AlertTriangle,
-  Calendar,
-  MapPin,
+
   Package,
   Shield
 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { loadLogoForPDF, addLogoToPDF } from "@/lib/utils";
 import { ClientOnly } from "@/components/ui/client-only";
 
+import { Printer } from "lucide-react";
+import { ClaimReportPDF, generateClaimPDF } from "@/components/pdf/claim-report-pdf";
+import { generatePrintContent } from "@/components/pdf/claim-print-helper";
+
 // Types for claims
-interface Claim {
+export interface Claim {
   id: string;
   shipmentNumber: string;
   claimType: string;
@@ -217,6 +219,10 @@ const claimTypeConfig = {
   handling: { label: "Handling Damage", color: "bg-yellow-50 text-yellow-700", icon: Package }
 };
 
+
+
+
+
 export default function ClaimsHistoryPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -224,12 +230,11 @@ export default function ClaimsHistoryPage() {
   const [dateFilter, setDateFilter] = useState<string>("all");
   const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
-  const [isClient, setIsClient] = useState(false);
 
-  // Ensure client-side only rendering for dynamic functionality
-  useEffect(() => {
-    setIsClient(true);
-  }, []);
+  
+
+
+
 
   // Filter claims based on search and filters
   const filteredClaims = useMemo(() => {
@@ -299,6 +304,30 @@ export default function ClaimsHistoryPage() {
     setIsDetailModalOpen(true);
   };
 
+  // Handle print claim - generates complete claim report for printing
+  const handlePrintClaim = async (claim: Claim) => {
+    try {
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        // Generate complete claim report HTML
+        const printHTML = generatePrintContent(claim);
+        
+        printWindow.document.write(printHTML);
+        printWindow.document.close();
+        printWindow.focus();
+        
+        // Allow time for content to load before printing
+        setTimeout(() => {
+          printWindow.print();
+          printWindow.close();
+        }, 500);
+      }
+    } catch (error) {
+      console.error('Print generation error:', error);
+      toast.error("Failed to generate print preview");
+    }
+  };
+
   // Handle downloading claim documents as professional PDF report
   const handleDownloadClaimDocuments = async (claim: Claim) => {
     // Ensure we're on the client side
@@ -309,350 +338,21 @@ export default function ClaimsHistoryPage() {
 
     try {
       await toast.promise(
-        generateClaimReportPDF(claim),
+        generateClaimPDF(claim),
         {
-          loading: `Generating report for ${claim.id}…`,
-          success: "Download started",
-          error: "Failed to generate report",
+          loading: `Generating PDF report for ${claim.id}…`,
+          success: "PDF downloaded successfully",
+          error: "Failed to generate PDF report",
         }
       );
     } catch (err) {
       console.error("PDF generation error:", err);
       // Fallback error toast just in case
-      toast.error("Something went wrong generating the report");
+      toast.error("Something went wrong generating the PDF report");
     }
   };
 
-  // Generate professional PDF report for claim
-  const generateClaimReportPDF = async (claim: Claim): Promise<void> => {
-    try {
-      // Dynamic imports to avoid SSR issues
-      const { jsPDF } = await import('jspdf');
-      const { autoTable } = await import('jspdf-autotable');
 
-      // Create new PDF document
-      const doc = new jsPDF('p', 'mm', 'a4');
-      // Tighter global line height for denser layout
-      doc.setLineHeightFactor(1.1);
-      
-      // Load logo
-      let logoData: string;
-      try {
-        logoData = await loadLogoForPDF();
-      } catch (error) {
-        logoData = 'PARCEGO'; // Fallback
-      }
-
-      // Page dimensions and compact margins
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 12;
-      let yPosition = margin;
-
-      // Header with logo and title
-      try {
-        // Slightly smaller logo for compact header
-        addLogoToPDF(doc, margin, yPosition, 32, 6, logoData);
-      } catch (logoError) {
-        // Fallback text logo
-        doc.setFontSize(14);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(0, 145, 245);
-        doc.text('PARCEGO', margin, yPosition + 5);
-      }
-
-      // Report title (just below logo)
-      doc.setFontSize(16);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      // Balanced gap between logo and title: 30px
-      const pxToMm = 25.4 / 96;
-      const titleBaselineY = yPosition + (30 * pxToMm);
-      doc.text('CLAIM REPORT', margin, titleBaselineY);
-
-      // Contact Information Box (top right) - Structured format
-      const contactInfoData = [
-        ['Email', 'support@parcego.com'],
-        ['Claim ID', claim.id],
-        ['Phone Number', '1-800-PARCEGO'],
-        ['Shipment ID', claim.shipmentNumber],
-        ['Date Generated', new Date().toLocaleDateString()]
-      ];
-
-      autoTable(doc, {
-        body: contactInfoData,
-        startY: yPosition - 2,
-        margin: { left: pageWidth - 72, right: margin },
-        tableWidth: 68,
-        theme: 'plain',
-        styles: {
-          fontSize: 8,
-          cellPadding: { top: 1, right: 2, bottom: 1, left: 2 },
-          textColor: [60, 60, 60],
-          lineWidth: 0,
-          fillColor: false
-        },
-        columnStyles: {
-          0: {
-            fontStyle: 'bold',
-            cellWidth: 24,
-            halign: 'left',
-            textColor: [0, 80, 150]
-          },
-          1: {
-            cellWidth: 44,
-            halign: 'left',
-            fontStyle: 'normal'
-          }
-        }
-      });
-
-      // Start main content relative to the title to push body lower
-      yPosition = titleBaselineY + 12;
-
-      // Basic Information Section
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      // Ensure "BASIC INFORMATION" sits just under title
-      doc.text('BASIC INFORMATION', margin, titleBaselineY + 6);
-      yPosition = titleBaselineY + 12;
-
-      const statusConfig = getClaimStatusConfig(claim.status);
-      const typeConfig = getClaimTypeConfig(claim.claimType);
-      
-      const basicInfoData = [
-        ['Claim Type', typeConfig.label],
-        ['Status', statusConfig.label],
-        ['Claimed Amount', claim.amount],
-        ['Payout Amount', claim.payoutAmount],
-        ['Processing Time', getClaimProcessingTime(claim.submittedDate, claim.resolvedDate)],
-        ['Submitted Date', new Date(claim.submittedDate).toLocaleDateString()],
-        ...(claim.resolvedDate ? [['Resolved Date', new Date(claim.resolvedDate).toLocaleDateString()]] : [])
-      ];
-
-      autoTable(doc, {
-        body: basicInfoData,
-        startY: yPosition,
-        theme: 'plain',
-        tableLineWidth: 0,
-        styles: {
-          fontSize: 8,
-          cellPadding: 2,
-          textColor: [60, 60, 60],
-          lineWidth: 0
-        },
-        columnStyles: {
-          0: { cellWidth: 40, fontStyle: 'bold', fillColor: [248, 248, 248] },
-          1: { cellWidth: 'auto' }
-        },
-        margin: { left: margin, right: margin }
-      });
-
-      yPosition = (doc as any).lastAutoTable.finalY + 6;
-
-      // Incident Details Section
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text('INCIDENT DETAILS', margin, yPosition);
-      yPosition += 5;
-
-      const incidentData = [
-        ['Incident Date', new Date(claim.incidentDate).toLocaleDateString()],
-        ['Incident Location', claim.incidentLocation],
-        ['Description', claim.description]
-      ];
-
-      autoTable(doc, {
-        body: incidentData,
-        startY: yPosition,
-        theme: 'plain',
-        tableLineWidth: 0,
-        styles: {
-          fontSize: 8,
-          cellPadding: 2,
-          textColor: [60, 60, 60],
-          lineWidth: 0
-        },
-        columnStyles: {
-          0: { cellWidth: 40, fontStyle: 'bold', fillColor: [248, 248, 248] },
-          1: { cellWidth: 'auto' }
-        },
-        margin: { left: margin, right: margin }
-      });
-
-      yPosition = (doc as any).lastAutoTable.finalY + 6;
-
-      // Contact Information Section
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text('CONTACT INFORMATION', margin, yPosition);
-      yPosition += 5;
-
-      const contactData = [
-        ['Contact Name', claim.contactName],
-        ['Business Name', claim.businessName || 'N/A'],
-        ['Phone', claim.contactPhone],
-        ['Email', claim.contactEmail]
-      ];
-
-      autoTable(doc, {
-        body: contactData,
-        startY: yPosition,
-        theme: 'plain',
-        tableLineWidth: 0,
-        styles: {
-          fontSize: 8,
-          cellPadding: 2,
-          textColor: [60, 60, 60],
-          lineWidth: 0
-        },
-        columnStyles: {
-          0: { cellWidth: 40, fontStyle: 'bold', fillColor: [248, 248, 248] },
-          1: { cellWidth: 'auto' }
-        },
-        margin: { left: margin, right: margin }
-      });
-
-      yPosition = (doc as any).lastAutoTable.finalY + 6;
-
-      // Supporting Documents Section
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text('SUPPORTING DOCUMENTS', margin, yPosition);
-      yPosition += 5;
-
-      // Prepare documents data with mock metadata
-      const documentsData = claim.documents.map((doc, index) => {
-        const extension = doc.split('.').pop()?.toLowerCase() || 'unknown';
-        const mockSize = ['1.2 MB', '845 KB', '2.1 MB', '567 KB'][index % 4];
-        const mockDate = new Date(Date.now() - (index * 24 * 60 * 60 * 1000)).toLocaleDateString();
-        
-        return [
-          (index + 1).toString(),
-          doc,
-          extension.toUpperCase(),
-          mockSize,
-          mockDate
-        ];
-      });
-
-      autoTable(doc, {
-        head: [['#', 'Document Name', 'Type', 'Size', 'Date']],
-        body: documentsData,
-        startY: yPosition,
-        theme: 'plain',
-        tableLineWidth: 0,
-        styles: {
-          fontSize: 8,
-          cellPadding: 2,
-          textColor: [60, 60, 60],
-          lineWidth: 0
-        },
-        headStyles: {
-          fillColor: [245, 245, 245],
-          textColor: [0, 0, 0],
-          fontStyle: 'bold'
-        },
-        columnStyles: {
-          0: { cellWidth: 12, halign: 'center' },
-          1: { cellWidth: 'auto' },
-          2: { cellWidth: 18, halign: 'center' },
-          3: { cellWidth: 18, halign: 'right' },
-          4: { cellWidth: 22, halign: 'center' }
-        },
-        margin: { left: margin, right: margin }
-      });
-
-      yPosition = (doc as any).lastAutoTable.finalY + 8;
-
-      // Footer
-      const footerY = pageHeight - 22;
-      
-      // Terms section
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text('IMPORTANT NOTES', margin, footerY);
-
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(60, 60, 60);
-      doc.setFontSize(7);
-      const notes = [
-        'This report contains confidential claim information.',
-        'For questions about this claim, contact support@parcego.com',
-        'Keep this document for your records.'
-      ];
-
-      notes.forEach((note, index) => {
-        doc.text(note, margin, footerY + 4 + (index * 2.6));
-      });
-
-      // Page footer
-      doc.setFontSize(7);
-      doc.setTextColor(120, 120, 120);
-      doc.text(
-        `Generated on ${new Date().toLocaleDateString()} | Parcego Claims Report`,
-        pageWidth / 2,
-        pageHeight - 6,
-        { align: 'center' }
-      );
-
-      // Save the PDF
-      const filename = `claim-report-${claim.id}-${new Date().toISOString().split('T')[0]}.pdf`;
-      doc.save(filename);
-
-    } catch (error) {
-      console.error('Failed to generate claim report PDF:', error);
-      
-      // Fallback to text download
-      const reportContent = `CLAIM REPORT - ${claim.id}
-
-Generated: ${new Date().toLocaleString()}
-
-BASIC INFORMATION:
-Claim ID: ${claim.id}
-Shipment Number: ${claim.shipmentNumber}
-Claim Type: ${getClaimTypeConfig(claim.claimType).label}
-Status: ${getClaimStatusConfig(claim.status).label}
-Claimed Amount: ${claim.amount}
-Payout Amount: ${claim.payoutAmount}
-Processing Time: ${getClaimProcessingTime(claim.submittedDate, claim.resolvedDate)}
-
-INCIDENT DETAILS:
-Incident Date: ${new Date(claim.incidentDate).toLocaleDateString()}
-Incident Location: ${claim.incidentLocation}
-Description: ${claim.description}
-
-CONTACT INFORMATION:
-Contact Name: ${claim.contactName}
-Business Name: ${claim.businessName || 'N/A'}
-Phone: ${claim.contactPhone}
-Email: ${claim.contactEmail}
-
-SUPPORTING DOCUMENTS:
-${claim.documents.map((doc, index) => `${index + 1}. ${doc}`).join('\n')}
-
----
-Parcego Courier Services
-Generated on ${new Date().toLocaleDateString()}`;
-
-      const blob = new Blob([reportContent], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `claim-report-${claim.id}-${new Date().toISOString().split('T')[0]}.txt`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      throw new Error('PDF generation failed, downloaded text version instead');
-    }
-  };
 
   // Calculate summary statistics
   const summaryStats = useMemo(() => {
@@ -914,6 +614,16 @@ Generated on ${new Date().toLocaleDateString()}`;
                               >
                                 <Eye className="h-4 w-4" />
                               </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0"
+                                title="Print Claim"
+                                onClick={() => handlePrintClaim(claim)}
+                                id={`parcego-claims-history-print-${claim.id}`}
+                              >
+                                <Printer className="h-4 w-4" />
+                              </Button>
                               <ClientOnly fallback={
                                 <Button
                                   variant="ghost"
@@ -951,7 +661,7 @@ Generated on ${new Date().toLocaleDateString()}`;
 
       {/* Claim Detail Modal */}
       <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto bg-white">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto bg-white">
           {selectedClaim && (
             <>
               <DialogHeader>
@@ -960,165 +670,20 @@ Generated on ${new Date().toLocaleDateString()}`;
                   <span>Claim Details - {selectedClaim.id}</span>
                 </DialogTitle>
                 <DialogDescription>
-                  Detailed information about claim {selectedClaim.id} for shipment {selectedClaim.shipmentNumber}
+                  Preview of the claim report for {selectedClaim.id} - this matches the PDF export exactly
                 </DialogDescription>
               </DialogHeader>
               
-              <div className="space-y-6">
-                {/* Basic Information */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Claim ID</Label>
-                      <p className="text-lg font-mono">{selectedClaim.id}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Shipment Number</Label>
-                      <p className="text-lg font-mono">{selectedClaim.shipmentNumber}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Claim Type</Label>
-                      <Badge className={getClaimTypeConfig(selectedClaim.claimType).color}>
-                        {getClaimTypeConfig(selectedClaim.claimType).label}
-                      </Badge>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Status</Label>
-                      <div className="flex items-center space-x-2">
-                        <Badge className={getClaimStatusConfig(selectedClaim.status).color}>
-                          {getClaimStatusConfig(selectedClaim.status).label}
-                        </Badge>
-                        <span className="text-sm text-gray-500">
-                          {getClaimStatusConfig(selectedClaim.status).description}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Claimed Amount</Label>
-                      <p className="text-2xl font-bold text-blue-600">{selectedClaim.amount}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Payout Amount</Label>
-                      <p className={`text-2xl font-bold ${
-                        selectedClaim.payoutAmount === "Pending" ? "text-yellow-600" : 
-                        selectedClaim.payoutAmount === "$0.00" ? "text-red-600" : "text-green-600"
-                      }`}>
-                        {selectedClaim.payoutAmount}
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Processing Time</Label>
-                      <p className="text-lg">
-                        {getClaimProcessingTime(selectedClaim.submittedDate, selectedClaim.resolvedDate)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Incident Details */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Incident Details</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Incident Date</Label>
-                      <p className="flex items-center space-x-2">
-                        <Calendar className="h-4 w-4 text-gray-400" />
-                        <span>{new Date(selectedClaim.incidentDate).toLocaleDateString()}</span>
-                      </p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Incident Location</Label>
-                      <p className="flex items-center space-x-2">
-                        <MapPin className="h-4 w-4 text-gray-400" />
-                        <span>{selectedClaim.incidentLocation}</span>
-                      </p>
-                    </div>
-                  </div>
-                  <div>
-                    <Label className="text-sm font-medium text-gray-500">Description</Label>
-                    <p className="mt-1 text-gray-700">{selectedClaim.description}</p>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Contact Information */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Contact Information</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Contact Name</Label>
-                      <p>{selectedClaim.contactName}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Business Name</Label>
-                      <p>{selectedClaim.businessName || "N/A"}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Phone</Label>
-                      <p>{selectedClaim.contactPhone}</p>
-                    </div>
-                    <div>
-                      <Label className="text-sm font-medium text-gray-500">Email</Label>
-                      <p>{selectedClaim.contactEmail}</p>
-                    </div>
-                  </div>
-                </div>
-
-                <Separator />
-
-                {/* Documents */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Supporting Documents</h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {selectedClaim.documents.map((doc, index) => (
-                      <div key={index} className="flex items-center space-x-2 p-2 bg-gray-50 rounded">
-                        <FileText className="h-4 w-4 text-gray-400" />
-                        <span className="text-sm">{doc}</span>
-                        <Button variant="ghost" size="sm" className="ml-auto">
-                          <Download className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Timeline */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Claim Timeline</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-3">
-                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                      <div>
-                        <p className="text-sm font-medium">Claim Submitted</p>
-                        <p className="text-xs text-gray-500">
-                          {new Date(selectedClaim.submittedDate).toLocaleDateString()} at {new Date(selectedClaim.submittedDate).toLocaleTimeString()}
-                        </p>
-                      </div>
-                    </div>
-                    {selectedClaim.resolvedDate && (
-                      <div className="flex items-center space-x-3">
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                        <div>
-                          <p className="text-sm font-medium">Claim Resolved</p>
-                          <p className="text-xs text-gray-500">
-                            {new Date(selectedClaim.resolvedDate).toLocaleDateString()} at {new Date(selectedClaim.resolvedDate).toLocaleTimeString()}
-                          </p>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
+              {/* PDF Preview */}
+              <div className="border rounded-lg bg-gray-50 p-4 overflow-auto">
+                <ClaimReportPDF claim={selectedClaim} isPreview={true} />
               </div>
             </>
           )}
         </DialogContent>
       </Dialog>
+
+
     </div>
   );
 }

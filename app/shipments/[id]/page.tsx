@@ -9,10 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Icon } from "@/components/ui/icon";
 import { Progress } from "@/components/ui/progress";
 import { useReactToPrint } from "react-to-print";
-import { generateMockShipments, formatCurrency } from "@/lib/mock/shipments";
+import { getMockShipments, formatCurrency } from "@/lib/mock/shipments";
 import { downloadFile, generateMockInvoice, generatePdfInvoice } from '@/lib/utils';
-
-const allShipments = generateMockShipments();
 
 // Timeline data with status and completion
 const timelineSteps = [
@@ -28,19 +26,27 @@ export default function ShipmentDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id as string;
   const printRef = useRef<HTMLDivElement>(null);
+  
+  // Data loading state for consistent SSR/CSR
+  const [allShipments, setAllShipments] = React.useState<Array<Record<string, unknown>>>([]);
+  const [isDataLoaded, setIsDataLoaded] = React.useState(false);
 
-  const shipment = useMemo(() => allShipments.find((s) => s.id === id), [id]);
+  // Load data on client to prevent hydration mismatches
+  React.useEffect(() => {
+    const shipments = getMockShipments();
+    setAllShipments(shipments);
+    setIsDataLoaded(true);
+  }, []);
+
+  const shipment = useMemo(() => 
+    isDataLoaded ? allShipments.find((s) => s.id === id) : null, 
+    [id, allShipments, isDataLoaded]
+  );
 
   // Print functionality
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: `Shipment ${shipment?.id || 'Details'}`,
-    onBeforeGetContent: () => {
-      // Ensure all content is loaded before printing
-      return new Promise((resolve) => {
-        setTimeout(resolve, 100);
-      });
-    },
     onAfterPrint: () => {
       console.log('Print completed');
     },
@@ -305,7 +311,7 @@ export default function ShipmentDetailPage() {
                             : 'bg-gray-100 border-gray-300 text-gray-400'
                         }`}>
                           <Icon 
-                            name={step.icon as any} 
+                            name={step.icon as string} 
                             size={18} 
                             className={step.active ? 'text-green-600' : ''}
                           />

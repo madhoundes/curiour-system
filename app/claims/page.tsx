@@ -15,7 +15,7 @@ import { Stepper, StepperStep } from "@/components/ui/stepper";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { FileText, CheckCircle, Clock, AlertTriangle, XCircle, Calendar as CalendarIcon } from "lucide-react";
+import { CheckCircle, Calendar as CalendarIcon } from "lucide-react";
 
 // Types for the claims form
 interface ClaimFormData {
@@ -79,86 +79,24 @@ const stepperSteps: StepperStep[] = [
   { id: "review", title: "Review & Submit", status: "upcoming" }
 ];
 
-// Mock claims data for the modal
-const mockClaimsHistory = [
-  {
-    id: "CLM-001",
-    shipmentNumber: "ASH-20250101-ABC123",
-    claimType: "Damage",
-    status: "approved",
-    submittedDate: "2025-01-10",
-    resolvedDate: "2025-01-15",
-    amount: "$150.00",
-    description: "Package damaged during transit - corner crushed",
-    payoutAmount: "$150.00",
-    documents: ["receipt.pdf", "damage_photos.zip"]
-  },
-  {
-    id: "CLM-002",
-    shipmentNumber: "ASH-20250102-DEF456",
-    claimType: "Loss",
-    status: "under_investigation",
-    submittedDate: "2025-01-12",
-    resolvedDate: null,
-    amount: "$75.00",
-    description: "Package lost during delivery - never received",
-    payoutAmount: "Pending",
-    documents: ["invoice.pdf", "proof_of_value.pdf"]
-  },
-  {
-    id: "CLM-003",
-    shipmentNumber: "ASH-20250103-GHI789",
-    claimType: "Delay",
-    status: "pending_review",
-    submittedDate: "2025-01-14",
-    resolvedDate: null,
-    amount: "$25.00",
-    description: "Significant delivery delay - 5 days late",
-    payoutAmount: "Pending",
-    documents: ["delivery_confirmation.pdf"]
-  },
-  {
-    id: "CLM-004",
-    shipmentNumber: "ASH-20250104-JKL012",
-    claimType: "Theft",
-    status: "rejected",
-    submittedDate: "2025-01-08",
-    resolvedDate: "2025-01-13",
-    amount: "$200.00",
-    description: "Package stolen from doorstep - insufficient evidence",
-    payoutAmount: "$0.00",
-    documents: ["police_report.pdf", "security_footage.zip"]
-  },
-  {
-    id: "CLM-005",
-    shipmentNumber: "ASH-20250105-MNO345",
-    claimType: "Damage",
-    status: "approved",
-    submittedDate: "2025-01-06",
-    resolvedDate: "2025-01-11",
-    amount: "$300.00",
-    description: "Package contents damaged due to improper handling",
-    payoutAmount: "$300.00",
-    documents: ["damage_assessment.pdf", "repair_quotes.pdf"]
-  }
-];
+// Mock claims data for the modal (removed as not currently used)
 
-// Status configuration for claims
-const claimStatusConfig = {
-  approved: { label: "Approved", color: "bg-green-50 text-green-700 border-green-200", icon: CheckCircle },
-  pending_review: { label: "Pending Review", color: "bg-yellow-50 text-yellow-700 border-yellow-200", icon: Clock },
-  under_investigation: { label: "Under Investigation", color: "bg-blue-50 text-blue-700 border-blue-200", icon: AlertTriangle },
-  rejected: { label: "Rejected", color: "bg-red-50 text-red-700 border-red-200", icon: XCircle }
-};
+// Status configuration for claims (commented out as not currently used)
+// const claimStatusConfig = {
+//   approved: { label: "Approved", color: "bg-green-50 text-green-700 border-green-200", icon: CheckCircle },
+//   pending_review: { label: "Pending Review", color: "bg-yellow-50 text-yellow-700 border-yellow-200", icon: Clock },
+//   under_investigation: { label: "Under Investigation", color: "bg-blue-50 text-blue-700 border-blue-200", icon: AlertTriangle },
+//   rejected: { label: "Rejected", color: "bg-red-50 text-red-700 border-red-200", icon: XCircle }
+// };
 
-// Claim type configuration
-const claimTypeConfig = {
-  damage: { label: "Damage", color: "bg-orange-50 text-orange-700" },
-  loss: { label: "Loss", color: "bg-red-50 text-red-700" },
-  delay: { label: "Delay", color: "bg-yellow-50 text-yellow-700" },
-  theft: { label: "Theft", color: "bg-purple-50 text-purple-700" },
-  handling: { label: "Handling", color: "bg-yellow-50 text-yellow-700" }
-};
+// Claim type configuration (commented out as not currently used)
+// const claimTypeConfig = {
+//   damage: { label: "Damage", color: "bg-orange-50 text-orange-700" },
+//   loss: { label: "Loss", color: "bg-red-50 text-red-700" },
+//   delay: { label: "Delay", color: "bg-yellow-50 text-yellow-700" },
+//   theft: { label: "Theft", color: "bg-purple-50 text-purple-700" },
+//   handling: { label: "Handling", color: "bg-yellow-50 text-yellow-700" }
+// };
 
 export default function ClaimsPage() {
   const router = useRouter();
@@ -179,7 +117,7 @@ export default function ClaimsPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [isClaimsHistoryOpen, setIsClaimsHistoryOpen] = useState(false);
+
   const [claimNumber, setClaimNumber] = useState<string>("");
 
   useEffect(() => {
@@ -246,36 +184,36 @@ export default function ClaimsPage() {
     setSubmitted(true);
   };
 
-  // Handle claims history modal open/close
-  const handleClaimsHistoryOpen = () => {
-    setIsClaimsHistoryOpen(true);
-  };
+  // Handle claims history modal open/close (commented out as not currently used)
+  // const handleClaimsHistoryOpen = () => {
+  //   setIsClaimsHistoryOpen(true);
+  // };
 
-  const handleClaimsHistoryClose = () => {
-    setIsClaimsHistoryOpen(false);
-  };
+  // const handleClaimsHistoryClose = () => {
+  //   setIsClaimsHistoryOpen(false);
+  // };
 
-  // Get status configuration for claims
-  const getClaimStatusConfig = (status: string) => {
-    return claimStatusConfig[status as keyof typeof claimStatusConfig] || claimStatusConfig.pending_review;
-  };
+  // Get status configuration for claims (commented out as not currently used)
+  // const getClaimStatusConfig = (status: string) => {
+  //   return claimStatusConfig[status as keyof typeof claimStatusConfig] || claimStatusConfig.pending_review;
+  // };
 
-  // Get claim type configuration
-  const getClaimTypeConfig = (type: string) => {
-    return claimTypeConfig[type as keyof typeof claimTypeConfig] || claimTypeConfig.damage;
-  };
+  // Get claim type configuration (commented out as not currently used)
+  // const getClaimTypeConfig = (type: string) => {
+  //   return claimTypeConfig[type as keyof typeof claimTypeConfig] || claimTypeConfig.damage;
+  // };
 
-  // Calculate processing time for claims
-  const getClaimProcessingTime = (submittedDate: string, resolvedDate: string | null) => {
-    if (!resolvedDate) return "In Progress";
-    
-    const submitted = new Date(submittedDate);
-    const resolved = new Date(resolvedDate);
-    const diffTime = Math.abs(resolved.getTime() - submitted.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    return `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
-  };
+  // Calculate processing time for claims (commented out as not currently used)
+  // const getClaimProcessingTime = (submittedDate: string, resolvedDate: string | null) => {
+  //   if (!resolvedDate) return "In Progress";
+  //   
+  //   const submitted = new Date(submittedDate);
+  //   const resolved = new Date(resolvedDate);
+  //   const diffTime = Math.abs(resolved.getTime() - submitted.getTime());
+  //   const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+  //   
+  //   return `${diffDays} day${diffDays !== 1 ? 's' : ''}`;
+  // };
 
   // Render step content
   const renderStepContent = () => {
