@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Icon } from '@/components/ui/icon'
-import { PageHeader } from '@/components/ui/page-header'
+
 import { mockHelpArticles } from '@/lib/mock/support'
 
 export default function ArticlePage() {
@@ -29,7 +29,7 @@ export default function ArticlePage() {
           <Icon name="file-text" className="h-12 w-12 text-gray-400 mx-auto mb-4" />
           <h2 className="text-2xl font-semibold text-gray-900 mb-2">Article Not Found</h2>
           <p className="text-gray-600 mb-6">
-            The article you're looking for doesn't exist or may have been moved.
+            The article you&apos;re looking for doesn&apos;t exist or may have been moved.
           </p>
           <Button onClick={handleBack} variant="outline">
             <Icon name="arrow-left" className="h-4 w-4 mr-2" />

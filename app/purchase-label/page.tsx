@@ -53,6 +53,10 @@ export default function PurchaseLabelPage() {
   // Enhanced state management
   const [isProcessing, setIsProcessing] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  // Preview modal state
+  const [showPreview, setShowPreview] = useState(false);
+  const [pdfBlobUrl, setPdfBlobUrl] = useState<string>("");
+  const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   // Generate tracking number (deferred to client to avoid SSR hydration mismatch)
   const [trackingNumber, setTrackingNumber] = useState<string>("");
 
@@ -123,45 +127,34 @@ export default function PurchaseLabelPage() {
     }, 2000);
   };
   
-  // Generate and download PDF label using the polished React-PDF version
+  // Generate and download PDF label using the unified shipping label service
   const handleDownloadLabel = async () => {
     try {
-      // Prepare data for the polished shipping label
-      const shippingData: ShippingLabelData = {
+      // Use the unified shipping label service
+      const { createShippingLabelFromOrderData, generateAndDownloadLabel } = await import('@/lib/shipping-label-service');
+      
+      const shippingData = createShippingLabelFromOrderData({
         trackingNumber: trackingNumber,
-        sender: {
-          name: "John's Electronics Store",
-          address: '123 Business St, Suite 100',
-          city: 'New York',
-          state: 'NY',
-          postalCode: '10001',
-        },
-        recipient: {
-          name: mockOrderData.recipientName,
-          company: mockOrderData.recipientCompany,
-          address: mockOrderData.recipientAddress,
-          city: mockOrderData.recipientCity,
-          state: mockOrderData.recipientProvince,
-          postalCode: mockOrderData.recipientPostalCode,
-          phone: mockOrderData.recipientPhone,
-          email: mockOrderData.recipientEmail,
-        },
-        service: {
-          type: mockOrderData.serviceType.toUpperCase(),
-          description: mockOrderData.selectedQuote.deliveryTime,
-        },
-        package: {
-          weight: `${mockOrderData.weight} ${mockOrderData.weightUnit}`,
-          dimensions: `${mockOrderData.length}" × ${mockOrderData.width}" × ${mockOrderData.height}" ${mockOrderData.dimensionUnit}`,
-          type: mockOrderData.packageType,
-        },
-        shipDate: new Date().toLocaleDateString(),
-        logoUrl: '/Logo/Horizontal-logo.svg', // Updated to use custom logo
-      };
+        recipientName: mockOrderData.recipientName,
+        recipientCompany: mockOrderData.recipientCompany,
+        recipientAddress: mockOrderData.recipientAddress,
+        recipientCity: mockOrderData.recipientCity,
+        recipientProvince: mockOrderData.recipientProvince,
+        recipientPostalCode: mockOrderData.recipientPostalCode,
+        recipientPhone: mockOrderData.recipientPhone,
+        recipientEmail: mockOrderData.recipientEmail,
+        serviceType: mockOrderData.serviceType,
+        selectedQuote: mockOrderData.selectedQuote,
+        weight: mockOrderData.weight,
+        weightUnit: mockOrderData.weightUnit,
+        length: mockOrderData.length,
+        width: mockOrderData.width,
+        height: mockOrderData.height,
+        dimensionUnit: mockOrderData.dimensionUnit,
+        packageType: mockOrderData.packageType
+      });
 
-      // Dynamically import and generate the polished PDF to avoid chunk loading issues
-      const { generatePolishedShippingLabel } = await import('@/lib/pdf-generator');
-      await generatePolishedShippingLabel(shippingData);
+      await generateAndDownloadLabel(shippingData);
       
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -169,17 +162,16 @@ export default function PurchaseLabelPage() {
     }
   };
   
-  // Handle preview and print label with improved error handling and browser compatibility
+  // Handle preview - generate PDF and open stable modal
   const handlePreviewAndPrint = async () => {
-    console.log('Preview & Print Label clicked - starting process...');
+    console.log('Preview & Print Label clicked - generating preview...');
+    
+    if (isGeneratingPreview) {
+      return; // Prevent double-clicks
+    }
     
     try {
-      // Show loading state
-      const buttonElement = document.getElementById('parcego-payment-preview-print-btn');
-      if (buttonElement) {
-        buttonElement.textContent = 'Generating PDF...';
-        buttonElement.setAttribute('disabled', 'true');
-      }
+      setIsGeneratingPreview(true);
 
       // Prepare data for the polished shipping label
       const shippingData: ShippingLabelData = {
@@ -210,13 +202,12 @@ export default function PurchaseLabelPage() {
           dimensions: `${mockOrderData.length}" × ${mockOrderData.width}" × ${mockOrderData.height}" ${mockOrderData.dimensionUnit}`,
           type: mockOrderData.packageType,
         },
-        shipDate: new Date().toLocaleDateString(),
-        logoUrl: '/Logo/Horizontal-logo.svg', // Updated to use custom logo
+        shipDate: new Date().toLocaleDateString()
       };
 
       console.log('Generating PDF blob with data:', shippingData);
 
-      // Generate PDF blob with better error handling
+      // Generate PDF blob
       const { generateShippingLabelBlob } = await import('@/lib/pdf-generator');
       const pdfBlob = await generateShippingLabelBlob(shippingData);
       
@@ -226,126 +217,80 @@ export default function PurchaseLabelPage() {
 
       console.log('PDF blob generated successfully, size:', pdfBlob.size);
       
-      // Create object URL for the PDF
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-      console.log('PDF object URL created:', pdfUrl);
-      
-      // Method 1: Try direct browser print using iframe (preferred)
-      const printWithIframe = () => {
-        return new Promise<boolean>((resolve) => {
-          const iframe = document.createElement('iframe');
-          iframe.style.position = 'fixed';
-          iframe.style.right = '0';
-          iframe.style.bottom = '0';
-          iframe.style.width = '0';
-          iframe.style.height = '0';
-          iframe.style.border = 'none';
-          iframe.src = pdfUrl;
-          
-          let hasLoaded = false;
-          let hasPrinted = false;
-          
-          iframe.onload = () => {
-            if (hasLoaded) return;
-            hasLoaded = true;
-            
-            console.log('PDF loaded in iframe, attempting to print...');
-            
-            setTimeout(() => {
-              try {
-                if (iframe.contentWindow) {
-                  iframe.contentWindow.focus();
-                  iframe.contentWindow.print();
-                  hasPrinted = true;
-                  console.log('Print dialog triggered successfully');
-                  resolve(true);
-                } else {
-                  console.log('iframe.contentWindow not available');
-                  resolve(false);
-                }
-              } catch (error) {
-                console.error('Error calling iframe print:', error);
-                resolve(false);
-              }
-              
-              // Cleanup after delay
-              setTimeout(() => {
-                try {
-                  if (document.body.contains(iframe)) {
-                    document.body.removeChild(iframe);
-                  }
-                  URL.revokeObjectURL(pdfUrl);
-                } catch (cleanupError) {
-                  console.error('Cleanup error:', cleanupError);
-                }
-              }, 2000);
-            }, 500); // Give iframe time to fully load
-          };
-          
-          iframe.onerror = () => {
-            console.error('Error loading PDF in iframe');
-            resolve(false);
-          };
-          
-          // Timeout fallback
-          setTimeout(() => {
-            if (!hasPrinted) {
-              console.log('Print timeout reached, falling back');
-              resolve(false);
-            }
-          }, 5000);
-          
-          document.body.appendChild(iframe);
-        });
-      };
-
-      // Method 2: Fallback - open in new tab
-      const printWithNewTab = () => {
-        console.log('Using fallback method: opening PDF in new tab');
-        const newWindow = window.open(pdfUrl, '_blank');
-        if (newWindow) {
-          newWindow.addEventListener('load', () => {
-            newWindow.focus();
-            // Give the PDF time to load fully before printing
-            setTimeout(() => {
-              try {
-                newWindow.print();
-              } catch (error) {
-                console.error('Error printing in new tab:', error);
-              }
-            }, 1000);
-          });
-          return true;
-        }
-        return false;
-      };
-
-      // Try iframe method first, fallback to new tab if it fails
-      const iframePrintSuccess = await printWithIframe();
-      
-      if (!iframePrintSuccess) {
-        console.log('Iframe print failed, trying new tab method...');
-        const newTabSuccess = printWithNewTab();
-        
-        if (!newTabSuccess) {
-          // Final fallback - just open the PDF
-          console.log('Both print methods failed, opening PDF for manual printing');
-          window.open(pdfUrl, '_blank');
-          alert('PDF opened in new tab. Please use your browser\'s print function (Ctrl+P) to print the label.');
-        }
+      // Clean up previous blob URL if exists
+      if (pdfBlobUrl) {
+        URL.revokeObjectURL(pdfBlobUrl);
       }
+      
+      // Create new object URL for the PDF
+      const newPdfUrl = URL.createObjectURL(pdfBlob);
+      setPdfBlobUrl(newPdfUrl);
+      
+      // Open the preview modal
+      setShowPreview(true);
+      
+      console.log('Preview modal opened with PDF URL:', newPdfUrl);
       
     } catch (error) {
       console.error('Error in handlePreviewAndPrint:', error);
-      alert(`Failed to generate or print PDF. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert(`Failed to generate PDF preview. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
-      // Reset button state
-      const buttonElement = document.getElementById('parcego-payment-preview-print-btn');
-      if (buttonElement) {
-        buttonElement.innerHTML = '<svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path></svg>Preview & Print Label';
-        buttonElement.removeAttribute('disabled');
-      }
+      setIsGeneratingPreview(false);
     }
+  };
+
+  // Handle preview modal close with cleanup
+  const handlePreviewClose = () => {
+    setShowPreview(false);
+    // Clean up blob URL after a delay to allow for any in-progress operations
+    setTimeout(() => {
+      if (pdfBlobUrl) {
+        URL.revokeObjectURL(pdfBlobUrl);
+        setPdfBlobUrl("");
+      }
+    }, 1000);
+  };
+
+  // Handle print from preview modal
+  const handlePrintFromPreview = () => {
+    if (!pdfBlobUrl) {
+      alert('PDF not ready for printing. Please try again.');
+      return;
+    }
+    
+    // Create a hidden iframe for printing
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    iframe.src = pdfBlobUrl;
+    
+    iframe.onload = () => {
+      setTimeout(() => {
+        try {
+          if (iframe.contentWindow) {
+            iframe.contentWindow.focus();
+            iframe.contentWindow.print();
+          }
+        } catch (error) {
+          console.error('Error printing:', error);
+          // Fallback - open in new tab
+          window.open(pdfBlobUrl, '_blank');
+        }
+        
+        // Clean up iframe after delay
+        setTimeout(() => {
+          if (document.body.contains(iframe)) {
+            document.body.removeChild(iframe);
+          }
+        }, 2000);
+      }, 500);
+    };
+    
+    document.body.appendChild(iframe);
   };
   
   return (
@@ -683,18 +628,108 @@ export default function PurchaseLabelPage() {
               <Button
                 onClick={handlePreviewAndPrint}
                 variant="outline"
-                className="flex-1 border-blue-700 text-blue-700 hover:bg-blue-100 h-12 text-base font-medium"
+                className="flex-1 border-blue-700 text-blue-700 hover:bg-blue-100 h-12 text-base font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 id="parcego-payment-preview-print-btn"
+                disabled={isGeneratingPreview}
               >
-                <Icon name="Printer" size={18} className="mr-2" />
-                Preview & Print Label
+                {isGeneratingPreview ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-blue-700 border-t-transparent"></div>
+                    <span>Generating Preview...</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <Icon name="Printer" size={18} />
+                    <span>Preview & Print Label</span>
+                  </div>
+                )}
               </Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Preview modal removed - direct print functionality implemented */}
+      {/* Label Preview Modal */}
+      <Dialog open={showPreview} onOpenChange={handlePreviewClose}>
+        <DialogContent className="max-w-4xl w-full h-[90vh] bg-white p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-0">
+            <div className="flex items-center justify-between">
+              <div>
+                <DialogTitle className="text-xl font-bold text-gray-900">
+                  Shipping Label Preview
+                </DialogTitle>
+                <p className="text-gray-600 text-sm mt-1">
+                  Review your shipping label before printing • Tracking: {trackingNumber}
+                </p>
+              </div>
+              <Button
+                onClick={handlePreviewClose}
+                variant="outline"
+                size="sm"
+                className="text-gray-500 hover:text-gray-700"
+                id="parcego-preview-close-btn"
+              >
+                <Icon name="X" size={16} />
+              </Button>
+            </div>
+          </DialogHeader>
+          
+          <div className="flex-1 p-6 pt-4">
+            {/* PDF Preview */}
+            <div className="w-full h-full border border-gray-200 rounded-lg overflow-hidden bg-white shadow-inner">
+              {pdfBlobUrl ? (
+                <iframe
+                  src={pdfBlobUrl}
+                  className="w-full h-full border-0"
+                  title="Shipping Label Preview"
+                  id="parcego-preview-iframe"
+                  onLoad={() => console.log('PDF preview loaded successfully')}
+                  onError={() => console.error('Error loading PDF preview')}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center bg-gray-50">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-2 border-blue-700 border-t-transparent mx-auto mb-4"></div>
+                    <p className="text-gray-500">Loading preview...</p>
+                  </div>
+                </div>
+              )}
+            </div>
+            
+            {/* Action Buttons */}
+            <div className="flex gap-3 mt-6 pt-4 border-t border-gray-200">
+              <Button
+                onClick={handlePrintFromPreview}
+                className="bg-blue-700 hover:bg-blue-800 text-white px-6 py-2 h-10 font-medium"
+                disabled={!pdfBlobUrl}
+                id="parcego-preview-print-btn"
+              >
+                <Icon name="Printer" size={16} className="mr-2" />
+                Print Label
+              </Button>
+              
+              <Button
+                onClick={handleDownloadLabel}
+                variant="outline"
+                className="border-green-700 text-green-700 hover:bg-green-100 px-6 py-2 h-10 font-medium"
+                id="parcego-preview-download-btn"
+              >
+                <Icon name="Download" size={16} className="mr-2" />
+                Download PDF
+              </Button>
+              
+              <Button
+                onClick={handlePreviewClose}
+                variant="outline"
+                className="border-gray-300 text-gray-700 hover:bg-gray-100 px-6 py-2 h-10 font-medium ml-auto"
+                id="parcego-preview-close-footer-btn"
+              >
+                Close Preview
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

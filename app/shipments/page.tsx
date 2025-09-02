@@ -33,11 +33,9 @@ import {
 } from "@/components/ui/tooltip";
 
 import type { Shipment, ShipmentStatus } from "@/lib/mock/shipments";
-import { formatCurrency, generateMockShipments } from "@/lib/mock/shipments";
+import { formatCurrency, getMockShipments } from "@/lib/mock/shipments";
 import PrintLabelsModal from "./print-labels-modal";
 import CancelShipmentDialog from "./cancel-shipment-dialog";
-
-const allShipments: Shipment[] = generateMockShipments();
 
 // Function to get status badge styling based on shipment status
 const getStatusBadge = (status: ShipmentStatus) => {
@@ -103,6 +101,11 @@ const statusOptions = [
 
 export default function ShipmentsPage() {
   const router = useRouter();
+  
+  // Data loading state for consistent SSR/CSR
+  const [allShipments, setAllShipments] = useState<Shipment[]>([]);
+  const [isDataLoaded, setIsDataLoaded] = useState(false);
+  
   const [query, setQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
   const [showExportDialog, setShowExportDialog] = useState(false);
@@ -110,7 +113,7 @@ export default function ShipmentsPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showPrintLabelsModal, setShowPrintLabelsModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [shipmentToCancel, setShipmentToCancel] = useState<{ id: string; trackingNumber: string } | null>(null);
+  // const [shipmentToCancel, setShipmentToCancel] = useState<{ id: string; trackingNumber: string } | null>(null);
   const [showReorderDialog, setShowReorderDialog] = useState(false);
   const [shipmentToReorder, setShipmentToReorder] = useState<Shipment | null>(null);
   const [isReordering, setIsReordering] = useState(false);
@@ -118,6 +121,13 @@ export default function ShipmentsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [pageSize, setPageSize] = useState<number>(25);
   const [pageIndex, setPageIndex] = useState<number>(0);
+  
+  // Load data on client to prevent hydration mismatches
+  React.useEffect(() => {
+    const shipments = getMockShipments();
+    setAllShipments(shipments);
+    setIsDataLoaded(true);
+  }, []);
 
   const handleToggleSelect = (id: string) => {
     setSelectedIds((prev) => {
@@ -163,10 +173,10 @@ export default function ShipmentsPage() {
     }
   };
 
-  const openCancelDialog = (shipment: Shipment) => {
-    setShipmentToCancel({ id: shipment.id, trackingNumber: shipment.trackingNumber });
-    setShowCancelDialog(true);
-  };
+  // const openCancelDialog = (shipment: Shipment) => {
+  //   setShipmentToCancel({ id: shipment.id, trackingNumber: shipment.trackingNumber });
+  //   setShowCancelDialog(true);
+  // };
 
   // Enhanced reorder functionality with better UX
   const handleReorderShipment = async (shipment: Shipment) => {
@@ -264,6 +274,9 @@ export default function ShipmentsPage() {
   };
 
   const filtered = useMemo(() => {
+    // Return empty array while data is loading
+    if (!isDataLoaded || allShipments.length === 0) return [];
+    
     const q = query.trim().toLowerCase();
     let list = allShipments;
     if (q) {
@@ -284,12 +297,17 @@ export default function ShipmentsPage() {
     // Sort: most recent first
     list = list.slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
     return list;
-  }, [query, selectedStatus]);
+  }, [query, selectedStatus, allShipments, isDataLoaded]);
 
-  // Force export dialog re-render when selections change for real-time updates
+  // Log selection changes for debugging (removed empty effect to prevent warnings)
   React.useEffect(() => {
-    // This effect ensures the export dialog message updates in real-time
-    // when selectedIds or filtered data changes
+    if (process.env.NODE_ENV === 'development') {
+      console.log('Selection updated:', {
+        selectedCount: selectedIds.size,
+        filteredCount: filtered.length,
+        exportType
+      });
+    }
   }, [selectedIds, filtered, exportType]);
 
   const paged = useMemo(() => {
@@ -325,6 +343,23 @@ export default function ShipmentsPage() {
       return `Showing ${selectedInFilteredCount} of ${totalFilteredCount} shipments (${selectedCount} selected)`;
     }
   };
+
+  // Early return for loading state
+  if (!isDataLoaded) {
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="animate-pulse">
+          <div className="h-8 bg-gray-200 rounded w-48 mb-4"></div>
+          <div className="h-10 bg-gray-200 rounded mb-4"></div>
+          <div className="space-y-3">
+            {[...Array(5)].map((_, i) => (
+              <div key={i} className="h-16 bg-gray-200 rounded"></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

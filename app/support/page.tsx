@@ -24,7 +24,7 @@ import { mockFAQs, mockHelpArticles, mockVideoTutorials, helpCategories } from '
 export default function SupportHelpCenter() {
   const router = useRouter();
   const [activeCategory, setActiveCategory] = useState<FAQCategory | 'all'>('all');
-  const [bookmarkedItems, setBookmarkedItems] = useState<string[]>([]);
+
   const [activeTab, setActiveTab] = useState('overview');
   const [showContactForm, setShowContactForm] = useState(false);
   const [contactForm, setContactForm] = useState({
@@ -59,13 +59,13 @@ export default function SupportHelpCenter() {
     });
   }, [activeCategory]);
 
-  const handleBookmarkToggle = (itemId: string) => {
-    setBookmarkedItems(prev => 
-      prev.includes(itemId) 
-        ? prev.filter(id => id !== itemId)
-        : [...prev, itemId]
-    );
-  };
+  // const handleBookmarkToggle = (itemId: string) => {
+  //   setBookmarkedItems(prev => 
+  //     prev.includes(itemId) 
+  //       ? prev.filter(id => id !== itemId)
+  //       : [...prev, itemId]
+  //   );
+  // };
 
   const handleReadArticle = (articleId: string) => {
     // Navigate to the dedicated article page

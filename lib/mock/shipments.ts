@@ -80,12 +80,13 @@ const names = [
 export const generateMockShipments = (count = 120, seed = 20250811): Shipment[] => {
   const rand = createSeededRandom(seed);
   const shipments: Shipment[] = [];
-  const now = new Date();
+  // Use fixed base date to ensure consistency between server and client
+  const baseDate = new Date('2025-01-15T10:30:00Z');
 
   for (let i = 0; i < count; i += 1) {
     const dayOffset = Math.floor(rand() * 90);
-    const created = new Date(now);
-    created.setDate(now.getDate() - dayOffset);
+    const created = new Date(baseDate);
+    created.setDate(baseDate.getDate() - dayOffset);
     const updated = new Date(created);
     updated.setHours(created.getHours() + Math.floor(rand() * 72));
 
@@ -151,6 +152,18 @@ export const generateMockShipments = (count = 120, seed = 20250811): Shipment[] 
 
 export const formatCurrency = (value: number): string => {
   return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
+};
+
+// Memoized version to prevent regeneration on every component render
+let _cachedShipments: Shipment[] | null = null;
+
+export const getMockShipments = (count = 120, seed = 20250811): Shipment[] => {
+  if (_cachedShipments !== null && _cachedShipments.length === count) {
+    return _cachedShipments;
+  }
+  
+  _cachedShipments = generateMockShipments(count, seed);
+  return _cachedShipments;
 };
 
 

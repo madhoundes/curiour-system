@@ -8,16 +8,31 @@ import type { ShippingLabelData } from '@/components/pdf/polished-shipping-label
  */
 export async function generatePolishedShippingLabel(data: ShippingLabelData): Promise<void> {
   try {
-    // Dynamically import React-PDF to avoid SSR issues and chunk loading problems
+    // Dynamically import React-PDF and QR code generator to avoid SSR issues and chunk loading problems
     const { pdf } = await import('@react-pdf/renderer');
-    const { default: PolishedShippingLabel } = await import('@/components/pdf/polished-shipping-label');
+    const { default: PolishedShippingLabel, generateSyncQRCode } = await import('@/components/pdf/polished-shipping-label');
+    
+    console.log('generatePolishedShippingLabel: Pre-generating QR code for:', data.trackingNumber);
+    
+    // Pre-generate QR code for reliable PDF rendering
+    const preGeneratedQRCode = await generateSyncQRCode(data.trackingNumber);
+    
+    // Create data with pre-generated QR code
+    const dataWithQRCode: ShippingLabelData = {
+      ...data,
+      preGeneratedQRCode
+    };
+    
+    console.log('generatePolishedShippingLabel: QR code pre-generated, creating PDF document...');
     
     // Create the PDF document
-    const MyDocument = React.createElement(PolishedShippingLabel, { data });
+    const MyDocument = React.createElement(PolishedShippingLabel, { data: dataWithQRCode });
     
     // Generate blob
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const blob = await pdf(MyDocument as any).toBlob();
+    
+    console.log('generatePolishedShippingLabel: PDF blob generated, size:', blob?.size || 'unknown');
     
     // Create download link
     const url = URL.createObjectURL(blob);
@@ -33,7 +48,7 @@ export async function generatePolishedShippingLabel(data: ShippingLabelData): Pr
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
     
-    console.log('Polished PDF generated successfully!');
+    console.log('Polished PDF generated and downloaded successfully!');
   } catch (error) {
     console.error('Error generating polished PDF:', error);
     throw new Error('Failed to generate PDF. Please try again.');
@@ -49,9 +64,9 @@ export async function generateShippingLabelBlob(data: ShippingLabelData): Promis
   try {
     console.log('generateShippingLabelBlob: Importing React-PDF modules...');
     
-    // Dynamically import React-PDF to avoid SSR issues and chunk loading problems
+    // Dynamically import React-PDF and QR code generator to avoid SSR issues and chunk loading problems
     const { pdf } = await import('@react-pdf/renderer');
-    const { default: PolishedShippingLabel } = await import('@/components/pdf/polished-shipping-label');
+    const { default: PolishedShippingLabel, generateSyncQRCode } = await import('@/components/pdf/polished-shipping-label');
     
     console.log('generateShippingLabelBlob: Modules imported successfully');
     
@@ -68,7 +83,19 @@ export async function generateShippingLabelBlob(data: ShippingLabelData): Promis
     
     console.log('generateShippingLabelBlob: Data validation passed');
     
-    const doc = React.createElement(PolishedShippingLabel, { data });
+    // Pre-generate QR code for reliable PDF rendering
+    console.log('generateShippingLabelBlob: Pre-generating QR code for:', data.trackingNumber);
+    const preGeneratedQRCode = await generateSyncQRCode(data.trackingNumber);
+    
+    // Create data with pre-generated QR code
+    const dataWithQRCode: ShippingLabelData = {
+      ...data,
+      preGeneratedQRCode
+    };
+    
+    console.log('generateShippingLabelBlob: QR code pre-generated, creating PDF document...');
+    
+    const doc = React.createElement(PolishedShippingLabel, { data: dataWithQRCode });
     console.log('generateShippingLabelBlob: React element created');
     
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -132,6 +159,5 @@ export const sampleShippingData: ShippingLabelData = {
     dimensions: '12" × 8" × 6" in',
     type: 'box',
   },
-  shipDate: '8/25/2025',
-  logoUrl: '/Logo/Horizontal-logo.svg', // Updated to use custom SVG logo
+  shipDate: '8/25/2025'
 };
