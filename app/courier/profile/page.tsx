@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 
 type NotificationFrequency = "immediate" | "hourly" | "daily";
 
@@ -140,6 +141,46 @@ export default function CourierProfilePage() {
     router.push("/courier");
   }, [router]);
 
+  const handleLogout = useCallback(() => {
+    try {
+      console.log("Logout initiated");
+      
+      // Clear all authentication data
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem("courier_authenticated");
+        localStorage.removeItem("courier_email");
+        localStorage.removeItem("courier_login_time");
+        
+        // Clear authentication cookie with proper attributes
+        document.cookie = "courier_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+        console.log("Authentication data cleared");
+      }
+      
+      // Close the dropdown menu first
+      setShowLogoutConfirm(false);
+      
+      // Add a small delay to ensure state is cleared before navigation
+      setTimeout(() => {
+        console.log("Navigating to courier login");
+        if (router && typeof router.push === 'function') {
+          router.push("/courier-login");
+        } else {
+          console.error("Router not available, using window.location");
+          window.location.href = "/courier-login";
+        }
+      }, 100);
+    } catch (error) {
+      console.error("Logout error:", error);
+      // Fallback: still try to navigate even if clearing state fails
+      if (router && typeof router.push === 'function') {
+        router.push("/courier-login");
+      } else {
+        console.error("Router not available in fallback, using window.location");
+        window.location.href = "/courier-login";
+      }
+    }
+  }, [router]);
+
   const handleAvatarBrowse = useCallback(() => {
     fileInputRef.current?.click();
   }, []);
@@ -265,7 +306,11 @@ export default function CourierProfilePage() {
   const availabilityLabel = useMemo(() => (availability ? "Available" : "Unavailable"), [availability]);
 
   return (
-    <div className="min-h-screen bg-gray-50" id="parcego-courier-profile-container">
+    <div 
+      className="min-h-screen bg-gray-50 pb-24 md:pb-28"
+      id="parcego-courier-profile-container"
+      style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))' }}
+    >
       {/* Toast */}
       {showToast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50">
@@ -276,34 +321,91 @@ export default function CourierProfilePage() {
         </div>
       )}
 
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b px-4 py-4" id="parcego-courier-profile-header">
+      {/* Enhanced Courier Header - Unified with Dashboard */}
+      <div 
+        className="bg-white shadow-sm border-b px-4 py-3"
+        id="parcego-courier-profile-header"
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="icon"
               onClick={handleGoBack}
-              className="p-3"
+              className="h-9 w-9 md:h-10 md:w-10"
               id="parcego-courier-profile-back-btn"
               aria-label="Go back to courier home"
             >
-              <Icon name="ArrowLeft" size={22} className="text-gray-700" />
+              <Icon name="ArrowLeft" size={18} className="text-gray-700" />
             </Button>
             <div>
-              <h1 className="text-xl font-semibold -mt-4">Account Profile</h1>
-              <p className="text-sm text-muted-foreground">Manage your courier account details, security, and preferences.</p>
+              <h1 className="text-lg font-semibold text-gray-900">Account Profile</h1>
+              <p className="text-sm text-gray-500">Manage your courier account details, security, and preferences.</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="relative">
-              <Avatar className="size-9">
-                <AvatarImage src={avatarObjectUrl} alt="Courier avatar" />
-                <AvatarFallback>A M</AvatarFallback>
-              </Avatar>
-              <span className={`absolute -bottom-1 -right-1 size-3 rounded-full border-2 border-white ${availability ? "bg-emerald-500" : "bg-gray-400"}`} aria-hidden />
-            </div>
-            <Badge className="bg-blue-100 text-blue-800 border-blue-200">{MOCK_PROFILE.courierId}</Badge>
+          
+          <div className="flex items-center space-x-1 md:space-x-2">
+            {/* Notifications */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="parcego-header__notification-btn h-9 w-9 md:h-10 md:w-10"
+              id="parcego-courier-profile-notifications-btn"
+              onClick={() => router.push('/notifications')}
+            >
+              <Icon name="Bell" size={18} className="md:w-5 md:h-5" />
+            </Button>
+            
+            {/* Profile Menu Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="parcego-header__profile-btn h-9 w-9 md:h-10 md:w-10 rounded-full"
+                  id="parcego-courier-profile-menu-btn"
+                  aria-label="Profile menu"
+                >
+                  <div className="relative">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={avatarObjectUrl} alt="Courier avatar" />
+                      <AvatarFallback className="bg-gray-100 text-gray-700 text-sm font-medium">
+                        {MOCK_PROFILE.fullName.split(' ').map(n => n[0]).join('')}
+                      </AvatarFallback>
+                    </Avatar>
+                    <span className={`absolute -bottom-1 -right-1 size-3 rounded-full border-2 border-white ${availability ? "bg-emerald-500" : "bg-gray-400"}`} aria-hidden />
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{MOCK_PROFILE.fullName}</p>
+                    <p className="text-xs leading-none text-muted-foreground">
+                      {MOCK_PROFILE.courierId}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => router.push('/courier')}
+                  className="cursor-pointer"
+                  id="parcego-courier-profile-dashboard-menu-item"
+                >
+                  <Icon name="Home" size={16} className="mr-2" />
+                  <span>Dashboard</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={handleLogout}
+                  className="cursor-pointer text-red-600 focus:text-red-600"
+                  id="parcego-courier-profile-logout-menu-item"
+                >
+                  <Icon name="LogOut" size={16} className="mr-2" />
+                  <span>Sign Out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
@@ -770,11 +872,81 @@ export default function CourierProfilePage() {
             </div>
             <div className="mt-6 flex items-center justify-end gap-2">
               <Button variant="outline" onClick={() => setShowLogoutConfirm(false)}>Cancel</Button>
-              <Button variant="destructive" onClick={() => { setShowLogoutConfirm(false); router.push("/"); }}>Log out</Button>
+              <Button variant="destructive" onClick={handleLogout}>Log out</Button>
             </div>
           </div>
         </div>
       )}
+
+      {/* Native-Style Bottom Navigation - Unified with Dashboard */}
+      <div 
+        className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-200/50 shadow-lg shadow-gray-900/10 z-[100]"
+        id="parcego-courier-profile-bottom-nav"
+        style={{
+          paddingBottom: 'env(safe-area-inset-bottom)',
+          WebkitBackdropFilter: 'blur(12px)',
+          backdropFilter: 'blur(12px)'
+        }}
+      >
+        <div className="flex justify-around items-center px-2 pt-2 pb-1">
+          <button
+            onClick={() => router.push('/courier')}
+            className="flex flex-col items-center justify-center min-w-0 flex-1 py-2 px-1 rounded-xl transition-all duration-200 ease-out text-gray-500 hover:text-gray-700 hover:bg-gray-100/50 active:bg-gray-200/50 active:scale-95"
+            id="parcego-nav-overview-btn"
+            type="button"
+          >
+            <div className="transition-all duration-200 ease-out">
+              <Icon name="Home" size={20} className="text-current" />
+            </div>
+            <span className="text-xs font-medium mt-1 transition-all duration-200 ease-out text-current">
+              Overview
+            </span>
+          </button>
+          
+          <button
+            onClick={() => router.push('/courier')}
+            className="flex flex-col items-center justify-center min-w-0 flex-1 py-2 px-1 rounded-xl transition-all duration-200 ease-out text-gray-500 hover:text-gray-700 hover:bg-gray-100/50 active:bg-gray-200/50 active:scale-95"
+            id="parcego-nav-deliveries-btn"
+            type="button"
+          >
+            <div className="relative transition-all duration-200 ease-out">
+              <Icon name="Package" size={20} className="text-current" />
+            </div>
+            <span className="text-xs font-medium mt-1 transition-all duration-200 ease-out text-current">
+              Deliveries
+            </span>
+          </button>
+          
+          <button
+            onClick={() => router.push('/courier/performance')}
+            className="flex flex-col items-center justify-center min-w-0 flex-1 py-2 px-1 rounded-xl transition-all duration-200 ease-out text-gray-500 hover:text-gray-700 hover:bg-gray-100/50 active:bg-gray-200/50 active:scale-95"
+            id="parcego-nav-performance-btn"
+            type="button"
+          >
+            <div className="transition-all duration-200 ease-out">
+              <Icon name="BarChart3" size={20} className="text-current" />
+            </div>
+            <span className="text-xs font-medium mt-1 transition-all duration-200 ease-out text-current">
+              Performance
+            </span>
+          </button>
+          
+          <button
+            onClick={() => router.push('/courier/profile')}
+            className="flex flex-col items-center justify-center min-w-0 flex-1 py-2 px-1 rounded-xl transition-all duration-200 ease-out bg-blue-100/80 text-blue-600 shadow-sm"
+            id="parcego-nav-profile-btn"
+            type="button"
+          >
+            <div className="transition-all duration-200 ease-out transform scale-110">
+              <Icon name="User" size={20} className="text-blue-600" />
+            </div>
+            <span className="text-xs font-medium mt-1 transition-all duration-200 ease-out text-blue-600">
+              Profile
+            </span>
+            <div className="absolute -bottom-0.5 left-1/2 transform -translate-x-1/2 w-8 h-1 bg-blue-600 rounded-full" />
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

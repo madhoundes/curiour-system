@@ -129,16 +129,28 @@ npm install
 # Run development server
 npm run dev:local    # Local development (localhost:3000)
 npm run dev:lan      # Network development (0.0.0.0:3001)
+npm run dev:https    # Network development with HTTPS (camera support)
 ```
 
 ### Available Scripts
 ```bash
-npm run dev          # Standard development server
-npm run dev:local    # Local development (localhost:3000)
-npm run dev:lan      # Network development (0.0.0.0:3001)
-npm run build        # Production build
-npm run start        # Production server
-npm run lint         # Code quality check ✅
+npm run dev              # Standard development server
+npm run dev:local        # Local development (localhost:3000)
+npm run dev:lan          # Network development (0.0.0.0:3001)
+npm run dev:https        # Network development with HTTPS (camera support)
+npm run dev:https:local  # Local HTTPS development
+npm run build            # Production build
+npm run start            # Production server
+npm run lint             # Code quality check ✅
+```
+
+## 📷 Camera Access Setup
+
+For camera functionality over network LAN, HTTPS is required. See [HTTPS-SETUP.md](./HTTPS-SETUP.md) for detailed instructions.
+
+**Quick HTTPS setup:**
+```bash
+./start-https-dev.sh
 ```
 
 ## 📁 Project Structure

@@ -377,20 +377,20 @@ export default function OutForDeliveryPage() {
           <div className="relative bg-white rounded-xl shadow-lg w-full max-w-md border p-6">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-lg font-semibold">Pre-drop Scan</h2>
-                <p className="text-sm text-muted-foreground">Enter or scan the package code (UI only).</p>
+                <h2 className="text-lg font-bold">Pre-drop Scan</h2>
+                <p className="text-sm font-medium text-muted-foreground">Enter or scan the package code (UI only).</p>
               </div>
               <Button variant="ghost" size="icon" aria-label="Close" onClick={() => setShowScanDialog(false)}><Icon name="X" /></Button>
             </div>
             <div className="mt-4 space-y-3">
               <Input placeholder="Enter code e.g. PCG-123456" aria-label="Package code" />
-              <div className="h-24 rounded-lg border-dashed border flex items-center justify-center text-sm text-muted-foreground">
+              <div className="h-24 rounded-lg border-dashed border flex items-center justify-center text-sm font-medium text-muted-foreground">
                 <Icon name="ScanBarcode" size={18} className="mr-2" /> Scanner placeholder
               </div>
             </div>
             <div className="mt-4 flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowScanDialog(false)}>Cancel</Button>
-              <Button onClick={handleScanSubmit}><Icon name="Check" size={16} className="mr-2" />Submit</Button>
+              <Button variant="outline" onClick={() => setShowScanDialog(false)} className="font-semibold">Cancel</Button>
+              <Button onClick={handleScanSubmit} className="font-bold"><Icon name="Check" size={16} className="mr-2" />Submit</Button>
             </div>
           </div>
         </div>

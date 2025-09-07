@@ -1,0 +1,28 @@
+# Courier Route Simulation – Cursor Prompt
+
+## Goal
+Simulate the full courier delivery journey: start route, navigate, confirm delivery, auto-advance, and visualize progress.
+
+## Steps
+1. On dashboard, show “Ready for Next Delivery?” with customer/address.
+2. Clicking “Start Route” opens an interactive map modal with:
+   - Current location, destination, optimal route.
+   - Option to open in Google Maps/Waze/Apple Maps.
+3. On arrival, require:
+   - Barcode scan (mock input)
+   - Photo upload (mock)
+   - “Confirm Delivery” button
+4. On success, auto-advance to next stop and repeat.
+5. Show progress bar/stepper for route completion.
+6. Provide simulation controls for dev/test (auto-complete, skip, fail).
+7. All UI: shadcn/ui + Tailwind, accessible, responsive.
+
+## Acceptance
+- Each delivery step is interactive and testable.
+- Map and navigation are visually clear.
+- Delivery cannot be confirmed without barcode and photo.
+- Progress and next stop always visible.
+- Simulation controls available for rapid testing.
+
+## Edge Cases
+- Barcode mismatch, photo fail, GPS fail, all complete.

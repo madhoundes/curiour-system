@@ -319,17 +319,35 @@ export default function CourierPerformance() {
           </CardContent>
         </Card>
 
-        <div className="grid gap-4 md:grid-cols-2" id="parcego-courier-performance-key-metrics">
-          <Card id="parcego-courier-performance-metric-completion">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4" id="parcego-courier-performance-key-metrics">
+          <Card id="parcego-courier-performance-metric-deliveries">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Icon name="Target" size={18} /> Delivery Completion Rate
+                <Icon name="Package" size={18} /> Total Deliveries
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="flex items-center justify-between">
-                <p className="text-3xl font-bold">{completionPct}%</p>
-                <Badge variant="secondary">{currentData.completed}/{currentData.deliveries}</Badge>
+                <p className="text-3xl font-bold">{currentData.deliveries}</p>
+                <Badge variant="secondary">{selectedPeriod === "monthly" ? "Monthly" : selectedPeriod === "weekly" ? "Weekly" : "Today"}</Badge>
+              </div>
+              <div className="text-sm text-gray-600">
+                <Icon name="Target" size={14} className="mr-1 inline" />
+                {currentData.remaining} remaining
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card id="parcego-courier-performance-metric-completion">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Icon name="CheckCircle" size={18} /> Completed
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-3xl font-bold">{currentData.completed}</p>
+                <Badge variant="secondary">{completionPct}%</Badge>
               </div>
               <div className="h-2 bg-gray-200 rounded-full" aria-label="completion progress">
                 <div
@@ -344,31 +362,68 @@ export default function CourierPerformance() {
           <Card id="parcego-courier-performance-metric-earnings">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Icon name="DollarSign" size={18} /> Earnings Breakdown
+                <Icon name="DollarSign" size={18} /> Earnings
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2">
               <div className="flex items-center justify-between">
                 <p className="text-3xl font-bold">${currentData.earnings.toFixed(2)}</p>
                 <Badge variant="secondary">{selectedPeriod === "monthly" ? "Monthly" : selectedPeriod === "weekly" ? "Weekly" : "Today"}</Badge>
               </div>
-              <div className="grid grid-cols-3 gap-2 text-sm">
-                <div className="p-3 rounded-lg bg-gray-50">
-                  <p className="text-gray-500">Base</p>
-                  <p className="font-medium">${(selectedPeriod === "monthly" ? mockPerformanceData.earningsBreakdown.month.base : mockPerformanceData.earningsBreakdown.week.base).toFixed(2)}</p>
-                </div>
-                <div className="p-3 rounded-lg bg-gray-50">
-                  <p className="text-gray-500">Tips</p>
-                  <p className="font-medium">${(selectedPeriod === "monthly" ? mockPerformanceData.earningsBreakdown.month.tips : mockPerformanceData.earningsBreakdown.week.tips).toFixed(2)}</p>
-                </div>
-                <div className="p-3 rounded-lg bg-gray-50">
-                  <p className="text-gray-500">Payout</p>
-                  <p className="font-medium">{selectedPeriod === "monthly" ? mockPerformanceData.earningsBreakdown.month.payouts : mockPerformanceData.earningsBreakdown.week.payouts}</p>
-                </div>
+              <div className="text-sm text-gray-600">
+                <Icon name="TrendingUp" size={14} className="mr-1 inline" />
+                {selectedPeriod === "today" ? "+$12.50 from yesterday" : "On track"}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card id="parcego-courier-performance-metric-efficiency">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Icon name="TrendingUp" size={18} /> Efficiency
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-3xl font-bold">{currentData.onTimeRate}%</p>
+                <Badge variant="secondary">On-time</Badge>
+              </div>
+              <div className="text-sm text-gray-600">
+                <Icon name="Target" size={14} className="mr-1 inline" />
+                Target: 90%
               </div>
             </CardContent>
           </Card>
         </div>
+
+        {/* Detailed Earnings Breakdown */}
+        <Card id="parcego-courier-performance-metric-earnings-detailed">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Icon name="DollarSign" size={18} /> Earnings Breakdown
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-3xl font-bold">${currentData.earnings.toFixed(2)}</p>
+              <Badge variant="secondary">{selectedPeriod === "monthly" ? "Monthly" : selectedPeriod === "weekly" ? "Weekly" : "Today"}</Badge>
+            </div>
+            <div className="grid grid-cols-3 gap-2 text-sm">
+              <div className="p-3 rounded-lg bg-gray-50">
+                <p className="text-gray-500">Base</p>
+                <p className="font-medium">${(selectedPeriod === "monthly" ? mockPerformanceData.earningsBreakdown.month.base : mockPerformanceData.earningsBreakdown.week.base).toFixed(2)}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-gray-50">
+                <p className="text-gray-500">Tips</p>
+                <p className="font-medium">${(selectedPeriod === "monthly" ? mockPerformanceData.earningsBreakdown.month.tips : mockPerformanceData.earningsBreakdown.week.tips).toFixed(2)}</p>
+              </div>
+              <div className="p-3 rounded-lg bg-gray-50">
+                <p className="text-gray-500">Payout</p>
+                <p className="font-medium">{selectedPeriod === "monthly" ? mockPerformanceData.earningsBreakdown.month.payouts : mockPerformanceData.earningsBreakdown.week.payouts}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <Card id="parcego-courier-performance-metric-efficiency" className="parcego-courier-performance__efficiency-full-width">
           <CardHeader>

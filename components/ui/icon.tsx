@@ -45,6 +45,8 @@ const iconAliases: Record<string, IconName> = {
   "file-text": "FileText",
   "video": "Video",
   "x": "X",
+  "trash": "Trash2",
+  "Trash": "Trash2",
   // Additional icons
   "Bell": "Bell",
   "bell": "Bell",

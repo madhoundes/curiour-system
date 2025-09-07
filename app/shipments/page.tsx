@@ -113,7 +113,7 @@ export default function ShipmentsPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showPrintLabelsModal, setShowPrintLabelsModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
-  // const [shipmentToCancel, setShipmentToCancel] = useState<{ id: string; trackingNumber: string } | null>(null);
+  const [shipmentToCancel, setShipmentToCancel] = useState<{ id: string; trackingNumber: string } | null>(null);
   const [showReorderDialog, setShowReorderDialog] = useState(false);
   const [shipmentToReorder, setShipmentToReorder] = useState<Shipment | null>(null);
   const [isReordering, setIsReordering] = useState(false);
@@ -173,10 +173,10 @@ export default function ShipmentsPage() {
     }
   };
 
-  // const openCancelDialog = (shipment: Shipment) => {
-  //   setShipmentToCancel({ id: shipment.id, trackingNumber: shipment.trackingNumber });
-  //   setShowCancelDialog(true);
-  // };
+  const openCancelDialog = (shipment: Shipment) => {
+    setShipmentToCancel({ id: shipment.id, trackingNumber: shipment.trackingNumber });
+    setShowCancelDialog(true);
+  };
 
   // Enhanced reorder functionality with better UX
   const handleReorderShipment = async (shipment: Shipment) => {
@@ -552,6 +552,35 @@ export default function ShipmentsPage() {
                                   {s.status === "CANCELLED" 
                                     ? "Cannot reorder cancelled shipments" 
                                     : "Reorder/Resend this shipment"
+                                  }
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
+
+                          {/* Cancel Shipment Button */}
+                          <TooltipProvider>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  id={`parcego-shipments-cancel-${s.id}`}
+                                  onClick={() => openCancelDialog(s)}
+                                  aria-label={`Cancel shipment ${s.id}`}
+                                  className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600 transition-colors duration-150"
+                                  disabled={s.status === "CANCELLED" || s.status === "DELIVERED"}
+                                >
+                                  <Icon name="X" size={16} />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent className="bg-black text-white border-black [&>svg]:fill-black [&>svg]:stroke-black">
+                                <p>
+                                  {s.status === "CANCELLED" 
+                                    ? "Shipment already cancelled" 
+                                    : s.status === "DELIVERED"
+                                    ? "Cannot cancel delivered shipments"
+                                    : "Cancel this shipment"
                                   }
                                 </p>
                               </TooltipContent>
