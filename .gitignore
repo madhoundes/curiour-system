@@ -10,6 +10,10 @@
 !.yarn/releases
 !.yarn/versions
 
+# expo courier app dependencies
+/expo-courier-app/node_modules
+/expo-courier-app-fresh/node_modules
+
 # testing
 /coverage
 
@@ -39,3 +43,23 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# logs
+*.log
+server.log
+dev.log
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+/dist
+/.next
+/out
