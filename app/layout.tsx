@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ShipmentProvider } from "@/lib/shipment-context";
+import { Toaster } from "sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -38,6 +39,8 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* Mobile viewport meta tag for proper responsive scaling */}
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
         {/* Prevent iOS from auto-linking phone numbers/dates to avoid hydration diffs */}
         <meta
           name="format-detection"
@@ -61,6 +64,7 @@ export default function RootLayout({
         <ShipmentProvider>
           {children}
         </ShipmentProvider>
+        <Toaster position="top-right" richColors />
         
         {/* Browser extension compatibility script */}
         <script

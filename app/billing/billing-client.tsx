@@ -138,7 +138,7 @@ export function BillingPage() {
         />
 
         {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <SummaryCard 
             id="parcego-billing-summary-card-outstanding"
             title="Outstanding Balance" 
@@ -168,7 +168,7 @@ export function BillingPage() {
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} id="parcego-billing-tabs">
           <TabsList
-            className="flex w-full h-9 sm:h-10 p-1 bg-gray-100 rounded-lg overflow-hidden justify-start"
+            className="flex w-full h-9 sm:h-10 p-1 bg-gray-100 rounded-lg overflow-x-auto justify-start scrollbar-hide"
             style={{ padding: '1.68rem .75rem' }}
           >
             <TabsTrigger 
@@ -235,13 +235,13 @@ export function BillingPage() {
 
 function SummaryCard({ id, title, value, description }: { id: string; title: string; value: string; description: string }) {
   return (
-    <Card id={id}>
-      <CardHeader className="pb-2">
-        <CardTitle className="text-base font-normal text-muted-foreground">{title}</CardTitle>
+    <Card id={id} className="w-full">
+      <CardHeader className="pb-2 px-4 sm:px-6">
+        <CardTitle className="text-sm sm:text-base font-normal text-muted-foreground">{title}</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
-        <p className="text-xs text-muted-foreground mt-1">{description}</p>
+      <CardContent className="px-4 sm:px-6">
+        <div className="text-xl sm:text-2xl font-bold break-words">{value}</div>
+        <p className="text-xs text-muted-foreground mt-1 break-words">{description}</p>
       </CardContent>
     </Card>
   )
@@ -250,59 +250,95 @@ function SummaryCard({ id, title, value, description }: { id: string; title: str
 function PaymentHistoryTab({ payments }: { payments: Payment[] }) {
   return (
     <Card id="parcego-billing-table-payments" className="overflow-hidden" style={{ paddingTop: '0px' }}>
-      <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100/50 border-b pt-8">
-        <CardTitle className="flex items-center gap-2">
+      <CardHeader className="bg-gradient-to-r from-gray-50 to-gray-100/50 border-b pt-6 sm:pt-8 px-4 sm:px-6">
+        <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
           <Icon name="CreditCard" size={20} className="text-blue-600" />
           Payment History
         </CardTitle>
-        <CardDescription>View all your past payments and their status</CardDescription>
+        <CardDescription className="text-sm">View all your past payments and their status</CardDescription>
       </CardHeader>
       <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-gray-50/50 hover:bg-gray-50/50">
-              <TableHead className="font-semibold text-gray-700 pl-6">Date</TableHead>
-              <TableHead className="font-semibold text-gray-700">Amount</TableHead>
-              <TableHead className="font-semibold text-gray-700">Status</TableHead>
-              <TableHead className="font-semibold text-gray-700">Method</TableHead>
-              <TableHead className="font-semibold text-gray-700">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {payments.map((payment) => (
-              <TableRow 
-                key={payment.id} 
-                id={`parcego-billing-row-${payment.id}`}
-                className="border-b border-gray-100"
-              >
-                <TableCell className="transition-colors duration-200 py-4 pl-6">
-                  {new Date(payment.date).toLocaleDateString()}
-                </TableCell>
-                <TableCell className="font-medium transition-colors duration-200 py-4">
-                  ${payment.amount.toFixed(2)}
-                </TableCell>
-                <TableCell className="transition-all duration-200 py-4">
-                  <div className="status-badge">
-                    <EnhancedPaymentStatusBadge status={payment.status} />
+        {/* Mobile Card Layout */}
+        <div className="block sm:hidden">
+          {payments.map((payment) => (
+            <div
+              key={payment.id}
+              id={`parcego-billing-mobile-row-${payment.id}`}
+              className="border-b border-gray-100 p-4 space-y-3"
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-900 truncate">
+                    ${payment.amount.toFixed(2)}
                   </div>
-                </TableCell>
-                <TableCell className="transition-all duration-200 py-4">
-                  <div className="flex items-center gap-3 group">
-                    <div className="payment-method-icon">
-                      <PaymentMethodIcon type={getPaymentMethodType(payment.method)} />
-                    </div>
-                    <span className="text-sm transition-colors duration-200">{payment.method}</span>
+                  <div className="text-xs text-gray-500">
+                    {new Date(payment.date).toLocaleDateString()}
                   </div>
-                </TableCell>
-                <TableCell className="transition-all duration-200 py-4">
-                  <div className="flex gap-2">
-                    <EnhancedPaymentDetailsDialog payment={payment} />
-                  </div>
-                </TableCell>
+                </div>
+                <div className="ml-2">
+                  <EnhancedPaymentStatusBadge status={payment.status} />
+                </div>
+              </div>
+              
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <PaymentMethodIcon type={getPaymentMethodType(payment.method)} />
+                  <span className="text-sm text-gray-600 truncate">{payment.method}</span>
+                </div>
+                <EnhancedPaymentDetailsDialog payment={payment} />
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop Table Layout */}
+        <div className="hidden sm:block overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="bg-gray-50/50 hover:bg-gray-50/50">
+                <TableHead className="font-semibold text-gray-700 pl-6">Date</TableHead>
+                <TableHead className="font-semibold text-gray-700">Amount</TableHead>
+                <TableHead className="font-semibold text-gray-700">Status</TableHead>
+                <TableHead className="font-semibold text-gray-700">Method</TableHead>
+                <TableHead className="font-semibold text-gray-700">Actions</TableHead>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {payments.map((payment) => (
+                <TableRow 
+                  key={payment.id} 
+                  id={`parcego-billing-row-${payment.id}`}
+                  className="border-b border-gray-100"
+                >
+                  <TableCell className="transition-colors duration-200 py-4 pl-6">
+                    {new Date(payment.date).toLocaleDateString()}
+                  </TableCell>
+                  <TableCell className="font-medium transition-colors duration-200 py-4">
+                    ${payment.amount.toFixed(2)}
+                  </TableCell>
+                  <TableCell className="transition-all duration-200 py-4">
+                    <div className="status-badge">
+                      <EnhancedPaymentStatusBadge status={payment.status} />
+                    </div>
+                  </TableCell>
+                  <TableCell className="transition-all duration-200 py-4">
+                    <div className="flex items-center gap-3 group">
+                      <div className="payment-method-icon">
+                        <PaymentMethodIcon type={getPaymentMethodType(payment.method)} />
+                      </div>
+                      <span className="text-sm transition-colors duration-200">{payment.method}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell className="transition-all duration-200 py-4">
+                    <div className="flex gap-2">
+                      <EnhancedPaymentDetailsDialog payment={payment} />
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
         
         {/* Empty state */}
         {payments.length === 0 && (
@@ -644,15 +680,15 @@ Generated on: ${new Date().toLocaleDateString('en-US', {
 function InvoicesTab({ invoices }: { invoices: Invoice[] }) {
   return (
     <Card id="parcego-billing-table-invoices">
-      <CardHeader>
-        <div className="flex items-center justify-between">
+      <CardHeader className="px-4 sm:px-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <CardTitle>Invoices</CardTitle>
-            <CardDescription>View and download your invoices</CardDescription>
+            <CardTitle className="text-lg sm:text-xl">Invoices</CardTitle>
+            <CardDescription className="text-sm">View and download your invoices</CardDescription>
           </div>
           <Button 
             id="parcego-billing-download-all-btn"
-            className="transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-blue-100/50 focus:ring-2 focus:ring-blue-200 focus:ring-offset-2 bg-blue-600 hover:bg-blue-700 text-white"
+            className="w-full sm:w-auto transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-blue-100/50 focus:ring-2 focus:ring-blue-200 focus:ring-offset-2 bg-blue-600 hover:bg-blue-700 text-white text-sm"
             onClick={async () => {
               try {
                 // For multiple invoices, we'll create a combined PDF with all line items
@@ -706,33 +742,39 @@ function InvoicesTab({ invoices }: { invoices: Invoice[] }) {
           </Button>
         </div>
       </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Date</TableHead>
-              <TableHead>Due Date</TableHead>
-              <TableHead>Amount</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {invoices.map((invoice) => (
-              <TableRow key={invoice.id} id={`parcego-billing-row-${invoice.id}`}>
-                <TableCell>{new Date(invoice.date).toLocaleDateString()}</TableCell>
-                <TableCell>{new Date(invoice.dueDate).toLocaleDateString()}</TableCell>
-                <TableCell>${invoice.amount.toFixed(2)}</TableCell>
-                <TableCell>
+      <CardContent className="p-0">
+        {/* Mobile Card Layout */}
+        <div className="block sm:hidden">
+          {invoices.map((invoice) => (
+            <div
+              key={invoice.id}
+              id={`parcego-billing-mobile-invoice-${invoice.id}`}
+              className="border-b border-gray-100 p-4 space-y-3"
+            >
+              <div className="flex justify-between items-start">
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-medium text-gray-900">
+                    ${invoice.amount.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Due: {new Date(invoice.dueDate).toLocaleDateString()}
+                  </div>
+                </div>
+                <div className="ml-2">
                   <InvoiceStatusBadge status={invoice.status} />
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-3">
-                    <InvoiceDetailsDialog invoice={invoice} />
-                    <Button 
-                      variant="ghost" 
-                      size="sm"
-                      onClick={async () => {
+                </div>
+              </div>
+              
+              <div className="text-xs text-gray-500">
+                Issued: {new Date(invoice.date).toLocaleDateString()}
+              </div>
+              
+              <div className="flex gap-2">
+                <InvoiceDetailsDialog invoice={invoice} />
+                <Button 
+                  variant="ghost" 
+                  size="sm"
+                  onClick={async () => {
                         try {
                           await generatePdfInvoice({
                             invoiceNumber: invoice.id.toUpperCase(),
@@ -769,7 +811,7 @@ function InvoicesTab({ invoices }: { invoices: Invoice[] }) {
                         }
                       }}
                       id={`parcego-download-invoice-${invoice.id}-btn`}
-                      className="ml-2 transition-all duration-300 hover:scale-105 hover:shadow-md hover:shadow-gray-200/50 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 focus:ring-2 focus:ring-blue-200 focus:ring-offset-1"
+                      className="transition-all duration-300 hover:scale-105 hover:shadow-md hover:shadow-gray-200/50 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 focus:ring-2 focus:ring-blue-200 focus:ring-offset-1"
                       aria-label={`Download invoice ${invoice.id}`}
                       title={`Download invoice ${invoice.id} as text file`}
                     >
@@ -777,15 +819,92 @@ function InvoicesTab({ invoices }: { invoices: Invoice[] }) {
                       Download
                     </Button>
                   </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
-  )
-}
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table Layout */}
+            <div className="hidden sm:block overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Due Date</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {invoices.map((invoice) => (
+                    <TableRow key={invoice.id} id={`parcego-billing-row-${invoice.id}`}>
+                      <TableCell>{new Date(invoice.date).toLocaleDateString()}</TableCell>
+                      <TableCell>{new Date(invoice.dueDate).toLocaleDateString()}</TableCell>
+                      <TableCell>${invoice.amount.toFixed(2)}</TableCell>
+                      <TableCell>
+                        <InvoiceStatusBadge status={invoice.status} />
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-3">
+                          <InvoiceDetailsDialog invoice={invoice} />
+                          <Button 
+                            variant="ghost" 
+                            size="sm"
+                            onClick={async () => {
+                              try {
+                                await generatePdfInvoice({
+                                  invoiceNumber: invoice.id.toUpperCase(),
+                                  issueDate: new Date(invoice.date).toLocaleDateString(),
+                                  dueDate: new Date(invoice.dueDate).toLocaleDateString(),
+                                  billTo: {
+                                    name: 'Parcego Business Account',
+                                    company: 'Your Business Name',
+                                    address: '123 Business Street',
+                                    city: 'Toronto',
+                                    province: 'ON',
+                                    postalCode: 'M5V 3A8',
+                                    country: 'Canada'
+                                  },
+                                  lineItems: invoice.lineItems.map(item => ({
+                                    description: item.description,
+                                    quantity: 1,
+                                    unitPrice: item.amount,
+                                    amount: item.amount
+                                  })),
+                                  subtotal: invoice.amount - (invoice.amount * 0.13),
+                                  tax: invoice.amount * 0.13,
+                                  total: invoice.amount,
+                                  currency: invoice.currency,
+                                  status: invoice.status,
+                                  notes: 'Payment is due within 30 days. Thank you for your business!'
+                                });
+                              } catch (error) {
+                                console.error('Failed to generate PDF invoice:', error);
+                                // Fallback to text invoice
+                                const invoiceContent = generateInvoiceContent(invoice);
+                                const filename = `invoice-${invoice.id}-${new Date(invoice.date).toISOString().split('T')[0]}.txt`;
+                                downloadFile(invoiceContent, filename, 'text/plain');
+                              }
+                            }}
+                            id={`parcego-download-invoice-${invoice.id}-btn`}
+                            className="ml-2 transition-all duration-300 hover:scale-105 hover:shadow-md hover:shadow-gray-200/50 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 focus:ring-2 focus:ring-blue-200 focus:ring-offset-1"
+                            aria-label={`Download invoice ${invoice.id}`}
+                            title={`Download invoice ${invoice.id} as text file`}
+                          >
+                            <Icon name="Download" size={14} className="mr-1" />
+                            Download
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      )
+    }
 
 // Add Payment Method Dialog Component
 function AddPaymentMethodDialog({ 
@@ -1234,43 +1353,45 @@ function PaymentMethodsTab({
   return (
     <div className="space-y-6">
       <Card id="parcego-billing-payment-methods">
-        <CardHeader>
-          <div className="flex items-center justify-between">
+        <CardHeader className="px-4 sm:px-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
             <div>
-              <CardTitle>Payment Methods</CardTitle>
-              <CardDescription>Manage your payment methods</CardDescription>
+              <CardTitle className="text-lg sm:text-xl">Payment Methods</CardTitle>
+              <CardDescription className="text-sm">Manage your payment methods</CardDescription>
             </div>
             <Button 
               id="parcego-billing-add-method-btn"
               onClick={() => setIsAddMethodDialogOpen(true)}
+              className="w-full sm:w-auto text-sm"
             >
               Add Payment Method
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 sm:px-6">
           <div className="space-y-4">
             {methods.map((method) => (
               <div
                 key={method.id}
                 id={`parcego-billing-method-${method.id}`}
-                className="flex items-center justify-between p-4 border rounded-lg"
+                className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-3"
               >
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 flex-1 min-w-0">
                   <PaymentMethodIcon type={method.type} />
-                  <div>
-                    <div className="font-medium">{method.label}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate">{method.label}</div>
                     {method.expiry && <div className="text-sm text-muted-foreground">Expires {method.expiry}</div>}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-shrink-0">
                   {method.isDefault && (
-                    <Badge variant="secondary">Default</Badge>
+                    <Badge variant="secondary" className="text-xs">Default</Badge>
                   )}
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => handleDeleteMethod(method.id)}
+                    className="text-xs"
                   >
                     Remove
                   </Button>
@@ -1320,20 +1441,20 @@ function PaymentMethodsTab({
 function TaxDocumentsTab({ documents }: { documents: TaxDocument[] }) {
   return (
     <Card id="parcego-billing-tax-documents">
-      <CardHeader>
-        <CardTitle>Tax Documents</CardTitle>
-        <CardDescription>Access your tax documents and forms</CardDescription>
+      <CardHeader className="px-4 sm:px-6">
+        <CardTitle className="text-lg sm:text-xl">Tax Documents</CardTitle>
+        <CardDescription className="text-sm">Access your tax documents and forms</CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="px-4 sm:px-6">
         <div className="space-y-4">
           {documents.map((doc) => (
             <div
               key={doc.id}
               id={`parcego-billing-doc-${doc.id}`}
-              className="flex items-center justify-between p-4 border rounded-lg"
+              className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-3"
             >
-              <div>
-                <div className="font-medium">{doc.type} - {doc.year}</div>
+              <div className="flex-1 min-w-0">
+                <div className="font-medium truncate">{doc.type} - {doc.year}</div>
                 <div className="text-sm text-muted-foreground">
                   Issued on {new Date(doc.issuedDate).toLocaleDateString()}
                 </div>
@@ -1347,7 +1468,7 @@ function TaxDocumentsTab({ documents }: { documents: TaxDocument[] }) {
                   downloadFile(docContent, filename, 'text/plain');
                 }}
                 id={`parcego-download-tax-doc-${doc.id}-btn`}
-                className="transition-all duration-300 hover:scale-105 hover:shadow-md hover:shadow-blue-200/50 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 focus:ring-2 focus:ring-blue-200 focus:ring-offset-1"
+                className="w-full sm:w-auto transition-all duration-300 hover:scale-105 hover:shadow-md hover:shadow-blue-200/50 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 focus:ring-2 focus:ring-blue-200 focus:ring-offset-1 text-sm"
                 aria-label={`Download ${doc.type} tax document for ${doc.year}`}
                 title={`Download ${doc.type} tax document for ${doc.year} as text file`}
               >
@@ -1461,21 +1582,21 @@ function PreferencesTab() {
 
   return (
     <Card id="parcego-billing-preferences">
-      <CardHeader>
-        <CardTitle>Billing Preferences</CardTitle>
-        <CardDescription>Manage your billing settings and notifications</CardDescription>
+      <CardHeader className="px-4 sm:px-6">
+        <CardTitle className="text-lg sm:text-xl">Billing Preferences</CardTitle>
+        <CardDescription className="text-sm">Manage your billing settings and notifications</CardDescription>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 px-4 sm:px-6">
         <div>
           <h3 className="text-lg font-medium mb-4">Billing Contact</h3>
           <div className="space-y-2">
             {/* Email Section */}
-            <div className="flex justify-between items-start">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
               <div className="flex-1">
                 <div className="font-medium mb-2">Email</div>
                 {isEditingEmail ? (
                   <form onSubmit={emailForm.handleSubmit(handleEmailSave)} className="space-y-3">
-                    <div className="max-w-sm">
+                    <div className="max-w-sm w-full">
                       <Controller
                         name="email"
                         control={emailForm.control}
@@ -1503,13 +1624,13 @@ function PreferencesTab() {
                         )}
                       />
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex flex-col sm:flex-row gap-2">
                       <Button 
                         type="submit" 
                         size="sm"
                         disabled={emailForm.formState.isSubmitting || !emailForm.formState.isValid}
                         id="parcego-billing-email-save-btn"
-                        className="h-8 px-3 transition-all duration-200"
+                        className="h-8 px-3 transition-all duration-200 w-full sm:w-auto"
                       >
                         {emailForm.formState.isSubmitting ? (
                           <>
@@ -1530,7 +1651,7 @@ function PreferencesTab() {
                         onClick={handleEmailCancel}
                         disabled={emailForm.formState.isSubmitting}
                         id="parcego-billing-email-cancel-btn"
-                        className="h-8 px-3 transition-all duration-200"
+                        className="h-8 px-3 transition-all duration-200 w-full sm:w-auto"
                       >
                         <Icon name="X" size={14} className="mr-1" />
                         Cancel
@@ -1547,7 +1668,7 @@ function PreferencesTab() {
                   size="sm"
                   onClick={handleEmailEdit}
                   id="parcego-billing-email-edit-btn"
-                  className="flex-shrink-0 transition-all duration-200 hover:bg-gray-50"
+                  className="flex-shrink-0 transition-all duration-200 hover:bg-gray-50 w-full sm:w-auto"
                 >
                   <Icon name="Edit" size={16} className="mr-2" />
                   Edit
@@ -1558,12 +1679,12 @@ function PreferencesTab() {
             <Separator className="my-4" />
             
             {/* Address Section */}
-            <div className="flex justify-between items-start">
+            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
               <div className="flex-1">
                 <div className="font-medium mb-2">Billing Address</div>
                 {isEditingAddress ? (
                   <form onSubmit={addressForm.handleSubmit(handleAddressSave)} className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4 max-w-md">
+                    <div className="grid grid-cols-1 gap-4 max-w-md w-full">
                       <Controller
                         name="line1"
                         control={addressForm.control}
@@ -1632,7 +1753,7 @@ function PreferencesTab() {
                         )}
                       />
                       
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <Controller
                           name="city"
                           control={addressForm.control}
@@ -1726,13 +1847,13 @@ function PreferencesTab() {
                       />
                     </div>
                     
-                    <div className="flex gap-2 pt-2">
+                    <div className="flex flex-col sm:flex-row gap-2 pt-2">
                       <Button 
                         type="submit" 
                         size="sm"
                         disabled={addressForm.formState.isSubmitting || !addressForm.formState.isValid}
                         id="parcego-billing-address-save-btn"
-                        className="h-8 px-3 transition-all duration-200"
+                        className="h-8 px-3 transition-all duration-200 w-full sm:w-auto"
                       >
                         {addressForm.formState.isSubmitting ? (
                           <>
@@ -1753,7 +1874,7 @@ function PreferencesTab() {
                         onClick={handleAddressCancel}
                         disabled={addressForm.formState.isSubmitting}
                         id="parcego-billing-address-cancel-btn"
-                        className="h-8 px-3 transition-all duration-200"
+                        className="h-8 px-3 transition-all duration-200 w-full sm:w-auto"
                       >
                         <Icon name="X" size={14} className="mr-1" />
                         Cancel
@@ -1775,7 +1896,7 @@ function PreferencesTab() {
                   size="sm"
                   onClick={handleAddressEdit}
                   id="parcego-billing-address-edit-btn"
-                  className="flex-shrink-0 transition-all duration-200 hover:bg-gray-50"
+                  className="flex-shrink-0 transition-all duration-200 hover:bg-gray-50 w-full sm:w-auto"
                 >
                   <Icon name="Edit" size={16} className="mr-2" />
                   Edit
@@ -1788,8 +1909,8 @@ function PreferencesTab() {
         <div>
           <h3 className="text-lg font-medium mb-4">Notification Preferences</h3>
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex-1">
                 <div className="font-medium">Payment Reminders</div>
                 <div className="text-sm text-muted-foreground">Receive reminders before payment due dates</div>
               </div>
@@ -1797,7 +1918,7 @@ function PreferencesTab() {
                 variant={notifications.paymentReminders ? "default" : "outline"}
                 size="sm"
                 onClick={() => toggleNotification('paymentReminders')}
-                className={`transition-all duration-300 min-w-[80px] ${
+                className={`transition-all duration-300 min-w-[80px] w-full sm:w-auto ${
                   notifications.paymentReminders 
                     ? 'bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-200/50' 
                     : 'hover:bg-red-50 hover:border-red-300 hover:text-red-700 hover:shadow-md hover:shadow-red-100/50'
@@ -1815,8 +1936,8 @@ function PreferencesTab() {
                 {notifications.paymentReminders ? 'Enabled' : 'Disabled'}
               </Button>
             </div>
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex-1">
                 <div className="font-medium">Invoice Notifications</div>
                 <div className="text-sm text-muted-foreground">Get notified when new invoices are available</div>
               </div>
@@ -1824,7 +1945,7 @@ function PreferencesTab() {
                 variant={notifications.invoiceNotifications ? "default" : "outline"}
                 size="sm"
                 onClick={() => toggleNotification('invoiceNotifications')}
-                className={`transition-all duration-300 min-w-[80px] ${
+                className={`transition-all duration-300 min-w-[80px] w-full sm:w-auto ${
                   notifications.invoiceNotifications 
                     ? 'bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-200/50' 
                     : 'hover:bg-red-50 hover:border-red-300 hover:text-red-700 hover:shadow-md hover:shadow-red-100/50'
@@ -1842,8 +1963,8 @@ function PreferencesTab() {
                 {notifications.invoiceNotifications ? 'Enabled' : 'Disabled'}
               </Button>
             </div>
-            <div className="flex items-center justify-between">
-              <div>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex-1">
                 <div className="font-medium">Payment Confirmations</div>
                 <div className="text-sm text-muted-foreground">Receive confirmation for successful payments</div>
               </div>
@@ -1851,7 +1972,7 @@ function PreferencesTab() {
                 variant={notifications.paymentConfirmations ? "default" : "outline"}
                 size="sm"
                 onClick={() => toggleNotification('paymentConfirmations')}
-                className={`transition-all duration-300 min-w-[80px] ${
+                className={`transition-all duration-300 min-w-[80px] w-full sm:w-auto ${
                   notifications.paymentConfirmations 
                     ? 'bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-200/50' 
                     : 'hover:bg-red-50 hover:border-red-300 hover:text-red-700 hover:shadow-md hover:shadow-red-100/50'

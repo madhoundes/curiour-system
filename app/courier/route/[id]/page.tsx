@@ -963,7 +963,24 @@ export default function CourierRouteSimulation() {
   const handleConfirmDelivery = () => {
     setRouteStatus("delivered");
     setIsConfirmModalOpen(false);
-    
+
+    // Update delivery status in persistent storage for main courier page
+    try {
+      const completedDeliveries = JSON.parse(localStorage.getItem('parcego_completed_deliveries') || '[]');
+      if (!completedDeliveries.includes(deliveryId)) {
+        completedDeliveries.push(deliveryId);
+        localStorage.setItem('parcego_completed_deliveries', JSON.stringify(completedDeliveries));
+
+        // Update remaining deliveries count
+        const currentRemaining = parseInt(localStorage.getItem('parcego_remaining_deliveries') || '0');
+        if (currentRemaining > 0) {
+          localStorage.setItem('parcego_remaining_deliveries', String(currentRemaining - 1));
+        }
+      }
+    } catch (error) {
+      console.warn('Failed to update delivery status in localStorage:', error);
+    }
+
     // Trigger celebratory confetti immediately
     setTimeout(() => {
       triggerCelebrationConfetti();
@@ -1535,8 +1552,11 @@ export default function CourierRouteSimulation() {
             id="parcego-nav-deliveries-btn"
             type="button"
           >
-            <div className="transition-all duration-200 ease-out group-active:scale-95">
+            <div className="transition-all duration-200 ease-out group-active:scale-95 relative">
               <Icon name="Package" size={20} className="text-current" />
+              <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                {Math.max((mockDeliveries.length - 0), 0)}
+              </div>
             </div>
             <span className="text-xs font-medium mt-1 transition-all duration-200 ease-out text-current">
               Deliveries

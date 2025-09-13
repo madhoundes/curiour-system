@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import dynamic from "next/dynamic";
@@ -11,6 +11,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Icon } from "@/components/ui/icon";
 import { Separator } from "@/components/ui/separator";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { NotificationBanner } from "@/components/ui/notification-banner";
 
 // Mock data for courier dashboard
 const mockCourierData = {
@@ -202,9 +206,65 @@ function CourierDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
+  const [isScanPackageModalOpen, setIsScanPackageModalOpen] = useState(false);
+  
+  // Notification banner state
+  const [showNotificationBanner, setShowNotificationBanner] = useState(true);
+  const [notificationBanner, setNotificationBanner] = useState({
+    type: "warning" as "info" | "success" | "warning" | "error",
+    title: "Delivery Status Update",
+    message: "You have 3 pending deliveries that need attention (mock)",
+  });
+  
+  // Deliveries & Stats state (sequential by priority)
+  const [deliveries, setDeliveries] = useState<typeof mockDeliveries>(() => [...mockDeliveries]);
+  const [stats, setStats] = useState(() => ({ ...mockCourierData.stats }));
+  const priorityOrder: Record<string, number> = { high: 3, medium: 2, low: 1 };
+  const activeDeliveryId = React.useMemo(() => {
+    const pending = deliveries.filter(d => d.status !== 'delivered');
+    if (pending.length === 0) return null;
+    const next = [...pending].sort((a, b) => (priorityOrder[b.priority] - priorityOrder[a.priority]))[0];
+    return next.id;
+  }, [deliveries]);
+  const sortedDeliveries = React.useMemo(() => {
+    const list = [...deliveries].sort((a, b) => {
+      const aDelivered = a.status === 'delivered' ? 1 : 0;
+      const bDelivered = b.status === 'delivered' ? 1 : 0;
+      if (aDelivered !== bDelivered) return aDelivered - bDelivered; // delivered last
+      return (priorityOrder[b.priority] - priorityOrder[a.priority]);
+    });
+    if (activeDeliveryId) {
+      const idx = list.findIndex(d => d.id === activeDeliveryId);
+      if (idx > 0) {
+        const [active] = list.splice(idx, 1);
+        list.unshift(active);
+      }
+    }
+    return list;
+  }, [deliveries, activeDeliveryId]);
   
   // Notification state management
   const [notifications, setNotifications] = useState(mockNotifications);
+  
+  // Scan package state management
+  const [scannedPackageData, setScannedPackageData] = useState<any>(null);
+  const [scanInput, setScanInput] = useState("");
+  const [isScanValid, setIsScanValid] = useState(false);
+  const [scanValidationMessage, setScanValidationMessage] = useState("");
+  const [scanError, setScanError] = useState("");
+  
+  // Camera scanning state
+  const [isCameraActive, setIsCameraActive] = useState(false);
+  const [cameraError, setCameraError] = useState("");
+  const [scanMode, setScanMode] = useState<'camera' | 'manual'>('camera');
+  const [isScanning, setIsScanning] = useState(false);
+  const [html5QrcodeScanner, setHtml5QrcodeScanner] = useState<any>(null);
+  // Fallback ZXing and overlay state
+  const zxingControlsRef = useRef<any>(null);
+  const zxingReaderRef = useRef<any>(null);
+  const zxingVideoElRef = useRef<HTMLVideoElement | null>(null);
+  const [scanBoxSize, setScanBoxSize] = useState<number>(0);
+  
 
   // Check authentication on component mount
   useEffect(() => {
@@ -224,9 +284,27 @@ function CourierDashboard() {
       try {
         const authenticated = localStorage.getItem("courier_authenticated");
         const loginTime = localStorage.getItem("courier_login_time");
-        
+
         console.log('🔍 Authentication status:', authenticated);
         console.log('🔍 Login time:', loginTime);
+
+        // Load completed deliveries from localStorage
+        const completedDeliveries = JSON.parse(localStorage.getItem('parcego_completed_deliveries') || '[]');
+        if (completedDeliveries.length > 0) {
+          setDeliveries(prev => prev.map(delivery =>
+            completedDeliveries.includes(delivery.id)
+              ? { ...delivery, status: 'delivered' as const }
+              : delivery
+          ));
+
+          // Update stats based on completed deliveries
+          const completedCount = completedDeliveries.length;
+          setStats(prev => ({
+            ...prev,
+            completed: Math.max(prev.completed, completedCount),
+            remaining: Math.max(0, prev.deliveriesToday - completedCount)
+          }));
+        }
         
         // Check if authentication exists and is not expired (24 hours)
         if (authenticated === "true" && loginTime) {
@@ -264,15 +342,19 @@ function CourierDashboard() {
     checkAuthentication();
   }, [router]);
 
-  // Keyboard support for notification modal
+  // Keyboard support for modals
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && isNotificationModalOpen) {
-        handleNotificationClose();
+      if (event.key === 'Escape') {
+        if (isScanPackageModalOpen) {
+          handleScanPackageClose();
+        } else if (isNotificationModalOpen) {
+          handleNotificationClose();
+        }
       }
     };
 
-    if (isNotificationModalOpen) {
+    if (isNotificationModalOpen || isScanPackageModalOpen) {
       document.addEventListener('keydown', handleKeyDown);
       // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden';
@@ -282,7 +364,54 @@ function CourierDashboard() {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'unset';
     };
-  }, [isNotificationModalOpen]);
+  }, [isNotificationModalOpen, isScanPackageModalOpen]);
+
+  // Cleanup camera scanner on component unmount
+  useEffect(() => {
+    return () => {
+      // Clean up scanner when component unmounts
+      if (html5QrcodeScanner) {
+        try {
+          // Prefer stopping first if available
+          if (typeof html5QrcodeScanner.stop === 'function') {
+            // Stop returns a promise; fire and forget to avoid blocking unmount
+            Promise.resolve(html5QrcodeScanner.stop()).then(() => {
+              if (typeof html5QrcodeScanner.clear === 'function') {
+                return html5QrcodeScanner.clear();
+              }
+            }).catch(() => {
+              // Swallow errors silently to avoid unmount crashes
+            });
+          } else if (typeof html5QrcodeScanner.clear === 'function') {
+            // Fallback if stop is not available
+            Promise.resolve(html5QrcodeScanner.clear()).catch(() => {});
+          }
+        } catch (_) {
+          // No-op
+        }
+      }
+      // ZXing cleanup on unmount
+      if (zxingControlsRef.current) {
+        try { zxingControlsRef.current.stop(); } catch (_) {}
+        zxingControlsRef.current = null;
+      }
+      if (zxingVideoElRef.current && zxingVideoElRef.current.parentElement) {
+        try { zxingVideoElRef.current.parentElement.removeChild(zxingVideoElRef.current); } catch (_) {}
+        zxingVideoElRef.current = null;
+      }
+    };
+  }, [html5QrcodeScanner]);
+
+  const unreadNotificationsCount = notifications.filter(n => n.status === 'unread').length;
+  // Expose remaining deliveries for other pages' bottom nav badge (simple UI-only state share)
+  useEffect(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        const remaining = String(stats.remaining ?? 0);
+        localStorage.setItem('parcego_remaining_deliveries', remaining);
+      }
+    } catch (_) {}
+  }, [stats.remaining]);
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -319,39 +448,32 @@ function CourierDashboard() {
   }
 
   const handleScanPackage = (deliveryId: string) => {
-    // Development mode: Skip modal and treat as successful scan
-    if (process.env.NODE_ENV === 'development') {
-      console.log(`🧪 Development: Bypassing scan modal for delivery ${deliveryId}`);
-      
-      // Simulate immediate successful scan and progress to next step
-      const delivery = mockDeliveries.find(d => d.id === deliveryId);
-      if (delivery) {
-        // Progress based on current status
-        if (delivery.status === "ready_for_pickup") {
-          // Skip to route planning
-          router.push(`/courier/route/${deliveryId}`);
-        } else if (delivery.status === "in_transit") {
-          // Skip to proof of delivery
-          router.push(`/courier/proof/${deliveryId}`);
-        } else {
-          // Default to scan page
-          router.push(`/courier/scan/${deliveryId}`);
-        }
-        return;
-      }
-    }
+    console.log(`📦 Opening scan package modal for delivery ${deliveryId}`);
     
-    // Production mode: Navigate to scan page
-    router.push(`/courier/scan/${deliveryId}`);
+    // Reset all scan states
+    setScanInput("");
+    setIsScanValid(false);
+    setScanValidationMessage("");
+    setScanError("");
+    setScannedPackageData(null);
+    setCameraError("");
+    setScanMode('camera');
+    setIsScanning(false);
+    
+    // Open the scan package modal and attempt to start camera
+    setIsScanPackageModalOpen(true);
+    
+    // Start camera automatically when modal opens
+    setTimeout(() => {
+      handleCameraStart();
+    }, 300); // Small delay to ensure modal is fully rendered
   };
 
   const handleStartRoute = (deliveryId: string) => {
     router.push(`/courier/route/${deliveryId}`);
   };
 
-  const handleMarkDelivered = (deliveryId: string) => {
-    router.push(`/courier/proof/${deliveryId}`);
-  };
+
 
 
   const handleLogout = () => {
@@ -442,7 +564,331 @@ function CourierDashboard() {
     }
   };
 
-  const unreadNotificationsCount = notifications.filter(n => n.status === 'unread').length;
+  
+
+  // Utility: wait for an element to be present in DOM
+  const waitForElementById = async (id: string, timeoutMs: number = 3000): Promise<HTMLElement | null> => {
+    const start = typeof performance !== 'undefined' ? performance.now() : Date.now();
+    while (((typeof performance !== 'undefined' ? performance.now() : Date.now()) - start) < timeoutMs) {
+      const el = document.getElementById(id);
+      if (el) return el as HTMLElement;
+      await new Promise(requestAnimationFrame);
+    }
+    return null;
+  };
+
+  // Camera scanning functions
+  const handleCameraStart = async () => {
+    console.log("🎥 Starting camera for barcode scanning...");
+    
+    try {
+      // Check if browser supports camera access
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        throw new Error("Camera not supported in this browser");
+      }
+      
+      // Check secure context for camera access
+      if (!window.isSecureContext) {
+        throw new Error("Camera requires HTTPS or localhost. Please use a secure connection.");
+      }
+      
+      // Ensure we're in camera mode and modal is open so the container mounts
+      if (scanMode !== 'camera') {
+        setScanMode('camera');
+      }
+      if (!isScanPackageModalOpen) {
+        console.warn('Scan modal not open during camera start; delaying until open...');
+      }
+
+      // Request camera permission and start stream automatically
+      setIsScanning(true);
+      setCameraError("");
+      
+      // Ensure the container exists before rendering
+      const containerEl = await waitForElementById("parcego-camera-scanner-container", 3500);
+      if (!containerEl) {
+        throw new Error("Scanner container not mounted yet");
+      }
+      // Clear any previous content
+      containerEl.innerHTML = "";
+      
+      // Dynamically import html5-qrcode to avoid SSR issues
+      const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import('html5-qrcode');
+      
+      const formatsToSupport = [
+        // Focus on QR for faster, more reliable detection; add common 1D if needed
+        Html5QrcodeSupportedFormats.QR_CODE
+      ];
+      
+      // Enable native BarcodeDetector if supported for speed & accuracy
+      const html5QrCode = new Html5Qrcode(
+        "parcego-camera-scanner-container",
+        {
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+          formatsToSupport
+        } as any
+      );
+      
+      const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
+      const config: any = {
+        fps: 15,
+        // square box sized to ~66% of shortest edge
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
+          const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+          const size = Math.floor(minEdge * 0.8);
+          setScanBoxSize(size);
+          return { width: size, height: size };
+        },
+        aspectRatio: isMobile ? 1.777778 : 1.333333,
+        disableFlip: true,
+        // Prefer environment camera and hint autofocus/zoom to the browser
+        videoConstraints: ({
+          facingMode: { ideal: "environment" },
+          advanced: [
+            // Best-effort hints; browsers ignore unsupported ones
+            { focusMode: "continuous" as any },
+            { exposureMode: "continuous" as any }
+          ]
+        } as unknown) as MediaTrackConstraints
+      };
+      
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        config,
+        (decodedText: string) => {
+          console.log("✅ Code scanned successfully:", decodedText);
+          handleBarcodeDetected(decodedText);
+        },
+        (errorMessage: string) => {
+          if (!errorMessage.includes("No MultiFormat Readers") && !errorMessage.includes("No valid barcode")) {
+            console.warn("🔍 Scan error:", errorMessage);
+          }
+        }
+      );
+      
+      // Try to improve focus/zoom after stream starts (best-effort)
+      try {
+        await html5QrCode.applyVideoConstraints(({
+          advanced: [
+            { focusMode: "continuous" as any },
+            { exposureMode: "continuous" as any }
+          ]
+        } as unknown) as MediaTrackConstraints);
+      } catch (_) {
+        // Ignore if not supported
+      }
+      
+      setHtml5QrcodeScanner(html5QrCode);
+      setIsCameraActive(true);
+      setIsScanning(false);
+      console.log("✅ Camera scanner initialized successfully");
+      
+    } catch (error) {
+      console.error("❌ Camera initialization failed:", error);
+      const errorMessage = error instanceof Error ? error.message : "Camera access failed";
+      // If the container wasn't present yet, try once more after waiting briefly
+      if (errorMessage.toLowerCase().includes('container not mounted') || errorMessage.toLowerCase().includes('element with id')) {
+        const el = await waitForElementById('parcego-camera-scanner-container', 2000);
+        if (el) {
+          try {
+            console.warn('Container became available, retrying camera start...');
+            await handleCameraStart();
+            return;
+          } catch (_) { /* fallthrough to fallback */ }
+        }
+      }
+      // Try ZXing fallback when not a secure-context failure
+      if (!errorMessage.toLowerCase().includes('https') && !errorMessage.toLowerCase().includes('secure')) {
+        try {
+          const containerEl = document.getElementById('parcego-camera-scanner-container');
+          if (containerEl) {
+            containerEl.innerHTML = '';
+            const video = document.createElement('video');
+            video.setAttribute('playsinline', 'true');
+            video.muted = true;
+            video.style.width = '100%';
+            video.style.height = '100%';
+            video.style.objectFit = 'cover';
+            containerEl.appendChild(video);
+            zxingVideoElRef.current = video;
+
+            const ZXing = await import('@zxing/browser');
+            const reader = new ZXing.BrowserMultiFormatReader();
+            const devices = await ZXing.BrowserMultiFormatReader.listVideoInputDevices();
+            const backCam = devices.find((d: MediaDeviceInfo) => /back|rear|environment/i.test(d.label)) || devices[devices.length - 1];
+            const selectedId = backCam ? backCam.deviceId : undefined;
+            const controls = await reader.decodeFromVideoDevice(selectedId, video, (result, err) => {
+              if (result) {
+                handleBarcodeDetected(result.getText());
+              }
+            });
+            zxingReaderRef.current = reader;
+            zxingControlsRef.current = controls;
+            setHtml5QrcodeScanner(null);
+            setIsCameraActive(true);
+            setIsScanning(false);
+            setCameraError('');
+            console.log('✅ ZXing fallback initialized');
+            return;
+          }
+        } catch (zxErr) {
+          console.warn('ZXing fallback failed:', zxErr);
+        }
+      }
+
+      setCameraError(errorMessage);
+      setIsScanning(false);
+      setIsCameraActive(false);
+      setScanMode('manual');
+    }
+  };
+  
+  const handleCameraStop = async () => {
+    console.log("⏹ Stopping camera...");
+    
+    try {
+      // Clean up html5-qrcode instance
+      if (html5QrcodeScanner) {
+        if (typeof html5QrcodeScanner.stop === 'function') {
+          await html5QrcodeScanner.stop();
+        }
+        if (typeof html5QrcodeScanner.clear === 'function') {
+          await html5QrcodeScanner.clear();
+        }
+        setHtml5QrcodeScanner(null);
+        console.log("✅ Camera scanner cleaned up successfully");
+      }
+      // Clean up ZXing fallback if present
+      if (zxingControlsRef.current) {
+        try { await zxingControlsRef.current.stop(); } catch (_) {}
+        zxingControlsRef.current = null;
+      }
+      zxingReaderRef.current = null;
+      if (zxingVideoElRef.current && zxingVideoElRef.current.srcObject) {
+        try {
+          const stream = zxingVideoElRef.current.srcObject as MediaStream;
+          stream.getTracks().forEach(t => t.stop());
+        } catch (_) {}
+      }
+      if (zxingVideoElRef.current && zxingVideoElRef.current.parentElement) {
+        try { zxingVideoElRef.current.parentElement.removeChild(zxingVideoElRef.current); } catch (_) {}
+        zxingVideoElRef.current = null;
+      }
+    } catch (error) {
+      console.warn("⚠️ Error cleaning up scanner:", error);
+    }
+    
+    setIsCameraActive(false);
+    setIsScanning(false);
+    setCameraError("");
+  };
+  
+  const handleBarcodeDetected = (detectedCode: string) => {
+    console.log("📱 Barcode detected:", detectedCode);
+    
+    // Stop scanning after successful detection
+    setIsScanning(false);
+    
+    // Simulate successful scan by calling existing submit logic
+    setScanInput(detectedCode);
+    const validation = validateScan(detectedCode);
+    setIsScanValid(validation.valid);
+    setScanValidationMessage(validation.message);
+    
+    if (validation.valid) {
+      // Automatically process successful scan
+      setTimeout(() => {
+        handleScanSubmit();
+      }, 500);
+    }
+  };
+  
+  const handleCameraError = (error: any) => {
+    console.error("📹 Camera error:", error);
+    setCameraError(error.message || "Camera error occurred");
+    setIsCameraActive(false);
+    setIsScanning(false);
+    // Auto-fallback to manual input
+    setScanMode('manual');
+  };
+
+  const handleCameraRefresh = async () => {
+    try {
+      setIsScanning(true);
+      // Ensure camera mode so the container mounts
+      if (scanMode !== 'camera') {
+        setScanMode('camera');
+        // Wait for the container to mount
+        await waitForElementById('parcego-camera-scanner-container', 3000);
+      }
+      await handleCameraStop();
+      await handleCameraStart();
+    } catch (err) {
+      console.warn("⚠️ Camera refresh failed:", err);
+      setIsScanning(false);
+    }
+  };
+
+  // Scan package functions
+  const handleScanPackageClose = async () => {
+    // Stop camera if active
+    if (isCameraActive || html5QrcodeScanner) {
+      await handleCameraStop();
+    }
+    
+    setIsScanPackageModalOpen(false);
+    setScanInput("");
+    setIsScanValid(false);
+    setScanValidationMessage("");
+    setScanError("");
+    setScannedPackageData(null);
+    setCameraError("");
+    setScanMode('camera');
+    setIsCameraActive(false);
+    setIsScanning(false);
+  };
+
+  const handleScanSubmit = () => {
+    if (!scanInput || scanInput.trim().length === 0) {
+      setScanError("Please enter or scan a barcode");
+      return;
+    }
+
+    // Mock package data based on scanned input
+    const mockPackageData = {
+      trackingNumber: scanInput.trim(),
+      customerName: "Sarah Johnson",
+      address: "123 Main Street, Downtown District, NY 10001",
+      packageType: "Express Delivery",
+      weight: "2.5 kg",
+      estimatedDelivery: "Today, 4:00 PM",
+      currentStatus: "ready_for_pickup" as const,
+      specialInstructions: "Call upon arrival"
+    };
+
+    setScannedPackageData(mockPackageData);
+    setScanError("");
+    console.log(`Package scanned successfully: ${scanInput}`);
+  };
+
+  const validateScan = (input: string) => {
+    if (!input || input.trim().length === 0) {
+      return { valid: false, message: "" };
+    }
+
+    // Basic validation for tracking numbers
+    if (input.length >= 6) {
+      return { 
+        valid: true, 
+        message: "Valid tracking number format" 
+      };
+    }
+
+    return { 
+      valid: false, 
+      message: "Tracking number too short (minimum 6 characters)" 
+    };
+  };
 
 
   return (
@@ -451,9 +897,23 @@ function CourierDashboard() {
       id="parcego-courier-dashboard-container"
       style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom))' }}
     >
+      {/* Glass Blur Notification Banner */}
+      <NotificationBanner
+        id="parcego-courier-dashboard-notification-banner"
+        type={notificationBanner.type}
+        title={notificationBanner.title}
+        message={notificationBanner.message}
+        isVisible={showNotificationBanner}
+        onDismiss={() => setShowNotificationBanner(false)}
+        showDismissButton={true}
+        className="animate-in slide-in-from-top duration-500 ease-out"
+      />
+
       {/* Enhanced Courier Header */}
       <div 
-        className="bg-white shadow-sm border-b px-4 py-3"
+        className={`bg-white shadow-sm border-b px-4 py-3 transition-all duration-300 ease-out ${
+          showNotificationBanner ? 'mt-16' : 'mt-0'
+        }`}
         id="parcego-courier-header"
       >
         <div className="flex items-center justify-between">
@@ -553,16 +1013,16 @@ function CourierDashboard() {
                 <Icon name="Sun" size={20} className="md:w-6 md:h-6 text-blue-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <h3 className="text-base md:text-lg font-semibold text-blue-900 mb-1">
+                <h3 className="text-lg/7 md:text-xl/8 font-bold text-blue-900 mb-1 tracking-tight antialiased">
                   Good Morning, {mockCourierData.name.split(' ')[0]}!
                 </h3>
                 <p className="text-sm md:text-base text-blue-700">
-                  You have {mockCourierData.stats.remaining} deliveries remaining today. 
-                  {mockCourierData.stats.completed > 0 ? ` Great job completing ${mockCourierData.stats.completed} deliveries!` : ' Ready to start your deliveries!'}
+                  You have {stats.remaining} deliveries remaining today. 
+                  {stats.completed > 0 ? ` Great job completing ${stats.completed} deliveries!` : ' Ready to start your deliveries!'}
                 </p>
               </div>
               <div className="text-right flex-shrink-0">
-                <p className="text-xl md:text-2xl font-bold text-blue-900">{mockCourierData.stats.completed}/{mockCourierData.stats.deliveriesToday}</p>
+                <p className="text-xl md:text-2xl font-bold text-blue-900">{stats.completed}/{stats.deliveriesToday}</p>
                 <p className="text-xs md:text-sm text-blue-600">Completed</p>
               </div>
             </div>
@@ -589,7 +1049,7 @@ function CourierDashboard() {
                       Delivery Progress
                     </h3>
                     <span className="text-2xl font-bold text-gray-900" style={{ fontWeight: 700 }}>
-                      {Math.round((mockCourierData.stats.completed / mockCourierData.stats.deliveriesToday) * 100)}%
+                      {Math.round((stats.completed / stats.deliveriesToday) * 100)}%
                     </span>
                   </div>
                   
@@ -598,7 +1058,7 @@ function CourierDashboard() {
                     <div 
                       className="h-full rounded-full transition-all duration-500 ease-out"
                       style={{
-                        width: `${Math.round((mockCourierData.stats.completed / mockCourierData.stats.deliveriesToday) * 100)}%`,
+                        width: `${Math.round((stats.completed / stats.deliveriesToday) * 100)}%`,
                         background: 'linear-gradient(90deg, #10b981 0%, #059669 50%, #047857 100%)',
                         boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
                       }}
@@ -606,7 +1066,11 @@ function CourierDashboard() {
                   </div>
                   
                   <div className="text-sm text-gray-600" style={{ fontWeight: 700 }}>
-                    Next: {mockDeliveries[0]?.customerName} - {mockDeliveries[0]?.address}
+                    {activeDeliveryId ? (
+                      <>Next: {sortedDeliveries[0]?.customerName} - {sortedDeliveries[0]?.address}</>
+                    ) : (
+                      <>All deliveries completed</>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -618,11 +1082,11 @@ function CourierDashboard() {
                     <div className="p-2 bg-blue-100 rounded-lg w-12 h-12 mx-auto mb-3 flex items-center justify-center">
                       <Icon name="Package" size={20} className="text-blue-600" />
                     </div>
-                    <p className="text-xl font-bold text-gray-900">{mockCourierData.stats.completed}</p>
+                    <p className="text-xl font-bold text-gray-900">{stats.completed}</p>
                     <p className="text-sm text-gray-500">Completed Today</p>
                     <div className="mt-2 text-xs text-blue-600">
                       <Icon name="CheckCircle" size={12} className="mr-1 inline" />
-                      {Math.round((mockCourierData.stats.completed / mockCourierData.stats.deliveriesToday) * 100)}% of total
+                      {Math.round((stats.completed / stats.deliveriesToday) * 100)}% of total
                     </div>
                   </CardContent>
                 </Card>
@@ -632,7 +1096,7 @@ function CourierDashboard() {
                     <div className="p-2 bg-orange-100 rounded-lg w-12 h-12 mx-auto mb-3 flex items-center justify-center">
                       <Icon name="Clock" size={20} className="text-orange-600" />
                     </div>
-                    <p className="text-xl font-bold text-gray-900">{mockCourierData.stats.remaining}</p>
+                    <p className="text-xl font-bold text-gray-900">{stats.remaining}</p>
                     <p className="text-sm text-gray-500">Remaining Today</p>
                     <div className="mt-2 text-xs text-orange-600">
                       <Icon name="Target" size={12} className="mr-1 inline" />
@@ -660,154 +1124,132 @@ function CourierDashboard() {
                   </div>
                 </CardContent>
               </Card>
+
             </div>
           )}
 
-          {/* Deliveries Content */}
+          {/* Deliveries Content - Redesigned for Courier Efficiency */}
           {activeTab === "deliveries" && (
             <div className="space-y-4">
               <Card 
-                className="parcego-deliveries-card"
+                className="parcego-deliveries-card shadow-sm"
                 id="parcego-courier-deliveries-list"
               >
-                <CardHeader>
+                <CardHeader className="pb-2">
                   <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg">Today&apos;s Deliveries</CardTitle>
+                    <CardTitle className="text-lg font-bold text-gray-900">Today&apos;s Deliveries</CardTitle>
                     <Badge 
                       variant="secondary"
-                      className="parcego-badge parcego-badge--remaining"
+                      className="parcego-badge parcego-badge--remaining bg-blue-100 text-blue-700 font-medium"
                       id="parcego-courier-remaining-count"
                     >
-                      {mockCourierData.stats.remaining} remaining
+                      {stats.remaining} remaining
                     </Badge>
                   </div>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {mockDeliveries.map((delivery) => (
+                <CardContent className="space-y-5 pt-2">
+                  {sortedDeliveries.map((delivery, index) => (
                     <div
                       key={delivery.id}
-                      className="border rounded-lg p-4 parcego-delivery-card"
+                      className={`border rounded-lg p-4 parcego-delivery-card ${
+                        delivery.status === 'delivered' ? 'opacity-60' : (index === 0 ? 'shadow-sm border-blue-200' : 'opacity-60')
+                      } ${delivery.status !== 'delivered' && delivery.id !== activeDeliveryId ? 'pointer-events-none select-none' : ''}`}
                       id={`parcego-delivery-card-${delivery.id}`}
+                      style={{
+                        transition: 'all 0.2s ease-out',
+                      }}
+                      aria-disabled={delivery.status !== 'delivered' && delivery.id !== activeDeliveryId}
                     >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-2">
+                      <div className="flex items-start space-x-3 mb-3">
+                        {/* Refined Status Indicator */}
+                        <div className="flex-shrink-0 mt-1">
+                          <div className={`w-2 h-2 rounded-full ${getStatusColor(delivery.status)} ring-2 ring-opacity-30 ${getStatusColor(delivery.status).replace('bg-', 'ring-')}`}></div>
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center flex-wrap gap-2 mb-2">
                             <h3 
-                              className="font-medium text-gray-900"
+                              className="text-lg font-bold text-gray-900 mr-auto"
                               id={`parcego-delivery-customer-${delivery.id}`}
                             >
                               {delivery.customerName}
                             </h3>
-                            <Badge 
-                              className={`text-xs ${getStatusColor(delivery.status)} text-white parcego-status-badge`}
-                              id={`parcego-delivery-status-${delivery.id}`}
-                            >
-                              {getStatusText(delivery.status)}
-                            </Badge>
-                            <Badge 
-                              className={`text-xs ${getPriorityColor(delivery.priority)} text-white`}
-                              variant="secondary"
-                            >
-                              {delivery.priority}
-                            </Badge>
+                            <div className="flex flex-wrap gap-1.5">
+                              <Badge 
+                                className={`text-xs ${getStatusColor(delivery.status)} text-white parcego-status-badge`}
+                                id={`parcego-delivery-status-${delivery.id}`}
+                              >
+                                {getStatusText(delivery.status)}
+                              </Badge>
+                              <Badge 
+                                className={`text-xs ${getPriorityColor(delivery.priority)} text-white`}
+                                variant="secondary"
+                              >
+                                {delivery.priority}
+                              </Badge>
+                            </div>
                           </div>
-                          <div className="space-y-2">
+                          
+                          <div className="space-y-2.5">
                             <p 
-                              className="text-sm text-gray-600 flex items-center"
+                              className="text-sm text-gray-700 flex items-center font-medium"
                               id={`parcego-delivery-address-${delivery.id}`}
                             >
-                              <Icon name="MapPin" size={16} className="mr-2 text-gray-400" />
+                              <Icon name="MapPin" size={16} className="mr-2 text-blue-500" />
                               {delivery.address}
                             </p>
-                            <p 
-                              className="text-sm text-gray-500 flex items-center"
-                              id={`parcego-delivery-time-${delivery.id}`}
-                            >
-                              <Icon name="Clock" size={16} className="mr-2 text-gray-400" />
-                              {delivery.timeWindow} (Est: {delivery.estimatedTime})
-                            </p>
-                            <div className="flex items-center space-x-4 text-xs text-gray-500">
-                              <span className="flex items-center">
-                                <Icon name="Package" size={12} className="mr-1" />
+                            
+                            <div className="flex flex-wrap items-center gap-4 text-xs text-gray-600 font-medium mt-1">
+                              <span className="flex items-center bg-gray-100 px-2 py-1 rounded-full">
+                                <Icon name="Package" size={12} className="mr-1.5 text-gray-500" />
                                 {delivery.packageType}
                               </span>
-                              <span className="flex items-center">
-                                <Icon name="Scale" size={12} className="mr-1" />
+                              <span className="flex items-center bg-gray-100 px-2 py-1 rounded-full">
+                                <Icon name="Scale" size={12} className="mr-1.5 text-gray-500" />
                                 {delivery.weight}
+                              </span>
+                              <span className="flex items-center bg-gray-100 px-2 py-1 rounded-full">
+                                <Icon name="Barcode" size={12} className="mr-1.5 text-gray-500" />
+                                {delivery.trackingNumber.slice(-6)}
                               </span>
                             </div>
                           </div>
+                          
                           {delivery.specialInstructions && (
-                            <div className="mt-3 p-2 bg-blue-50 rounded-md border border-blue-200">
+                            <div className="mt-3 p-3 bg-amber-50 rounded-md border border-amber-200">
                               <p 
-                                className="text-xs text-blue-700 flex items-center"
+                                className="text-sm text-amber-800 flex items-start"
                                 id={`parcego-delivery-instructions-${delivery.id}`}
                               >
-                                <Icon name="AlertCircle" size={12} className="mr-2" />
-                                <span className="font-medium">Special Instructions:</span> {delivery.specialInstructions}
+                                <Icon name="AlertCircle" size={14} className="mr-2 mt-0.5 text-amber-600 flex-shrink-0" />
+                                <span><span className="font-semibold">Special Instructions:</span> {delivery.specialInstructions}</span>
                               </p>
                             </div>
                           )}
                         </div>
-                        
-                        {/* Status Timeline Indicator */}
-                        <div className="ml-4 flex flex-col items-center">
-                          <div className="w-16 h-16 rounded-full border-2 border-gray-200 flex items-center justify-center mb-2">
-                            <div className={`w-3 h-3 rounded-full ${getStatusColor(delivery.status)}`}></div>
-                          </div>
-                          <p className="text-xs text-gray-500 text-center">Status</p>
-                        </div>
                       </div>
 
-                      <Separator className="my-4" />
+                      <Separator className="my-3" />
 
-                      <div className="flex space-x-2">
-                        {delivery.status === "ready_for_pickup" && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleScanPackage(delivery.id)}
-                              className="flex-1 parcego-delivery-action-btn parcego-delivery-action-btn--scan hover:bg-blue-50 hover:border-blue-300"
-                              id={`parcego-scan-btn-${delivery.id}`}
-                            >
-                              <Icon name="Camera" size={16} className="mr-2" />
-                              Scan Package
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => handleStartRoute(delivery.id)}
-                              className="flex-1 parcego-delivery-action-btn parcego-delivery-action-btn--route bg-blue-600 hover:bg-blue-700"
-                              id={`parcego-route-btn-${delivery.id}`}
-                            >
-                              <Icon name="Route" size={16} className="mr-2" />
-                              Start Route
-                            </Button>
-                          </>
-                        )}
-                        
-                        {delivery.status === "in_transit" && (
+                      <div className="flex justify-center">
+                        {delivery.status === 'delivered' ? (
+                          <div className="flex-1 flex items-center justify-center h-11 bg-emerald-50 border-2 border-emerald-200 rounded-md">
+                            <div className="flex items-center text-emerald-700 font-medium">
+                              <Icon name="CheckCircle" size={16} className="mr-2" />
+                              Delivered
+                            </div>
+                          </div>
+                        ) : (
                           <Button
-                            size="sm"
-                            onClick={() => handleMarkDelivered(delivery.id)}
-                            className="w-full parcego-delivery-action-btn parcego-delivery-action-btn--delivered bg-green-600 hover:bg-green-700"
-                            id={`parcego-delivered-btn-${delivery.id}`}
+                            size="default"
+                            onClick={() => handleStartRoute(delivery.id)}
+                            className={`w-full h-11 parcego-delivery-action-btn ${delivery.id === activeDeliveryId ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-200 text-gray-500'} `}
+                            id={`parcego-route-btn-${delivery.id}`}
+                            disabled={delivery.id !== activeDeliveryId}
+                            aria-disabled={delivery.id !== activeDeliveryId}
                           >
-                            <Icon name="CheckCircle" size={16} className="mr-2" />
-                            Mark as Delivered
-                          </Button>
-                        )}
-                        
-                        {delivery.status === "assigned" && (
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled
-                            className="w-full parcego-delivery-action-btn parcego-delivery-action-btn--waiting text-gray-400"
-                            id={`parcego-waiting-btn-${delivery.id}`}
-                          >
-                            <Icon name="Clock" size={16} className="mr-2" />
-                            Waiting for Pickup
+                            <Icon name="Route" size={16} className="mr-2" />
+                            Navigate
                           </Button>
                         )}
                       </div>
@@ -818,41 +1260,6 @@ function CourierDashboard() {
             </div>
           )}
 
-          {/* Performance Content */}
-          {activeTab === "performance" && (
-            <div className="space-y-4">
-              <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Icon name="BarChart3" size={20} className="text-blue-600" />
-                    Performance Analytics
-                  </CardTitle>
-                  <CardDescription>
-                    Detailed performance metrics and insights are available in the dedicated Performance page
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="text-center py-6">
-                    <div className="p-4 bg-blue-100 rounded-full w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-                      <Icon name="BarChart3" size={32} className="text-blue-600" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-gray-900 mb-2">View Your Performance</h3>
-                    <p className="text-gray-600 mb-6">
-                      Access comprehensive analytics including delivery completion rates, 
-                      earnings breakdown, efficiency metrics, and career progress.
-                    </p>
-                    <Button 
-                      onClick={() => router.push('/courier/performance')}
-                      className="bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-200"
-                    >
-                      <Icon name="ArrowRight" size={16} className="mr-2" />
-                      Go to Performance Page
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          )}
         </div>
       </div>
 
@@ -929,7 +1336,7 @@ function CourierDashboard() {
               />
               {/* Delivery count badge */}
               <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                {mockCourierData.stats.remaining}
+                {stats.remaining}
               </div>
             </div>
             <span className={`
@@ -944,39 +1351,17 @@ function CourierDashboard() {
           </button>
           
           <button
-            onClick={() => setActiveTab("performance")}
-            className={`
-              flex flex-col items-center justify-center min-w-0 flex-1 py-2 px-1 rounded-xl transition-all duration-200 ease-out
-              parcego-nav-btn parcego-nav-btn--performance group
-              ${activeTab === "performance" 
-                ? "bg-blue-100/80 text-blue-600 shadow-sm" 
-                : "text-gray-500 hover:text-gray-700 hover:bg-gray-100/50 active:bg-gray-200/50 active:scale-95"
-              }
-            `}
+            onClick={() => router.push('/courier/performance')}
+            className="flex flex-col items-center justify-center min-w-0 flex-1 py-2 px-1 rounded-xl transition-all duration-200 ease-out parcego-nav-btn parcego-nav-btn--performance group text-gray-500 hover:text-gray-700 hover:bg-gray-100/50 active:bg-gray-200/50 active:scale-95"
             id="parcego-nav-performance-btn"
             type="button"
           >
-            <div className={`
-              transition-all duration-200 ease-out
-              ${activeTab === "performance" ? "transform scale-110" : "group-active:scale-95"}
-            `}>
-              <Icon 
-                name="BarChart3" 
-                size={20} 
-                className={`
-                  ${activeTab === "performance" ? "text-blue-600" : "text-current"}
-                `} 
-              />
+            <div className="transition-all duration-200 ease-out group-active:scale-95">
+              <Icon name="BarChart3" size={20} className="text-current" />
             </div>
-            <span className={`
-              text-xs font-medium mt-1 transition-all duration-200 ease-out
-              ${activeTab === "performance" ? "text-blue-600" : "text-current"}
-            `}>
+            <span className="text-xs font-medium mt-1 transition-all duration-200 ease-out text-current">
               Performance
             </span>
-            {activeTab === "performance" && (
-              <div className="absolute -bottom-0.5 left-1/2 transform -translate-x-1/2 w-8 h-1 bg-blue-600 rounded-full" />
-            )}
           </button>
           
           <button
@@ -1002,24 +1387,21 @@ function CourierDashboard() {
       {/* Off-Canvas Notification Modal */}
       {isNotificationModalOpen && (
         <>
-          {/* Backdrop */}
           <div 
-            className="fixed inset-0 bg-black/50 z-[200] transition-opacity duration-300 ease-out"
+            className="fixed inset-0 bg-black/30 z-[200] transition-opacity duration-300 ease-out"
             id="parcego-courier-notification-backdrop"
             onClick={handleNotificationClose}
             aria-hidden="true"
           />
-          
-          {/* Off-Canvas Modal */}
           <div 
-            className="fixed inset-y-0 left-0 w-full max-w-sm bg-white shadow-2xl z-[201] transform transition-transform duration-300 ease-out animate-in slide-in-from-left"
+            className="fixed inset-y-0 left-0 w-full max-w-sm bg-white shadow-2xl z-[201] transform transition-transform duration-300 ease-out animate-in slide-in-from-left flex flex-col"
             id="parcego-courier-notification-modal"
             role="dialog"
             aria-modal="true"
             aria-labelledby="parcego-notification-modal-title"
           >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
+            {/* Fixed Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white flex-shrink-0">
               <h2 
                 className="text-lg font-semibold text-gray-900"
                 id="parcego-notification-modal-title"
@@ -1042,11 +1424,24 @@ function CourierDashboard() {
                 <Icon name="X" size={18} />
               </Button>
             </div>
-
-            {/* Modal Content - Scrollable */}
-            <div className="flex-1 overflow-y-auto">
+            
+            {/* Scrollable Content Area with Hidden Scrollbar */}
+            <div 
+              className="flex-1 overflow-y-auto overflow-x-hidden"
+              style={{
+                scrollbarWidth: 'none', /* Firefox */
+                msOverflowStyle: 'none', /* Internet Explorer 10+ */
+                WebkitOverflowScrolling: 'touch', /* iOS smooth scrolling */
+              }}
+              id="parcego-courier-notification-scroll-area"
+            >
+              <style jsx>{`
+                #parcego-courier-notification-scroll-area::-webkit-scrollbar {
+                  display: none; /* Safari and Chrome */
+                }
+              `}</style>
+              
               {notifications.length === 0 ? (
-                /* Empty State */
                 <div 
                   className="flex flex-col items-center justify-center p-8 text-center"
                   id="parcego-notification-empty-state"
@@ -1055,10 +1450,9 @@ function CourierDashboard() {
                     <Icon name="Bell" size={24} className="text-gray-400" />
                   </div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No notifications</h3>
-                  <p className="text-sm text-gray-500">You&apos;re all caught up! New notifications will appear here.</p>
+                  <p className="text-sm text-gray-500">You're all caught up! New notifications will appear here.</p>
                 </div>
               ) : (
-                /* Notification List */
                 <div className="divide-y divide-gray-100">
                   {notifications.map((notification, index) => (
                     <div
@@ -1079,7 +1473,6 @@ function CourierDashboard() {
                       aria-label={`Notification: ${notification.title}. ${notification.status === 'unread' ? 'Unread' : 'Read'}`}
                     >
                       <div className="flex items-start space-x-3">
-                        {/* Notification Icon */}
                         <div className={`p-2 rounded-lg flex-shrink-0 ${
                           notification.priority === 'high' 
                             ? 'bg-red-100' 
@@ -1093,8 +1486,6 @@ function CourierDashboard() {
                             className={getPriorityColor(notification.priority)}
                           />
                         </div>
-                        
-                        {/* Notification Content */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between mb-1">
                             <h3 className={`text-sm font-medium ${
@@ -1132,10 +1523,10 @@ function CourierDashboard() {
                 </div>
               )}
             </div>
-
-            {/* Modal Footer - Action Buttons */}
+            
+            {/* Fixed Action Buttons at Bottom */}
             {notifications.length > 0 && (
-              <div className="p-4 border-t border-gray-200 bg-white">
+              <div className="p-4 border-t border-gray-200 bg-white flex-shrink-0 relative z-[100]">
                 <div className="flex space-x-3">
                   <Button
                     variant="outline"
@@ -1164,6 +1555,436 @@ function CourierDashboard() {
           </div>
         </>
       )}
+
+      {/* Scan Package Modal */}
+      {isScanPackageModalOpen && (
+        <>
+          {/* Backdrop */}
+          <div 
+            className="fixed inset-0 bg-black/30 z-[200] transition-opacity duration-300 ease-out"
+            id="parcego-courier-scan-package-backdrop"
+            onClick={handleScanPackageClose}
+            aria-hidden="true"
+          />
+          
+          {/* Modal */}
+          <div 
+            className="fixed inset-y-0 left-0 w-full max-w-sm bg-white shadow-2xl z-[201] transform transition-transform duration-300 ease-out animate-in slide-in-from-left"
+            id="parcego-courier-scan-package-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="parcego-scan-package-modal-title"
+          >
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-white sticky top-0 z-10">
+              <h2 
+                className="text-lg font-semibold text-gray-900 flex items-center"
+                id="parcego-scan-package-modal-title"
+              >
+                <Icon name="Camera" size={20} className="text-purple-600 mr-2" />
+                Scan Package
+              </h2>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full hover:bg-gray-100"
+                  id="parcego-courier-scan-package-refresh-btn"
+                  onClick={handleCameraRefresh}
+                  aria-label="Refresh camera"
+                >
+                  <Icon name="RotateCcw" size={18} />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full hover:bg-gray-100"
+                  id="parcego-courier-scan-package-close-btn"
+                  onClick={handleScanPackageClose}
+                  aria-label="Close scan package modal"
+                >
+                  <Icon name="X" size={18} />
+                </Button>
+              </div>
+            </div>
+
+            {/* Modal Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto">
+              {!scannedPackageData ? (
+                /* Camera/Scan Interface */
+                <div className="flex flex-col h-full">
+                  {scanMode === 'camera' ? (
+                    /* Camera Scanning Interface */
+                    <div className="flex flex-col">
+                      {/* Camera Container - Fixed Height */}
+                      <div className="relative bg-gray-900 h-[45vh] overflow-hidden rounded-t-lg">
+                        {/* HTML5-QRCode Scanner Container */}
+                        <div 
+                          id="parcego-camera-scanner-container"
+                          className={`w-full h-full bg-gray-900 ${(!isCameraActive && !isScanning) ? 'hidden' : ''}`}
+                          style={{ 
+                            display: 'flex', 
+                            justifyContent: 'center', 
+                            alignItems: 'center',
+                            flexDirection: 'column'
+                          }}
+                        >
+                          {/* Fallback content while scanner loads */}
+                          <div className="text-center text-gray-300 p-4">
+                            <Icon name="Camera" size={48} className="mx-auto mb-3 animate-pulse text-white" />
+                            <p className="text-lg font-semibold mb-2 text-white">Initializing Camera...</p>
+                            <p className="text-sm opacity-75 text-gray-300">Please allow camera access when prompted</p>
+                          </div>
+                        </div>
+
+                        {/* Scanning Instructions - Fixed Position */}
+                        {isCameraActive && (
+                          <div className="absolute top-4 left-4 right-4 z-20">
+                            <div className="bg-blue-600/95 backdrop-blur-sm text-white px-4 py-3 rounded-lg text-sm font-medium shadow-lg">
+                              <div className="flex items-center">
+                                <Icon name="Info" size={16} className="mr-2 flex-shrink-0" />
+                                <span>Position the barcode or QR code within the scanning area below</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Scanning Area Overlay - Centered and Clear */}
+                        {isCameraActive && !isScanning && !cameraError && (
+                          <div
+                            id="parcego-camera-scan-overlay"
+                            className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center z-10"
+                            aria-hidden="true"
+                          >
+                            {/* Scanning Area Box */}
+                            <div
+                              className="relative border-2 border-blue-500 bg-blue-500/10 rounded-2xl shadow-2xl"
+                              style={{ width: `${scanBoxSize}px`, height: `${scanBoxSize}px` }}
+                              aria-hidden="true"
+                            >
+                              {/* Corner markers - Enhanced */}
+                              <div className="absolute -top-1 -left-1 w-8 h-8 border-t-4 border-l-4 border-blue-400 rounded-tl-2xl" />
+                              <div className="absolute -top-1 -right-1 w-8 h-8 border-t-4 border-r-4 border-blue-400 rounded-tr-2xl" />
+                              <div className="absolute -bottom-1 -left-1 w-8 h-8 border-b-4 border-l-4 border-blue-400 rounded-bl-2xl" />
+                              <div className="absolute -bottom-1 -right-1 w-8 h-8 border-b-4 border-r-4 border-blue-400 rounded-br-2xl" />
+                              
+                              {/* Scanning animation line */}
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <div className="w-full h-0.5 bg-gradient-to-r from-transparent via-blue-400 to-transparent animate-pulse" />
+                              </div>
+                            </div>
+                            
+                            {/* Scanning Status - Below the box */}
+                            <div className="mt-6 flex items-center gap-2 bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full shadow-lg">
+                              <div className="w-3 h-3 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                              <span className="text-sm font-medium text-gray-800">Scanning for barcode...</span>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {/* Loading Overlay while scanning starts */}
+                        {isScanning && (
+                          <div className="absolute inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-20">
+                            <div className="text-center py-8">
+                              <div className="p-4 bg-blue-100 rounded-full mb-4 w-20 h-20 mx-auto flex items-center justify-center">
+                                <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                              </div>
+                              <h3 className="text-xl font-bold text-white mb-2">Starting Camera...</h3>
+                              <p className="text-sm text-gray-300">Please allow camera access when prompted</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Error State */}
+                      {cameraError && (
+                        <div className="flex-1 flex items-center justify-center p-6">
+                          <div className="text-center">
+                            <div className="p-4 bg-red-100 rounded-full mb-4 w-20 h-20 mx-auto flex items-center justify-center">
+                              <Icon name="AlertTriangle" size={36} className="text-red-600" />
+                            </div>
+                            <h3 className="text-xl font-bold text-red-600 mb-2">Camera Unavailable</h3>
+                            <p className="text-sm text-gray-600 mb-6">{cameraError}</p>
+                            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                              <Button
+                                onClick={handleCameraStart}
+                                variant="outline"
+                                className="w-full sm:w-auto"
+                              >
+                                <Icon name="RotateCcw" size={16} className="mr-2" />
+                                Retry Camera
+                              </Button>
+                              <Button
+                                onClick={() => setScanMode('manual')}
+                                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
+                              >
+                                <Icon name="Edit" size={16} className="mr-2" />
+                                Enter Manually
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Bottom Section - Actions */}
+                      <div className="p-4 bg-white border-t border-gray-200 rounded-b-lg">
+                        {/* Action Buttons - Consistent styling */}
+                        <div className="flex flex-col gap-3">
+                          {!cameraError && !isScanning && (
+                            <Button
+                              onClick={() => setScanMode('manual')}
+                              variant="outline"
+                              className="w-full justify-center py-3 text-gray-700 hover:text-gray-900 hover:bg-gray-50"
+                            >
+                              <Icon name="Edit" size={16} className="mr-2" />
+                              Enter Tracking Number Manually
+                            </Button>
+                          )}
+                          
+                          {cameraError && (
+                            <Button
+                              onClick={() => {
+                                setScanMode('camera');
+                                setCameraError('');
+                                setTimeout(() => handleCameraStart(), 100);
+                              }}
+                              variant="outline"
+                              className="w-full justify-center py-3 text-blue-700 hover:text-blue-900 hover:bg-blue-50"
+                            >
+                              <Icon name="Camera" size={16} className="mr-2" />
+                              Try Camera Again
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Manual Input Mode */
+                    <div className="flex flex-col flex-1">
+                      {/* Header Section */}
+                      <div className="text-center py-6 px-4 bg-gradient-to-br from-blue-50 to-indigo-50">
+                        <div className="p-4 bg-blue-100 rounded-full mb-4 w-20 h-20 mx-auto flex items-center justify-center">
+                          <Icon name="Edit" size={32} className="text-blue-600" />
+                        </div>
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">Manual Entry</h3>
+                        <p className="text-sm text-gray-600">Enter the package tracking number manually</p>
+                      </div>
+
+                      {/* Input Section */}
+                      <div className="flex-1 p-4 space-y-4">
+                        <div className="space-y-3">
+                          <label htmlFor="scan-input" className="text-sm font-semibold text-gray-700 block">
+                            Tracking Number
+                          </label>
+                          <Input
+                            id="scan-input"
+                            value={scanInput}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              setScanInput(value);
+                              setScanError("");
+                              
+                              // Auto-validate as user types
+                              const validation = validateScan(value);
+                              setIsScanValid(validation.valid);
+                              setScanValidationMessage(validation.message);
+                            }}
+                            placeholder="Enter tracking number (e.g., PCG789123456)"
+                            className="w-full text-lg py-4 px-4 border-2 focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                            autoFocus
+                          />
+                          
+                          {/* Validation status display */}
+                          {scanInput && (
+                            <div className="space-y-2">
+                              {isScanValid ? (
+                                <Alert className="border-green-200 bg-green-50">
+                                  <Icon name="CheckCircle" size={16} className="text-green-600" />
+                                  <AlertDescription className="text-green-800">
+                                    <div className="font-bold">{scanValidationMessage}</div>
+                                  </AlertDescription>
+                                </Alert>
+                              ) : scanValidationMessage && !isScanValid ? (
+                                <Alert variant="destructive">
+                                  <Icon name="AlertTriangle" size={16} />
+                                  <AlertDescription>{scanValidationMessage}</AlertDescription>
+                                </Alert>
+                              ) : (
+                                <div className="text-sm text-gray-500">
+                                  <div className="flex items-center mb-1">
+                                    <Icon name="Info" size={14} className="mr-1" />
+                                    <span className="font-medium">Enter a tracking number to validate</span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          
+                          {scanError && (
+                            <Alert variant="destructive">
+                              <Icon name="AlertTriangle" size={16} />
+                              <AlertDescription>{scanError}</AlertDescription>
+                            </Alert>
+                          )}
+                        </div>
+                      </div>
+                      
+                      {/* Bottom Section - Actions */}
+                      <div className="p-4 bg-white border-t border-gray-200">
+                        <div className="flex flex-col gap-3">
+                          <Button
+                            onClick={() => {
+                              setScanMode('camera');
+                              setScanInput("");
+                              setScanError("");
+                              setTimeout(() => handleCameraStart(), 100);
+                            }}
+                            variant="outline"
+                            className="w-full justify-center py-3 text-blue-700 hover:text-blue-900 hover:bg-blue-50"
+                          >
+                            <Icon name="Camera" size={16} className="mr-2" />
+                            Switch to Camera Scanning
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                /* Package Details Display */
+                <div className="flex flex-col flex-1">
+                  {/* Success Header */}
+                  <div className="text-center py-6 px-4 bg-gradient-to-br from-green-50 to-emerald-50">
+                    <div className="p-4 bg-green-100 rounded-full mb-4 w-20 h-20 mx-auto flex items-center justify-center">
+                      <Icon name="CheckCircle" size={36} className="text-green-600" />
+                    </div>
+                    <h3 className="text-xl font-bold text-green-600 mb-2">Package Found!</h3>
+                    <p className="text-sm text-gray-600">Package details loaded successfully</p>
+                  </div>
+
+                  {/* Package Details Card */}
+                  <div className="flex-1 p-4">
+                    <Card className="border-green-200 bg-green-50/30 shadow-sm">
+                      <CardHeader className="pb-4">
+                        <CardTitle className="text-lg flex items-center justify-between">
+                          <span className="flex items-center">
+                            <Icon name="Package" size={20} className="mr-2 text-green-600" />
+                            Package Details
+                          </span>
+                          <Badge className="bg-blue-600 text-white px-3 py-1">
+                            {scannedPackageData.currentStatus.replace(/_/g, " ").toUpperCase()}
+                          </Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid gap-4">
+                          <div className="flex items-start space-x-3 p-3 bg-white/50 rounded-lg">
+                            <Icon name="Hash" size={18} className="text-gray-500 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-gray-700">Tracking Number</p>
+                              <p className="text-sm text-gray-600 font-mono bg-gray-100 px-2 py-1 rounded mt-1">{scannedPackageData.trackingNumber}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-start space-x-3 p-3 bg-white/50 rounded-lg">
+                            <Icon name="User" size={18} className="text-gray-500 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-gray-700">Customer</p>
+                              <p className="text-sm text-gray-600 mt-1">{scannedPackageData.customerName}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-start space-x-3 p-3 bg-white/50 rounded-lg">
+                            <Icon name="MapPin" size={18} className="text-gray-500 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-gray-700">Delivery Address</p>
+                              <p className="text-sm text-gray-600 mt-1">{scannedPackageData.address}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-start space-x-3 p-3 bg-white/50 rounded-lg">
+                            <Icon name="Package" size={18} className="text-gray-500 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-gray-700">Package Type</p>
+                              <p className="text-sm text-gray-600 mt-1">{scannedPackageData.packageType}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-start space-x-3 p-3 bg-white/50 rounded-lg">
+                            <Icon name="Scale" size={18} className="text-gray-500 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-gray-700">Weight</p>
+                              <p className="text-sm text-gray-600 mt-1">{scannedPackageData.weight}</p>
+                            </div>
+                          </div>
+                          
+                          <div className="flex items-start space-x-3 p-3 bg-white/50 rounded-lg">
+                            <Icon name="Clock" size={18} className="text-gray-500 flex-shrink-0 mt-0.5" />
+                            <div className="flex-1">
+                              <p className="text-sm font-semibold text-gray-700">Estimated Delivery</p>
+                              <p className="text-sm text-gray-600 mt-1">{scannedPackageData.estimatedDelivery}</p>
+                            </div>
+                          </div>
+
+                          {scannedPackageData.specialInstructions && (
+                            <div className="flex items-start space-x-3 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                              <Icon name="AlertCircle" size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+                              <div className="flex-1">
+                                <p className="text-sm font-semibold text-amber-800">Special Instructions</p>
+                                <p className="text-sm text-amber-700 mt-1">{scannedPackageData.specialInstructions}</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Bottom Section - Actions */}
+                  <div className="p-4 bg-white border-t border-gray-200">
+                    <div className="flex flex-col gap-3">
+                      <Button
+                        onClick={handleScanPackageClose}
+                        className="w-full justify-center py-3 bg-green-600 hover:bg-green-700 text-white font-semibold"
+                      >
+                        <Icon name="CheckCircle" size={16} className="mr-2" />
+                        Continue with Delivery
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer - Only for Manual Mode Submit */}
+            {!scannedPackageData && scanMode === 'manual' && (
+              <div className="p-4 border-t border-gray-200 bg-white">
+                <div className="flex space-x-3">
+                  <Button
+                    variant="outline"
+                    onClick={handleScanPackageClose}
+                    className="flex-1 h-12 font-semibold"
+                  >
+                    Cancel
+                  </Button>
+                  
+                  <Button
+                    onClick={handleScanSubmit}
+                    className="flex-1 h-12 transition-all duration-200 font-bold bg-blue-600 hover:bg-blue-700 text-white"
+                    disabled={!scanInput || scanInput.trim().length === 0}
+                  >
+                    <div className="flex items-center space-x-2">
+                      <Icon name="Search" size={16} />
+                      <span>Find Package</span>
+                    </div>
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
     </div>
   );
 }

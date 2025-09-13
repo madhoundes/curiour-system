@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
+  FlatList,
   ScrollView,
   TouchableOpacity,
   Alert,
@@ -11,62 +12,97 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
+import RNRestart from 'react-native-restart';
+
+// Type definitions
+interface Delivery {
+  id: string;
+  trackingNumber: string;
+  customerName: string;
+  address: string;
+  timeWindow: string;
+  estimatedTime: string;
+  status: 'ready_for_pickup' | 'in_transit' | 'assigned' | 'delivered';
+  packageType: string;
+  weight: string;
+  specialInstructions: string;
+  priority: 'high' | 'medium' | 'low';
+}
+
+interface DeliveryCardProps {
+  delivery: Delivery;
+  activeDeliveryId: string | null;
+  onScanPackage: (deliveryId: string) => void;
+  onStartRoute: (deliveryId: string) => void;
+  onMarkDelivered: (deliveryId: string) => void;
+  getStatusColor: (status: string) => string;
+  getStatusText: (status: string) => string;
+  getPriorityColor: (priority: string) => string;
+}
+
+// Generate 25 remaining deliveries with diverse data
+const generateMockDeliveries = (): Delivery[] => {
+  const customers = [
+    "Sarah Johnson", "Mike Chen", "Lisa Brown", "David Wilson", "Emma Davis",
+    "James Smith", "Maria Garcia", "Robert Johnson", "Jennifer Lee", "Michael Brown",
+    "Ashley Williams", "Christopher Jones", "Jessica Miller", "Matthew Davis", "Amanda Wilson",
+    "Joshua Moore", "Stephanie Taylor", "Andrew Anderson", "Nicole Thomas", "Daniel Jackson",
+    "Rachel White", "Kevin Harris", "Michelle Martin", "Ryan Thompson", "Laura Garcia"
+  ];
+
+  const addresses = [
+    "123 Main Street, Downtown", "456 Oak Avenue, Suburbs", "789 Pine Road, Uptown",
+    "321 Elm Street, Midtown", "654 Maple Drive, Westside", "987 Cedar Lane, Eastside",
+    "147 Birch Street, Northside", "258 Spruce Avenue, Southside", "369 Willow Way, Central",
+    "741 Poplar Place, Riverside", "852 Ash Boulevard, Hillside", "963 Hickory Heights, Valley",
+    "159 Sycamore Square, Plaza", "357 Chestnut Circle, Gardens", "468 Walnut Walk, Park",
+    "579 Cherry Court, Manor", "680 Apple Avenue, Estate", "791 Orange Orchard, Grove",
+    "802 Lemon Lane, Terrace", "913 Grape Grove, Vineyard", "024 Berry Boulevard, Farm",
+    "135 Peach Place, Ranch", "246 Plum Parkway, Meadow", "357 Pear Plaza, Field",
+    "468 Banana Boulevard, Garden"
+  ];
+
+  const packageTypes = ["Standard", "Fragile", "Documents", "Electronics", "Clothing", "Books", "Food"];
+  const priorities: ('high' | 'medium' | 'low')[] = ["high", "medium", "low"];
+  const statuses: ('ready_for_pickup' | 'in_transit' | 'assigned')[] = ["ready_for_pickup", "in_transit", "assigned"];
+  const specialInstructions = [
+    "Call upon arrival", "Handle with care - electronics", "Signature required", "Leave at door",
+    "Ring doorbell twice", "Call before delivery", "Leave with neighbor", "No signature required",
+    "Fragile - handle carefully", "Deliver to back door", "Call upon arrival - elderly resident",
+    "Leave in mailbox", "Deliver to front desk", "Call if no answer", "Special handling required"
+  ];
+
+  return Array.from({ length: 25 }, (_, index) => {
+    const customerIndex = index % customers.length;
+    const addressIndex = index % addresses.length;
+    const packageType = packageTypes[index % packageTypes.length];
+    const priority = priorities[index % priorities.length];
+    const status = statuses[index % statuses.length];
+    const specialInstruction = specialInstructions[index % specialInstructions.length];
+    
+    const hour = 8 + (index % 12); // 8 AM to 7 PM
+    const minute = (index * 15) % 60; // 15-minute intervals
+    const timeWindow = `${hour}:${minute.toString().padStart(2, '0')} PM - ${hour + 2}:${minute.toString().padStart(2, '0')} PM`;
+    const estimatedTime = `${hour + 1}:${(minute + 15).toString().padStart(2, '0')} PM`;
+    
+    return {
+      id: `PCG-DEL-${(index + 1).toString().padStart(3, '0')}`,
+      trackingNumber: `PCG789123${(456 + index).toString().padStart(3, '0')}`,
+      customerName: customers[customerIndex],
+      address: addresses[addressIndex],
+      timeWindow,
+      estimatedTime,
+      status,
+      packageType,
+      weight: `${(0.5 + (index * 0.3) % 5).toFixed(1)} kg`,
+      specialInstructions: specialInstruction,
+      priority
+    };
+  });
+};
 
 // Mock data for deliveries
-const mockDeliveries = [
-  {
-    id: "PCG-DEL-001",
-    trackingNumber: "PCG789123456",
-    customerName: "Sarah Johnson",
-    address: "123 Main Street, Downtown",
-    timeWindow: "2:00 PM - 4:00 PM",
-    estimatedTime: "2:30 PM",
-    status: "ready_for_pickup",
-    packageType: "Standard",
-    weight: "2.5 kg",
-    specialInstructions: "Call upon arrival",
-    priority: "high"
-  },
-  {
-    id: "PCG-DEL-002",
-    trackingNumber: "PCG789123457",
-    customerName: "Mike Chen",
-    address: "456 Oak Avenue, Suburbs",
-    timeWindow: "3:00 PM - 5:00 PM",
-    estimatedTime: "3:15 PM",
-    status: "in_transit",
-    packageType: "Fragile",
-    weight: "1.2 kg",
-    specialInstructions: "Handle with care - electronics",
-    priority: "medium"
-  },
-  {
-    id: "PCG-DEL-003",
-    trackingNumber: "PCG789123458",
-    customerName: "Lisa Brown",
-    address: "789 Pine Road, Uptown",
-    timeWindow: "4:00 PM - 6:00 PM",
-    estimatedTime: "4:45 PM",
-    status: "assigned",
-    packageType: "Documents",
-    weight: "0.3 kg",
-    specialInstructions: "Signature required",
-    priority: "low"
-  },
-  {
-    id: "PCG-DEL-004",
-    trackingNumber: "PCG789123459",
-    customerName: "David Wilson",
-    address: "321 Elm Street, Midtown",
-    timeWindow: "5:00 PM - 7:00 PM",
-    estimatedTime: "5:30 PM",
-    status: "delivered",
-    packageType: "Standard",
-    weight: "1.8 kg",
-    specialInstructions: "Leave at door",
-    priority: "medium"
-  }
-];
+const mockDeliveries = generateMockDeliveries();
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -111,52 +147,326 @@ const getPriorityColor = (priority: string) => {
   }
 };
 
+// Memoized delivery card component for performance
+const DeliveryCard = React.memo(({ delivery, activeDeliveryId, onScanPackage, onStartRoute, onMarkDelivered, getStatusColor, getStatusText, getPriorityColor }: DeliveryCardProps) => {
+  const isActive = delivery.id === activeDeliveryId;
+  const isDelivered = delivery.status === 'delivered';
+
+  return (
+    <View style={[
+      styles.deliveryCard,
+      (!isDelivered && !isActive) ? { opacity: 0.6 } : null
+    ]}>
+      <View style={styles.deliveryHeader}>
+        <View style={styles.deliveryInfo}>
+          <Text style={styles.deliveryCustomer}>{delivery.customerName}</Text>
+          <Text style={styles.trackingNumber}>{delivery.trackingNumber}</Text>
+          <View style={styles.deliveryBadges}>
+            <View style={[
+              styles.statusBadge,
+              { backgroundColor: getStatusColor(delivery.status) },
+              isDelivered && styles.statusBadgeDelivered
+            ]}>
+              <View style={styles.statusBadgeContent}>
+                {isDelivered && (
+                  <Ionicons name="checkmark-circle" size={14} color="white" style={{ marginRight: 4 }} />
+                )}
+                <Text style={[
+                  styles.statusBadgeText,
+                  isDelivered && styles.statusBadgeTextDelivered
+                ]}>
+                  {getStatusText(delivery.status)}
+                </Text>
+              </View>
+            </View>
+            <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(delivery.priority) }]}>
+              <Text style={styles.priorityBadgeText}>{delivery.priority}</Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.deliveryStatusIndicator}>
+          <View style={[styles.statusDot, { backgroundColor: getStatusColor(delivery.status) }]} />
+        </View>
+      </View>
+      
+      <View style={styles.deliveryDetails}>
+        <View style={styles.deliveryDetailRow}>
+          <Ionicons name="location-outline" size={16} color="#6b7280" />
+          <Text style={styles.deliveryDetailText}>{delivery.address}</Text>
+        </View>
+        <View style={styles.deliveryDetailRow}>
+          <Ionicons name="time-outline" size={16} color="#6b7280" />
+          <Text style={styles.deliveryDetailText}>
+            {delivery.timeWindow} (Est: {delivery.estimatedTime})
+          </Text>
+        </View>
+        <View style={styles.deliveryMeta}>
+          <View style={styles.deliveryMetaItem}>
+            <Ionicons name="cube-outline" size={12} color="#6b7280" />
+            <Text style={styles.deliveryMetaText}>{delivery.packageType}</Text>
+          </View>
+          <View style={styles.deliveryMetaItem}>
+            <Ionicons name="scale-outline" size={12} color="#6b7280" />
+            <Text style={styles.deliveryMetaText}>{delivery.weight}</Text>
+          </View>
+        </View>
+      </View>
+
+      {delivery.specialInstructions && (
+        <View style={styles.specialInstructions}>
+          <Ionicons name="information-circle-outline" size={12} color="#3b82f6" />
+          <Text style={styles.specialInstructionsText}>
+            <Text style={styles.specialInstructionsLabel}>Special Instructions: </Text>
+            {delivery.specialInstructions}
+          </Text>
+        </View>
+      )}
+
+      <View style={styles.deliveryActions}>
+        {isDelivered ? (
+          <View style={styles.deliveredStatus}>
+            <View style={styles.deliveredIconContainer}>
+              <Ionicons name="checkmark-circle" size={24} color="#059669" />
+            </View>
+            <View style={styles.deliveredTextContainer}>
+              <Text style={styles.deliveredTextMain}>✓ DELIVERED</Text>
+              <Text style={styles.deliveredTextSub}>Successfully completed</Text>
+            </View>
+          </View>
+        ) : (
+          <>
+            <TouchableOpacity
+              style={[
+                styles.deliveryActionButton,
+                isActive ? undefined : styles.deliveryActionButtonDisabled
+              ]}
+              onPress={() => onScanPackage(delivery.id)}
+              activeOpacity={0.7}
+              disabled={!isActive}
+            >
+              <Ionicons name="camera-outline" size={16} color={isActive ? '#3b82f6' : '#9ca3af'} />
+              <Text style={[
+                styles.deliveryActionButtonText,
+                !isActive ? { color: '#9ca3af' } : null
+              ]}>Scan Package</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.deliveryActionButton,
+                isActive ? styles.deliveryActionButtonPrimary : styles.deliveryActionButtonDisabled
+              ]}
+              onPress={() => onStartRoute(delivery.id)}
+              activeOpacity={0.8}
+              disabled={!isActive}
+            >
+              <Ionicons name="map-outline" size={16} color={isActive ? 'white' : '#9ca3af'} />
+              <Text style={[
+                styles.deliveryActionButtonText,
+                isActive ? { color: 'white' } : { color: '#9ca3af' }
+              ]}>Start Route</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.deliveryActionButton,
+                isActive ? styles.deliveryActionButtonSuccess : styles.deliveryActionButtonDisabled
+              ]}
+              onPress={() => onMarkDelivered(delivery.id)}
+              activeOpacity={0.8}
+              disabled={!isActive}
+            >
+              <Ionicons name="checkmark-circle-outline" size={16} color={isActive ? 'white' : '#9ca3af'} />
+              <Text style={[
+                styles.deliveryActionButtonText,
+                isActive ? { color: 'white' } : { color: '#9ca3af' }
+              ]}>Mark as Delivered</Text>
+            </TouchableOpacity>
+          </>
+        )}
+      </View>
+    </View>
+  );
+});
+
 export default function DeliveriesScreen() {
   const [selectedFilter, setSelectedFilter] = useState('all');
+  const [deliveries, setDeliveries] = useState(() => [...mockDeliveries]);
+  const priorityOrder: Record<string, number> = { high: 3, medium: 2, low: 1 };
+  
+  // Calculate counts based on current deliveries state
+  const completed = useMemo(() => deliveries.filter(d => d.status === 'delivered').length, [deliveries]);
+  const remaining = useMemo(() => deliveries.filter(d => d.status !== 'delivered').length, [deliveries]);
+  
+  const activeDeliveryId = useMemo(() => {
+    const pending = deliveries.filter(d => d.status !== 'delivered');
+    if (pending.length === 0) return null;
+    const next = [...pending].sort((a, b) => priorityOrder[b.priority] - priorityOrder[a.priority])[0];
+    return next.id;
+  }, [deliveries]);
+  
+  const sortedDeliveries = useMemo(() => {
+    const list = [...deliveries].sort((a, b) => {
+      const aDelivered = a.status === 'delivered' ? 1 : 0;
+      const bDelivered = b.status === 'delivered' ? 1 : 0;
+      if (aDelivered !== bDelivered) return aDelivered - bDelivered; // delivered last
+      return priorityOrder[b.priority] - priorityOrder[a.priority];
+    });
+    if (activeDeliveryId) {
+      const idx = list.findIndex(d => d.id === activeDeliveryId);
+      if (idx > 0) {
+        const [active] = list.splice(idx, 1);
+        list.unshift(active);
+      }
+    }
+    return list;
+  }, [deliveries, activeDeliveryId]);
 
-  const handleHapticFeedback = () => {
+  const handleHapticFeedback = useCallback(() => {
     if (Platform.OS === 'ios') {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
-  };
+  }, []);
 
-  const handleScanPackage = (deliveryId: string) => {
+  const handleScanPackage = useCallback((deliveryId: string) => {
     handleHapticFeedback();
     Alert.alert("Scan Package", `Scanning package for delivery ${deliveryId}`);
-  };
+  }, [handleHapticFeedback]);
 
-  const handleStartRoute = (deliveryId: string) => {
+  const handleStartRoute = useCallback((deliveryId: string) => {
     handleHapticFeedback();
     Alert.alert("Start Route", `Starting route for delivery ${deliveryId}`);
-  };
+  }, [handleHapticFeedback]);
 
-  const handleMarkDelivered = (deliveryId: string) => {
+  const handleMarkDelivered = useCallback((deliveryId: string) => {
     handleHapticFeedback();
-    Alert.alert("Mark Delivered", `Marking delivery ${deliveryId} as delivered`);
-  };
+    setDeliveries(prev => prev.map(d => d.id === deliveryId ? { ...d, status: 'delivered' } : d));
+    Alert.alert("Delivered", `Delivery ${deliveryId} marked as delivered.`);
+  }, [handleHapticFeedback]);
 
-  const filteredDeliveries = mockDeliveries.filter(delivery => {
-    if (selectedFilter === 'all') return true;
-    return delivery.status === selectedFilter;
-  });
+  const handleReloadApp = useCallback(() => {
+    handleHapticFeedback();
+    Alert.alert(
+      "Reload App",
+      "This will restart the app to refresh all data and clear caches. Continue?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Reload", 
+          style: "destructive",
+          onPress: () => {
+            try {
+              RNRestart.restart();
+            } catch (error) {
+              console.error('Failed to restart app:', error);
+              Alert.alert("Error", "Failed to restart app. Please restart manually.");
+            }
+          }
+        }
+      ]
+    );
+  }, [handleHapticFeedback]);
 
-  const filterOptions = [
-    { key: 'all', label: 'All', count: mockDeliveries.length },
-    { key: 'ready_for_pickup', label: 'Ready', count: mockDeliveries.filter(d => d.status === 'ready_for_pickup').length },
-    { key: 'in_transit', label: 'In Transit', count: mockDeliveries.filter(d => d.status === 'in_transit').length },
-    { key: 'delivered', label: 'Delivered', count: mockDeliveries.filter(d => d.status === 'delivered').length },
-  ];
+  const handleClearCache = useCallback(() => {
+    handleHapticFeedback();
+    Alert.alert(
+      "Clear Cache",
+      "This will clear all caches and reload the app. This may take a moment. Continue?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Clear & Reload", 
+          style: "destructive",
+          onPress: () => {
+            // Clear app state
+            setDeliveries(() => [...mockDeliveries]);
+            setSelectedFilter('all');
+            
+            // Show loading message
+            Alert.alert(
+              "Cache Cleared", 
+              "App cache has been cleared. The app will now reload with fresh data.",
+              [
+                {
+                  text: "OK",
+                  onPress: () => {
+                    try {
+                      RNRestart.restart();
+                    } catch (error) {
+                      console.error('Failed to restart app:', error);
+                      Alert.alert("Error", "Cache cleared but failed to restart. Please restart manually.");
+                    }
+                  }
+                }
+              ]
+            );
+          }
+        }
+      ]
+    );
+  }, [handleHapticFeedback]);
+
+  const filteredDeliveries = useMemo(() => {
+    return sortedDeliveries.filter(delivery => {
+      if (selectedFilter === 'all') return true;
+      return delivery.status === selectedFilter;
+    });
+  }, [sortedDeliveries, selectedFilter]);
+
+  const filterOptions = useMemo(() => [
+    { key: 'all', label: 'All', count: deliveries.length },
+    { key: 'ready_for_pickup', label: 'Ready', count: deliveries.filter(d => d.status === 'ready_for_pickup').length },
+    { key: 'in_transit', label: 'In Transit', count: deliveries.filter(d => d.status === 'in_transit').length },
+    { key: 'assigned', label: 'Assigned', count: deliveries.filter(d => d.status === 'assigned').length },
+    { key: 'delivered', label: 'Delivered', count: deliveries.filter(d => d.status === 'delivered').length },
+  ], [deliveries]);
+
+  // Optimized renderItem function
+  const renderItem = useCallback(({ item }: { item: Delivery }) => (
+    <DeliveryCard
+      delivery={item}
+      activeDeliveryId={activeDeliveryId}
+      onScanPackage={handleScanPackage}
+      onStartRoute={handleStartRoute}
+      onMarkDelivered={handleMarkDelivered}
+      getStatusColor={getStatusColor}
+      getStatusText={getStatusText}
+      getPriorityColor={getPriorityColor}
+    />
+  ), [activeDeliveryId, handleScanPackage, handleStartRoute, handleMarkDelivered]);
+
+  const keyExtractor = useCallback((item: Delivery) => item.id, []);
+
+  // Get item layout for performance optimization
+  const getItemLayout = useCallback((data: ArrayLike<Delivery> | null | undefined, index: number) => ({
+    length: 200, // Approximate height of each delivery card
+    offset: 200 * index,
+    index,
+  }), []);
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView 
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Header */}
-        <View style={styles.header}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
           <Text style={styles.headerTitle}>Today's Deliveries</Text>
+          <View style={styles.headerBadge}>
+            <Text style={styles.headerBadgeText}>{remaining} remaining</Text>
+          </View>
+        </View>
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={[styles.headerButton, styles.headerButtonSecondary]}
+            onPress={handleReloadApp}
+          >
+            <Ionicons name="refresh-outline" size={18} color="#6b7280" />
+            <Text style={[styles.headerButtonText, styles.headerButtonTextSecondary]}>Reload</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.headerButton, styles.headerButtonSecondary]}
+            onPress={handleClearCache}
+          >
+            <Ionicons name="trash-outline" size={18} color="#ef4444" />
+            <Text style={[styles.headerButtonText, styles.headerButtonTextDanger]}>Clear</Text>
+          </TouchableOpacity>
           <TouchableOpacity 
             style={styles.headerButton}
             onPress={() => {
@@ -168,160 +478,64 @@ export default function DeliveriesScreen() {
             <Text style={styles.headerButtonText}>Route</Text>
           </TouchableOpacity>
         </View>
+      </View>
 
-        {/* Filter Tabs */}
-        <View style={styles.filterContainer}>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterScrollContent}
-          >
-            {filterOptions.map((filter) => (
-              <TouchableOpacity
-                key={filter.key}
-                style={[
-                  styles.filterTab,
-                  selectedFilter === filter.key && styles.filterTabActive
-                ]}
-                onPress={() => {
-                  handleHapticFeedback();
-                  setSelectedFilter(filter.key);
-                }}
-                activeOpacity={0.7}
-              >
+      {/* Filter Tabs */}
+      <View style={styles.filterContainer}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScrollContent}
+        >
+          {filterOptions.map((filter) => (
+            <TouchableOpacity
+              key={filter.key}
+              style={[
+                styles.filterTab,
+                selectedFilter === filter.key && styles.filterTabActive
+              ]}
+              onPress={() => {
+                handleHapticFeedback();
+                setSelectedFilter(filter.key);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={[
+                styles.filterTabText,
+                selectedFilter === filter.key && styles.filterTabTextActive
+              ]}>
+                {filter.label}
+              </Text>
+              <View style={[
+                styles.filterBadge,
+                selectedFilter === filter.key && styles.filterBadgeActive
+              ]}>
                 <Text style={[
-                  styles.filterTabText,
-                  selectedFilter === filter.key && styles.filterTabTextActive
+                  styles.filterBadgeText,
+                  selectedFilter === filter.key && styles.filterBadgeTextActive
                 ]}>
-                  {filter.label}
+                  {filter.count}
                 </Text>
-                <View style={[
-                  styles.filterBadge,
-                  selectedFilter === filter.key && styles.filterBadgeActive
-                ]}>
-                  <Text style={[
-                    styles.filterBadgeText,
-                    selectedFilter === filter.key && styles.filterBadgeTextActive
-                  ]}>
-                    {filter.count}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Deliveries List */}
-        <View style={styles.deliveriesContainer}>
-          {filteredDeliveries.map((delivery) => (
-            <View key={delivery.id} style={styles.deliveryCard}>
-              <View style={styles.deliveryHeader}>
-                <View style={styles.deliveryInfo}>
-                  <Text style={styles.deliveryCustomer}>{delivery.customerName}</Text>
-                  <Text style={styles.trackingNumber}>{delivery.trackingNumber}</Text>
-                  <View style={styles.deliveryBadges}>
-                    <View style={[styles.statusBadge, { backgroundColor: getStatusColor(delivery.status) }]}>
-                      <Text style={styles.statusBadgeText}>{getStatusText(delivery.status)}</Text>
-                    </View>
-                    <View style={[styles.priorityBadge, { backgroundColor: getPriorityColor(delivery.priority) }]}>
-                      <Text style={styles.priorityBadgeText}>{delivery.priority}</Text>
-                    </View>
-                  </View>
-                </View>
-                <View style={styles.deliveryStatusIndicator}>
-                  <View style={[styles.statusDot, { backgroundColor: getStatusColor(delivery.status) }]} />
-                </View>
               </View>
-              
-              <View style={styles.deliveryDetails}>
-                <View style={styles.deliveryDetailRow}>
-                  <Ionicons name="location-outline" size={16} color="#6b7280" />
-                  <Text style={styles.deliveryDetailText}>{delivery.address}</Text>
-                </View>
-                <View style={styles.deliveryDetailRow}>
-                  <Ionicons name="time-outline" size={16} color="#6b7280" />
-                  <Text style={styles.deliveryDetailText}>
-                    {delivery.timeWindow} (Est: {delivery.estimatedTime})
-                  </Text>
-                </View>
-                <View style={styles.deliveryMeta}>
-                  <View style={styles.deliveryMetaItem}>
-                    <Ionicons name="cube-outline" size={12} color="#6b7280" />
-                    <Text style={styles.deliveryMetaText}>{delivery.packageType}</Text>
-                  </View>
-                  <View style={styles.deliveryMetaItem}>
-                    <Ionicons name="scale-outline" size={12} color="#6b7280" />
-                    <Text style={styles.deliveryMetaText}>{delivery.weight}</Text>
-                  </View>
-                </View>
-              </View>
-
-              {delivery.specialInstructions && (
-                <View style={styles.specialInstructions}>
-                  <Ionicons name="information-circle-outline" size={12} color="#3b82f6" />
-                  <Text style={styles.specialInstructionsText}>
-                    <Text style={styles.specialInstructionsLabel}>Special Instructions: </Text>
-                    {delivery.specialInstructions}
-                  </Text>
-                </View>
-              )}
-
-              <View style={styles.deliveryActions}>
-                {delivery.status === "ready_for_pickup" && (
-                  <>
-                    <TouchableOpacity
-                      style={styles.deliveryActionButton}
-                      onPress={() => handleScanPackage(delivery.id)}
-                      activeOpacity={0.7}
-                    >
-                      <Ionicons name="camera-outline" size={16} color="#3b82f6" />
-                      <Text style={styles.deliveryActionButtonText}>Scan Package</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={[styles.deliveryActionButton, styles.deliveryActionButtonPrimary]}
-                      onPress={() => handleStartRoute(delivery.id)}
-                      activeOpacity={0.8}
-                    >
-                      <Ionicons name="map-outline" size={16} color="white" />
-                      <Text style={[styles.deliveryActionButtonText, { color: 'white' }]}>Start Route</Text>
-                    </TouchableOpacity>
-                  </>
-                )}
-                
-                {delivery.status === "in_transit" && (
-                  <TouchableOpacity
-                    style={[styles.deliveryActionButton, styles.deliveryActionButtonSuccess]}
-                    onPress={() => handleMarkDelivered(delivery.id)}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons name="checkmark-circle-outline" size={16} color="white" />
-                    <Text style={[styles.deliveryActionButtonText, { color: 'white' }]}>Mark as Delivered</Text>
-                  </TouchableOpacity>
-                )}
-                
-                {delivery.status === "assigned" && (
-                  <TouchableOpacity
-                    style={[styles.deliveryActionButton, styles.deliveryActionButtonDisabled]}
-                    disabled
-                  >
-                    <Ionicons name="time-outline" size={16} color="#9ca3af" />
-                    <Text style={[styles.deliveryActionButtonText, { color: '#9ca3af' }]}>Waiting for Pickup</Text>
-                  </TouchableOpacity>
-                )}
-
-                {delivery.status === "delivered" && (
-                  <View style={styles.deliveredStatus}>
-                    <Ionicons name="checkmark-circle" size={20} color="#10b981" />
-                    <Text style={styles.deliveredText}>Delivered Successfully</Text>
-                  </View>
-                )}
-              </View>
-            </View>
+            </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
+      </View>
 
-        {/* Empty State */}
-        {filteredDeliveries.length === 0 && (
+      {/* Deliveries List */}
+      <FlatList
+        data={filteredDeliveries}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        getItemLayout={getItemLayout}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.deliveriesContainer}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={10}
+        updateCellsBatchingPeriod={50}
+        initialNumToRender={10}
+        windowSize={21}
+        ListEmptyComponent={() => (
           <View style={styles.emptyState}>
             <Ionicons name="cube-outline" size={64} color="#d1d5db" />
             <Text style={styles.emptyStateTitle}>No deliveries found</Text>
@@ -333,7 +547,7 @@ export default function DeliveriesScreen() {
             </Text>
           </View>
         )}
-      </ScrollView>
+      />
     </SafeAreaView>
   );
 }
@@ -359,10 +573,32 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
   },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
   headerTitle: {
     fontSize: 20,
     fontWeight: '600',
     color: '#1f2937',
+    marginRight: 12,
+  },
+  headerBadge: {
+    backgroundColor: '#3b82f6',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  headerBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   headerButton: {
     flexDirection: 'row',
@@ -372,11 +608,24 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 8,
   },
+  headerButtonSecondary: {
+    backgroundColor: '#f3f4f6',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
   headerButtonText: {
     fontSize: 14,
     fontWeight: '500',
     color: '#3b82f6',
     marginLeft: 4,
+  },
+  headerButtonTextSecondary: {
+    color: '#6b7280',
+    fontSize: 12,
+  },
+  headerButtonTextDanger: {
+    color: '#ef4444',
+    fontSize: 12,
   },
   filterContainer: {
     backgroundColor: 'white',
@@ -427,6 +676,7 @@ const styles = StyleSheet.create({
   },
   deliveriesContainer: {
     padding: 20,
+    paddingBottom: 40,
   },
   deliveryCard: {
     backgroundColor: 'white',
@@ -468,10 +718,31 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 6,
   },
+  statusBadgeDelivered: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+    borderWidth: 1,
+    borderColor: '#059669',
+  },
+  statusBadgeContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   statusBadgeText: {
     color: 'white',
     fontSize: 12,
     fontWeight: '500',
+  },
+  statusBadgeTextDelivered: {
+    fontSize: 13,
+    fontWeight: '700',
+    letterSpacing: 0.5,
   },
   priorityBadge: {
     paddingHorizontal: 8,
@@ -574,15 +845,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 8,
-    backgroundColor: '#dcfce7',
-    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    backgroundColor: '#ecfdf5',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#10b981',
+    shadowColor: '#10b981',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 5,
   },
-  deliveredText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#10b981',
-    marginLeft: 4,
+  deliveredIconContainer: {
+    marginRight: 8,
+    backgroundColor: '#10b981',
+    borderRadius: 16,
+    padding: 4,
+  },
+  deliveredTextContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+  deliveredTextMain: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: '#059669',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+  },
+  deliveredTextSub: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#047857',
+    marginTop: 2,
   },
   emptyState: {
     alignItems: 'center',
