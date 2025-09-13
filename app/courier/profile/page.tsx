@@ -596,7 +596,7 @@ export default function CourierProfilePage() {
     });
 
     const getFrameClassName = () => {
-      let baseClasses = "relative w-32 h-32 rounded-lg border-2 transition-all duration-200 flex items-center justify-center";
+      const baseClasses = "relative w-32 h-32 rounded-lg border-2 transition-all duration-200 flex items-center justify-center";
 
       if (disabled) {
         return `${baseClasses} border-gray-200 bg-gray-50 cursor-not-allowed opacity-60`;
@@ -693,7 +693,7 @@ export default function CourierProfilePage() {
     });
 
     const getDropzoneClassName = () => {
-      let baseClasses = "mt-4 h-40 rounded-lg border-2 border-dashed transition-all duration-200 flex flex-col items-center justify-center";
+      const baseClasses = "mt-4 h-40 rounded-lg border-2 border-dashed transition-all duration-200 flex flex-col items-center justify-center";
 
       if (disabled) {
         return `${baseClasses} border-gray-200 bg-gray-50 cursor-not-allowed opacity-60`;
