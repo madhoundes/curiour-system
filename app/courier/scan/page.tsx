@@ -46,6 +46,11 @@ export default function CourierScanPackagePage() {
   const [scanError, setScanError] = useState("");
   const [scannerInstance, setScannerInstance] = useState<unknown>(null);
   const [isMobile, setIsMobile] = useState(false);
+  
+  // Development testing states
+  const [isDevModeBypass, setIsDevModeBypass] = useState(false);
+  const [scanSuccess, setScanSuccess] = useState(false);
+  const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
 
   // Check if device is mobile
   useEffect(() => {
@@ -102,6 +107,18 @@ export default function CourierScanPackagePage() {
       stopCamera();
     }
     router.push('/courier');
+  };
+
+  // Development bypass function
+  const handleDevBypassScan = () => {
+    setScanError("");
+    setIsDevModeBypass(true);
+    
+    // Simulate immediate successful scan
+    const mockTrackingNumber = "PCG-2025-DEV-TEST";
+    handleScanSuccess(mockTrackingNumber);
+    
+    console.log("🧪 Development bypass: Simulated successful scan");
   };
 
   const handleStartScan = async () => {
@@ -213,6 +230,30 @@ export default function CourierScanPackagePage() {
     setIsCameraActive(false);
     setIsScanning(false);
   }, [scannerInstance]);
+
+  // Development testing function to simulate successful scan from within modal
+  const handleTestScanSuccess = () => {
+    setScanError("");
+    setScanSuccess(true);
+    setShowSuccessOverlay(true);
+    
+    // Simulate successful scan with visual feedback
+    const mockTrackingNumber = "PCG-2025-TEST-SUCCESS";
+    
+    // Provide haptic feedback on mobile devices
+    if (isMobile && 'vibrate' in navigator) {
+      navigator.vibrate([200, 100, 200]); // Success pattern
+    }
+    
+    // Show success overlay for a moment, then proceed
+    setTimeout(() => {
+      handleScanSuccess(mockTrackingNumber);
+      setScanSuccess(false);
+      setShowSuccessOverlay(false);
+    }, 1500);
+    
+    console.log("🧪 Test scan success triggered from modal");
+  };
 
   const handleScanSuccess = (trackingNumber: string) => {
     // Stop camera immediately after successful scan
@@ -334,13 +375,26 @@ export default function CourierScanPackagePage() {
           <CardContent>
             <div className="relative bg-black rounded-lg overflow-hidden mb-4" id="parcego-scan-viewfinder">
               {isCameraActive ? (
-                <div className="parcego-scan__viewfinder parcego-scan__viewfinder--active">
+                <div className="parcego-scan__viewfinder parcego-scan__viewfinder--active relative">
                   {/* Scanner container - HTML5 QR Code will render here */}
                   <div 
                     id="scanner-container" 
                     ref={scannerContainerRef}
                     className="w-full h-48"
                   />
+                  
+                  {/* Success Overlay for Testing */}
+                  {showSuccessOverlay && (
+                    <div className="absolute inset-0 bg-green-500/80 flex items-center justify-center z-10 animate-in fade-in duration-300">
+                      <div className="text-center text-white">
+                        <div className="bg-white/20 rounded-full p-3 mb-3 mx-auto w-16 h-16 flex items-center justify-center">
+                          <Icon name="CheckCircle" size={32} className="text-white" />
+                        </div>
+                        <p className="text-lg font-semibold">Barcode Verified Successfully</p>
+                        <p className="text-sm opacity-90">Processing scan result...</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="parcego-scan__viewfinder parcego-scan__viewfinder--inactive h-48 flex items-center justify-center bg-gray-800">
@@ -381,34 +435,66 @@ export default function CourierScanPackagePage() {
 
             <div className="flex space-x-2">
               {!isCameraActive ? (
-                <Button
-                  className="flex-1 h-12 parcego-scan__btn--start"
-                  onClick={handleStartScan}
-                  disabled={isScanning}
-                  id="parcego-scan-start-btn"
-                >
-                  {isScanning ? (
-                    <>
-                      <Icon name="Loader2" size={20} className="mr-2 animate-spin" />
-                      {isMobile ? "Initializing Camera..." : "Starting Camera..."}
-                    </>
-                  ) : (
-                    <>
-                      <Icon name="Camera" size={20} className="mr-2" />
-                      Start Scan
-                    </>
+                <>
+                  <Button
+                    className="flex-1 h-12 parcego-scan__btn--start"
+                    onClick={handleStartScan}
+                    disabled={isScanning}
+                    id="parcego-scan-start-btn"
+                  >
+                    {isScanning ? (
+                      <>
+                        <Icon name="Loader2" size={20} className="mr-2 animate-spin" />
+                        {isMobile ? "Initializing Camera..." : "Starting Camera..."}
+                      </>
+                    ) : (
+                      <>
+                        <Icon name="Camera" size={20} className="mr-2" />
+                        Start Scan
+                      </>
+                    )}
+                  </Button>
+                  {/* Development Testing Button */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <Button
+                      variant="outline"
+                      className="h-12 px-4 parcego-scan__btn--dev-bypass border-orange-300 hover:bg-orange-50"
+                      onClick={handleDevBypassScan}
+                      disabled={isScanning}
+                      id="parcego-scan-dev-bypass-btn"
+                      title="Development: Bypass modal and simulate successful scan"
+                    >
+                      <Icon name="Zap" size={16} />
+                      <span className="sr-only">Dev Bypass</span>
+                    </Button>
                   )}
-                </Button>
+                </>
               ) : (
-                <Button
-                  variant="destructive"
-                  className="flex-1 h-12 parcego-scan__btn--stop"
-                  onClick={stopCamera}
-                  id="parcego-scan-stop-btn"
-                >
-                  <Icon name="Square" size={20} className="mr-2" />
-                  Stop Scan
-                </Button>
+                <>
+                  <Button
+                    variant="destructive"
+                    className="flex-1 h-12 parcego-scan__btn--stop"
+                    onClick={stopCamera}
+                    id="parcego-scan-stop-btn"
+                  >
+                    <Icon name="Square" size={20} className="mr-2" />
+                    Stop Scan
+                  </Button>
+                  {/* Development Testing Button within Modal */}
+                  {process.env.NODE_ENV === 'development' && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      className="h-12 px-3 parcego-scan__btn--test-success bg-green-100 hover:bg-green-200 text-green-700 border-green-300"
+                      onClick={handleTestScanSuccess}
+                      id="parcego-scan-test-success-btn"
+                      title="Development: Simulate successful scan with visual feedback"
+                    >
+                      <Icon name="RefreshCw" size={14} className="mr-1" />
+                      Test
+                    </Button>
+                  )}
+                </>
               )}
             </div>
           </CardContent>
@@ -686,6 +772,32 @@ export default function CourierScanPackagePage() {
           </div>
         )}
 
+        {/* Development Testing Instructions */}
+        {process.env.NODE_ENV === 'development' && (
+          <Card className="border-purple-200 bg-purple-50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-purple-800 flex items-center">
+                <Icon name="TestTube" size={16} className="mr-2" />
+                Development Testing Mode
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="text-xs text-purple-700 space-y-2">
+              <div className="space-y-1">
+                <p className="font-medium">Testing Options:</p>
+                <ul className="list-disc list-inside space-y-1 ml-2">
+                  <li><span className="font-medium">⚡ Bypass Button:</span> Skip camera modal entirely</li>
+                  <li><span className="font-medium">🔄 Test Button:</span> Simulate scan success within camera modal</li>
+                  <li><span className="font-medium">✅ Visual Feedback:</span> Green overlay + success message</li>
+                </ul>
+              </div>
+              <div className="pt-1 border-t border-purple-200">
+                <p className="font-medium text-purple-900">Navigation Flow:</p>
+                <p>Dashboard &quot;Scan Package&quot; → Routes directly to next step (bypasses modal)</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Debug Information (Development Only) */}
         {process.env.NODE_ENV === 'development' && (
           <Card className="border-orange-200 bg-orange-50">
@@ -700,6 +812,9 @@ export default function CourierScanPackagePage() {
               <p>Scanning: {isScanning ? 'Yes' : 'No'}</p>
               <p>Scanner Instance: {scannerInstance ? 'Active' : 'None'}</p>
               <p>getUserMedia Support: {typeof navigator?.mediaDevices?.getUserMedia === 'function' ? 'Available' : 'Not Available'}</p>
+              <p>Dev Bypass Mode: {isDevModeBypass ? 'Yes' : 'No'}</p>
+              <p>Scan Success: {scanSuccess ? 'Active' : 'Inactive'}</p>
+              <p>Success Overlay: {showSuccessOverlay ? 'Visible' : 'Hidden'}</p>
             </CardContent>
           </Card>
         )}

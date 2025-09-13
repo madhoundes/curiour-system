@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { PageHeader } from "@/components/ui/page-header";
+import { toast } from "sonner";
 
 // Import types and mock data from the support library
 import type { FAQCategory } from '@/lib/mock/support';
@@ -79,7 +80,7 @@ export default function SupportHelpCenter() {
     setShowContactForm(false);
     setContactForm({ name: '', email: '', subject: '', message: '', priority: 'normal' });
     // Show success message
-    alert('Thank you for your message! We\'ll get back to you within 24 hours.');
+    toast.success('Thank you for your message! We\'ll get back to you within 24 hours.');
   };
 
   return (
@@ -429,12 +430,15 @@ export default function SupportHelpCenter() {
               <Label htmlFor="priority" className="text-sm font-medium text-gray-700">Priority</Label>
               <Select
                 value={contactForm.priority}
-                onValueChange={(value) => setContactForm(prev => ({ ...prev, priority: value }))}
+                onValueChange={(value) => {
+                  console.log('Priority changed to:', value);
+                  setContactForm(prev => ({ ...prev, priority: value }));
+                }}
               >
-                <SelectTrigger>
-                  <SelectValue />
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select priority level" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="z-[10000]">
                   <SelectItem value="low">Low</SelectItem>
                   <SelectItem value="normal">Normal</SelectItem>
                   <SelectItem value="high">High</SelectItem>

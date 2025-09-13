@@ -1,12 +1,56 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/* Glass Blur Effect Variables */
+:root {
+  /* Glass effect variables for notification banners */
+  --glass-frost-blur: 8px;
+  --glass-tint-opacity: 0.1;
+  --glass-shadow-blur: 20px;
+  --glass-shadow-spread: -5px;
+  --glass-shadow-color: rgba(255, 255, 255, 0.3);
+  --glass-border-opacity: 0.6;
+  --glass-backdrop-saturate: 150%;
+}
+
+/* Enhanced glass blur effect for better visibility */
+.glass-blur-enhanced {
+  backdrop-filter: blur(var(--glass-frost-blur)) saturate(var(--glass-backdrop-saturate));
+  -webkit-backdrop-filter: blur(var(--glass-frost-blur)) saturate(var(--glass-backdrop-saturate));
+  background: rgba(255, 255, 255, var(--glass-tint-opacity));
+  box-shadow: 
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.05);
+}
+
 /* Custom utilities */
 .line-clamp-2 {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Custom scrollbar utilities */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* Internet Explorer 10+ */
+  scrollbar-width: none;  /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Safari and Chrome */
+}
+
+/* Camera flash animation */
+@keyframes flash {
+  0% { opacity: 0; }
+  50% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+.animate-flash {
+  animation: flash 0.2s ease-in-out;
 }
 
 @custom-variant dark (&:is(.dark *));
@@ -1238,6 +1282,24 @@ body {
 .dark [data-slot="button"].bg-primary,
 .dark [data-slot="button"][class*="bg-primary"] {
   font-weight: 700 !important;
+}
+
+/* Dropdown Menu Z-Index Fix */
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"] {
+  z-index: 9999 !important;
+  position: relative;
+}
+
+/* Ensure dropdown portals are rendered at the highest level */
+[data-radix-portal] {
+  z-index: 9999 !important;
+}
+
+/* Fix for unified header dropdown positioning */
+#parcego-unified-header [data-slot="dropdown-menu-content"] {
+  z-index: 10000 !important;
+  position: fixed !important;
 }
 
 /* Custom breakpoint for analytics section (1024px - 1275px) */

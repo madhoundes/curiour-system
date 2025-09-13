@@ -2,9 +2,11 @@
 
 Fast, reliable, and affordable delivery solutions for small businesses.
 
-## 🚀 Current Version: v0.3.0
+## 🚀 Current Version: v3.0.1
 
-**Status**: Frontend UI Complete - Ready for Backend Integration & Deployment
+**Status**: Complete Codebase Uploaded to GitHub - Ready for Backend Integration & Deployment
+
+**Latest Update**: January 15, 2025 - Complete project codebase successfully uploaded to GitHub repository with enhanced .gitignore and proper file organization.
 
 ## 🏗️ Technology Stack
 
@@ -129,16 +131,28 @@ npm install
 # Run development server
 npm run dev:local    # Local development (localhost:3000)
 npm run dev:lan      # Network development (0.0.0.0:3001)
+npm run dev:https    # Network development with HTTPS (camera support)
 ```
 
 ### Available Scripts
 ```bash
-npm run dev          # Standard development server
-npm run dev:local    # Local development (localhost:3000)
-npm run dev:lan      # Network development (0.0.0.0:3001)
-npm run build        # Production build
-npm run start        # Production server
-npm run lint         # Code quality check ✅
+npm run dev              # Standard development server
+npm run dev:local        # Local development (localhost:3000)
+npm run dev:lan          # Network development (0.0.0.0:3001)
+npm run dev:https        # Network development with HTTPS (camera support)
+npm run dev:https:local  # Local HTTPS development
+npm run build            # Production build
+npm run start            # Production server
+npm run lint             # Code quality check ✅
+```
+
+## 📷 Camera Access Setup
+
+For camera functionality over network LAN, HTTPS is required. See [HTTPS-SETUP.md](./HTTPS-SETUP.md) for detailed instructions.
+
+**Quick HTTPS setup:**
+```bash
+./start-https-dev.sh
 ```
 
 ## 📁 Project Structure
@@ -261,7 +275,19 @@ For technical support or questions:
 
 ## 🚀 Recent Updates
 
-### v0.3.0 (Current)
+### v3.0.1 (Latest - January 2025)
+- 🆕 **New Features**: Added comprehensive shipment tracking page with real-time status updates
+- 🎨 **UI Enhancements**: Completely redesigned merchant dashboard with improved navigation and layout
+- 🔧 **Bug Fixes**: Resolved login authentication issues and form validation errors
+- 📱 **Mobile Improvements**: Enhanced responsive design for better mobile experience
+- ⚡ **Performance**: Optimized component loading and state management
+- 🔒 **Security**: Enhanced input validation and XSS protection
+- 📊 **Analytics**: Added new analytics widgets and reporting features
+- 🎯 **UX Improvements**: Streamlined user workflows and improved accessibility
+- 📝 **Documentation**: Updated API documentation and user guides
+- 🧪 **Testing**: Added comprehensive test coverage for critical components
+
+### v0.3.0 (Previous)
 - ✅ **Code Quality**: Resolved all ESLint errors and warnings
 - ✅ **Performance**: Optimized component rendering and state management
 - ✅ **Accessibility**: Enhanced ARIA labels and keyboard navigation

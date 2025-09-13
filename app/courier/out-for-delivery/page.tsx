@@ -8,6 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Icon } from "@/components/ui/icon";
+import { NotificationBanner } from "@/components/ui/notification-banner";
 
 type StopStatus = "pending" | "en_route" | "delivered" | "failed";
 
@@ -43,6 +44,14 @@ export default function OutForDeliveryPage() {
   const [isPaused, setIsPaused] = useState(false);
   const [showToast, setShowToast] = useState<{ message: string; tone: "success" | "warning" | "neutral" } | null>(null);
   const [isOffline, setIsOffline] = useState(false);
+  
+  // Notification banner state
+  const [showNotificationBanner, setShowNotificationBanner] = useState(true);
+  const [notificationBanner, setNotificationBanner] = useState({
+    type: "info" as "info" | "success" | "warning" | "error",
+    title: "Delivery Route Active",
+    message: "You are currently on delivery route with 3 stops remaining (mock)",
+  });
 
   // Dialog states
   const [showAttemptDialog, setShowAttemptDialog] = useState(false);
@@ -134,6 +143,18 @@ export default function OutForDeliveryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50" id="parcego-ofd-container">
+      {/* Glass Blur Notification Banner */}
+      <NotificationBanner
+        id="parcego-ofd-notification-banner"
+        type={notificationBanner.type}
+        title={notificationBanner.title}
+        message={notificationBanner.message}
+        isVisible={showNotificationBanner}
+        onDismiss={() => setShowNotificationBanner(false)}
+        showDismissButton={true}
+        className="animate-in slide-in-from-top duration-500 ease-out"
+      />
+
       {/* Toast */}
       {showToast && (
         <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50" aria-live="polite">
@@ -156,7 +177,12 @@ export default function OutForDeliveryPage() {
       )}
 
       {/* Header */}
-      <div className="bg-white shadow-sm border-b px-4 py-4" id="parcego-ofd-header">
+      <div 
+        className={`bg-white shadow-sm border-b px-4 py-4 transition-all duration-300 ease-out ${
+          showNotificationBanner ? 'mt-16' : 'mt-0'
+        }`}
+        id="parcego-ofd-header"
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button id="parcego-ofd-back-btn" variant="ghost" size="icon" onClick={handleBack} aria-label="Go back" className="p-3"><Icon name="ArrowLeft" size={22} className="text-gray-700" /></Button>
@@ -320,7 +346,7 @@ export default function OutForDeliveryPage() {
       {/* Attempt Delivery Dialog (headless) */}
       {showAttemptDialog && (
         <div id="parcego-ofd-attempt-dialog" role="dialog" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setShowAttemptDialog(false)} />
+          <div className="absolute inset-0 bg-black/30" onClick={() => setShowAttemptDialog(false)} />
           <div className="relative bg-white rounded-xl shadow-lg w-full max-w-lg border p-6">
             <div className="flex items-start justify-between">
               <div>
@@ -377,20 +403,20 @@ export default function OutForDeliveryPage() {
           <div className="relative bg-white rounded-xl shadow-lg w-full max-w-md border p-6">
             <div className="flex items-start justify-between">
               <div>
-                <h2 className="text-lg font-semibold">Pre-drop Scan</h2>
-                <p className="text-sm text-muted-foreground">Enter or scan the package code (UI only).</p>
+                <h2 className="text-lg font-bold">Pre-drop Scan</h2>
+                <p className="text-sm font-medium text-muted-foreground">Enter or scan the package code (UI only).</p>
               </div>
               <Button variant="ghost" size="icon" aria-label="Close" onClick={() => setShowScanDialog(false)}><Icon name="X" /></Button>
             </div>
             <div className="mt-4 space-y-3">
               <Input placeholder="Enter code e.g. PCG-123456" aria-label="Package code" />
-              <div className="h-24 rounded-lg border-dashed border flex items-center justify-center text-sm text-muted-foreground">
+              <div className="h-24 rounded-lg border-dashed border flex items-center justify-center text-sm font-medium text-muted-foreground">
                 <Icon name="ScanBarcode" size={18} className="mr-2" /> Scanner placeholder
               </div>
             </div>
             <div className="mt-4 flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowScanDialog(false)}>Cancel</Button>
-              <Button onClick={handleScanSubmit}><Icon name="Check" size={16} className="mr-2" />Submit</Button>
+              <Button variant="outline" onClick={() => setShowScanDialog(false)} className="font-semibold">Cancel</Button>
+              <Button onClick={handleScanSubmit} className="font-bold"><Icon name="Check" size={16} className="mr-2" />Submit</Button>
             </div>
           </div>
         </div>

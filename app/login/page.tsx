@@ -118,16 +118,7 @@ const Login03Page = () => {
             {/* Removed Parcego text under logo */}
           </div>
 
-          {/* Sample Credentials */}
-          {/* <div className="mb-5 w-full rounded-lg border border-border bg-muted/50 p-4 text-left text-sm text-muted-foreground">
-            <p className="mb-1 font-medium text-foreground">Sample Credentials</p>
-            <p>
-              Email: <span className="select-all font-medium text-foreground">merchant@business.com</span>
-            </p>
-            <p>
-              Password: <span className="select-all font-medium text-foreground">password123</span>
-            </p>
-          </div> */}
+
 
           {/* Tabs for Login/Signup */}
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">

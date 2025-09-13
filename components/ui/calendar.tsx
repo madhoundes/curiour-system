@@ -20,6 +20,8 @@ function Calendar({
     <DayPicker
       showOutsideDays={showOutsideDays}
       weekStartsOn={weekStartsOn}
+      today={new Date()} // Explicitly set today's date for consistent highlighting
+      navLayout="around" // Position navigation buttons evenly around the caption
       className={cn(
         // Center the whole widget and provide consistent internal spacing
         "p-4 w-full max-w-sm mx-auto",
@@ -30,26 +32,28 @@ function Calendar({
         months: "flex flex-col items-center justify-center",
         month: "w-full space-y-3",
         // caption/title centered with proper spacing
-        caption: "relative flex items-center justify-center",
+        caption: "relative flex items-center justify-center px-8",
         caption_label: "text-base font-medium",
-        // navigation arrows positioned evenly at sides of caption
-        nav: "flex items-center",
+        // navigation arrows positioned evenly at sides of caption with proper flexbox
+        nav: "absolute inset-0 flex items-center justify-between w-full",
         nav_button: cn(
           buttonVariants({ variant: "outline" }),
-          "h-7 w-7 bg-transparent p-0 opacity-70 hover:opacity-100"
+          "h-7 w-7 bg-transparent p-0 opacity-70 hover:opacity-100 z-10"
         ),
-        nav_button_previous: "float-left text-left",
-        nav_button_next: "float-right text-right",
+        nav_button_previous: "relative",
+        nav_button_next: "relative",
         // weekdays header and weeks grid
         weekdays: "grid grid-cols-7 gap-1",
         weekday:
           "text-center text-[0.8rem] font-medium text-muted-foreground",
         week: "grid grid-cols-7 gap-1 mt-1",
         day: "flex items-center justify-center",
-        // day button styling with clear selected state (black background)
+        // day button styling with clear selected state and today's date highlighting
         day_button: cn(
           buttonVariants({ variant: "ghost" }),
-          "h-9 w-9 p-0 font-normal aria-selected:opacity-100 data-[selected=true]:bg-black data-[selected=true]:text-white"
+          "h-9 w-9 p-0 font-normal aria-selected:opacity-100",
+          "data-[selected=true]:bg-black data-[selected=true]:text-white",
+          "data-[today=true]:bg-blue-50 data-[today=true]:text-blue-700 data-[today=true]:font-semibold"
         ),
         // states
         day_outside:

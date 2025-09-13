@@ -55,9 +55,6 @@ export default function NotFound() {
               <Link href="/shipments" className="text-blue-600 hover:text-blue-800">
                 Shipments
               </Link>
-              <Link href="/analytics" className="text-blue-600 hover:text-blue-800">
-                Analytics
-              </Link>
             </div>
           </div>
         </CardContent>

@@ -1,4 +1,6 @@
 import type { NextConfig } from "next";
+import fs from 'fs';
+import path from 'path';
 
 const nextConfig: NextConfig = {
      // Temporarily ignore ESLint errors during build for Vercel deployment
@@ -11,13 +13,22 @@ const nextConfig: NextConfig = {
   },
   serverExternalPackages: ["@prisma/client"],
   // Allow external network access during development
-  allowedDevOrigins: ['10.0.0.66', '*.10.0.0.66', 'localhost', '127.0.0.1'],
+  allowedDevOrigins: ['10.0.0.66', '*.10.0.0.66', 'localhost', '127.0.0.1', '10.0.0.31'],
   // Enable logging for debugging network issues
   logging: {
     fetches: {
       fullUrl: true,
     },
   },
+  // HTTPS configuration for development
+  ...(process.env.NODE_ENV === 'development' && {
+    server: {
+      https: {
+        key: fs.readFileSync(path.join(process.cwd(), 'ssl/localhost.key')),
+        cert: fs.readFileSync(path.join(process.cwd(), 'ssl/localhost.crt')),
+      },
+    },
+  }),
   // Webpack configuration to fix chunk loading issues
   webpack: (config, { isServer }) => {
     // Fix for React-PDF and other dynamic imports

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { UnifiedHeader } from "@/components/ui/unified-header";
@@ -36,10 +36,9 @@ const navigationSections: NavigationSection[] = [
   },
 
   {
-    id: "analytics",
-    title: "Analytics & Reports",
+    id: "reports",
+    title: "Reports & Billing",
     items: [
-      { id: "analytics", label: "Analytics", href: "/analytics", icon: "BarChart3", description: "Performance insights" },
       { id: "billing", label: "Billing & Payments", href: "/billing", icon: "CreditCard", description: "Manage payments and invoices" }
     ]
   },
@@ -71,6 +70,29 @@ export function MerchantDashboardLayout({ children }: MerchantDashboardLayoutPro
   const router = useRouter();
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Prevent body scroll when sidebar is open on mobile
+  useEffect(() => {
+    if (sidebarOpen) {
+      // Store the current scroll position
+      const scrollY = window.scrollY;
+      
+      // Prevent scrolling by setting body position fixed
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
+      document.body.style.overflow = 'hidden';
+      
+      return () => {
+        // Restore scrolling when sidebar closes
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        document.body.style.overflow = '';
+        window.scrollTo(0, scrollY);
+      };
+    }
+  }, [sidebarOpen]);
   
   // Check if navigation item is active
   const isActiveNavItem = (href: string) => {
@@ -118,9 +140,15 @@ export function MerchantDashboardLayout({ children }: MerchantDashboardLayoutPro
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-30 lg:hidden transition-opacity duration-300 ease-out motion-reduce:transition-none"
+          className="fixed inset-x-0 top-16 bottom-0 bg-black bg-opacity-75 z-40 lg:hidden transition-opacity duration-300 ease-out motion-reduce:transition-none"
           onClick={() => setSidebarOpen(false)}
+          onTouchStart={() => setSidebarOpen(false)}
           aria-hidden="true"
+          style={{
+            backdropFilter: 'blur(2px)',
+            WebkitBackdropFilter: 'blur(2px)',
+            zIndex: 40,
+          }}
         />
       )}
 
@@ -128,8 +156,8 @@ export function MerchantDashboardLayout({ children }: MerchantDashboardLayoutPro
         {/* Sidebar */}
         <div 
           className={cn(
-            "fixed left-0 top-16 bottom-0 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-out z-30 motion-reduce:transition-none shadow-lg",
-            "lg:translate-x-0 lg:fixed lg:inset-0 lg:shadow-none",
+            "fixed left-0 top-16 bottom-0 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-out z-60 motion-reduce:transition-none shadow-lg",
+            "lg:translate-x-0 lg:fixed lg:inset-0 lg:shadow-none lg:z-30",
             sidebarOpen ? "translate-x-0" : "-translate-x-full"
           )}
           id="parcego-dashboard-sidebar"
@@ -189,7 +217,7 @@ export function MerchantDashboardLayout({ children }: MerchantDashboardLayoutPro
         {/* Main Content */}
         <div 
           className={cn(
-            "flex-1 transition-all duration-300 ease-out motion-reduce:transition-none",
+            "flex-1 transition-all duration-300 ease-out motion-reduce:transition-none relative z-10",
             "lg:ml-64" // Add left margin on large screens to account for fixed sidebar
           )}
           id="parcego-dashboard-main-container"
