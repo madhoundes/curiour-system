@@ -471,7 +471,7 @@ export default function CourierProfilePage() {
     return null;
   }, []);
 
-  const handleVehiclePhotoDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[], slotIndex?: number) => {
+  const handleVehiclePhotoDrop = useCallback((acceptedFiles: File[], rejectedFiles: { errors: { code: string; message: string }[] }[], slotIndex?: number) => {
     setVehiclePhotoError(null);
 
     if (rejectedFiles.length > 0) {
@@ -572,7 +572,7 @@ export default function CourierProfilePage() {
   const VehiclePhotoFrame: React.FC<{
     index: number;
     preview: string | null;
-    onDrop: (acceptedFiles: File[], rejectedFiles: any[], slotIndex: number) => void;
+    onDrop: (acceptedFiles: File[], rejectedFiles: { errors: { code: string; message: string }[] }[], slotIndex: number) => void;
     onRemove: (index: number) => void;
     isUploading: boolean;
     disabled?: boolean;
@@ -669,7 +669,7 @@ export default function CourierProfilePage() {
 
   // Vehicle Photo Dropzone Component (for initial upload area)
   const VehiclePhotoDropzone: React.FC<{
-    onDrop: (acceptedFiles: File[], rejectedFiles: any[], slotIndex?: number) => void;
+    onDrop: (acceptedFiles: File[], rejectedFiles: { errors: { code: string; message: string }[] }[], slotIndex?: number) => void;
     error: string | null;
     isUploading: boolean;
     disabled?: boolean;
@@ -944,7 +944,7 @@ export default function CourierProfilePage() {
                     <Icon name="Bell" size={24} className="text-gray-400" />
                   </div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No notifications</h3>
-                  <p className="text-sm text-gray-500">You're all caught up! New notifications will appear here.</p>
+                  <p className="text-sm text-gray-500">You&apos;re all caught up! New notifications will appear here.</p>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">

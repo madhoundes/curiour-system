@@ -176,7 +176,7 @@ export default function SupportHelpCenter() {
                       <p className="text-sm text-gray-600 leading-relaxed mb-3">{category.description}</p>
                       <div className="flex items-center justify-between pt-3 border-t border-gray-100">
                         <span className="text-xs text-gray-500">Click to explore</span>
-                        <Icon name="arrow-right" className="h-4 w-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
+                        <Icon name="ArrowRight" className="h-4 w-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
                       </div>
                     </CardContent>
                   </Card>
@@ -271,7 +271,7 @@ export default function SupportHelpCenter() {
                   </Accordion>
                 ) : (
                   <div id="parcego-support-no-results" className="text-center py-12">
-                    <Icon name="help-circle" className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <Icon name="CircleQuestionMark" className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No FAQs found</h3>
                     <p className="text-gray-500 mb-4">
                       No FAQs available for the selected category
@@ -307,7 +307,7 @@ export default function SupportHelpCenter() {
                       <CardContent className="px-4 pb-4">
                         <div className="flex items-center justify-between">
                           <span className="flex items-center gap-1 text-sm text-gray-500">
-                            <Icon name="clock" className="h-4 w-4" />
+                            <Icon name="Clock" className="h-4 w-4" />
                             {article.readTime} min read
                           </span>
                           <Button 
@@ -324,7 +324,7 @@ export default function SupportHelpCenter() {
                   ))
                 ) : (
                   <div id="parcego-support-no-results" className="text-center py-12">
-                    <Icon name="file-text" className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <Icon name="FileText" className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No articles found</h3>
                     <p className="text-gray-500 mb-4">
                       No articles available for the selected category
@@ -370,7 +370,7 @@ export default function SupportHelpCenter() {
                   ))
                 ) : (
                   <div id="parcego-support-no-results" className="text-center py-12">
-                    <Icon name="video" className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <Icon name="Video" className="h-12 w-12 text-gray-400 mx-auto mb-4" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No video tutorials found</h3>
                     <p className="text-gray-500 mb-4">
                       No video tutorials available for the selected category

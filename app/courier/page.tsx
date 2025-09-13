@@ -4,14 +4,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import dynamic from "next/dynamic";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Icon } from "@/components/ui/icon";
 import { Separator } from "@/components/ui/separator";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+// import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NotificationBanner } from "@/components/ui/notification-banner";
@@ -174,18 +174,18 @@ const getStatusText = (status: string) => {
   }
 };
 
-const getPriorityColor = (priority: string) => {
-  switch (priority) {
-    case "high":
-      return "bg-red-600";
-    case "medium":
-      return "bg-amber-600";
-    case "low":
-      return "bg-emerald-600";
-    default:
-      return "bg-slate-600";
-  }
-};
+// const getPriorityColor = (priority: string) => {
+//   switch (priority) {
+//     case "high":
+//       return "bg-red-600";
+//     case "medium":
+//       return "bg-amber-600";
+//     case "low":
+//       return "bg-emerald-600";
+//     default:
+//       return "bg-slate-600";
+//   }
+// };
 
 // Client-only wrapper to prevent hydration mismatches
 const ClientOnlyCourierDashboard = dynamic(() => Promise.resolve(CourierDashboard), {
@@ -219,13 +219,13 @@ function CourierDashboard() {
   // Deliveries & Stats state (sequential by priority)
   const [deliveries, setDeliveries] = useState<typeof mockDeliveries>(() => [...mockDeliveries]);
   const [stats, setStats] = useState(() => ({ ...mockCourierData.stats }));
-  const priorityOrder: Record<string, number> = { high: 3, medium: 2, low: 1 };
+  const priorityOrder = React.useMemo(() => ({ high: 3, medium: 2, low: 1 }), []);
   const activeDeliveryId = React.useMemo(() => {
     const pending = deliveries.filter(d => d.status !== 'delivered');
     if (pending.length === 0) return null;
     const next = [...pending].sort((a, b) => (priorityOrder[b.priority] - priorityOrder[a.priority]))[0];
     return next.id;
-  }, [deliveries]);
+  }, [deliveries, priorityOrder]);
   const sortedDeliveries = React.useMemo(() => {
     const list = [...deliveries].sort((a, b) => {
       const aDelivered = a.status === 'delivered' ? 1 : 0;
@@ -241,13 +241,20 @@ function CourierDashboard() {
       }
     }
     return list;
-  }, [deliveries, activeDeliveryId]);
+  }, [deliveries, activeDeliveryId, priorityOrder]);
   
   // Notification state management
   const [notifications, setNotifications] = useState(mockNotifications);
   
   // Scan package state management
-  const [scannedPackageData, setScannedPackageData] = useState<any>(null);
+  interface ScannedPackageData {
+    trackingNumber: string;
+    status: string;
+    location: string;
+    timestamp: string;
+  }
+  
+  const [scannedPackageData, setScannedPackageData] = useState<ScannedPackageData | null>(null);
   const [scanInput, setScanInput] = useState("");
   const [isScanValid, setIsScanValid] = useState(false);
   const [scanValidationMessage, setScanValidationMessage] = useState("");
@@ -258,10 +265,10 @@ function CourierDashboard() {
   const [cameraError, setCameraError] = useState("");
   const [scanMode, setScanMode] = useState<'camera' | 'manual'>('camera');
   const [isScanning, setIsScanning] = useState(false);
-  const [html5QrcodeScanner, setHtml5QrcodeScanner] = useState<any>(null);
+  const [html5QrcodeScanner, setHtml5QrcodeScanner] = useState<Html5Qrcode | null>(null);
   // Fallback ZXing and overlay state
-  const zxingControlsRef = useRef<any>(null);
-  const zxingReaderRef = useRef<any>(null);
+  const zxingControlsRef = useRef<HTMLDivElement | null>(null);
+  const zxingReaderRef = useRef<BarcodeReader | null>(null);
   const zxingVideoElRef = useRef<HTMLVideoElement | null>(null);
   const [scanBoxSize, setScanBoxSize] = useState<number>(0);
   
@@ -364,7 +371,7 @@ function CourierDashboard() {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'unset';
     };
-  }, [isNotificationModalOpen, isScanPackageModalOpen]);
+  }, [isNotificationModalOpen, isScanPackageModalOpen, handleScanPackageClose]);
 
   // Cleanup camera scanner on component unmount
   useEffect(() => {
@@ -412,6 +419,25 @@ function CourierDashboard() {
       }
     } catch (_) {}
   }, [stats.remaining]);
+
+  // Scan package functions
+  const handleScanPackageClose = React.useCallback(async () => {
+    // Stop camera if active
+    if (isCameraActive || html5QrcodeScanner) {
+      await handleCameraStop();
+    }
+    
+    setIsScanPackageModalOpen(false);
+    setScanInput("");
+    setIsScanValid(false);
+    setScanValidationMessage("");
+    setScanError("");
+    setScannedPackageData(null);
+    setCameraError("");
+    setScanMode('camera');
+    setIsCameraActive(false);
+    setIsScanning(false);
+  }, [isCameraActive, html5QrcodeScanner, handleCameraStop]);
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -626,11 +652,11 @@ function CourierDashboard() {
         {
           experimentalFeatures: { useBarCodeDetectorIfSupported: true },
           formatsToSupport
-        } as any
+        }
       );
       
       const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
-      const config: any = {
+      const config: Html5QrcodeCameraScanConfig = {
         fps: 15,
         // square box sized to ~66% of shortest edge
         qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
@@ -646,8 +672,8 @@ function CourierDashboard() {
           facingMode: { ideal: "environment" },
           advanced: [
             // Best-effort hints; browsers ignore unsupported ones
-            { focusMode: "continuous" as any },
-            { exposureMode: "continuous" as any }
+            { focusMode: "continuous" },
+            { exposureMode: "continuous" }
           ]
         } as unknown) as MediaTrackConstraints
       };
@@ -670,8 +696,8 @@ function CourierDashboard() {
       try {
         await html5QrCode.applyVideoConstraints(({
           advanced: [
-            { focusMode: "continuous" as any },
-            { exposureMode: "continuous" as any }
+            { focusMode: "continuous" },
+            { exposureMode: "continuous" }
           ]
         } as unknown) as MediaTrackConstraints);
       } catch (_) {
@@ -803,7 +829,7 @@ function CourierDashboard() {
     }
   };
   
-  const handleCameraError = (error: any) => {
+  const handleCameraError = (error: Error) => {
     console.error("📹 Camera error:", error);
     setCameraError(error.message || "Camera error occurred");
     setIsCameraActive(false);
@@ -829,24 +855,7 @@ function CourierDashboard() {
     }
   };
 
-  // Scan package functions
-  const handleScanPackageClose = async () => {
-    // Stop camera if active
-    if (isCameraActive || html5QrcodeScanner) {
-      await handleCameraStop();
-    }
-    
-    setIsScanPackageModalOpen(false);
-    setScanInput("");
-    setIsScanValid(false);
-    setScanValidationMessage("");
-    setScanError("");
-    setScannedPackageData(null);
-    setCameraError("");
-    setScanMode('camera');
-    setIsCameraActive(false);
-    setIsScanning(false);
-  };
+  // Scan package functions will be defined after handleCameraStop
 
   const handleScanSubmit = () => {
     if (!scanInput || scanInput.trim().length === 0) {
@@ -1450,7 +1459,7 @@ function CourierDashboard() {
                     <Icon name="Bell" size={24} className="text-gray-400" />
                   </div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No notifications</h3>
-                  <p className="text-sm text-gray-500">You're all caught up! New notifications will appear here.</p>
+                  <p className="text-sm text-gray-500">You&apos;re all caught up! New notifications will appear here.</p>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
