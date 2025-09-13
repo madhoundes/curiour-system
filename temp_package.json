@@ -10,7 +10,9 @@
     "dev:https:local": "next dev -H localhost -p 3000 --experimental-https --experimental-https-key ./ssl/localhost.key --experimental-https-cert ./ssl/localhost.crt",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "install:legacy": "npm install --legacy-peer-deps",
+    "build:legacy": "npm run install:legacy && npm run build"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -96,5 +98,5 @@
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.6",
     "typescript": "^5"
-  }
+  },
 }

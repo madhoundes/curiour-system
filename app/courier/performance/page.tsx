@@ -337,7 +337,7 @@ export default function CourierPerformance() {
                     <Icon name="Bell" size={24} className="text-gray-400" />
                   </div>
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No notifications</h3>
-                  <p className="text-sm text-gray-500">You're all caught up! New notifications will appear here.</p>
+                  <p className="text-sm text-gray-500">You&apos;re all caught up! New notifications will appear here.</p>
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">

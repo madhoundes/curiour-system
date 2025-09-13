@@ -112,6 +112,10 @@ const iconAliases: Record<string, IconName> = {
   "message-square": "MessageSquare",
   "ScanBarcode": "ScanBarcode",
   "scan-barcode": "ScanBarcode",
+  "Warehouse": "Building",
+  "warehouse": "Building",
+  "Building": "Building",
+  "building": "Building",
   // Clock aliases
   "Clock": "Clock",
   "clock": "Clock",
@@ -160,6 +164,8 @@ const iconAliases: Record<string, IconName> = {
   // Undeliverable page icons
   "PackageX": "PackageX",
   "Eye": "Eye",
+  "eye": "Eye",
+  "eye-off": "EyeOff",
   "Check": "Check",
   // Dashboard shipping tips icons
   "Scale": "Scale",
@@ -178,7 +184,11 @@ const iconAliases: Record<string, IconName> = {
   "MoreVertical": "EllipsisVertical",
   "more-vertical": "EllipsisVertical",
   "EllipsisVertical": "EllipsisVertical",
-  "ellipsis-vertical": "EllipsisVertical"
+  "ellipsis-vertical": "EllipsisVertical",
+  "minus": "Minus",
+  "Minus": "Minus",
+  "check": "Check",
+  "Check": "Check"
 };
 
 // Centralized Lucide icon renderer to avoid scattered imports and runtime errors

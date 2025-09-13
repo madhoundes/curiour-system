@@ -1,0 +1,106 @@
+# Client Package Tracking Landing Page – UI/UX Spec
+
+## Purpose
+A single-purpose, customer-facing page for tracking packages/orders by tracking number. No login, no clutter—just instant, clear tracking.
+
+---
+
+## Layout
+
+- **Centered Card:**  
+  - Input field: "Enter your tracking number"
+  - Primary button: "Track"
+  - Error message (if needed)
+
+- **Tracking Timeline (after submit):**
+  - Vertical or horizontal timeline
+  - Each step: icon, label, timestamp
+  - Current status highlighted
+  - Estimated delivery date/time
+  - Progress bar (optional)
+
+---
+
+## Components
+
+- **TrackingInputCard**
+  - Props: { onSubmit: (trackingNumber: string) => void }
+  - Features: input, button, error state, accessibility
+
+- **TrackingTimeline**
+  - Props: { events: TrackingEvent[], currentStatus: string, estimatedDelivery: string }
+  - Features: icons, labels, timestamps, highlight, progress bar
+
+---
+
+## Accessibility
+
+- All elements have ARIA labels
+- Input and button are keyboard accessible
+- Timeline is screen reader friendly
+- Color contrast meets WCAG AA
+
+---
+
+## Visuals
+
+- Use shadcn/ui and Tailwind CSS
+- Lucide icons for statuses
+- Subtle transitions for focus, step highlight, and progress
+- Responsive: mobile, tablet, desktop
+
+---
+
+## Mock Data Example
+
+```typescript
+const mockTrackingEvents = [
+  { status: "Label Created", icon: "Package", timestamp: "2025-09-10 09:00" },
+  { status: "Picked Up", icon: "Truck", timestamp: "2025-09-10 12:00" },
+  { status: "In Transit", icon: "Plane", timestamp: "2025-09-11 08:00" },
+  { status: "Out for Delivery", icon: "MapPin", timestamp: "2025-09-12 07:30" },
+  { status: "Delivered", icon: "CheckCircle", timestamp: "2025-09-12 14:15" }
+];
+const mockEstimatedDelivery = "2025-09-12 15:00";
+```
+
+---
+
+## User Flows
+
+1. **Page Load:**  
+   - Input card is focused, ready for tracking number.
+
+2. **User Enters Tracking Number:**  
+   - Button enabled, Enter key submits.
+
+3. **Valid Submission:**  
+   - Timeline and estimated delivery appear with smooth transition.
+
+4. **Invalid Submission:**  
+   - Error message shown, input re-focused.
+
+---
+
+## Edge Cases
+
+- Empty input: button disabled
+- Invalid tracking: show error, do not show timeline
+- Responsive: timeline stacks vertically on mobile
+
+---
+
+## Out of Scope
+
+- No login/authentication
+- No backend/API integration
+- No extra navigation or marketing content
+
+---
+
+## Success Criteria
+
+- Effortless, one-step tracking for all users
+- Clear, visual status timeline with icons and progress
+- Fully accessible and responsive
+- No distractions or unnecessary steps
