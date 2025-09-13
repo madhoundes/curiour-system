@@ -2,7 +2,7 @@
 
 Fast, reliable, and affordable delivery solutions for small businesses.
 
-## 🚀 Current Version: v0.3.0
+## 🚀 Current Version: v3.0.1
 
 **Status**: Frontend UI Complete - Ready for Backend Integration & Deployment
 
@@ -273,7 +273,19 @@ For technical support or questions:
 
 ## 🚀 Recent Updates
 
-### v0.3.0 (Current)
+### v3.0.1 (Latest - January 2025)
+- 🆕 **New Features**: Added comprehensive shipment tracking page with real-time status updates
+- 🎨 **UI Enhancements**: Completely redesigned merchant dashboard with improved navigation and layout
+- 🔧 **Bug Fixes**: Resolved login authentication issues and form validation errors
+- 📱 **Mobile Improvements**: Enhanced responsive design for better mobile experience
+- ⚡ **Performance**: Optimized component loading and state management
+- 🔒 **Security**: Enhanced input validation and XSS protection
+- 📊 **Analytics**: Added new analytics widgets and reporting features
+- 🎯 **UX Improvements**: Streamlined user workflows and improved accessibility
+- 📝 **Documentation**: Updated API documentation and user guides
+- 🧪 **Testing**: Added comprehensive test coverage for critical components
+
+### v0.3.0 (Previous)
 - ✅ **Code Quality**: Resolved all ESLint errors and warnings
 - ✅ **Performance**: Optimized component rendering and state management
 - ✅ **Accessibility**: Enhanced ARIA labels and keyboard navigation
