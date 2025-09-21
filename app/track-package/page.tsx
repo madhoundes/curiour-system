@@ -86,13 +86,13 @@ function TrackPackageContent() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
       {/* Header */}
-      {/* <header id="parcego-tracking-header" className="container mx-auto max-w-7xl px-4 py-6 flex items-center gap-3">
+      <header id="parcego-tracking-header" className="container mx-auto max-w-7xl px-4 py-6 flex items-center gap-3">
         <Button id="parcego-tracking-back-btn" variant="ghost" size="sm" aria-label="Back to dashboard" onClick={() => router.push('/dashboard')}>
           <Icon name="ArrowLeft" />
           Back
         </Button>
         <h1 className="text-xl font-semibold text-gray-900">Track Package</h1>
-      </header> */}
+      </header>
 
       {/* Hero Banner */}
       <section className="container mx-auto max-w-7xl px-4 pb-8 pt-8">
@@ -227,5 +227,4 @@ export default function TrackPackagePage() {
     </Suspense>
   )
 }
-
 
