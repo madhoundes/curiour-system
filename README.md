@@ -34,7 +34,7 @@ Fast, reliable, and affordable delivery solutions for small businesses.
 - **Label Generation**: 4x6 inch PDF labels with barcode/QR codes
 - **Print & Preview**: Modal-based label preview and printing
 
-### 🚚 Courier Operations
+### 🚒 Courier Operations
 - **Courier Dashboard**: Dedicated courier interface
 - **Route Optimization**: AI-powered route planning
 - **Package Scanning**: Barcode/QR code scanning functionality
@@ -116,7 +116,7 @@ Fast, reliable, and affordable delivery solutions for small businesses.
 - **Desktop Experience**: Full-featured desktop interface
 - **Touch-Friendly**: Optimized touch interactions
 
-## 🔒 Security Features
+## 🔐 Security Features
 
 - **Input Validation**: Comprehensive form validation
 - **XSS Protection**: Secure content rendering
@@ -299,7 +299,7 @@ For technical support or questions:
 - 🔧 **Bug Fixes**: Resolved login authentication issues and form validation errors
 - 📱 **Mobile Improvements**: Enhanced responsive design for better mobile experience
 - ⚡ **Performance**: Optimized component loading and state management
-- 🔒 **Security**: Enhanced input validation and XSS protection
+- 🔐 **Security**: Enhanced input validation and XSS protection
 - 📊 **Analytics**: Added new analytics widgets and reporting features
 - 🎯 **UX Improvements**: Streamlined user workflows and improved accessibility
 - 📝 **Documentation**: Updated API documentation and user guides
