@@ -385,4 +385,3 @@ export const typeToIcon: Record<string, string> = {
   NOTE_ADDED: 'message-square'
 };
 
-
