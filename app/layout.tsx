@@ -37,7 +37,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <>
+      {/* suppressHydrationWarning prevents hydration mismatches caused by browser extensions modifying the HTML tag */}
+      <html
+        lang="en"
+        suppressHydrationWarning={true}
+      >
       <head>
         {/* Mobile viewport meta tag for proper responsive scaling */}
         <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
@@ -71,15 +76,28 @@ export default function RootLayout({
           suppressHydrationWarning
           dangerouslySetInnerHTML={{
             __html: `
-              // Remove browser extension attributes that cause hydration mismatch
+              // Handle browser extension attributes that cause hydration mismatch
               if (typeof window !== 'undefined') {
-                // Wait for extensions to load
+                // Wait for extensions to load and modify DOM
                 setTimeout(() => {
                   const body = document.body;
+                  const html = document.documentElement;
+
+                  // Check for known extension attributes
                   if (body.hasAttribute('cz-shortcut-listen')) {
                     console.log('[Parcego] Detected ColorZilla extension, handling hydration compatibility');
                   }
-                  // Don't remove the attribute, just ensure React knows about it
+                  if (html.hasAttribute('crxlauncher')) {
+                    console.log('[Parcego] Detected Chrome extension launcher attribute, handling hydration compatibility');
+                  }
+
+                  // Log any other extension attributes for debugging
+                  const extensionAttributes = ['crxlauncher', 'cz-shortcut-listen', 'data-extension-installed'];
+                  extensionAttributes.forEach(attr => {
+                    if (html.hasAttribute(attr) || body.hasAttribute(attr)) {
+                      console.log(\`[Parcego] Browser extension attribute detected: \${attr}\`);
+                    }
+                  });
                 }, 100);
               }
             `
@@ -87,5 +105,6 @@ export default function RootLayout({
         />
       </body>
     </html>
+    </>
   );
 }

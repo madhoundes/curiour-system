@@ -32,7 +32,7 @@ export function NotificationBanner({
     switch (type) {
       case "success":
         return {
-          container: "bg-emerald-50/80 border-emerald-200/60",
+          container: "bg-emerald-50 border-emerald-200",
           icon: "text-emerald-600",
           title: "text-emerald-900",
           message: "text-emerald-700",
@@ -40,7 +40,7 @@ export function NotificationBanner({
         };
       case "warning":
         return {
-          container: "bg-amber-50/80 border-amber-200/60",
+          container: "bg-amber-50 border-amber-200",
           icon: "text-amber-600",
           title: "text-amber-900",
           message: "text-amber-700",
@@ -48,7 +48,7 @@ export function NotificationBanner({
         };
       case "error":
         return {
-          container: "bg-red-50/80 border-red-200/60",
+          container: "bg-red-50 border-red-200",
           icon: "text-red-600",
           title: "text-red-900",
           message: "text-red-700",
@@ -56,7 +56,7 @@ export function NotificationBanner({
         };
       default:
         return {
-          container: "bg-blue-50/80 border-blue-200/60",
+          container: "bg-blue-50 border-blue-200",
           icon: "text-blue-600",
           title: "text-blue-900",
           message: "text-blue-700",
@@ -71,36 +71,19 @@ export function NotificationBanner({
     <div
       id={id}
       className={`
-        fixed top-0 left-0 right-0 z-[9999] w-full
-        glass-blur-enhanced
-        border-b border-opacity-60
+        fixed top-0 left-0 right-0 z-[999999] w-full
+        border-b border-solid
         transition-all duration-300 ease-out
         ${styles.container}
         ${className}
       `}
       style={{
-        // Enhanced glass effect with better visibility
-        backdropFilter: 'blur(12px) saturate(180%)',
-        WebkitBackdropFilter: 'blur(12px) saturate(180%)',
-        background: 'rgba(255, 255, 255, 0.15)',
         boxShadow: `
           0 8px 32px rgba(0, 0, 0, 0.12),
-          0 2px 8px rgba(0, 0, 0, 0.08),
-          inset 0 1px 0 rgba(255, 255, 255, 0.3),
-          inset 0 -1px 0 rgba(0, 0, 0, 0.1)
+          0 2px 8px rgba(0, 0, 0, 0.08)
         `,
       } as React.CSSProperties}
     >
-      {/* Glass effect overlay */}
-      <div 
-        className="absolute inset-0 bg-gradient-to-b from-white/20 to-transparent"
-        style={{
-          backdropFilter: 'blur(2px)',
-          WebkitBackdropFilter: 'blur(2px)',
-        }}
-        aria-hidden="true"
-      />
-      
       {/* Content */}
       <div className="relative px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex items-start justify-between">

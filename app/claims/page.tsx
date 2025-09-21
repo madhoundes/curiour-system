@@ -618,11 +618,11 @@ export default function ClaimsPage() {
         </div>
       </div>
 
-      {/* Insurance Coverage Information */}
-      <div>
+      {/* Insurance Coverage Information - Hidden */}
+      {/* <div>
         <h2 className="text-xl font-semibold text-gray-900 mb-4">Insurance Coverage Options</h2>
         {renderInsuranceCoverage()}
-      </div>
+      </div> */}
 
       {/* Claims Form */}
       <Card>
@@ -712,12 +712,8 @@ export default function ClaimsPage() {
               </ul>
             </div>
             <div className="space-y-3">
-              <h4 className="font-semibold">Process Timeline:</h4>
-              <ul className="space-y-2 text-sm">
-                <li>Initial review: 1-2 business days</li>
-                <li>Investigation: 3-5 business days</li>
-                <li>Final decision: 5-7 business days</li>
-              </ul>
+             
+         
             </div>
           </div>
         </CardContent>

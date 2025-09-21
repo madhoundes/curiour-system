@@ -1,6 +1,4 @@
 import type { NextConfig } from "next";
-import fs from 'fs';
-import path from 'path';
 
 const nextConfig: NextConfig = {
      // Temporarily ignore ESLint errors during build for Vercel deployment
@@ -20,15 +18,6 @@ const nextConfig: NextConfig = {
       fullUrl: true,
     },
   },
-  // HTTPS configuration for development
-  ...(process.env.NODE_ENV === 'development' && {
-    server: {
-      https: {
-        key: fs.readFileSync(path.join(process.cwd(), 'ssl/localhost.key')),
-        cert: fs.readFileSync(path.join(process.cwd(), 'ssl/localhost.crt')),
-      },
-    },
-  }),
   // Webpack configuration to fix chunk loading issues
   webpack: (config, { isServer }) => {
     // Fix for React-PDF and other dynamic imports
@@ -71,6 +60,12 @@ const nextConfig: NextConfig = {
   // Experimental features for better chunk handling
   experimental: {
     optimizePackageImports: ['@react-pdf/renderer'],
+    // HTTPS configuration for development
+    ...(process.env.NODE_ENV === 'development' && {
+      serverActions: {
+        allowedOrigins: ['localhost:3000', '127.0.0.1:3000'],
+      },
+    }),
   },
 };
 
