@@ -137,8 +137,8 @@ export function BillingPage() {
           description="Manage your billing information, payment methods, and invoices"
         />
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+        {/* Summary Cards - Hidden */}
+        {/* <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
           <SummaryCard 
             id="parcego-billing-summary-card-outstanding"
             title="Outstanding Balance" 
@@ -163,7 +163,7 @@ export function BillingPage() {
             value="$2,147.50" 
             description="Since January 1, 2025"
           />
-        </div>
+        </div> */}
 
         {/* Main Content Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} id="parcego-billing-tabs">

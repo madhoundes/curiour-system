@@ -170,6 +170,45 @@ Thank you for choosing Parcego!
 For questions, contact support@parcego.com`;
 };
 
+// Type declaration for jsPDF with autotable plugin
+interface jsPDFWithAutoTable extends jsPDF {
+  autoTable: (options: any) => void;
+  lastAutoTable?: {
+    finalY: number;
+  };
+}
+
+/**
+ * Test function to verify jsPDF autotable integration
+ * @returns Promise<boolean> - True if autotable is working correctly
+ */
+export const testPdfAutoTable = async (): Promise<boolean> => {
+  try {
+    console.log('Testing jsPDF autotable integration...');
+
+    // Dynamic imports
+    const { jsPDF } = await import('jspdf');
+    const { applyPlugin } = await import('jspdf-autotable');
+
+    // Apply the plugin
+    applyPlugin(jsPDF);
+
+    // Create document and test autotable
+    const doc = new jsPDF() as jsPDFWithAutoTable;
+
+    doc.autoTable({
+      head: [['Test', 'Column']],
+      body: [['Hello', 'World']]
+    });
+
+    console.log('jsPDF autotable integration test passed!');
+    return true;
+  } catch (error) {
+    console.error('jsPDF autotable integration test failed:', error);
+    return false;
+  }
+};
+
 /**
  * Converts SVG to canvas data URL for PDF embedding
  * @param svgPath - Path to the SVG file
@@ -343,14 +382,17 @@ export const generatePdfInvoice = async (invoiceData: {
 }): Promise<void> => {
   try {
     console.log('Starting PDF invoice generation...');
-    
+
     // Dynamic imports to avoid SSR issues
     const { jsPDF } = await import('jspdf');
-    await import('jspdf-autotable');
-    console.log('jsPDF and autotable imported successfully');
+    const { applyPlugin } = await import('jspdf-autotable');
+
+    // Apply the autotable plugin to jsPDF
+    applyPlugin(jsPDF);
+    console.log('jsPDF and autotable plugin applied successfully');
 
     // Create new PDF document
-    const doc = new jsPDF('p', 'mm', 'a4');
+    const doc = new jsPDF('p', 'mm', 'a4') as jsPDFWithAutoTable;
     console.log('PDF document created successfully');
     
     // Load logo
@@ -392,23 +434,32 @@ export const generatePdfInvoice = async (invoiceData: {
       doc.text('PARCEGO', margin, yPosition + 6);
     }
 
-    // Company information (right side)
-    doc.setFontSize(10);
+    // Company information (right side) - Top section
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text('Parcego Courier Services', pageWidth - margin, yPosition + 6, { align: 'right' });
+    
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(60, 60, 60);
     const companyInfo = [
-      'Parcego Courier Services',
       'professional@parcego.com',
       '1-800-PARCEGO',
       'www.parcego.com'
     ];
     
-    const companyYPos = yPosition;
     companyInfo.forEach((line, index) => {
-      doc.text(line, pageWidth - margin - 50, companyYPos + (index * 4) + 6);
+      doc.text(line, pageWidth - margin, yPosition + 12 + (index * 4), { align: 'right' });
     });
 
-    yPosition += 25;
+    // Visual separator line
+    const separatorY = yPosition + 28;
+    doc.setDrawColor(200, 200, 200);
+    doc.setLineWidth(0.5);
+    doc.line(pageWidth - margin - 60, separatorY, pageWidth - margin, separatorY);
+
+    yPosition += 35;
 
     // Invoice title and details
     doc.setFontSize(24);
@@ -416,20 +467,52 @@ export const generatePdfInvoice = async (invoiceData: {
     doc.setTextColor(0, 0, 0);
     doc.text('INVOICE', margin, yPosition);
 
-    // Invoice details (right side)
+    // Invoice details (right side) - Bottom section with better formatting
+    const detailsStartY = yPosition - 20;
+    const rightAlignX = pageWidth - margin;
+    
+    // Invoice number - prominent
     doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
+    doc.text(`Invoice #: ${invoiceData.invoiceNumber}`, rightAlignX, detailsStartY, { align: 'right' });
+    
+    // Issue date
     doc.setFont('helvetica', 'normal');
-    const invoiceDetails = [
-      `Invoice #: ${invoiceData.invoiceNumber}`,
-      `Issue Date: ${invoiceData.issueDate}`,
-      `Due Date: ${invoiceData.dueDate}`,
-      ...(invoiceData.status ? [`Status: ${invoiceData.status.toUpperCase()}`] : [])
-    ];
-
-    const detailsYPos = yPosition - 15;
-    invoiceDetails.forEach((line, index) => {
-      doc.text(line, pageWidth - margin - 50, detailsYPos + (index * 5) + 5);
-    });
+    doc.setTextColor(60, 60, 60);
+    doc.text(`Issue Date: ${invoiceData.issueDate}`, rightAlignX, detailsStartY + 6, { align: 'right' });
+    
+    // Due date - highlighted with background
+    const dueDateY = detailsStartY + 12;
+    const dueDateText = `Due Date: ${invoiceData.dueDate}`;
+    
+    // Calculate text width for background
+    const textWidth = doc.getTextWidth(dueDateText);
+    const padding = 3;
+    
+    // Draw highlight background for due date
+    doc.setFillColor(255, 248, 220); // Light yellow background
+    doc.setDrawColor(255, 193, 7); // Amber border
+    doc.setLineWidth(0.5);
+    doc.roundedRect(
+      rightAlignX - textWidth - padding * 2, 
+      dueDateY - 3, 
+      textWidth + padding * 2, 
+      6, 
+      1, 1, 'FD'
+    );
+    
+    // Add due date text
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(184, 134, 11); // Dark amber text
+    doc.text(dueDateText, rightAlignX, dueDateY, { align: 'right' });
+    
+    // Status - if provided
+    if (invoiceData.status) {
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(60, 60, 60);
+      doc.text(`Status: ${invoiceData.status.toUpperCase()}`, rightAlignX, dueDateY + 8, { align: 'right' });
+    }
 
     yPosition += 15;
 
@@ -494,7 +577,7 @@ export const generatePdfInvoice = async (invoiceData: {
       `${invoiceData.currency} ${item.amount.toFixed(2)}`
     ]);
 
-    (doc as Record<string, unknown>).autoTable({
+    doc.autoTable({
       head: [['Description', 'Qty', 'Unit Price', 'Amount']],
       body: tableData,
       startY: yPosition,
@@ -522,7 +605,7 @@ export const generatePdfInvoice = async (invoiceData: {
     });
 
     // Get final Y position from table
-    yPosition = (doc as Record<string, unknown>).lastAutoTable.finalY + 15;
+    yPosition = (doc.lastAutoTable?.finalY || yPosition) + 15;
 
     // Summary section
     const summaryX = pageWidth - margin - 60;

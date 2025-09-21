@@ -219,11 +219,11 @@ function CourierDashboard() {
   // Deliveries & Stats state (sequential by priority)
   const [deliveries, setDeliveries] = useState<typeof mockDeliveries>(() => [...mockDeliveries]);
   const [stats, setStats] = useState(() => ({ ...mockCourierData.stats }));
-  const priorityOrder = React.useMemo(() => ({ high: 3, medium: 2, low: 1 }), []);
+  const priorityOrder = React.useMemo(() => ({ high: 3, medium: 2, low: 1 } as const), []);
   const activeDeliveryId = React.useMemo(() => {
     const pending = deliveries.filter(d => d.status !== 'delivered');
     if (pending.length === 0) return null;
-    const next = [...pending].sort((a, b) => (priorityOrder[b.priority] - priorityOrder[a.priority]))[0];
+    const next = [...pending].sort((a, b) => (priorityOrder[b.priority as keyof typeof priorityOrder] - priorityOrder[a.priority as keyof typeof priorityOrder]))[0];
     return next.id;
   }, [deliveries, priorityOrder]);
   const sortedDeliveries = React.useMemo(() => {
@@ -231,7 +231,7 @@ function CourierDashboard() {
       const aDelivered = a.status === 'delivered' ? 1 : 0;
       const bDelivered = b.status === 'delivered' ? 1 : 0;
       if (aDelivered !== bDelivered) return aDelivered - bDelivered; // delivered last
-      return (priorityOrder[b.priority] - priorityOrder[a.priority]);
+      return (priorityOrder[b.priority as keyof typeof priorityOrder] - priorityOrder[a.priority as keyof typeof priorityOrder]);
     });
     if (activeDeliveryId) {
       const idx = list.findIndex(d => d.id === activeDeliveryId);
@@ -249,9 +249,13 @@ function CourierDashboard() {
   // Scan package state management
   interface ScannedPackageData {
     trackingNumber: string;
-    status: string;
-    location: string;
-    timestamp: string;
+    customerName: string;
+    address: string;
+    packageType: string;
+    weight: string;
+    estimatedDelivery: string;
+    currentStatus: string;
+    specialInstructions: string;
   }
   
   const [scannedPackageData, setScannedPackageData] = useState<ScannedPackageData | null>(null);
@@ -265,13 +269,54 @@ function CourierDashboard() {
   const [cameraError, setCameraError] = useState("");
   const [scanMode, setScanMode] = useState<'camera' | 'manual'>('camera');
   const [isScanning, setIsScanning] = useState(false);
-  const [html5QrcodeScanner, setHtml5QrcodeScanner] = useState<Html5Qrcode | null>(null);
+  const [html5QrcodeScanner, setHtml5QrcodeScanner] = useState<any | null>(null);
   // Fallback ZXing and overlay state
-  const zxingControlsRef = useRef<HTMLDivElement | null>(null);
-  const zxingReaderRef = useRef<BarcodeReader | null>(null);
+  const zxingControlsRef = useRef<any | null>(null);
+  const zxingReaderRef = useRef<any | null>(null);
   const zxingVideoElRef = useRef<HTMLVideoElement | null>(null);
   const [scanBoxSize, setScanBoxSize] = useState<number>(0);
   
+
+  // Camera scanning functions - defined early to avoid hoisting issues
+  const handleCameraStop = async () => {
+    console.log("⏹ Stopping camera...");
+    
+    try {
+      // Clean up html5-qrcode instance
+      if (html5QrcodeScanner) {
+        if (typeof html5QrcodeScanner.stop === 'function') {
+          await html5QrcodeScanner.stop();
+        }
+        if (typeof html5QrcodeScanner.clear === 'function') {
+          await html5QrcodeScanner.clear();
+        }
+        setHtml5QrcodeScanner(null);
+        console.log("✅ Camera scanner cleaned up successfully");
+      }
+      // Clean up ZXing fallback if present
+      if (zxingControlsRef.current) {
+        try { await (zxingControlsRef.current as any).stop(); } catch (_) {}
+        zxingControlsRef.current = null;
+      }
+      zxingReaderRef.current = null;
+      if (zxingVideoElRef.current && zxingVideoElRef.current.srcObject) {
+        try {
+          const stream = zxingVideoElRef.current.srcObject as MediaStream;
+          stream.getTracks().forEach(t => t.stop());
+        } catch (_) {}
+      }
+      if (zxingVideoElRef.current && zxingVideoElRef.current.parentElement) {
+        try { zxingVideoElRef.current.parentElement.removeChild(zxingVideoElRef.current); } catch (_) {}
+        zxingVideoElRef.current = null;
+      }
+    } catch (error) {
+      console.warn("⚠️ Error cleaning up scanner:", error);
+    }
+    
+    setIsCameraActive(false);
+    setIsScanning(false);
+    setCameraError("");
+  };
 
   // Check authentication on component mount
   useEffect(() => {
@@ -354,7 +399,20 @@ function CourierDashboard() {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         if (isScanPackageModalOpen) {
-          handleScanPackageClose();
+          // Inline the close logic to avoid circular dependency
+          if (isCameraActive || html5QrcodeScanner) {
+            handleCameraStop();
+          }
+          setIsScanPackageModalOpen(false);
+          setScanInput("");
+          setIsScanValid(false);
+          setScanValidationMessage("");
+          setScanError("");
+          setScannedPackageData(null);
+          setCameraError("");
+          setScanMode('camera');
+          setIsCameraActive(false);
+          setIsScanning(false);
         } else if (isNotificationModalOpen) {
           handleNotificationClose();
         }
@@ -371,7 +429,7 @@ function CourierDashboard() {
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'unset';
     };
-  }, [isNotificationModalOpen, isScanPackageModalOpen, handleScanPackageClose]);
+  }, [isNotificationModalOpen, isScanPackageModalOpen, isCameraActive, html5QrcodeScanner]);
 
   // Cleanup camera scanner on component unmount
   useEffect(() => {
@@ -399,7 +457,7 @@ function CourierDashboard() {
       }
       // ZXing cleanup on unmount
       if (zxingControlsRef.current) {
-        try { zxingControlsRef.current.stop(); } catch (_) {}
+        try { (zxingControlsRef.current as any).stop(); } catch (_) {}
         zxingControlsRef.current = null;
       }
       if (zxingVideoElRef.current && zxingVideoElRef.current.parentElement) {
@@ -651,12 +709,13 @@ function CourierDashboard() {
         "parcego-camera-scanner-container",
         {
           experimentalFeatures: { useBarCodeDetectorIfSupported: true },
-          formatsToSupport
+          formatsToSupport,
+          verbose: false
         }
       );
       
       const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
-      const config: Html5QrcodeCameraScanConfig = {
+      const config: any = {
         fps: 15,
         // square box sized to ~66% of shortest edge
         qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
@@ -767,46 +826,6 @@ function CourierDashboard() {
       setIsCameraActive(false);
       setScanMode('manual');
     }
-  };
-  
-  const handleCameraStop = async () => {
-    console.log("⏹ Stopping camera...");
-    
-    try {
-      // Clean up html5-qrcode instance
-      if (html5QrcodeScanner) {
-        if (typeof html5QrcodeScanner.stop === 'function') {
-          await html5QrcodeScanner.stop();
-        }
-        if (typeof html5QrcodeScanner.clear === 'function') {
-          await html5QrcodeScanner.clear();
-        }
-        setHtml5QrcodeScanner(null);
-        console.log("✅ Camera scanner cleaned up successfully");
-      }
-      // Clean up ZXing fallback if present
-      if (zxingControlsRef.current) {
-        try { await zxingControlsRef.current.stop(); } catch (_) {}
-        zxingControlsRef.current = null;
-      }
-      zxingReaderRef.current = null;
-      if (zxingVideoElRef.current && zxingVideoElRef.current.srcObject) {
-        try {
-          const stream = zxingVideoElRef.current.srcObject as MediaStream;
-          stream.getTracks().forEach(t => t.stop());
-        } catch (_) {}
-      }
-      if (zxingVideoElRef.current && zxingVideoElRef.current.parentElement) {
-        try { zxingVideoElRef.current.parentElement.removeChild(zxingVideoElRef.current); } catch (_) {}
-        zxingVideoElRef.current = null;
-      }
-    } catch (error) {
-      console.warn("⚠️ Error cleaning up scanner:", error);
-    }
-    
-    setIsCameraActive(false);
-    setIsScanning(false);
-    setCameraError("");
   };
   
   const handleBarcodeDetected = (detectedCode: string) => {

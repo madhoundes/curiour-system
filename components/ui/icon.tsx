@@ -188,7 +188,10 @@ const iconAliases: Record<string, IconName> = {
   "minus": "Minus",
   "Minus": "Minus",
   "check": "Check",
-  "Check": "Check"
+  "Check": "Check",
+  // Filter icon aliases
+  "Filter": "Funnel",
+  "filter": "Funnel"
 };
 
 // Centralized Lucide icon renderer to avoid scattered imports and runtime errors

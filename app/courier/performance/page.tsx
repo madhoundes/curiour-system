@@ -764,8 +764,8 @@ export default function CourierPerformance() {
           </div>
         </div>
 
-        {/* Section Header */}
-        <div className="flex items-center gap-3 mb-4">
+        {/* Section Header - Hidden */}
+        {/* <div className="flex items-center gap-3 mb-4">
           <div className="h-px bg-gradient-to-r from-green-200 to-transparent flex-1"></div>
           <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
             <div className="rounded-md bg-green-100 p-1.5">
@@ -774,10 +774,10 @@ export default function CourierPerformance() {
             Financial Details
           </h2>
           <div className="h-px bg-gradient-to-l from-green-200 to-transparent flex-1"></div>
-        </div>
+        </div> */}
 
-        {/* Earnings Breakdown - Enhanced */}
-        <Card id="parcego-courier-performance-metric-earnings-detailed" className="hover:shadow-md transition-shadow">
+        {/* Earnings Breakdown - Enhanced - Hidden */}
+        {/* <Card id="parcego-courier-performance-metric-earnings-detailed" className="hover:shadow-md transition-shadow">
           <CardHeader className="pb-3">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-2">
@@ -805,10 +805,10 @@ export default function CourierPerformance() {
               </div>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
-        {/* Section Header */}
-        <div className="flex items-center gap-3 mb-4">
+        {/* Section Header - Hidden */}
+        {/* <div className="flex items-center gap-3 mb-4">
           <div className="h-px bg-gradient-to-r from-purple-200 to-transparent flex-1"></div>
           <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
             <div className="rounded-md bg-purple-100 p-1.5">
@@ -817,10 +817,10 @@ export default function CourierPerformance() {
             Efficiency Analytics
           </h2>
           <div className="h-px bg-gradient-to-l from-purple-200 to-transparent flex-1"></div>
-        </div>
+        </div> */}
 
-        {/* Efficiency Metrics - Enhanced */}
-        <Card id="parcego-courier-performance-metric-efficiency" className="parcego-courier-performance__efficiency-full-width hover:shadow-md transition-shadow">
+        {/* Efficiency Metrics - Enhanced - Hidden */}
+        {/* <Card id="parcego-courier-performance-metric-efficiency" className="parcego-courier-performance__efficiency-full-width hover:shadow-md transition-shadow">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2">
               <div className="rounded-md bg-purple-100 p-1.5">
@@ -848,7 +848,7 @@ export default function CourierPerformance() {
               </div>
             </div>
           </CardContent>
-        </Card>
+        </Card> */}
 
       </div>
 
