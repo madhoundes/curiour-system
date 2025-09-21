@@ -210,7 +210,7 @@ function CourierDashboard() {
   
   // Notification banner state
   const [showNotificationBanner, setShowNotificationBanner] = useState(true);
-  const [notificationBanner, setNotificationBanner] = useState({
+  const [notificationBanner] = useState({
     type: "warning" as "info" | "success" | "warning" | "error",
     title: "Delivery Status Update",
     message: "You have 3 pending deliveries that need attention (mock)",
@@ -269,10 +269,10 @@ function CourierDashboard() {
   const [cameraError, setCameraError] = useState("");
   const [scanMode, setScanMode] = useState<'camera' | 'manual'>('camera');
   const [isScanning, setIsScanning] = useState(false);
-  const [html5QrcodeScanner, setHtml5QrcodeScanner] = useState<any | null>(null);
+  const [html5QrcodeScanner, setHtml5QrcodeScanner] = useState<unknown | null>(null);
   // Fallback ZXing and overlay state
-  const zxingControlsRef = useRef<any | null>(null);
-  const zxingReaderRef = useRef<any | null>(null);
+  const zxingControlsRef = useRef<unknown | null>(null);
+  const zxingReaderRef = useRef<unknown | null>(null);
   const zxingVideoElRef = useRef<HTMLVideoElement | null>(null);
   const [scanBoxSize, setScanBoxSize] = useState<number>(0);
   
@@ -295,7 +295,12 @@ function CourierDashboard() {
       }
       // Clean up ZXing fallback if present
       if (zxingControlsRef.current) {
-        try { await (zxingControlsRef.current as any).stop(); } catch (_) {}
+        try { 
+          const controls = zxingControlsRef.current as { stop: () => Promise<void> };
+          await controls.stop(); 
+        } catch {
+          // Ignore cleanup errors
+        }
         zxingControlsRef.current = null;
       }
       zxingReaderRef.current = null;
@@ -303,10 +308,16 @@ function CourierDashboard() {
         try {
           const stream = zxingVideoElRef.current.srcObject as MediaStream;
           stream.getTracks().forEach(t => t.stop());
-        } catch (_) {}
+        } catch {
+          // Ignore cleanup errors
+        }
       }
       if (zxingVideoElRef.current && zxingVideoElRef.current.parentElement) {
-        try { zxingVideoElRef.current.parentElement.removeChild(zxingVideoElRef.current); } catch (_) {}
+        try { 
+          zxingVideoElRef.current.parentElement.removeChild(zxingVideoElRef.current); 
+        } catch {
+          // Ignore cleanup errors
+        }
         zxingVideoElRef.current = null;
       }
     } catch (error) {
@@ -457,11 +468,18 @@ function CourierDashboard() {
       }
       // ZXing cleanup on unmount
       if (zxingControlsRef.current) {
-        try { (zxingControlsRef.current as any).stop(); } catch (_) {}
+        try { 
+          const controls = zxingControlsRef.current as { stop: () => void };
+          controls.stop(); 
+        } catch {
+          // Ignore cleanup errors
+        }
         zxingControlsRef.current = null;
       }
       if (zxingVideoElRef.current && zxingVideoElRef.current.parentElement) {
-        try { zxingVideoElRef.current.parentElement.removeChild(zxingVideoElRef.current); } catch (_) {}
+        try { zxingVideoElRef.current.parentElement.removeChild(zxingVideoElRef.current); } catch {
+  // Ignore cleanup errors
+}
         zxingVideoElRef.current = null;
       }
     };
@@ -475,7 +493,9 @@ function CourierDashboard() {
         const remaining = String(stats.remaining ?? 0);
         localStorage.setItem('parcego_remaining_deliveries', remaining);
       }
-    } catch (_) {}
+    } catch {
+  // Ignore cleanup errors
+}
   }, [stats.remaining]);
 
   // Scan package functions
@@ -531,7 +551,7 @@ function CourierDashboard() {
     );
   }
 
-  const handleScanPackage = (deliveryId: string) => {
+  const _handleScanPackage = (deliveryId: string) => {
     console.log(`📦 Opening scan package modal for delivery ${deliveryId}`);
     
     // Reset all scan states
@@ -715,7 +735,13 @@ function CourierDashboard() {
       );
       
       const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
-      const config: any = {
+      const config: {
+        fps: number;
+        qrbox: (viewfinderWidth: number, viewfinderHeight: number) => { width: number; height: number };
+        aspectRatio: number;
+        disableFlip: boolean;
+        videoConstraints: MediaTrackConstraints;
+      } = {
         fps: 15,
         // square box sized to ~66% of shortest edge
         qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
@@ -848,7 +874,7 @@ function CourierDashboard() {
     }
   };
   
-  const handleCameraError = (error: Error) => {
+  const _handleCameraError = (error: Error) => {
     console.error("📹 Camera error:", error);
     setCameraError(error.message || "Camera error occurred");
     setIsCameraActive(false);
@@ -868,8 +894,8 @@ function CourierDashboard() {
       }
       await handleCameraStop();
       await handleCameraStart();
-    } catch (err) {
-      console.warn("⚠️ Camera refresh failed:", err);
+    } catch (error) {
+      console.warn("⚠️ Camera refresh failed:", error);
       setIsScanning(false);
     }
   };
@@ -1482,7 +1508,7 @@ function CourierDashboard() {
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {notifications.map((notification, index) => (
+                  {notifications.map((notification) => (
                     <div
                       key={notification.id}
                       className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors duration-150 ${
