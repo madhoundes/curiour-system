@@ -41,6 +41,7 @@
     "@react-three/fiber": "^9.3.0",
     "@supabase/supabase-js": "^2.56.0",
     "@tabler/icons-react": "^3.34.1",
+    "@tailwindcss/postcss": "^4.1.13",
     "@tanstack/react-table": "^8.21.3",
     "@types/three": "^0.179.0",
     "@yudiel/react-qr-scanner": "^2.3.1",
@@ -86,7 +87,6 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
-    "@tailwindcss/postcss": "^4",
     "@types/canvas-confetti": "^1.9.0",
     "@types/jsbarcode": "^3.11.4",
     "@types/node": "^20",
@@ -95,6 +95,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "15.4.5",
+    "lightningcss": "^1.30.1",
     "tailwindcss": "^4",
     "tw-animate-css": "^1.3.6",
     "typescript": "^5"
