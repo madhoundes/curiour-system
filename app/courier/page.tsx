@@ -210,7 +210,7 @@ function CourierDashboard() {
   
   // Notification banner state
   const [showNotificationBanner, setShowNotificationBanner] = useState(true);
-  const [notificationBanner, setNotificationBanner] = useState({
+  const [notificationBanner] = useState({
     type: "warning" as "info" | "success" | "warning" | "error",
     title: "Delivery Status Update",
     message: "You have 3 pending deliveries that need attention (mock)",
@@ -461,7 +461,9 @@ function CourierDashboard() {
         zxingControlsRef.current = null;
       }
       if (zxingVideoElRef.current && zxingVideoElRef.current.parentElement) {
-        try { zxingVideoElRef.current.parentElement.removeChild(zxingVideoElRef.current); } catch (_) {}
+        try { zxingVideoElRef.current.parentElement.removeChild(zxingVideoElRef.current); } catch {
+  // Ignore cleanup errors
+}
         zxingVideoElRef.current = null;
       }
     };
@@ -475,7 +477,9 @@ function CourierDashboard() {
         const remaining = String(stats.remaining ?? 0);
         localStorage.setItem('parcego_remaining_deliveries', remaining);
       }
-    } catch (_) {}
+    } catch {
+  // Ignore cleanup errors
+}
   }, [stats.remaining]);
 
   // Scan package functions
@@ -531,7 +535,7 @@ function CourierDashboard() {
     );
   }
 
-  const handleScanPackage = (deliveryId: string) => {
+  const _handleScanPackage = (deliveryId: string) => {
     console.log(`📦 Opening scan package modal for delivery ${deliveryId}`);
     
     // Reset all scan states
@@ -848,7 +852,7 @@ function CourierDashboard() {
     }
   };
   
-  const handleCameraError = (error: Error) => {
+  const _handleCameraError = (error: Error) => {
     console.error("📹 Camera error:", error);
     setCameraError(error.message || "Camera error occurred");
     setIsCameraActive(false);
@@ -868,8 +872,8 @@ function CourierDashboard() {
       }
       await handleCameraStop();
       await handleCameraStart();
-    } catch (err) {
-      console.warn("⚠️ Camera refresh failed:", err);
+    } catch (error) {
+      console.warn("⚠️ Camera refresh failed:", error);
       setIsScanning(false);
     }
   };
@@ -1482,7 +1486,7 @@ function CourierDashboard() {
                 </div>
               ) : (
                 <div className="divide-y divide-gray-100">
-                  {notifications.map((notification, index) => (
+                  {notifications.map((notification) => (
                     <div
                       key={notification.id}
                       className={`p-4 hover:bg-gray-50 cursor-pointer transition-colors duration-150 ${
