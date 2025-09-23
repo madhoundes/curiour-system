@@ -19,6 +19,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
+import { authService } from "@/lib/api";
+import { toast } from "sonner";
+import type { ApiErrorResponse } from "@/lib/api/types";
 
 const loginFormSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -36,6 +39,9 @@ const signupFormSchema = z.object({
 const Login03Page = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
+  const [isForgotPasswordLoading, setIsForgotPasswordLoading] = useState(false);
   const router = useRouter();
 
   const loginForm = useForm<z.infer<typeof loginFormSchema>>({
@@ -70,24 +76,131 @@ const Login03Page = () => {
     setIsLoading(true);
     console.log("Login data:", data);
     
-    // Simulate API call delay
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      // Map form data to OAuth2PasswordRequestForm format
+      const loginData = {
+        username: data.email, // OAuth2 expects username field, but we use email
+        password: data.password,
+        grant_type: 'password'
+      };
+
+      const response = await authService.login(loginData);
+      
+      // Show success message
+      toast.success("Login successful! Welcome back.");
+      
+      // Redirect to dashboard
       console.log("Login successful - redirect to dashboard");
       handleSuccessfulAuth();
-    }, 2000);
+    } catch (error) {
+      console.error("Login failed:", error);
+      
+      // Type guard to check if error has the expected structure
+      const isApiError = (err: any): err is ApiErrorResponse => {
+        return err && typeof err === 'object' && 'status' in err;
+      };
+      
+      if (isApiError(error)) {
+        // Handle validation errors (422)
+        if (error.status === 422 && error.details && Array.isArray(error.details)) {
+          // Set form errors for specific fields
+          error.details.forEach((err) => {
+            if (err.field === 'username' || err.field === 'email') {
+              loginForm.setError('email', { message: err.message });
+            } else if (err.field === 'password') {
+              loginForm.setError('password', { message: err.message });
+            }
+          });
+          
+          toast.error("Please check your input and try again.");
+        } 
+        // Handle authentication errors (401)
+        else if (error.status === 401) {
+          toast.error("Invalid email or password. Please try again.");
+        }
+        else {
+          // Handle other API errors
+          toast.error(error.message || "Login failed. Please try again.");
+        }
+      } else {
+        // Handle unexpected errors
+        toast.error("An unexpected error occurred. Please try again.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const onSignupSubmit = async (data: z.infer<typeof signupFormSchema>) => {
     setIsLoading(true);
-    console.log("Signup data:", data);
     
-    // Simulate API call delay
-    setTimeout(() => {
+    try {
+      // Map form data to API request format
+      const registerData = {
+        email: data.email,
+        first_name: data.firstName,
+        last_name: data.lastName,
+        business_name: data.businessName,
+        password: data.password,
+      };
+
+      const response = await authService.register(registerData);
+      
+      // Show success message
+      toast.success("Registration successful! Please check your email to verify your account.");
+      
+      console.log("Registration successful:", response.data);
+      
+      // Redirect to login tab or dashboard
+      setActiveTab("login");
+      
+      // Pre-fill login form with registered email
+      loginForm.setValue("email", data.email);
+      
+    } catch (error) {
+      console.error("Registration failed:", error);
+      
+      // Type guard to check if error has the expected structure
+      const isApiError = (err: any): err is ApiErrorResponse => {
+        return err && typeof err === 'object' && 'status' in err;
+      };
+      
+      if (isApiError(error)) {
+        // Handle validation errors (422)
+        if (error.status === 422 && error.details && Array.isArray(error.details)) {
+          // Set form errors for specific fields
+          error.details.forEach((err) => {
+            if (err.field === 'email') {
+              signupForm.setError('email', { message: err.message });
+            } else if (err.field === 'first_name') {
+              signupForm.setError('firstName', { message: err.message });
+            } else if (err.field === 'last_name') {
+              signupForm.setError('lastName', { message: err.message });
+            } else if (err.field === 'business_name') {
+              signupForm.setError('businessName', { message: err.message });
+            } else if (err.field === 'password') {
+              signupForm.setError('password', { message: err.message });
+            }
+          });
+          
+          toast.error("Please check your input and try again.");
+        } 
+        // Handle "Email already registered" error (400)
+        else if (error.status === 400 && error.message?.includes("Email already registered")) {
+          signupForm.setError('email', { message: "This email is already registered. Please use a different email or try logging in." });
+          toast.error("Email already registered. Please use a different email.");
+        }
+        else {
+          // Handle other API errors
+          toast.error(error.message || "Registration failed. Please try again.");
+        }
+      } else {
+        // Handle unexpected errors
+        toast.error("An unexpected error occurred. Please try again.");
+      }
+    } finally {
       setIsLoading(false);
-      console.log("Signup successful - redirect to dashboard");
-      handleSuccessfulAuth();
-    }, 2000);
+    }
   };
 
   const handleGuestLogin = () => {
@@ -99,6 +212,27 @@ const Login03Page = () => {
       console.log("Guest login successful - redirect to dashboard");
       handleSuccessfulAuth();
     }, 2000);
+  };
+
+  const handleForgotPassword = async () => {
+    if (!forgotPasswordEmail) {
+      toast.error("Please enter your email address");
+      return;
+    }
+
+    setIsForgotPasswordLoading(true);
+    
+    try {
+      await authService.forgotPassword({ email: forgotPasswordEmail });
+      toast.success("If the email exists, a password reset link has been sent.");
+      setShowForgotPassword(false);
+      setForgotPasswordEmail("");
+    } catch (error) {
+      console.error("Forgot password failed:", error);
+      toast.error("Failed to send reset email. Please try again.");
+    } finally {
+      setIsForgotPasswordLoading(false);
+    }
   };
 
   return (
@@ -204,12 +338,13 @@ const Login03Page = () => {
               </Form>
 
               <div className="mt-3 space-y-2">
-                <Link
-                  href="#"
-                  className="text-sm block underline text-muted-foreground text-center"
+                <button
+                  type="button"
+                  onClick={() => setShowForgotPassword(true)}
+                  className="text-sm block underline text-muted-foreground text-center w-full hover:text-foreground transition-colors"
                 >
                   Forgot your password?
-                </Link>
+                </button>
                 <p className="text-sm text-center">
                   Don&apos;t have an account?{" "}
                   <button
@@ -399,6 +534,69 @@ const Login03Page = () => {
           </Button>
         </div>
       </div> */}
+
+      {/* Forgot Password Modal */}
+      {showForgotPassword && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold">Reset Password</h2>
+              <button
+                onClick={() => setShowForgotPassword(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <Icon name="X" className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <p className="text-sm text-gray-600 mb-4">
+              Enter your email address and we'll send you a link to reset your password.
+            </p>
+            
+            <div className="space-y-4">
+              <div>
+                <label htmlFor="forgot-email" className="block text-sm font-medium text-gray-700 mb-1">
+                  Email Address
+                </label>
+                <Input
+                  id="forgot-email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={forgotPasswordEmail}
+                  onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                  className="w-full"
+                  disabled={isForgotPasswordLoading}
+                />
+              </div>
+              
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowForgotPassword(false)}
+                  className="flex-1"
+                  disabled={isForgotPasswordLoading}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleForgotPassword}
+                  className="flex-1"
+                  disabled={isForgotPasswordLoading}
+                >
+                  {isForgotPasswordLoading ? (
+                    <>
+                      <Icon name="Loader2" className="mr-2 h-4 w-4 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    "Send Reset Link"
+                  )}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
