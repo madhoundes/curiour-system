@@ -1,13 +1,63 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Icon } from "@/components/ui/icon"
 import { Button } from "@/components/ui/button"
 import { GetInstantShippingQuoteModal } from "./get-instant-shipping-quote-modal"
-import { merchantInfo } from "@/lib/mock/dashboard"
+import { api } from "@/lib/api"
+import type { UserProfile } from "@/lib/api/types"
 
 export function WelcomeBanner() {
   const [showQuoteModal, setShowQuoteModal] = useState(false)
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const userProfileData = await api.profile.getProfile()
+        setUserProfile(userProfileData)
+      } catch (error) {
+        console.error('Failed to fetch user profile:', error)
+        // Fallback to mock data if API fails
+        setUserProfile({
+          id: 1,
+          first_name: 'John',
+          last_name: 'Merchant',
+          email: 'john@electronicsstore.com',
+          phone_number: '+1 (555) 123-4567',
+          business_name: "John's Electronics Store",
+          street_address: '123 Main St',
+          city: 'Toronto',
+          province: 'ON',
+          postal_code: 'M5V 3A8',
+          country: 'Canada',
+          preferred_timezone: 'America/Toronto',
+          preferred_date_format: 'MM/DD/YYYY',
+          enable_email_updates: true,
+          enable_sms_updates: true,
+          role: 'user',
+          is_active: true,
+          is_verified: true,
+          created_at: '2024-01-01T00:00:00Z',
+          updated_at: '2024-01-01T00:00:00Z'
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchUserProfile()
+  }, [])
+
+  const displayName = userProfile 
+    ? `${userProfile.first_name} ${userProfile.last_name}`
+    : 'Loading...'
+  
+  const businessName = userProfile?.business_name || 'Your Business'
+  const location = userProfile?.city && userProfile?.province && userProfile?.country
+    ? `${userProfile.city}, ${userProfile.province}, ${userProfile.country}`
+    : 'Loading...'
 
   return (
     <>
@@ -17,13 +67,13 @@ export function WelcomeBanner() {
           <div className="flex-1 pr-8">
             <div className="mb-4">
               <h1 className="text-2xl font-bold text-gray-900 -mt-4">
-                Welcome back, {merchantInfo.name.split(' ')[0]}!
+                Welcome back, {displayName.split(' ')[0]}!
               </h1>
               <p className="text-gray-600 mt-1">
                 Here&apos;s what&apos;s happening with your shipments today.
               </p>
               <p className="text-sm text-gray-500 mt-2">
-                {merchantInfo.businessName}
+                {businessName}
               </p>
             </div>
             

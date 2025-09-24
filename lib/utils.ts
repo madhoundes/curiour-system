@@ -7,36 +7,30 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Loads the PNG logo and converts it to a format suitable for PDF rendering
- * @returns Promise<string> - Base64 encoded PNG data or fallback text
+ * Loads the Parcego logo for PDF generation
+ * @returns Base64 encoded logo data
  */
 export const loadLogoForPDF = async (): Promise<string> => {
   try {
-    // Try to load the PNG file from the public directory
-    const response = await fetch('/Logo/Horizontal-logo.png');
-    if (!response.ok) {
-      throw new Error('Failed to load logo');
-    }
+    // Use the SVG logo and convert to base64
+    const logoSvg = `<svg width="120" height="40" viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg">
+      <rect width="120" height="40" rx="8" fill="#0091F5"/>
+      <circle cx="20" cy="20" r="12" fill="white"/>
+      <circle cx="35" cy="20" r="8" fill="rgba(255,255,255,0.8)"/>
+      <text x="50" y="25" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white">Parcego</text>
+    </svg>`;
     
-    // Convert PNG to base64 for PDF compatibility
-    const arrayBuffer = await response.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-    return `data:image/png;base64,${base64}`;
+    // Convert SVG to base64
+    const base64 = btoa(logoSvg);
+    return `data:image/svg+xml;base64,${base64}`;
   } catch (error) {
-    console.warn('Could not load logo, falling back to text:', error);
-    // Fallback to text representation
-    return 'PARCEGO';
+    console.error('Failed to load logo:', error);
+    return '';
   }
 };
 
 /**
- * Adds the company logo to a PDF document with exact dimensions to prevent distortion
- * @param pdf - jsPDF instance
- * @param x - X coordinate
- * @param y - Y coordinate
- * @param width - Logo width (in document units)
- * @param height - Logo height (in document units)
- * @param logoData - Logo data (PNG base64 or text)
+ * Adds logo to PDF at specified position
  */
 export const addLogoToPDF = (
   pdf: jsPDF,
@@ -47,24 +41,12 @@ export const addLogoToPDF = (
   logoData: string
 ) => {
   try {
-    if (logoData.startsWith('data:image/png')) {
-      // Add PNG logo with exact dimensions to maintain aspect ratio and prevent distortion
-      // PNG format is well-supported in jsPDF and preserves image quality
-      pdf.addImage(logoData, 'PNG', x, y, width, height);
-    } else {
-      // Fallback to text representation
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'bold');
-      pdf.setTextColor(0, 145, 245); // Blue color
-      pdf.text(logoData, x + width/2, y + height/2, { align: 'center' });
+    if (logoData) {
+      pdf.addImage(logoData, 'SVG', x, y, width, height);
     }
   } catch (error) {
-    console.warn('Could not add logo to PDF, using text fallback:', error);
-    // Fallback to text
-    pdf.setFontSize(12);
-    pdf.setFont('helvetica', 'bold');
-    pdf.setTextColor(0, 145, 245); // Blue color
-    pdf.text('PARCEGO', x + width/2, y + height/2, { align: 'center' });
+    console.error('Failed to add logo to PDF:', error);
+    // Continue without logo if it fails
   }
 };
 
@@ -73,54 +55,22 @@ export const addLogoToPDF = (
  * @param content - File content as string, Blob, or ArrayBuffer
  * @param filename - Name of the file to download
  * @param mimeType - MIME type of the file (default: 'text/plain')
+ * @deprecated This function is deprecated and should not be used in production
  */
 export const downloadFile = (
   content: string | Blob | ArrayBuffer,
   filename: string,
   mimeType: string = 'text/plain'
 ): void => {
-  try {
-    let blob: Blob;
-    
-    if (typeof content === 'string') {
-      blob = new Blob([content], { type: mimeType });
-    } else if (content instanceof ArrayBuffer) {
-      blob = new Blob([content], { type: mimeType });
-    } else {
-      blob = content;
-    }
-    
-    // Create download link
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    
-    // Trigger download
-    document.body.appendChild(link);
-    link.click();
-    
-    // Cleanup
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('Failed to download file:', error);
-    // Fallback: try to open in new tab
-    try {
-      const url = URL.createObjectURL(new Blob([content], { type: mimeType }));
-      window.open(url, '_blank');
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-    } catch (fallbackError) {
-      console.error('Fallback download also failed:', fallbackError);
-      alert('Download failed. Please try again.');
-    }
-  }
+  console.warn('downloadFile is deprecated and should not be used');
+  alert('File download is not available. Please use the proper API endpoints.');
 };
 
 /**
  * Generates a mock invoice content for demonstration purposes
  * @param shipmentData - Shipment information
  * @returns Formatted invoice content as string
+ * @deprecated This function is deprecated and should not be used in production
  */
 export const generateMockInvoice = (shipmentData: {
   trackingNumber: string;
@@ -131,46 +81,10 @@ export const generateMockInvoice = (shipmentData: {
   cost: number;
   createdAt: string;
 }): string => {
-  const invoiceNumber = `INV-${shipmentData.trackingNumber.replace('-', '')}`;
-  const issueDate = new Date().toLocaleDateString();
-  const dueDate = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString();
-  
-  const baseCost = Math.max(0, shipmentData.cost - 4.5);
-  const taxAmount = 4.5;
-  
-  return `INVOICE
-
-Invoice Number: ${invoiceNumber}
-Issue Date: ${issueDate}
-Due Date: ${dueDate}
-
-BILL TO:
-${shipmentData.recipient.name}
-${shipmentData.recipient.address1}
-${shipmentData.recipient.city}, ${shipmentData.recipient.province} ${shipmentData.recipient.postalCode}
-${shipmentData.recipient.country}
-
-SHIPMENT DETAILS:
-Tracking Number: ${shipmentData.trackingNumber}
-Service: ${shipmentData.service}
-Courier: ${shipmentData.courier}
-Weight: ${shipmentData.weightKg.toFixed(2)} kg
-Shipment Date: ${new Date(shipmentData.createdAt).toLocaleDateString()}
-
-CHARGES:
-Base Shipping Cost: $${baseCost.toFixed(2)}
-Taxes & Fees: $${taxAmount.toFixed(2)}
-Total Amount: $${shipmentData.cost.toFixed(2)}
-
-TERMS:
-Payment is due within 30 days of invoice date.
-Late payments may incur additional charges.
-
-Thank you for choosing Parcego!
-For questions, contact support@parcego.com`;
+  console.warn('generateMockInvoice is deprecated and should not be used');
+  return 'Mock invoice generation is no longer supported. Please use the real API endpoints.';
 };
 
-// Type declaration for jsPDF with autotable plugin
 interface jsPDFWithAutoTable extends jsPDF {
   autoTable: (options: any) => void;
   lastAutoTable?: {
@@ -179,174 +93,112 @@ interface jsPDFWithAutoTable extends jsPDF {
 }
 
 /**
- * Test function to verify jsPDF autotable integration
- * @returns Promise<boolean> - True if autotable is working correctly
+ * Tests if jsPDF autoTable plugin is available
  */
 export const testPdfAutoTable = async (): Promise<boolean> => {
   try {
-    console.log('Testing jsPDF autotable integration...');
-
-    // Dynamic imports
     const { jsPDF } = await import('jspdf');
-    const { applyPlugin } = await import('jspdf-autotable');
-
-    // Apply the plugin
-    applyPlugin(jsPDF);
-
-    // Create document and test autotable
-    const doc = new jsPDF() as jsPDFWithAutoTable;
-
-    doc.autoTable({
-      head: [['Test', 'Column']],
-      body: [['Hello', 'World']]
-    });
-
-    console.log('jsPDF autotable integration test passed!');
-    return true;
+    await import('jspdf-autotable');
+    
+    const testPdf = new jsPDF() as jsPDFWithAutoTable;
+    
+    if (typeof testPdf.autoTable === 'function') {
+      console.log('jsPDF autoTable plugin is available');
+      return true;
+    } else {
+      console.warn('jsPDF autoTable plugin is not available');
+      return false;
+    }
   } catch (error) {
-    console.error('jsPDF autotable integration test failed:', error);
+    console.error('Error testing jsPDF autoTable:', error);
     return false;
   }
 };
 
 /**
- * Converts SVG to canvas data URL for PDF embedding
- * @param svgPath - Path to the SVG file
- * @returns Promise<string> - Canvas data URL or fallback text
+ * Loads SVG as Canvas Data URL for PDF generation
  */
 export const loadSvgAsCanvasDataUrl = async (svgPath: string): Promise<string> => {
-  // Check if we're in a browser environment
-  if (typeof window === 'undefined' || typeof document === 'undefined') {
-    console.warn('Not in browser environment, returning fallback text');
-    return 'PARCEGO';
-  }
-  
-  try {
-    console.log('Loading SVG from path:', svgPath);
-    
-    const response = await fetch(svgPath);
-    if (!response.ok) {
-      throw new Error(`Failed to load SVG: ${response.status} ${response.statusText}`);
-    }
-    
-    const svgText = await response.text();
-    console.log('SVG loaded successfully, length:', svgText.length);
-    
-    // Method 1: Try using canvg library for better SVG support
+  return new Promise((resolve, reject) => {
     try {
-      console.log('Attempting to use canvg library...');
-      const { Canvg } = await import('canvg');
-      const canvas = document.createElement('canvas');
-      canvas.width = 200; // Logo width
-      canvas.height = 40; // Logo height
+      // Create an image element
+      const img = new Image();
       
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        // Fill with white background
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Use canvg to render SVG
-        const v = Canvg.fromString(ctx, svgText);
-        await v.render();
-        
-        // Convert to data URL
-        const dataUrl = canvas.toDataURL('image/png');
-        console.log('SVG converted successfully using canvg');
-        return dataUrl;
-      }
-    } catch (canvgError) {
-      console.warn('Canvg method failed, trying fallback:', canvgError);
-    }
-    
-    // Method 2: Fallback to native canvas method
-    console.log('Attempting native canvas method...');
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    
-    if (!ctx) {
-      throw new Error('Could not get canvas context');
-    }
-    
-    // Set canvas dimensions
-    canvas.width = 200; // Logo width
-    canvas.height = 40; // Logo height
-    
-    // Fill with white background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Create image from SVG
-    const img = new Image();
-    const svgBlob = new Blob([svgText], { type: 'image/svg+xml' });
-    const url = URL.createObjectURL(svgBlob);
-    
-    return new Promise((resolve, reject) => {
       img.onload = () => {
         try {
-          // Draw SVG to canvas
+          // Create a canvas
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          if (!ctx) {
+            reject(new Error('Could not get canvas context'));
+            return;
+          }
+          
+          // Set canvas size to match image
+          canvas.width = img.naturalWidth || img.width || 200;
+          canvas.height = img.naturalHeight || img.height || 200;
+          
+          // Draw the image on canvas
           ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           
           // Convert to data URL
           const dataUrl = canvas.toDataURL('image/png');
-          
-          // Clean up
-          URL.revokeObjectURL(url);
-          console.log('SVG converted successfully using native canvas');
           resolve(dataUrl);
-        } catch (drawError) {
-          URL.revokeObjectURL(url);
-          reject(new Error(`Failed to draw SVG to canvas: ${drawError}`));
+        } catch (error) {
+          console.error('Error converting SVG to canvas:', error);
+          reject(error);
         }
       };
       
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
+      img.onerror = (error) => {
+        console.error('Error loading SVG image:', error);
         reject(new Error('Failed to load SVG image'));
       };
       
-      img.src = url;
-    });
-    
-  } catch (error) {
-    console.warn('Could not load SVG, creating text-based logo canvas:', error);
-    
-    // Create a text-based logo as canvas
-    try {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      
-      if (ctx) {
-        canvas.width = 200;
-        canvas.height = 40;
+      // Handle SVG content
+      if (svgPath.startsWith('<svg')) {
+        // It's SVG content, convert to data URL
+        const svgBlob = new Blob([svgPath], { type: 'image/svg+xml' });
+        const url = URL.createObjectURL(svgBlob);
+        img.src = url;
         
-        // Fill with white background
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        
-        // Add text logo
-        ctx.fillStyle = '#0091f5'; // Parcego blue
-        ctx.font = 'bold 24px Arial, sans-serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('PARCEGO', canvas.width / 2, canvas.height / 2);
-        
-        const dataUrl = canvas.toDataURL('image/png');
-        console.log('Text-based logo canvas created successfully');
-        return dataUrl;
+        // Clean up the object URL after loading
+        img.onload = () => {
+          URL.revokeObjectURL(url);
+          try {
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            
+            if (!ctx) {
+              reject(new Error('Could not get canvas context'));
+              return;
+            }
+            
+            canvas.width = img.naturalWidth || img.width || 200;
+            canvas.height = img.naturalHeight || img.height || 200;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            
+            const dataUrl = canvas.toDataURL('image/png');
+            resolve(dataUrl);
+          } catch (error) {
+            console.error('Error converting SVG to canvas:', error);
+            reject(error);
+          }
+        };
+      } else {
+        // It's a path, load directly
+        img.src = svgPath;
       }
-    } catch (canvasError) {
-      console.warn('Failed to create text logo canvas:', canvasError);
+    } catch (error) {
+      console.error('Error in loadSvgAsCanvasDataUrl:', error);
+      reject(error);
     }
-    
-    return 'PARCEGO'; // Final fallback text
-  }
+  });
 };
 
 /**
- * Generates a professional PDF invoice with organized layout and logo
- * @param invoiceData - Invoice information including shipment details, line items, etc.
- * @returns Promise<void> - Downloads the PDF file
+ * Generates a PDF invoice using jsPDF
  */
 export const generatePdfInvoice = async (invoiceData: {
   invoiceNumber: string;
@@ -381,333 +233,162 @@ export const generatePdfInvoice = async (invoiceData: {
   };
 }): Promise<void> => {
   try {
-    console.log('Starting PDF invoice generation...');
-
-    // Dynamic imports to avoid SSR issues
     const { jsPDF } = await import('jspdf');
-    const { applyPlugin } = await import('jspdf-autotable');
-
-    // Apply the autotable plugin to jsPDF
-    applyPlugin(jsPDF);
-    console.log('jsPDF and autotable plugin applied successfully');
-
-    // Create new PDF document
-    const doc = new jsPDF('p', 'mm', 'a4') as jsPDFWithAutoTable;
-    console.log('PDF document created successfully');
+    await import('jspdf-autotable');
     
-    // Load logo
-    let logoData: string;
-    try {
-      logoData = await loadSvgAsCanvasDataUrl('/Logo/Horizontal-logo.svg');
-    } catch {
-      logoData = 'PARCEGO'; // Fallback
-    }
-
-    // Page dimensions
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const pageHeight = doc.internal.pageSize.getHeight();
-    const margin = 20;
-
-    // Add logo and company header
-    let yPosition = margin;
+    const pdf = new jsPDF() as jsPDFWithAutoTable;
     
+    // Load and add logo
     try {
-      if (logoData.startsWith('data:image/')) {
-        // Add image logo (PNG converted from SVG or text-based canvas)
-        const imageFormat = logoData.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-        doc.addImage(logoData, imageFormat, margin, yPosition, 40, 8);
-        console.log('Logo added to PDF successfully');
-      } else {
-        // Fallback text logo
-        doc.setFontSize(20);
-        doc.setFont('helvetica', 'bold');
-        doc.setTextColor(0, 145, 245);
-        doc.text(logoData, margin, yPosition + 6);
-        console.log('Text logo added to PDF as fallback');
+      const logoData = await loadLogoForPDF();
+      if (logoData) {
+        addLogoToPDF(pdf, 20, 20, 40, 13, logoData);
       }
     } catch (logoError) {
-      console.warn('Failed to add logo to PDF, using text fallback:', logoError);
-      // Fallback text logo
-      doc.setFontSize(20);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 145, 245);
-      doc.text('PARCEGO', margin, yPosition + 6);
+      console.warn('Could not load logo, continuing without it:', logoError);
     }
-
-    // Company information (right side) - Top section
-    doc.setFontSize(11);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 0, 0);
-    doc.text('Parcego Courier Services', pageWidth - margin, yPosition + 6, { align: 'right' });
     
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(60, 60, 60);
-    const companyInfo = [
-      'professional@parcego.com',
-      '1-800-PARCEGO',
-      'www.parcego.com'
-    ];
+    // Add company info
+    pdf.setFontSize(20);
+    pdf.setTextColor(0, 145, 245);
+    pdf.text('Parcego', 70, 30);
     
-    companyInfo.forEach((line, index) => {
-      doc.text(line, pageWidth - margin, yPosition + 12 + (index * 4), { align: 'right' });
-    });
-
-    // Visual separator line
-    const separatorY = yPosition + 28;
-    doc.setDrawColor(200, 200, 200);
-    doc.setLineWidth(0.5);
-    doc.line(pageWidth - margin - 60, separatorY, pageWidth - margin, separatorY);
-
-    yPosition += 35;
-
-    // Invoice title and details
-    doc.setFontSize(24);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 0, 0);
-    doc.text('INVOICE', margin, yPosition);
-
-    // Invoice details (right side) - Bottom section with better formatting
-    const detailsStartY = yPosition - 20;
-    const rightAlignX = pageWidth - margin;
+    pdf.setFontSize(10);
+    pdf.setTextColor(100, 100, 100);
+    pdf.text('Professional Shipping Solutions', 70, 37);
     
-    // Invoice number - prominent
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 0, 0);
-    doc.text(`Invoice #: ${invoiceData.invoiceNumber}`, rightAlignX, detailsStartY, { align: 'right' });
+    // Invoice title and number
+    pdf.setFontSize(24);
+    pdf.setTextColor(0, 0, 0);
+    pdf.text('INVOICE', 20, 60);
     
-    // Issue date
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(60, 60, 60);
-    doc.text(`Issue Date: ${invoiceData.issueDate}`, rightAlignX, detailsStartY + 6, { align: 'right' });
+    pdf.setFontSize(12);
+    pdf.text(`Invoice #: ${invoiceData.invoiceNumber}`, 20, 70);
+    pdf.text(`Issue Date: ${invoiceData.issueDate}`, 20, 78);
+    pdf.text(`Due Date: ${invoiceData.dueDate}`, 20, 86);
     
-    // Due date - highlighted with background
-    const dueDateY = detailsStartY + 12;
-    const dueDateText = `Due Date: ${invoiceData.dueDate}`;
-    
-    // Calculate text width for background
-    const textWidth = doc.getTextWidth(dueDateText);
-    const padding = 3;
-    
-    // Draw highlight background for due date
-    doc.setFillColor(255, 248, 220); // Light yellow background
-    doc.setDrawColor(255, 193, 7); // Amber border
-    doc.setLineWidth(0.5);
-    doc.roundedRect(
-      rightAlignX - textWidth - padding * 2, 
-      dueDateY - 3, 
-      textWidth + padding * 2, 
-      6, 
-      1, 1, 'FD'
-    );
-    
-    // Add due date text
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(184, 134, 11); // Dark amber text
-    doc.text(dueDateText, rightAlignX, dueDateY, { align: 'right' });
-    
-    // Status - if provided
     if (invoiceData.status) {
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(60, 60, 60);
-      doc.text(`Status: ${invoiceData.status.toUpperCase()}`, rightAlignX, dueDateY + 8, { align: 'right' });
+      pdf.text(`Status: ${invoiceData.status}`, 20, 94);
     }
-
-    yPosition += 15;
-
+    
     // Bill To section
-    doc.setFontSize(12);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 0, 0);
-    doc.text('BILL TO:', margin, yPosition);
-
-    yPosition += 8;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(60, 60, 60);
-
-    const billToLines = [
-      invoiceData.billTo.name,
-      ...(invoiceData.billTo.company ? [invoiceData.billTo.company] : []),
-      invoiceData.billTo.address,
-      `${invoiceData.billTo.city}, ${invoiceData.billTo.province} ${invoiceData.billTo.postalCode}`,
-      invoiceData.billTo.country
-    ];
-
-    billToLines.forEach((line, index) => {
-      doc.text(line, margin, yPosition + (index * 5));
-    });
-
-    yPosition += (billToLines.length * 5) + 10;
-
-    // Shipment details (if provided)
-    if (invoiceData.shipmentDetails) {
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text('SHIPMENT DETAILS:', margin, yPosition);
-
-      yPosition += 8;
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(60, 60, 60);
-
-      const shipmentLines = [
-        ...(invoiceData.shipmentDetails.trackingNumber ? [`Tracking #: ${invoiceData.shipmentDetails.trackingNumber}`] : []),
-        ...(invoiceData.shipmentDetails.service ? [`Service: ${invoiceData.shipmentDetails.service}`] : []),
-        ...(invoiceData.shipmentDetails.weight ? [`Weight: ${invoiceData.shipmentDetails.weight}`] : []),
-        ...(invoiceData.shipmentDetails.deliveryDate ? [`Delivery Date: ${invoiceData.shipmentDetails.deliveryDate}`] : [])
-      ];
-
-      shipmentLines.forEach((line, index) => {
-        doc.text(line, margin, yPosition + (index * 5));
-      });
-
-      yPosition += (shipmentLines.length * 5) + 15;
-    } else {
-      yPosition += 10;
+    pdf.setFontSize(14);
+    pdf.text('Bill To:', 20, 110);
+    
+    pdf.setFontSize(11);
+    let yPos = 120;
+    pdf.text(invoiceData.billTo.name, 20, yPos);
+    yPos += 7;
+    
+    if (invoiceData.billTo.company) {
+      pdf.text(invoiceData.billTo.company, 20, yPos);
+      yPos += 7;
     }
-
-    // Line items table using autoTable
+    
+    pdf.text(invoiceData.billTo.address, 20, yPos);
+    yPos += 7;
+    pdf.text(`${invoiceData.billTo.city}, ${invoiceData.billTo.province} ${invoiceData.billTo.postalCode}`, 20, yPos);
+    yPos += 7;
+    pdf.text(invoiceData.billTo.country, 20, yPos);
+    
+    // Shipment details if provided
+    if (invoiceData.shipmentDetails) {
+      pdf.setFontSize(14);
+      pdf.text('Shipment Details:', 120, 110);
+      
+      pdf.setFontSize(11);
+      let shipYPos = 120;
+      
+      if (invoiceData.shipmentDetails.trackingNumber) {
+        pdf.text(`Tracking: ${invoiceData.shipmentDetails.trackingNumber}`, 120, shipYPos);
+        shipYPos += 7;
+      }
+      
+      if (invoiceData.shipmentDetails.service) {
+        pdf.text(`Service: ${invoiceData.shipmentDetails.service}`, 120, shipYPos);
+        shipYPos += 7;
+      }
+      
+      if (invoiceData.shipmentDetails.weight) {
+        pdf.text(`Weight: ${invoiceData.shipmentDetails.weight}`, 120, shipYPos);
+        shipYPos += 7;
+      }
+      
+      if (invoiceData.shipmentDetails.deliveryDate) {
+        pdf.text(`Delivery: ${invoiceData.shipmentDetails.deliveryDate}`, 120, shipYPos);
+      }
+    }
+    
+    // Line items table
     const tableData = invoiceData.lineItems.map(item => [
       item.description,
       item.quantity?.toString() || '1',
-      item.unitPrice ? `${invoiceData.currency} ${item.unitPrice.toFixed(2)}` : '-',
-      `${invoiceData.currency} ${item.amount.toFixed(2)}`
+      item.unitPrice ? `${invoiceData.currency}${item.unitPrice.toFixed(2)}` : '-',
+      `${invoiceData.currency}${item.amount.toFixed(2)}`
     ]);
-
-    doc.autoTable({
+    
+    pdf.autoTable({
+      startY: yPos + 20,
       head: [['Description', 'Qty', 'Unit Price', 'Amount']],
       body: tableData,
-      startY: yPosition,
       theme: 'grid',
-      styles: {
-        fontSize: 10,
-        cellPadding: 6,
-        textColor: [60, 60, 60],
-        lineColor: [200, 200, 200],
-        lineWidth: 0.5
-      },
       headStyles: {
-        fillColor: [240, 240, 240],
-        textColor: [0, 0, 0],
-        fontStyle: 'bold',
+        fillColor: [0, 145, 245],
+        textColor: 255,
+        fontSize: 11,
+        fontStyle: 'bold'
+      },
+      bodyStyles: {
         fontSize: 10
       },
       columnStyles: {
-        0: { cellWidth: 'auto' },
+        0: { cellWidth: 80 },
         1: { cellWidth: 20, halign: 'center' },
-        2: { cellWidth: 30, halign: 'right' },
-        3: { cellWidth: 30, halign: 'right' }
-      },
-      margin: { left: margin, right: margin }
-    });
-
-    // Get final Y position from table
-    yPosition = (doc.lastAutoTable?.finalY || yPosition) + 15;
-
-    // Summary section
-    const summaryX = pageWidth - margin - 60;
-    const summaryLines = [
-      ['Subtotal:', `${invoiceData.currency} ${invoiceData.subtotal.toFixed(2)}`],
-      ['Tax:', `${invoiceData.currency} ${invoiceData.tax.toFixed(2)}`],
-      ['Total:', `${invoiceData.currency} ${invoiceData.total.toFixed(2)}`]
-    ];
-
-    summaryLines.forEach((line, index) => {
-      const isTotal = index === summaryLines.length - 1;
-      
-      doc.setFont('helvetica', isTotal ? 'bold' : 'normal');
-      doc.setFontSize(isTotal ? 12 : 10);
-      doc.setTextColor(0, 0, 0);
-      
-      // Draw line above total
-      if (isTotal) {
-        doc.line(summaryX, yPosition + (index * 7) - 2, summaryX + 55, yPosition + (index * 7) - 2);
+        2: { cellWidth: 40, halign: 'right' },
+        3: { cellWidth: 40, halign: 'right' }
       }
-      
-      doc.text(line[0], summaryX, yPosition + (index * 7) + 2);
-      doc.text(line[1], summaryX + 55, yPosition + (index * 7) + 2, { align: 'right' });
     });
-
-    yPosition += (summaryLines.length * 7) + 20;
-
-    // Notes section
+    
+    // Totals
+    const finalY = pdf.lastAutoTable?.finalY || yPos + 80;
+    const totalsX = 130;
+    let totalsY = finalY + 20;
+    
+    pdf.setFontSize(11);
+    pdf.text(`Subtotal: ${invoiceData.currency}${invoiceData.subtotal.toFixed(2)}`, totalsX, totalsY);
+    totalsY += 8;
+    pdf.text(`Tax: ${invoiceData.currency}${invoiceData.tax.toFixed(2)}`, totalsX, totalsY);
+    totalsY += 8;
+    
+    // Total with emphasis
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`Total: ${invoiceData.currency}${invoiceData.total.toFixed(2)}`, totalsX, totalsY);
+    
+    // Notes
     if (invoiceData.notes) {
-      doc.setFontSize(10);
-      doc.setFont('helvetica', 'bold');
-      doc.setTextColor(0, 0, 0);
-      doc.text('NOTES:', margin, yPosition);
-
-      yPosition += 6;
-      doc.setFont('helvetica', 'normal');
-      doc.setTextColor(60, 60, 60);
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      pdf.text('Notes:', 20, totalsY + 20);
       
-      const noteLines = doc.splitTextToSize(invoiceData.notes, pageWidth - (margin * 2));
-      noteLines.forEach((line: string, index: number) => {
-        doc.text(line, margin, yPosition + (index * 5));
-      });
-
-      yPosition += (noteLines.length * 5) + 15;
+      // Split notes into multiple lines if needed
+      const splitNotes = pdf.splitTextToSize(invoiceData.notes, 170);
+      pdf.text(splitNotes, 20, totalsY + 28);
     }
-
+    
     // Footer
-    const footerY = pageHeight - 30;
+    const pageHeight = pdf.internal.pageSize.height;
+    pdf.setFontSize(8);
+    pdf.setTextColor(100, 100, 100);
+    pdf.text('Thank you for your business!', 20, pageHeight - 20);
+    pdf.text(`Generated on ${new Date().toLocaleDateString()}`, 20, pageHeight - 12);
     
-    // Terms section
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 0, 0);
-    doc.text('TERMS & CONDITIONS', margin, footerY);
-
-    doc.setFont('helvetica', 'normal');
-    doc.setTextColor(60, 60, 60);
-    const terms = [
-      'Payment is due within 30 days of invoice date.',
-      'Late payments may incur additional charges.',
-      'For questions, contact support@parcego.com'
-    ];
-
-    terms.forEach((term, index) => {
-      doc.text(term, margin, footerY + 5 + (index * 4));
-    });
-
-    // Page footer
-    doc.setFontSize(8);
-    doc.setTextColor(120, 120, 120);
-    doc.text(
-      `Generated on ${new Date().toLocaleDateString()} | Parcego Courier Services`,
-      pageWidth / 2,
-      pageHeight - 10,
-      { align: 'center' }
-    );
-
     // Save the PDF
-    const filename = `invoice-${invoiceData.invoiceNumber}-${new Date().toISOString().split('T')[0]}.pdf`;
-    doc.save(filename);
-
-  } catch (error) {
-    console.error('Failed to generate PDF invoice:', error);
-    // Fallback to text download
-    const invoiceContent = generateMockInvoice({
-      trackingNumber: invoiceData.shipmentDetails?.trackingNumber || invoiceData.invoiceNumber,
-      recipient: {
-        name: invoiceData.billTo.name,
-        address1: invoiceData.billTo.address,
-        city: invoiceData.billTo.city,
-        province: invoiceData.billTo.province,
-        postalCode: invoiceData.billTo.postalCode,
-        country: invoiceData.billTo.country
-      },
-      service: invoiceData.shipmentDetails?.service || 'Standard',
-      courier: 'Parcego',
-      weightKg: parseFloat(invoiceData.shipmentDetails?.weight || '0'),
-      cost: invoiceData.total,
-      createdAt: invoiceData.issueDate
-    });
+    const filename = `${invoiceData.invoiceNumber.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+    pdf.save(filename);
     
-    const filename = `invoice-${invoiceData.invoiceNumber}-${new Date().toISOString().split('T')[0]}.txt`;
-    downloadFile(invoiceContent, filename, 'text/plain');
+  } catch (error) {
+    console.error('Error generating PDF invoice:', error);
+    throw new Error('Failed to generate PDF invoice. Please try again.');
   }
 };

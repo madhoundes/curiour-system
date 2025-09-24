@@ -186,84 +186,21 @@ export const createShippingLabelFromOrderData = (params: {
 };
 
 /**
- * Generate and download a single shipping label
+ * @deprecated Use shippingService.generateLabel() instead
+ * Generate and download shipping label - DEPRECATED
  */
 export const generateAndDownloadLabel = async (labelData: ShippingLabelData): Promise<void> => {
-  try {
-    console.log('Generating shipping label:', labelData.trackingNumber);
-    
-    const { generatePolishedShippingLabel } = await import('@/lib/pdf-generator');
-    await generatePolishedShippingLabel(labelData);
-    
-    console.log('Shipping label generated successfully');
-  } catch (error) {
-    console.error('Error generating shipping label:', error);
-    throw new Error('Failed to generate shipping label. Please try again.');
-  }
+  console.warn('generateAndDownloadLabel is deprecated. Use shippingService.generateLabel() instead.');
+  alert('This function is deprecated. Please use the updated label generation system.');
 };
 
 /**
- * Generate and download multiple shipping labels
+ * @deprecated Use shippingService.generateLabel() for each shipment instead
+ * Generate and download multiple shipping labels - DEPRECATED
  */
 export const generateAndDownloadMultipleLabels = async (shipments: Shipment[]): Promise<void> => {
-  try {
-    console.log('Generating multiple shipping labels:', shipments.length, 'shipments');
-    
-    // Import React PDF modules
-    const { pdf } = await import('@react-pdf/renderer');
-    const { default: PolishedShippingLabel, generateSyncQRCode } = await import('@/components/pdf/polished-shipping-label');
-    const React = await import('react');
-    
-    // Convert shipments to label data
-    const labelDataArray = shipments.map(createShippingLabelFromShipment);
-    
-    console.log('Pre-generating QR codes for', labelDataArray.length, 'labels...');
-    
-    // Pre-generate QR codes for all labels
-    const labelDataWithQRCodes = await Promise.all(
-      labelDataArray.map(async (labelData) => {
-        const preGeneratedQRCode = await generateSyncQRCode(labelData.trackingNumber);
-        return {
-          ...labelData,
-          preGeneratedQRCode
-        };
-      })
-    );
-    
-    console.log('All QR codes pre-generated, creating combined PDF document...');
-    
-    // Create a combined PDF document with multiple pages
-    const CombinedLabelsDocument = () => 
-      React.createElement('Document', null,
-        ...labelDataWithQRCodes.map((labelData, index) =>
-          React.createElement('Page', { 
-            key: `label-${index}`,
-            size: [288, 432], 
-            style: { padding: 0 } 
-          },
-            React.createElement(PolishedShippingLabel, { data: labelData })
-          )
-        )
-      );
-    
-    // Generate PDF blob
-    const blob = await pdf(React.createElement(CombinedLabelsDocument)).toBlob();
-    
-    // Download the combined PDF
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `shipping-labels-${shipments.length}-items-${new Date().toISOString().split('T')[0]}.pdf`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    
-    console.log('Multiple shipping labels generated successfully');
-  } catch (error) {
-    console.error('Error generating multiple shipping labels:', error);
-    throw new Error('Failed to generate shipping labels. Please try again.');
-  }
+  console.warn('generateAndDownloadMultipleLabels is deprecated. Use shippingService.generateLabel() for each shipment instead.');
+  alert('This function is deprecated. Please use the updated label generation system.');
 };
 
 /**

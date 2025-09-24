@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
+import { shippingService } from "@/lib/api/shipping";
 
 interface PackageData {
   trackingNumber: string;
@@ -301,19 +302,45 @@ export default function CourierScanPackagePage() {
     setScanError("");
   };
 
-  const handleStatusUpdate = (newStatus: PackageData["currentStatus"]) => {
+  const handleStatusUpdate = async (newStatus: PackageData["currentStatus"]) => {
     if (!scannedPackage) return;
     
     setIsUpdatingStatus(true);
+    setScanError("");
     
-    // Mock status update
-    setTimeout(() => {
+    try {
+      // Map the local status to API status format
+      const statusMap: Record<PackageData["currentStatus"], 'DRAFT' | 'PAID' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELLED'> = {
+        pending: 'DRAFT',
+        picked_up: 'PAID',
+        in_transit: 'IN_TRANSIT',
+        delivered: 'DELIVERED'
+      };
+      
+      const apiStatus = statusMap[newStatus];
+      
+      // Update status via API
+      await shippingService.updateShipmentStatus(
+        parseInt(scannedPackage.trackingNumber.replace(/\D/g, '')) || 1, // Extract numeric ID or use 1 as fallback
+        {
+          status: apiStatus,
+          change_reason: `Status updated by courier to ${newStatus}`,
+          notes: `Package status changed via courier scan interface`
+        }
+      );
+      
+      // Update local state on success
       setScannedPackage({
         ...scannedPackage,
         currentStatus: newStatus
       });
+      
+    } catch (error) {
+      console.error('Failed to update shipment status:', error);
+      setScanError('Failed to update package status. Please try again.');
+    } finally {
       setIsUpdatingStatus(false);
-    }, 1500);
+    }
   };
 
   const getStatusColor = (status: PackageData["currentStatus"]) => {

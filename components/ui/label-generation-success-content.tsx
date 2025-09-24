@@ -1,46 +1,32 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
-// import type { ShippingLabelData } from "@/components/pdf/polished-shipping-label";
+import { shippingService } from "@/lib/api/shipping";
 
 interface LabelGenerationSuccessContentProps {
   trackingNumber: string;
+  shipmentId?: number;
   onClose: () => void;
-}
-
-// Mock order data generator
-const generateMockOrderData = (trackingNumber: string) => {
-  // Use tracking number to generate consistent mock data
-  const hash = trackingNumber.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  const recipients = ["Sarah Johnson", "John Smith", "Emily Davis", "Michael Brown"];
-  const cities = ["Toronto", "Vancouver", "Montreal", "Calgary"];
-  const provinces = ["ON", "BC", "QC", "AB"];
-  
-  return {
-    recipientName: recipients[hash % recipients.length],
-    recipientCompany: "ABC Corp",
-    recipientAddress: "456 Customer Ave, Apt 2B",
-    recipientCity: cities[hash % cities.length],
-    recipientProvince: provinces[hash % provinces.length],
-    recipientPostalCode: "M5V3A8",
-    recipientPhone: "(555) 987-6543",
-    recipientEmail: "customer@email.com",
-    serviceType: "standard",
-    selectedQuote: {
-      deliveryTime: "3-5 business days",
-      price: 15.99
-    }
+  orderData?: {
+    recipientName: string;
+    recipientCity: string;
+    recipientProvince: string;
+    serviceType: string;
+    selectedQuote?: {
+      deliveryTime: string;
+      price: string;
+    };
   };
-};
+}
 
 const LabelGenerationSuccessContent: React.FC<LabelGenerationSuccessContentProps> = ({
   trackingNumber,
-  onClose
+  shipmentId,
+  onClose,
+  orderData
 }) => {
-  const mockOrderData = useMemo(() => generateMockOrderData(trackingNumber), [trackingNumber]);
-
   const handlePrint = () => {
     // Force a small delay to ensure DOM is ready for printing
     setTimeout(() => {
@@ -48,38 +34,26 @@ const LabelGenerationSuccessContent: React.FC<LabelGenerationSuccessContentProps
     }, 100);
   };
 
-  // Generate and download PDF label using the unified shipping label service
+  // Generate and download PDF label using the real API
   const handleDownloadLabel = async () => {
     try {
-      // Use the unified shipping label service
-      const { createShippingLabelFromOrderData, generateAndDownloadLabel } = await import('@/lib/shipping-label-service');
-      
-      const shippingData = createShippingLabelFromOrderData({
-        trackingNumber,
-        recipientName: mockOrderData.recipientName,
-        recipientCompany: mockOrderData.recipientCompany,
-        recipientAddress: mockOrderData.recipientAddress,
-        recipientCity: mockOrderData.recipientCity,
-        recipientProvince: mockOrderData.recipientProvince,
-        recipientPostalCode: mockOrderData.recipientPostalCode,
-        recipientPhone: mockOrderData.recipientPhone,
-        recipientEmail: mockOrderData.recipientEmail,
-        serviceType: mockOrderData.serviceType,
-        selectedQuote: mockOrderData.selectedQuote,
-        weight: "2.5",
-        weightUnit: "lbs",
-        length: "12",
-        width: "8",
-        height: "6",
-        dimensionUnit: "in",
-        packageType: "box"
-      });
+      if (!shipmentId) {
+        alert('Shipment ID is required to download the label. Please try again.');
+        return;
+      }
 
-      await generateAndDownloadLabel(shippingData);
+      const labelResponse = await shippingService.generateLabel(shipmentId);
+      
+      if (labelResponse.success && labelResponse.label_url) {
+        // Open the label URL in a new tab
+        window.open(labelResponse.label_url, '_blank');
+      } else {
+        throw new Error(labelResponse.message || 'Failed to generate label');
+      }
       
     } catch (error) {
-      console.error('Error generating PDF:', error);
-      alert('Failed to generate PDF. Please try again.');
+      console.error('Error generating label:', error);
+      alert(`Failed to generate label: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
@@ -122,23 +96,23 @@ const LabelGenerationSuccessContent: React.FC<LabelGenerationSuccessContentProps
             </div>
             <div className="space-y-1 text-left">
               <span className="font-medium text-gray-800">Recipient:</span>
-              <p className="text-gray-900">{mockOrderData.recipientName}</p>
+              <p className="text-gray-900">{orderData?.recipientName || 'N/A'}</p>
             </div>
             <div className="space-y-1 text-left">
               <span className="font-medium text-gray-800">Destination:</span>
-              <p className="text-gray-900">{mockOrderData.recipientCity}, {mockOrderData.recipientProvince}</p>
+              <p className="text-gray-900">{orderData?.recipientCity || 'N/A'}, {orderData?.recipientProvince || 'N/A'}</p>
             </div>
             <div className="space-y-1 text-left">
               <span className="font-medium text-gray-800">Service:</span>
-              <p className="text-gray-900 capitalize">{mockOrderData.serviceType}</p>
+              <p className="text-gray-900 capitalize">{orderData?.serviceType || 'N/A'}</p>
             </div>
             <div className="space-y-1 text-left">
               <span className="font-medium text-gray-800">Delivery Time:</span>
-              <p className="text-gray-900">{mockOrderData.selectedQuote.deliveryTime}</p>
+              <p className="text-gray-900">{orderData?.selectedQuote?.deliveryTime || 'N/A'}</p>
             </div>
             <div className="space-y-1 text-left">
               <span className="font-medium text-gray-800">Total Paid:</span>
-              <p className="text-gray-900 font-semibold text-base">${mockOrderData.selectedQuote.price}</p>
+              <p className="text-gray-900 font-semibold text-base">${orderData?.selectedQuote?.price || 'N/A'}</p>
             </div>
           </div>
         </div>

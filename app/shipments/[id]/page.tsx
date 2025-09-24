@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useRef } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,8 +9,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Icon } from "@/components/ui/icon";
 import { Progress } from "@/components/ui/progress";
 import { useReactToPrint } from "react-to-print";
-import { getMockShipments, formatCurrency } from "@/lib/mock/shipments";
-import { downloadFile, generateMockInvoice, generatePdfInvoice } from '@/lib/utils';
+import { formatCurrency } from "@/lib/mock/shipments";
+import { ShippingService } from "@/lib/api/shipping";
+import type { DetailedShipment } from "@/lib/api/types";
+import { generatePdfInvoice } from "@/lib/utils";
 
 // Timeline data with status and completion
 const timelineSteps = [
@@ -27,21 +29,67 @@ export default function ShipmentDetailPage() {
   const id = params?.id as string;
   const printRef = useRef<HTMLDivElement>(null);
   
-  // Data loading state for consistent SSR/CSR
-  const [allShipments, setAllShipments] = React.useState<Array<Record<string, unknown>>>([]);
-  const [isDataLoaded, setIsDataLoaded] = React.useState(false);
+  // State for API data loading
+  const [shipment, setShipment] = useState<DetailedShipment | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
-  // Load data on client to prevent hydration mismatches
-  React.useEffect(() => {
-    const shipments = getMockShipments();
-    setAllShipments(shipments);
-    setIsDataLoaded(true);
-  }, []);
+  const shippingService = new ShippingService();
 
-  const shipment = useMemo(() => 
-    isDataLoaded ? allShipments.find((s) => s.id === id) : null, 
-    [id, allShipments, isDataLoaded]
-  );
+  // Load shipment data from API
+  useEffect(() => {
+    const loadShipment = async () => {
+      if (!id) return;
+      
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        // Parse the shipment ID - assuming it's numeric
+        const shipmentId = parseInt(id.replace(/[^0-9]/g, ''), 10);
+        if (isNaN(shipmentId)) {
+          throw new Error('Invalid shipment ID format');
+        }
+        
+        const shipmentData = await shippingService.getShipment(shipmentId);
+        setShipment(shipmentData);
+      } catch (err) {
+        console.error('Failed to load shipment:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load shipment data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadShipment();
+  }, [id]);
+
+  // Handle shipment cancellation with API call
+  const handleCancelShipment = async () => {
+    if (!shipment || !confirm(`Are you sure you want to cancel shipment ${shipment.id}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      setIsUpdatingStatus(true);
+      await shippingService.updateShipmentStatus(shipment.id, {
+        status: 'CANCELLED',
+        change_reason: 'Cancelled by merchant',
+        notes: 'Shipment cancelled through merchant dashboard'
+      });
+      
+      // Update local state
+      setShipment(prev => prev ? { ...prev, status: 'CANCELLED' } : null);
+      alert(`Shipment ${shipment.id} has been cancelled successfully.`);
+      router.push("/shipments");
+    } catch (err) {
+      console.error('Failed to cancel shipment:', err);
+      alert('Failed to cancel shipment. Please try again.');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
 
   // Print functionality
   const handlePrint = useReactToPrint({
@@ -52,13 +100,42 @@ export default function ShipmentDetailPage() {
     },
   });
 
-  if (!shipment) {
+  // Loading state
+  if (isLoading) {
     return (
       <div className="max-w-3xl mx-auto p-6">
-        <p className="text-sm text-gray-600">Shipment not found.</p>
-        <Button variant="ghost" className="mt-2" onClick={() => router.push("/shipments")} id="parcego-shipments-back-btn">
-          <Icon name="ArrowLeft" size={16} className="mr-2" /> Back to Shipments
-        </Button>
+        <div className="flex items-center gap-3 mb-4">
+          <Button variant="ghost" onClick={() => router.push("/shipments")} id="parcego-shipments-back-btn">
+            <Icon name="ArrowLeft" size={16} className="mr-2" /> Back to Shipments
+          </Button>
+        </div>
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <Icon name="Loader2" size={32} className="animate-spin mx-auto mb-4 text-blue-600" />
+            <p className="text-sm text-gray-600">Loading shipment details...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error || !shipment) {
+    return (
+      <div className="max-w-3xl mx-auto p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <Button variant="ghost" onClick={() => router.push("/shipments")} id="parcego-shipments-back-btn">
+            <Icon name="ArrowLeft" size={16} className="mr-2" /> Back to Shipments
+          </Button>
+        </div>
+        <div className="text-center py-12">
+          <Icon name="AlertCircle" size={48} className="mx-auto mb-4 text-red-500" />
+          <h2 className="text-lg font-semibold mb-2">Shipment Not Found</h2>
+          <p className="text-sm text-gray-600 mb-4">{error || 'The requested shipment could not be found.'}</p>
+          <Button onClick={() => router.push("/shipments")}>
+            Return to Shipments
+          </Button>
+        </div>
       </div>
     );
   }
@@ -86,8 +163,8 @@ export default function ShipmentDetailPage() {
               {/* Main heading and tracking info */}
               <div className="flex-1 min-w-0">
                 <h1 className="text-xl sm:text-2xl font-bold text-gray-900 mb-1 break-words">{shipment.id}</h1>
-                <p className="text-sm text-gray-600 mb-1">Tracking: {shipment.trackingNumber}</p>
-                <p className="text-xs text-gray-500">Created on {new Date(shipment.createdAt).toLocaleDateString()}</p>
+                <p className="text-sm text-gray-600 mb-1">Tracking: {shipment.tracking_code}</p>
+                <p className="text-xs text-gray-500">Created on {new Date(shipment.created_at).toLocaleDateString()}</p>
               </div>
             </div>
 
@@ -131,21 +208,17 @@ export default function ShipmentDetailPage() {
               {shipment.status === "LABEL_CREATED" && (
                 <Button 
                   variant="destructive" 
-                  onClick={() => {
-                    if (confirm(`Are you sure you want to cancel shipment ${shipment.id}? This action cannot be undone.`)) {
-                      // Update the shipment status to CANCELLED
-                      shipment.status = "CANCELLED";
-                      shipment.updatedAt = new Date().toISOString();
-                      alert(`Shipment ${shipment.id} has been cancelled successfully.`);
-                      // Redirect back to shipments list
-                      router.push("/shipments");
-                    }
-                  }}
+                  onClick={handleCancelShipment}
+                  disabled={isUpdatingStatus}
                   aria-label="Cancel shipment"
                   className="p-2"
                   size="sm"
                 >
-                  <Icon name="X" size={16} />
+                  {isUpdatingStatus ? (
+                    <Icon name="Loader2" size={16} className="animate-spin" />
+                  ) : (
+                    <Icon name="X" size={16} />
+                  )}
                 </Button>
               )}
             </div>
@@ -157,7 +230,7 @@ export default function ShipmentDetailPage() {
           <CardContent className="p-3 sm:p-4">
             <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
               <Badge className="text-sm px-3 py-1 w-fit">{shipment.status.replace(/_/g, " ")}</Badge>
-              <span className="text-sm text-gray-700">{new Date(shipment.createdAt).toLocaleString()}</span>
+              <span className="text-sm text-gray-700">{new Date(shipment.created_at).toLocaleString()}</span>
             </div>
           </CardContent>
         </Card>
@@ -170,7 +243,7 @@ export default function ShipmentDetailPage() {
               <h1 className="text-3xl font-bold mb-2">Shipment Details</h1>
               <div className="text-lg text-gray-600">
                 <p><strong>Shipment ID:</strong> {shipment.id}</p>
-                <p><strong>Tracking Number:</strong> {shipment.trackingNumber}</p>
+                <p><strong>Tracking Number:</strong> {shipment.tracking_code}</p>
               </div>
             </div>
             
@@ -179,32 +252,58 @@ export default function ShipmentDetailPage() {
                 <h2 className="text-xl font-bold border-b pb-2">Shipment Information</h2>
                 <div className="space-y-2">
                   <p><strong>Status:</strong> {shipment.status.replace(/_/g, " ")}</p>
-                  <p><strong>Created:</strong> {new Date(shipment.createdAt).toLocaleDateString()}</p>
-                  <p><strong>Service:</strong> {shipment.service} via {shipment.courier}</p>
+                  <p><strong>Tracking Number:</strong> {shipment.tracking_code}</p>
+                  <p><strong>Service:</strong> Standard Delivery</p>
+                  <p><strong>Created:</strong> {new Date(shipment.created_at).toLocaleDateString()}</p>
+                  <p><strong>Updated:</strong> {new Date(shipment.updated_at).toLocaleDateString()}</p>
                 </div>
               </div>
               
               <div className="space-y-4">
                 <h2 className="text-xl font-bold border-b pb-2">Package Details</h2>
                 <div className="space-y-2">
-                  <p><strong>Weight:</strong> {shipment.weightKg.toFixed(2)} kg</p>
-                  <p><strong>Cost:</strong> {formatCurrency(shipment.cost)}</p>
+                  <p><strong>Type:</strong> {shipment.package.package_type}</p>
+                  <p><strong>Weight:</strong> {shipment.package.weight} kg</p>
+                  <p><strong>Dimensions:</strong> {shipment.package.length} × {shipment.package.width} × {shipment.package.height} cm</p>
+                  <p><strong>Contents:</strong> {shipment.package.contents_description}</p>
+                  <p><strong>Value:</strong> ${shipment.package.declared_value}</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div>
+                <h2 className="text-xl font-bold border-b pb-2 mb-4">Sender Information</h2>
+                <div className="space-y-2">
+                  <p><strong>Name:</strong> {shipment.sender_address.contact_name}</p>
+                  <p><strong>Company:</strong> {shipment.sender_address.company_name || 'N/A'}</p>
+                  <p><strong>Address:</strong> {shipment.sender_address.street_address}</p>
+                  <p><strong>City:</strong> {shipment.sender_address.city}, {shipment.sender_address.province} {shipment.sender_address.postal_code}</p>
+                  <p><strong>Phone:</strong> {shipment.sender_address.phone_number}</p>
+                  <p><strong>Email:</strong> {shipment.sender_address.email}</p>
+                </div>
+              </div>
+              
+              <div>
+                <h2 className="text-xl font-bold border-b pb-2 mb-4">Recipient Information</h2>
+                <div className="space-y-2">
+                  <p><strong>Name:</strong> {shipment.receiver_address.contact_name}</p>
+                  <p><strong>Company:</strong> {shipment.receiver_address.company_name || 'N/A'}</p>
+                  <p><strong>Address:</strong> {shipment.receiver_address.street_address}</p>
+                  <p><strong>City:</strong> {shipment.receiver_address.city}, {shipment.receiver_address.province} {shipment.receiver_address.postal_code}</p>
+                  <p><strong>Phone:</strong> {shipment.receiver_address.phone_number}</p>
+                  <p><strong>Email:</strong> {shipment.receiver_address.email}</p>
                 </div>
               </div>
             </div>
             
             <div className="mt-8">
-              <h2 className="text-xl font-bold border-b pb-2 mb-4">Recipient Information</h2>
+              <h2 className="text-xl font-bold border-b pb-2 mb-4">Billing Information</h2>
               <div className="space-y-2">
-                <p><strong>Name:</strong> {shipment.recipient.name}</p>
-                <p><strong>Address:</strong> {shipment.recipient.address1}</p>
-                <p><strong>City:</strong> {shipment.recipient.city}, {shipment.recipient.province} {shipment.recipient.postalCode}</p>
-                <p><strong>Country:</strong> {shipment.recipient.country}</p>
+                <p><strong>Subtotal:</strong> {formatCurrency(parseFloat(shipment.billing.subtotal))}</p>
+                <p><strong>Tax:</strong> {formatCurrency(parseFloat(shipment.billing.tax_amount))}</p>
+                <p><strong>Total:</strong> <span className="font-semibold">{formatCurrency(parseFloat(shipment.billing.amount))}</span></p>
               </div>
-            </div>
-            
-            <div className="mt-8 text-center text-sm text-gray-600">
-              <p>Generated on {new Date().toLocaleDateString()} at {new Date().toLocaleTimeString()}</p>
             </div>
           </div>
         </div>
@@ -244,12 +343,12 @@ export default function ShipmentDetailPage() {
               </CardHeader>
               <CardContent>
                 <div className="text-sm text-gray-700">
-                  <div className="font-medium">{shipment.recipient.name}</div>
-                  <div>{shipment.recipient.address1}</div>
+                  <div className="font-medium">{shipment.receiver_address.contact_name}</div>
+                  <div>{shipment.receiver_address.company_name && `${shipment.receiver_address.company_name} - `}{shipment.receiver_address.street_address}</div>
                   <div>
-                    {shipment.recipient.city}, {shipment.recipient.province} {shipment.recipient.postalCode}
+                    {shipment.receiver_address.city}, {shipment.receiver_address.province} {shipment.receiver_address.postal_code}
                   </div>
-                  <div>{shipment.recipient.country}</div>
+                  <div>Canada</div>
                 </div>
               </CardContent>
             </Card>
@@ -259,13 +358,13 @@ export default function ShipmentDetailPage() {
                 <CardHeader>
                   <CardTitle>Service</CardTitle>
                 </CardHeader>
-                <CardContent className="text-sm text-gray-700">{shipment.service} via {shipment.courier}</CardContent>
+                <CardContent className="text-sm text-gray-700">Standard Delivery</CardContent>
               </Card>
               <Card>
                 <CardHeader>
                   <CardTitle>Package</CardTitle>
                 </CardHeader>
-                <CardContent className="text-sm text-gray-700">{shipment.weightKg.toFixed(2)} kg • {formatCurrency(shipment.cost)}</CardContent>
+                <CardContent className="text-sm text-gray-700">{shipment.package.weight} kg • {formatCurrency(parseFloat(shipment.billing.amount))}</CardContent>
               </Card>
             </div>
           </TabsContent>
@@ -342,7 +441,7 @@ export default function ShipmentDetailPage() {
                           <div className="mt-2 text-sm text-gray-600 bg-green-50 p-2 rounded border border-green-200">
                             <div className="flex items-center gap-2">
                               <Icon name="Calendar" size={14} className="text-green-600" />
-                              <span>Delivered on {new Date(shipment.createdAt).toLocaleDateString()} at 9:56 PM</span>
+                              <span>Delivered on {new Date(shipment.created_at).toLocaleDateString()} at 9:56 PM</span>
                             </div>
                           </div>
                         )}
@@ -393,58 +492,81 @@ export default function ShipmentDetailPage() {
                 <CardDescription>Label and invoice</CardDescription>
               </CardHeader>
               <CardContent className="flex items-center gap-2">
-                <Button variant="outline" onClick={() => router.push(`/label/preview?tracking=${encodeURIComponent(shipment.trackingNumber)}`)}>
-                  <Icon name="FileText" size={16} className="mr-2" /> View Label
+                <Button 
+                  variant="outline" 
+                  onClick={async () => {
+                    try {
+                      // Convert shipment ID to number for API call
+                      const shipmentId = parseInt(shipment.id.toString(), 10);
+                      if (isNaN(shipmentId)) {
+                        throw new Error(`Invalid shipment ID: ${shipment.id}`);
+                      }
+                      
+                      // Use the real API endpoint to generate and download the label
+                      const labelResponse = await shippingService.generateLabel(shipmentId);
+                      
+                      if (labelResponse.label_url) {
+                        // Open the label URL in a new tab for download
+                        window.open(labelResponse.label_url, '_blank');
+                      } else {
+                        console.error('No label URL provided in response');
+                        alert('Failed to generate label - no URL provided');
+                      }
+                    } catch (error) {
+                      console.error('Failed to generate label:', error);
+                      alert('Failed to generate label. Please try again or contact support.');
+                    }
+                  }}
+                  id="parcego-download-label-btn"
+                >
+                  <Icon name="FileText" size={16} className="mr-2" /> Download Label
                 </Button>
                 <Button 
                   variant="outline" 
                   onClick={async () => {
                     try {
                       await generatePdfInvoice({
-                        invoiceNumber: `INV-${shipment.trackingNumber.replace('-', '')}`,
+                        invoiceNumber: `INV-${shipment.tracking_code.replace('-', '')}`,
                         issueDate: new Date().toLocaleDateString(),
                         dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(),
                         billTo: {
-                          name: shipment.recipient.name,
-                          address: shipment.recipient.address1,
-                          city: shipment.recipient.city,
-                          province: shipment.recipient.province,
-                          postalCode: shipment.recipient.postalCode,
-                          country: shipment.recipient.country
+                          name: shipment.receiver_address.contact_name,
+                          address: shipment.receiver_address.street_address,
+                          city: shipment.receiver_address.city,
+                          province: shipment.receiver_address.province,
+                          postalCode: shipment.receiver_address.postal_code,
+                          country: shipment.receiver_address.country
                         },
                         lineItems: [
                           {
-                            description: `${shipment.service} Delivery Service`,
+                            description: `Standard Delivery Service`,
                             quantity: 1,
-                            unitPrice: Math.max(0, shipment.cost - 4.5),
-                            amount: Math.max(0, shipment.cost - 4.5)
+                            unitPrice: parseFloat(shipment.billing.subtotal),
+                            amount: parseFloat(shipment.billing.subtotal)
                           },
                           {
                             description: 'Taxes & Fees',
                             quantity: 1,
-                            unitPrice: 4.5,
-                            amount: 4.5
+                            unitPrice: parseFloat(shipment.billing.tax_amount),
+                            amount: parseFloat(shipment.billing.tax_amount)
                           }
                         ],
-                        subtotal: Math.max(0, shipment.cost - 4.5),
-                        tax: 4.5,
-                        total: shipment.cost,
+                        subtotal: parseFloat(shipment.billing.subtotal),
+                        tax: parseFloat(shipment.billing.tax_amount),
+                        total: parseFloat(shipment.billing.amount),
                         currency: 'CAD',
                         status: shipment.status,
                         shipmentDetails: {
-                          trackingNumber: shipment.trackingNumber,
-                          service: shipment.service,
-                          weight: `${shipment.weightKg.toFixed(2)} kg`,
-                          deliveryDate: new Date(shipment.createdAt).toLocaleDateString()
+                          trackingNumber: shipment.tracking_code,
+                          service: 'Standard Delivery',
+                          weight: `${shipment.package.weight} kg`,
+                          deliveryDate: new Date(shipment.created_at).toLocaleDateString()
                         },
                         notes: 'Thank you for choosing Parcego! Your package was delivered with care.'
                       });
                     } catch (error) {
                       console.error('Failed to generate PDF invoice:', error);
-                      // Fallback to text invoice
-                      const invoiceContent = generateMockInvoice(shipment);
-                      const filename = `invoice-${shipment.trackingNumber}-${new Date().toISOString().split('T')[0]}.txt`;
-                      downloadFile(invoiceContent, filename, 'text/plain');
+                      alert('Failed to generate invoice. Please try again.');
                     }
                   }}
                   id="parcego-download-invoice-btn"
@@ -460,8 +582,21 @@ export default function ShipmentDetailPage() {
               <CardHeader>
                 <CardTitle>Payment Summary</CardTitle>
               </CardHeader>
-              <CardContent className="text-sm text-gray-700">
-                Base: {formatCurrency(Math.max(0, shipment.cost - 4.5))} • Taxes/Fees: {formatCurrency(4.5)} • Total: {formatCurrency(shipment.cost)}
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex justify-between">
+                    <span>Subtotal:</span>
+                    <span>${shipment.billing.subtotal}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Tax:</span>
+                    <span>${shipment.billing.tax_amount}</span>
+                  </div>
+                  <div className="flex justify-between font-semibold">
+                    <span>Total:</span>
+                    <span>${shipment.billing.amount}</span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

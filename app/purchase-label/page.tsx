@@ -2,7 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-
+import { useShipment } from "@/lib/shipment-context";
+import { shippingService } from "@/lib/api/shipping";
+import { profileService } from "@/lib/api/profile";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,8 +14,9 @@ import { PageHeader } from "@/components/ui/page-header";
 import { createStepperSteps, Stepper } from "@/components/ui/stepper";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
-// Removed unused imports - PDF generation now handled dynamically
 import type { ShippingLabelData } from "@/components/pdf/polished-shipping-label";
+import type { CreateShipmentRequest, UserProfile } from "@/lib/api/types";
+
 
 interface OrderData {
   recipientName: string;
@@ -49,16 +52,20 @@ interface OrderData {
 export default function PurchaseLabelPage() {
   console.log('PurchaseLabelPage: Component rendering');
   const router = useRouter();
+  const { formData } = useShipment();
   
   // Enhanced state management
   const [isProcessing, setIsProcessing] = useState(false);
   const [showConfirmation, setShowConfirmation] = useState(false);
+  const [shipmentError, setShipmentError] = useState<string | null>(null);
+  const [createdShipment, setCreatedShipment] = useState<any>(null);
   // Preview modal state
   const [showPreview, setShowPreview] = useState(false);
   const [pdfBlobUrl, setPdfBlobUrl] = useState<string>("");
   const [isGeneratingPreview, setIsGeneratingPreview] = useState(false);
   // Generate tracking number (deferred to client to avoid SSR hydration mismatch)
   const [trackingNumber, setTrackingNumber] = useState<string>("");
+  const [senderData, setSenderData] = useState<UserProfile | null>(null);
 
   useEffect(() => {
     if (!trackingNumber) {
@@ -67,6 +74,30 @@ export default function PurchaseLabelPage() {
       setTrackingNumber(`PCG${timestamp}${random}`);
     }
   }, [trackingNumber]);
+
+  // Load sender profile data
+  useEffect(() => {
+    const loadSenderData = async () => {
+      try {
+        const profile = await profileService.getProfile();
+        setSenderData(profile);
+        console.log('Profile loaded successfully:', profile);
+      } catch (error) {
+        console.error('Failed to load sender profile:', error);
+        
+        // Set error state instead of fallback data
+        if (error instanceof Error && error.message.includes('Authentication')) {
+          setShipmentError('Please log in to access your profile information.');
+        } else {
+          setShipmentError('Failed to load profile information. Please try refreshing the page.');
+        }
+        
+        // Don't set fallback data - require real profile data
+        setSenderData(null);
+      }
+    };
+    loadSenderData();
+  }, []);
   
   // Payment form state with high-quality dummy data
   const [cardNumber, setCardNumber] = useState("4242 4242 4242 4242");
@@ -80,36 +111,55 @@ export default function PurchaseLabelPage() {
     postalCode: "M5V 3A8"
   });
   
-  // Mock order data for testing
-  const mockOrderData: OrderData = {
-    recipientName: "Sarah Johnson",
-    recipientCompany: "ABC Corp",
-    recipientAddress: "456 Customer Ave, Apt 2B",
-    recipientCity: "Toronto",
-    recipientProvince: "ON",
-    recipientPostalCode: "M5V3A8",
-    recipientPhone: "(555) 987-6543",
-    recipientEmail: "customer@email.com",
-    packageType: "box",
-    serviceType: "standard",
-    specialInstructions: "Handle with care – demo run",
-    weight: "2.5",
-    weightUnit: "lbs",
-    length: "12",
-    width: "8",
-    height: "6",
-    dimensionUnit: "in",
-    fragile: false,
-    valuable: false,
-    insurance: false,
-    selectedQuote: {
-      id: 'standard-1',
-      name: 'Standard Delivery',
-      description: '3-5 business days delivery',
-      price: 15.99,
-      deliveryTime: '3-5 business days',
-      features: ['Tracking included', 'Signature required', 'Insurance available']
+  // Mock order data for testing - DEPRECATED: Use formData instead
+  // This mock data is kept for fallback purposes only
+  
+  // Helper function to create shipment request from form data
+  const createShipmentRequest = (): CreateShipmentRequest => {
+    if (!formData || !senderData) {
+      throw new Error('Missing shipment data or sender information');
     }
+
+    return {
+      sender_address: {
+        contact_name: senderData.business_name || `${senderData.first_name} ${senderData.last_name}` || "Contact Name",
+        company_name: senderData.business_name || "",
+        street_address: senderData.street_address || "",
+        street_address_2: senderData.street_address_2 || "",
+        city: senderData.city || "",
+        province: senderData.province || "",
+        postal_code: senderData.postal_code || "",
+        country: senderData.country || "Canada",
+        phone_number: senderData.phone_number || "",
+        email: senderData.email || ""
+      },
+      receiver_address: {
+        contact_name: formData.recipientName,
+        company_name: formData.recipientCompany || "",
+        street_address: formData.recipientAddress,
+        street_address_2: "",
+        city: formData.recipientCity,
+        province: formData.recipientProvince,
+        postal_code: formData.recipientPostalCode,
+        country: "Canada",
+        phone_number: formData.recipientPhone,
+        email: formData.recipientEmail
+      },
+      package: {
+        package_type: formData.packageType as 'box' | 'envelope' | 'tube' | 'pallet',
+        weight: parseFloat(formData.weight),
+        length: parseFloat(formData.length),
+        width: parseFloat(formData.width),
+        height: parseFloat(formData.height),
+        declared_value: 0, // Default value, could be made configurable
+        contents_description: formData.specialInstructions || "Package contents",
+        fragile: formData.fragile,
+        requires_signature: false, // Default value, could be made configurable
+        special_instructions: formData.specialInstructions || ""
+      },
+      special_instructions: formData.specialInstructions || "",
+      delivery_notes: ""
+    };
   };
   
   // Handle payment submission
@@ -119,42 +169,54 @@ export default function PurchaseLabelPage() {
     }
     
     setIsProcessing(true);
+    setShipmentError(null);
     
-    // Simulate payment processing
-    setTimeout(() => {
+    try {
+      // Create shipment request from context data
+      const shipmentRequest = createShipmentRequest();
+
+      // Create the shipment
+      const shipment = await shippingService.createShipment(shipmentRequest);
+      setCreatedShipment(shipment);
+      
+      // Generate label
+      const labelData = await shippingService.generateLabel(shipment.shipment.id, 'standard');
+      setTrackingNumber(labelData.tracking_number);
+      
       setIsProcessing(false);
       setShowConfirmation(true);
-    }, 2000);
+    } catch (error) {
+      console.error('Shipment creation failed:', error);
+      setShipmentError(error instanceof Error ? error.message : 'Failed to create shipment');
+      setIsProcessing(false);
+    }
   };
   
   // Generate and download PDF label using the unified shipping label service
   const handleDownloadLabel = async () => {
-    try {
-      // Use the unified shipping label service
-      const { createShippingLabelFromOrderData, generateAndDownloadLabel } = await import('@/lib/shipping-label-service');
-      
-      const shippingData = createShippingLabelFromOrderData({
-        trackingNumber: trackingNumber,
-        recipientName: mockOrderData.recipientName,
-        recipientCompany: mockOrderData.recipientCompany,
-        recipientAddress: mockOrderData.recipientAddress,
-        recipientCity: mockOrderData.recipientCity,
-        recipientProvince: mockOrderData.recipientProvince,
-        recipientPostalCode: mockOrderData.recipientPostalCode,
-        recipientPhone: mockOrderData.recipientPhone,
-        recipientEmail: mockOrderData.recipientEmail,
-        serviceType: mockOrderData.serviceType,
-        selectedQuote: mockOrderData.selectedQuote,
-        weight: mockOrderData.weight,
-        weightUnit: mockOrderData.weightUnit,
-        length: mockOrderData.length,
-        width: mockOrderData.width,
-        height: mockOrderData.height,
-        dimensionUnit: mockOrderData.dimensionUnit,
-        packageType: mockOrderData.packageType
-      });
+    if (!formData || !senderData) {
+      alert('Missing shipment data. Please go back and complete the shipment form.');
+      return;
+    }
 
-      await generateAndDownloadLabel(shippingData);
+    try {
+      // Use the unified shipping label service to create properly formatted data
+      const { createShippingLabelFromOrderData } = await import('@/lib/shipping-label-service');
+      
+      // Create shipment and generate label using real API
+      const shipmentRequest = createShipmentRequest();
+      const shipmentResponse = await shippingService.createShipment(shipmentRequest);
+      setCreatedShipment(shipmentResponse);
+      
+      // Generate label using the real API
+      const labelResponse = await shippingService.generateLabel(shipmentResponse.shipment.id);
+      
+      if (labelResponse.label_url) {
+        // Open the label in a new tab for download
+        window.open(labelResponse.label_url, '_blank');
+      } else {
+        throw new Error('No label URL received from API');
+      }
       
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -169,71 +231,45 @@ export default function PurchaseLabelPage() {
     if (isGeneratingPreview) {
       return; // Prevent double-clicks
     }
+
+    if (!formData || !senderData) {
+      alert('Missing shipment data. Please go back and complete the shipment form.');
+      return;
+    }
     
     try {
       setIsGeneratingPreview(true);
 
-      // Prepare data for the polished shipping label
-      const shippingData: ShippingLabelData = {
-        trackingNumber: trackingNumber,
-        sender: {
-          name: "John's Electronics Store",
-          address: '123 Business St, Suite 100',
-          city: 'New York',
-          state: 'NY',
-          postalCode: '10001',
-        },
-        recipient: {
-          name: mockOrderData.recipientName,
-          company: mockOrderData.recipientCompany,
-          address: mockOrderData.recipientAddress,
-          city: mockOrderData.recipientCity,
-          state: mockOrderData.recipientProvince,
-          postalCode: mockOrderData.recipientPostalCode,
-          phone: mockOrderData.recipientPhone,
-          email: mockOrderData.recipientEmail,
-        },
-        service: {
-          type: mockOrderData.serviceType.toUpperCase(),
-          description: mockOrderData.selectedQuote.deliveryTime,
-        },
-        package: {
-          weight: `${mockOrderData.weight} ${mockOrderData.weightUnit}`,
-          dimensions: `${mockOrderData.length}" × ${mockOrderData.width}" × ${mockOrderData.height}" ${mockOrderData.dimensionUnit}`,
-          type: mockOrderData.packageType,
-        },
-        shipDate: new Date().toLocaleDateString()
-      };
-
-      console.log('Generating PDF blob with data:', shippingData);
-
-      // Generate PDF blob
-      const { generateShippingLabelBlob } = await import('@/lib/pdf-generator');
-      const pdfBlob = await generateShippingLabelBlob(shippingData);
-      
-      if (!pdfBlob || pdfBlob.size === 0) {
-        throw new Error('Generated PDF blob is empty or invalid');
+      // Generate label using the real API for preview
+      if (!createdShipment) {
+        // Create shipment first if not already created
+        const shipmentRequest = createShipmentRequest();
+        const shipmentResponse = await shippingService.createShipment(shipmentRequest);
+        setCreatedShipment(shipmentResponse);
+        
+        // Generate label using the real API
+        const labelResponse = await shippingService.generateLabel(shipmentResponse.shipment.id);
+        
+        if (labelResponse.label_url) {
+          // Open the label in a new tab for preview
+          window.open(labelResponse.label_url, '_blank');
+        } else {
+          throw new Error('No label URL received from API');
+        }
+      } else {
+        // Use existing shipment to generate label
+        const labelResponse = await shippingService.generateLabel(createdShipment.shipment.id);
+        
+        if (labelResponse.label_url) {
+          // Open the label in a new tab for preview
+          window.open(labelResponse.label_url, '_blank');
+        } else {
+          throw new Error('No label URL received from API');
+        }
       }
-
-      console.log('PDF blob generated successfully, size:', pdfBlob.size);
-      
-      // Clean up previous blob URL if exists
-      if (pdfBlobUrl) {
-        URL.revokeObjectURL(pdfBlobUrl);
-      }
-      
-      // Create new object URL for the PDF
-      const newPdfUrl = URL.createObjectURL(pdfBlob);
-      setPdfBlobUrl(newPdfUrl);
-      
-      // Open the preview modal
-      setShowPreview(true);
-      
-      console.log('Preview modal opened with PDF URL:', newPdfUrl);
-      
     } catch (error) {
       console.error('Error in handlePreviewAndPrint:', error);
-      alert(`Failed to generate PDF preview. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      alert(`Failed to generate label preview. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsGeneratingPreview(false);
     }
@@ -315,6 +351,30 @@ export default function PurchaseLabelPage() {
 
         {/* Main Content */}
         <div className="space-y-8">
+          {/* Show error message if profile failed to load */}
+          {shipmentError && (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <Icon name="AlertCircle" size={20} className="text-red-600" />
+                  <p className="text-red-800 font-medium">{shipmentError}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Show loading state while profile is loading */}
+          {!senderData && !shipmentError && (
+            <Card className="border-blue-200 bg-blue-50">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-2">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+                  <p className="text-blue-800 font-medium">Loading your profile information...</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left Column - Payment Form */}
             <div className="lg:col-span-2 space-y-6">
@@ -492,24 +552,30 @@ export default function PurchaseLabelPage() {
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between">
                       <span className="text-muted-foreground">Shipping cost</span>
-                      <span className="font-medium">${mockOrderData.selectedQuote.price}</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Tax</span>
                       <span className="font-medium">$0.00</span>
                     </div>
                   </div>
                   <Separator />
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold">Total</span>
-                    <span className="text-xl font-bold">${mockOrderData.selectedQuote.price}</span>
+                    <span className="text-xl font-bold">$0.00</span>
                   </div>
+
+                  {/* Error Display */}
+                  {shipmentError && (
+                    <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                      <div className="flex items-center space-x-2">
+                        <Icon name="AlertCircle" size={16} className="text-red-600" />
+                        <span className="text-sm text-red-700">{shipmentError}</span>
+                      </div>
+                    </div>
+                  )}
 
                   <Button
                     id="parcego-payment-cta-btn"
                     type="button"
                     className="w-full bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 h-12 text-base font-medium transition-all duration-300 ease-out hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                    disabled={isProcessing}
+                    disabled={isProcessing || !formData || !senderData}
                     onClick={(e) => {
                       e.preventDefault();
                       handlePayment();
@@ -519,7 +585,7 @@ export default function PurchaseLabelPage() {
                     {isProcessing ? (
                       <div className="flex items-center space-x-2">
                         <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                        <span>Processing payment...</span>
+                        <span>Creating shipment...</span>
                       </div>
                     ) : (
                       <div className="flex items-center space-x-2">
@@ -570,23 +636,23 @@ export default function PurchaseLabelPage() {
                 </div>
                 <div className="space-y-1">
                   <span className="font-medium text-gray-800">Recipient:</span>
-                  <p className="text-gray-900">{mockOrderData.recipientName}</p>
+                  <p className="text-gray-900">{formData?.recipientName || 'N/A'}</p>
                 </div>
                 <div className="space-y-1">
                   <span className="font-medium text-gray-800">Destination:</span>
-                  <p className="text-gray-900">{mockOrderData.recipientCity}, {mockOrderData.recipientProvince}</p>
+                  <p className="text-gray-900">{formData?.recipientCity || 'N/A'}, {formData?.recipientProvince || 'N/A'}</p>
                 </div>
                 <div className="space-y-1">
                   <span className="font-medium text-gray-800">Service:</span>
-                  <p className="text-gray-900 capitalize">{mockOrderData.serviceType}</p>
+                  <p className="text-gray-900 capitalize">{formData?.serviceType || 'N/A'}</p>
                 </div>
                 <div className="space-y-1">
                   <span className="font-medium text-gray-800">Delivery Time:</span>
-                  <p className="text-gray-900">{mockOrderData.selectedQuote.deliveryTime}</p>
+                  <p className="text-gray-900">{formData?.selectedQuote?.deliveryTime || 'N/A'}</p>
                 </div>
                 <div className="space-y-1">
                   <span className="font-medium text-gray-800">Total Paid:</span>
-                  <p className="text-gray-900 font-semibold text-base">${mockOrderData.selectedQuote.price}</p>
+                  <p className="text-gray-900 font-semibold text-base">${formData?.selectedQuote?.price || 'N/A'}</p>
                 </div>
               </div>
             </div>

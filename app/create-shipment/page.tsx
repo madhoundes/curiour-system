@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useWizardBack } from "@/lib/wizard";
 import { useShipment } from "@/lib/shipment-context";
@@ -11,18 +11,20 @@ import { Label } from "@/components/ui/label";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { createStepperSteps, Stepper } from "@/components/ui/stepper";
+import { profileService } from "@/lib/api/profile";
+import { shippingService } from "@/lib/api/shipping";
+import type { UserProfile } from "@/lib/api/types";
 
-
-// Mock merchant data - in real app this would come from auth context
-const mockMerchantData = {
-  businessName: "John's Electronics Store",
-  contactName: "John Merchant",
-  address: "123 Business St, Suite 100",
-  city: "Toronto",
-  province: "ON",
-  postalCode: "M5V3A8",
-  phone: "(555) 123-4567",
-  email: "john@electronicsstore.com"
+// Default fallback data if profile loading fails
+const defaultSenderData = {
+  businessName: "Your Business",
+  contactName: "Contact Name",
+  address: "Business Address",
+  city: "City",
+  province: "Province",
+  postalCode: "Postal Code",
+  phone: "Phone Number",
+  email: "Email Address"
 };
 
 
@@ -37,19 +39,70 @@ export default function CreateShipmentPage() {
   } = useShipment();
   
   const [isLoading, setIsLoading] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(true);
+  const [senderData, setSenderData] = useState(defaultSenderData);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
+  // Load user profile data on component mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        setProfileLoading(true);
+        setProfileError(null);
+        
+        const profile = await profileService.getProfile();
+        
+        // Check if profile data is available before accessing properties
+        if (profile) {
+          // Map profile data to sender data format
+          setSenderData({
+            businessName: profile.business_name || (profile.first_name && profile.last_name ? `${profile.first_name} ${profile.last_name}` : "Your Business"),
+            contactName: (profile.first_name && profile.last_name ? `${profile.first_name} ${profile.last_name}` : "Contact Name"),
+            address: profile.street_address || "Business Address",
+            city: profile.city || "City",
+            province: profile.province || "Province", 
+            postalCode: profile.postal_code || "Postal Code",
+            phone: profile.phone_number || "Phone Number",
+            email: profile.email || "Email Address"
+          });
+        } else {
+          console.warn('Profile data is undefined, using default values');
+          // Keep default sender data if profile is undefined
+        }
+      } catch (error) {
+        console.error('Failed to load profile:', error);
+        setProfileError(error instanceof Error ? error.message : 'Failed to load profile');
+        // Keep default data if profile loading fails
+      } finally {
+        setProfileLoading(false);
+      }
+    };
+
+    loadProfile();
+  }, []);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     updateFormField(field as keyof typeof formData, value);
   };
 
-  const handleContinueToPackageDetails = () => {
-    setIsLoading(true);
-    
-    // Simulate validation and processing
-    setTimeout(() => {
-      setIsLoading(false);
+  const handleContinueToPackageDetails = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Validate form data before proceeding
+      if (!isFormValid()) {
+        throw new Error('Please fill in all required recipient information');
+      }
+
+      // In a real implementation, you might want to save draft shipment data here
+      // For now, we'll just proceed to the next step
       router.push('/package-details');
-    }, 1000);
+    } catch (error) {
+      console.error('Error proceeding to package details:', error);
+      // You could show a toast notification here
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleBackToDashboard = () => {
@@ -104,12 +157,23 @@ export default function CreateShipmentPage() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
+              {profileError && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-4">
+                  <div className="flex items-center">
+                    <Icon name="AlertTriangle" size={16} className="text-yellow-600 mr-2" />
+                    <span className="text-sm text-yellow-800">
+                      Unable to load profile data: {profileError}. Using default values.
+                    </span>
+                  </div>
+                </div>
+              )}
+              
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="parcego-sender-business-name">Business Name</Label>
                   <Input
                     id="parcego-sender-business-name"
-                    value={mockMerchantData.businessName}
+                    value={profileLoading ? "Loading..." : senderData.businessName}
                     readOnly
                     className="parcego-form__input parcego-form__input--readonly bg-gray-50"
                   />
@@ -118,7 +182,7 @@ export default function CreateShipmentPage() {
                   <Label htmlFor="parcego-sender-contact-name">Contact Name</Label>
                   <Input
                     id="parcego-sender-contact-name"
-                    value={mockMerchantData.contactName}
+                    value={profileLoading ? "Loading..." : senderData.contactName}
                     readOnly
                     className="parcego-form__input parcego-form__input--readonly bg-gray-50"
                   />
@@ -129,7 +193,7 @@ export default function CreateShipmentPage() {
                 <Label htmlFor="parcego-sender-address">Address</Label>
                 <Input
                   id="parcego-sender-address"
-                  value={mockMerchantData.address}
+                  value={profileLoading ? "Loading..." : senderData.address}
                   readOnly
                   className="parcego-form__input parcego-form__input--readonly bg-gray-50"
                 />
@@ -140,7 +204,7 @@ export default function CreateShipmentPage() {
                   <Label htmlFor="parcego-sender-city">City</Label>
                   <Input
                     id="parcego-sender-city"
-                    value={mockMerchantData.city}
+                    value={profileLoading ? "Loading..." : senderData.city}
                     readOnly
                     className="parcego-form__input parcego-form__input--readonly bg-gray-50"
                   />
@@ -149,7 +213,7 @@ export default function CreateShipmentPage() {
                   <Label htmlFor="parcego-sender-province">Province</Label>
                   <Input
                     id="parcego-sender-province"
-                    value={mockMerchantData.province}
+                    value={profileLoading ? "Loading..." : senderData.province}
                     readOnly
                     className="parcego-form__input parcego-form__input--readonly bg-gray-50"
                   />
@@ -158,7 +222,7 @@ export default function CreateShipmentPage() {
                   <Label htmlFor="parcego-sender-postal-code">Postal Code</Label>
                   <Input
                     id="parcego-sender-postal-code"
-                    value={mockMerchantData.postalCode}
+                    value={profileLoading ? "Loading..." : senderData.postalCode}
                     readOnly
                     className="parcego-form__input parcego-form__input--readonly bg-gray-50"
                   />
@@ -170,7 +234,7 @@ export default function CreateShipmentPage() {
                   <Label htmlFor="parcego-sender-phone">Phone</Label>
                   <Input
                     id="parcego-sender-phone"
-                    value={mockMerchantData.phone}
+                    value={profileLoading ? "Loading..." : senderData.phone}
                     readOnly
                     className="parcego-form__input parcego-form__input--readonly bg-gray-50"
                   />
@@ -179,7 +243,7 @@ export default function CreateShipmentPage() {
                   <Label htmlFor="parcego-sender-email">Email</Label>
                   <Input
                     id="parcego-sender-email"
-                    value={mockMerchantData.email}
+                    value={profileLoading ? "Loading..." : senderData.email}
                     readOnly
                     className="parcego-form__input parcego-form__input--readonly bg-gray-50"
                   />
