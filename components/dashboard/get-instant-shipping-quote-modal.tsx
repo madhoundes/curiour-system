@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Icon } from "@/components/ui/icon"
+import { api } from "@/lib/api"
+import type { QuoteEstimateRequest, QuoteEstimateResponse } from "@/lib/api/types"
 
 interface GetInstantShippingQuoteModalProps {
   open: boolean
@@ -28,8 +30,7 @@ interface PackageSizeOption {
 const packageSizeOptions: PackageSizeOption[] = [
   { value: "small", label: "Small", dimensions: "12x8x4 in" },
   { value: "medium", label: "Medium", dimensions: "16x12x8 in" },
-  { value: "large", label: "Large", dimensions: "20x16x12 in" },
-  { value: "extra-large", label: "Extra Large", dimensions: "24x20x16 in" }
+  { value: "large", label: "Large", dimensions: "20x16x12 in" }
 ]
 
 export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantShippingQuoteModalProps) {
@@ -41,6 +42,7 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
   const [isGenerating, setIsGenerating] = useState(false)
   const [quoteGenerated, setQuoteGenerated] = useState(false)
   const [estimatedCost, setEstimatedCost] = useState<string>("")
+  const [quoteError, setQuoteError] = useState<string>("")
 
   const handleInputChange = (field: keyof QuoteFormData, value: string) => {
     setFormData(prev => ({
@@ -55,19 +57,35 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
     }
 
     setIsGenerating(true)
+    setQuoteError("")
     
-    // Simulate API call for price calculation
-    setTimeout(() => {
+    try {
+      const quoteRequest: QuoteEstimateRequest = {
+        package_size: formData.packageSize as 'small' | 'medium' | 'large',
+        weight: parseFloat(formData.weight),
+        destination_postal_code: formData.destinationPostalCode
+      }
+
+      const response = await api.quotes.getEstimate(quoteRequest)
+      
+      setEstimatedCost(response.estimated_price.toFixed(2))
+      setQuoteGenerated(true)
+    } catch (error) {
+      console.error('Quote generation failed:', error)
+      setQuoteError(error instanceof Error ? error.message : 'Failed to generate quote. Please try again.')
+      
+      // Fallback to mock calculation
       const weight = parseFloat(formData.weight) || 1
       const baseRate = 15.99
       const weightMultiplier = weight * 2.5
-      const distanceFactor = 1.2 // Mock distance calculation
+      const distanceFactor = 1.2
       const total = (baseRate + weightMultiplier) * distanceFactor
       
       setEstimatedCost(total.toFixed(2))
       setQuoteGenerated(true)
+    } finally {
       setIsGenerating(false)
-    }, 1500)
+    }
   }
 
   const handleReset = () => {
@@ -78,6 +96,7 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
     })
     setQuoteGenerated(false)
     setEstimatedCost("")
+    setQuoteError("")
   }
 
   const handleCreateShipment = () => {
@@ -157,6 +176,17 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
             <Icon name="Calculator" size={16} className="mr-2" />
             {isGenerating ? "Generating..." : "Generate Price"}
           </Button>
+
+          {/* Error Display */}
+          {quoteError && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center">
+                <Icon name="AlertCircle" size={16} className="text-red-600 mr-2" />
+                <span className="text-sm font-medium text-red-800">Error</span>
+              </div>
+              <p className="text-sm text-red-700 mt-1">{quoteError}</p>
+            </div>
+          )}
 
           {/* Estimated Cost Display */}
           {quoteGenerated && estimatedCost && (

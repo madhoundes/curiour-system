@@ -7,7 +7,7 @@ import { Icon } from "@/components/ui/icon";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import type { Shipment } from "@/lib/mock/shipments";
-import { generateAndDownloadMultipleLabels } from "@/lib/shipping-label-service";
+import { shippingService } from "@/lib/api/shipping";
 
 interface PrintLabelsModalProps {
   open: boolean;
@@ -29,19 +29,40 @@ const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({
     return shipments.filter(shipment => selectedShipmentIds.includes(shipment.id));
   }, [shipments, selectedShipmentIds]);
 
-  // Generate and download unified PDF labels
+  // Generate and download labels using real API
   const handleGenerateLabels = async () => {
     if (selectedShipments.length === 0) return;
 
     setIsGenerating(true);
     
     try {
-      await generateAndDownloadMultipleLabels(selectedShipments);
+      // Generate labels for each selected shipment using real API
+      const labelPromises = selectedShipments.map(async (shipment) => {
+        try {
+          // Convert string ID to number for API call
+          const shipmentId = parseInt(shipment.id, 10);
+          if (isNaN(shipmentId)) {
+            throw new Error(`Invalid shipment ID: ${shipment.id}`);
+          }
+          
+          const labelResponse = await shippingService.generateLabel(shipmentId);
+          if (labelResponse.label_url) {
+            // Open each label in a new tab
+            window.open(labelResponse.label_url, '_blank');
+          }
+          return labelResponse;
+        } catch (error) {
+          console.error(`Error generating label for shipment ${shipment.id}:`, error);
+          throw error;
+        }
+      });
+      
+      await Promise.all(labelPromises);
       onOpenChange(false); // Close modal after successful generation
     } catch (error) {
       console.error('Error generating labels:', error);
       // Error handling - could show a toast notification here
-      alert('Failed to generate labels. Please try again.');
+      alert('Failed to generate some labels. Please try again.');
     } finally {
       setIsGenerating(false);
     }

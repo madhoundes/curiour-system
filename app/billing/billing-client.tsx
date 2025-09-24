@@ -33,7 +33,7 @@ import { type Payment, type Invoice, type PaymentMethod, type TaxDocument } from
 import { mockPayments, mockInvoices, mockPaymentMethods, mockTaxDocuments } from "./mock-data"
 
 // Logo utility functions for PDF generation
-import { loadLogoForPDF, addLogoToPDF, downloadFile, generatePdfInvoice } from "@/lib/utils"
+import { loadLogoForPDF, addLogoToPDF, generatePdfInvoice } from "@/lib/utils"
 
 // Function to generate invoice content for download
 const generateInvoiceContent = (invoice: Invoice): string => {
@@ -727,14 +727,7 @@ function InvoicesTab({ invoices }: { invoices: Invoice[] }) {
                 });
               } catch (error) {
                 console.error('Failed to generate combined PDF invoice:', error);
-                // Fallback to text invoice
-                const invoiceSeparator = '\n' + '='.repeat(50) + '\n';
-                const allInvoicesContent = invoices.map(invoice => {
-                  return generateInvoiceContent(invoice);
-                }).join(invoiceSeparator);
-                
-                const filename = `all-invoices-${new Date().toISOString().split('T')[0]}.txt`;
-                downloadFile(allInvoicesContent, filename, 'text/plain');
+                alert('Failed to generate invoices. Please try again.');
               }
             }}
           >
@@ -804,10 +797,7 @@ function InvoicesTab({ invoices }: { invoices: Invoice[] }) {
                           });
                         } catch (error) {
                           console.error('Failed to generate PDF invoice:', error);
-                          // Fallback to text invoice
-                          const invoiceContent = generateInvoiceContent(invoice);
-                          const filename = `invoice-${invoice.id}-${new Date(invoice.date).toISOString().split('T')[0]}.txt`;
-                          downloadFile(invoiceContent, filename, 'text/plain');
+                          alert('Failed to generate invoice. Please try again.');
                         }
                       }}
                       id={`parcego-download-invoice-${invoice.id}-btn`}
@@ -880,10 +870,7 @@ function InvoicesTab({ invoices }: { invoices: Invoice[] }) {
                                 });
                               } catch (error) {
                                 console.error('Failed to generate PDF invoice:', error);
-                                // Fallback to text invoice
-                                const invoiceContent = generateInvoiceContent(invoice);
-                                const filename = `invoice-${invoice.id}-${new Date(invoice.date).toISOString().split('T')[0]}.txt`;
-                                downloadFile(invoiceContent, filename, 'text/plain');
+                                alert('Failed to generate invoice. Please try again.');
                               }
                             }}
                             id={`parcego-download-invoice-${invoice.id}-btn`}
@@ -1463,9 +1450,7 @@ function TaxDocumentsTab({ documents }: { documents: TaxDocument[] }) {
                 variant="ghost" 
                 size="sm"
                 onClick={() => {
-                  const docContent = generateTaxDocumentContent(doc);
-                  const filename = `tax-document-${doc.type.toLowerCase()}-${doc.year}-${new Date(doc.issuedDate).toISOString().split('T')[0]}.txt`;
-                  downloadFile(docContent, filename, 'text/plain');
+                  alert('Tax document download is not available. Please contact support.');
                 }}
                 id={`parcego-download-tax-doc-${doc.id}-btn`}
                 className="w-full sm:w-auto transition-all duration-300 hover:scale-105 hover:shadow-md hover:shadow-blue-200/50 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 focus:ring-2 focus:ring-blue-200 focus:ring-offset-1 text-sm"

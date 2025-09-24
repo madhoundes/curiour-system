@@ -1,0 +1,39 @@
+{
+  "sender_address": {
+    "contact_name": "John Doe",
+    "company_name": "Acme Corp",
+    "street_address": "123 Main St",
+    "street_address_2": "Suite 100",
+    "city": "Toronto",
+    "province": "Ontario",
+    "postal_code": "M5V2A8",
+    "country": "Canada",
+    "phone_number": "+1-416-555-0123",
+    "email": "john@acme.com"
+  },
+  "receiver_address": {
+    "contact_name": "Jane Smith",
+    "company_name": "Tech Solutions",
+    "street_address": "456 Oak Ave",
+    "city": "Toronto",
+    "province": "Ontario",
+    "postal_code": "M5H2N2",
+    "country": "Canada",
+    "phone_number": "+1-416-555-0456",
+    "email": "jane@techsolutions.com"
+  },
+  "package": {
+    "package_type": "box",
+    "weight": 2.5,
+    "length": 30,
+    "width": 20,
+    "height": 15,
+    "declared_value": 150.00,
+    "contents_description": "Electronics",
+    "fragile": true,
+    "requires_signature": false,
+    "special_instructions": "Handle with care"
+  },
+  "special_instructions": "Deliver to reception desk",
+  "delivery_notes": "Customer prefers morning delivery"
+}

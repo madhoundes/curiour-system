@@ -30,6 +30,16 @@ export interface ShipmentFormData {
   valuable: boolean;
   insurance: boolean;
   insuranceAmount?: string;
+  
+  // Selected quote information
+  selectedQuote?: {
+    id: string;
+    name: string;
+    description: string;
+    price: number;
+    deliveryTime: string;
+    features: string[];
+  };
 }
 
 // Context interface

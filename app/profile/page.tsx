@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { profileService } from "@/lib/api/profile";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -76,18 +77,22 @@ export default function ProfileAccountPage() {
   const prefersReducedMotion =
     typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+  // Loading and error states
+  const [isLoading, setIsLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
+
   const defaultBusiness: BusinessInfo = useMemo(
     () => ({
-      businessName: "Acme Electronics LLC",
-      contactName: "Jane Merchant",
-      email: "jane@acme.com",
-      phone: "(555) 111-2222",
-      addressLine1: "123 Commerce Ave",
+      businessName: "",
+      contactName: "",
+      email: "",
+      phone: "",
+      addressLine1: "",
       addressLine2: "",
-      city: "New York",
-      state: "NY",
-      zip: "10001",
-      country: "USA",
+      city: "",
+      state: "",
+      zip: "",
+      country: "",
     }),
     []
   );
@@ -148,16 +153,58 @@ export default function ProfileAccountPage() {
   });
 
   useEffect(() => {
-    try {
-      const b = localStorage.getItem(STORAGE_KEYS.business);
-      const s = localStorage.getItem(STORAGE_KEYS.settings);
-      const n = localStorage.getItem(STORAGE_KEYS.notifications);
-      const i = localStorage.getItem(STORAGE_KEYS.integrations);
-      if (b) businessForm.reset(JSON.parse(b));
-      if (s) settingsForm.reset(JSON.parse(s));
-      if (n) notificationsForm.reset(JSON.parse(n));
-      if (i) integrationsForm.reset(JSON.parse(i));
-    } catch {}
+    const loadProfile = async () => {
+      try {
+        setIsLoading(true);
+        setProfileError(null);
+        
+        const profileData = await profileService.getProfile();
+        
+        // Map API response to form data
+        const businessData: BusinessInfo = {
+          businessName: profileData.business_name || "",
+          contactName: `${profileData.first_name || ""} ${profileData.last_name || ""}`.trim(),
+          email: profileData.email || "",
+          phone: profileData.phone_number || "",
+          addressLine1: profileData.street_address || "",
+          addressLine2: profileData.street_address_2 || "",
+          city: profileData.city || "",
+          state: profileData.province || "",
+          zip: profileData.postal_code || "",
+          country: profileData.country || "",
+        };
+        
+        businessForm.reset(businessData);
+        
+        // Load other data from localStorage as fallback for now
+        const s = localStorage.getItem(STORAGE_KEYS.settings);
+        const n = localStorage.getItem(STORAGE_KEYS.notifications);
+        const i = localStorage.getItem(STORAGE_KEYS.integrations);
+        if (s) settingsForm.reset(JSON.parse(s));
+        if (n) notificationsForm.reset(JSON.parse(n));
+        if (i) integrationsForm.reset(JSON.parse(i));
+        
+      } catch (error: any) {
+        console.error('Failed to load profile:', error);
+        setProfileError(error.message || 'Failed to load profile data');
+        
+        // Fallback to localStorage for all data if API fails
+        try {
+          const b = localStorage.getItem(STORAGE_KEYS.business);
+          const s = localStorage.getItem(STORAGE_KEYS.settings);
+          const n = localStorage.getItem(STORAGE_KEYS.notifications);
+          const i = localStorage.getItem(STORAGE_KEYS.integrations);
+          if (b) businessForm.reset(JSON.parse(b));
+          if (s) settingsForm.reset(JSON.parse(s));
+          if (n) notificationsForm.reset(JSON.parse(n));
+          if (i) integrationsForm.reset(JSON.parse(i));
+        } catch {}
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadProfile();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -166,12 +213,43 @@ export default function ProfileAccountPage() {
   const [notificationsMsg, setNotificationsMsg] = useState<string | null>(null);
   const [integrationsMsg, setIntegrationsMsg] = useState<string | null>(null);
 
-  const handleSave = <T,>(key: string, data: T, onOk: (msg: string) => void, label: string) => {
-    try {
-      localStorage.setItem(key, JSON.stringify(data));
-      onOk(`${label} saved`);
-    } catch {
-      onOk(`Could not save ${label}`);
+  const handleSave = async <T,>(key: string, data: T, onOk: (msg: string) => void, label: string) => {
+    // For business info, use API; for others, use localStorage for now
+    if (key === STORAGE_KEYS.business) {
+      try {
+        const businessData = data as BusinessInfo;
+        
+        // Map form data to API format
+        const updateData = {
+          business_name: businessData.businessName,
+          first_name: businessData.contactName.split(' ')[0] || "",
+          last_name: businessData.contactName.split(' ').slice(1).join(' ') || "",
+          phone_number: businessData.phone,
+          street_address: businessData.addressLine1,
+          street_address_2: businessData.addressLine2,
+          city: businessData.city,
+          province: businessData.state,
+          postal_code: businessData.zip,
+          country: businessData.country,
+        };
+        
+        await profileService.updateProfile(updateData);
+        
+        // Also save to localStorage as backup
+        localStorage.setItem(key, JSON.stringify(data));
+        onOk(`${label} saved successfully`);
+      } catch (error: any) {
+        console.error('Failed to save profile:', error);
+        onOk(`Failed to save ${label}: ${error.message || 'Unknown error'}`);
+      }
+    } else {
+      // For other data types, use localStorage
+      try {
+        localStorage.setItem(key, JSON.stringify(data));
+        onOk(`${label} saved`);
+      } catch {
+        onOk(`Could not save ${label}`);
+      }
     }
   };
 
@@ -244,6 +322,23 @@ export default function ProfileAccountPage() {
                   <CardDescription>Keep your company and contact info up to date.</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {/* Loading State */}
+                  {isLoading && (
+                    <Alert className="mb-3" role="status" aria-live="polite">
+                      <AlertTitle>Loading</AlertTitle>
+                      <AlertDescription>Loading your profile information...</AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Error State */}
+                  {profileError && (
+                    <Alert className="mb-3 border-red-200 bg-red-50" role="alert" aria-live="assertive">
+                      <AlertTitle className="text-red-800">Error</AlertTitle>
+                      <AlertDescription className="text-red-700">{profileError}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Success/Info Messages */}
                   {businessMsg && (
                     <Alert className="mb-3" role="status" aria-live="polite">
                       <AlertTitle>Business</AlertTitle>

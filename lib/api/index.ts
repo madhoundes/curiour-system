@@ -18,16 +18,31 @@ export { authService, AuthService } from './auth';
 // Admin service
 export { adminService } from './admin';
 
+// Quotes service
+export { quotesService } from './quotes';
+
+// Profile service
+export { profileService } from './profile';
+
+// Shipping service
+export { shippingService } from './shipping';
+
 // Import for internal use
 import { apiClient } from './client';
 import { authService } from './auth';
 import { adminService } from './admin';
+import { quotesService } from './quotes';
+import { profileService } from './profile';
+import { shippingService } from './shipping';
 
 // Utility functions for API integration
 export const api = {
   client: apiClient,
   auth: authService,
   admin: adminService,
+  quotes: quotesService,
+  profile: profileService,
+  shipping: shippingService,
 };
 
 export default api;
