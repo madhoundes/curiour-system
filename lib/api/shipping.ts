@@ -28,6 +28,60 @@ import type {
 
 export class ShippingService {
   /**
+   * Get list of user shipments with optional pagination
+   */
+  async getShipments(params?: {
+    skip?: number;
+    limit?: number;
+    status?: string;
+  }): Promise<DetailedShipment[]> {
+    try {
+      const response = await apiClient.get<DetailedShipment[]>(
+        API_ENDPOINTS.SHIPMENTS.LIST,
+        { params }
+      );
+
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        throw new Error('Authentication required');
+      }
+      throw new Error(error.message || 'Failed to get shipments');
+    }
+  }
+
+  /**
+   * Search user shipments by tracking code or ID
+   */
+  async searchShipments(query: string, params?: {
+    skip?: number;
+    limit?: number;
+  }): Promise<DetailedShipment[]> {
+    try {
+      if (!query || query.trim() === '') {
+        throw new Error('Search query is required');
+      }
+
+      const searchParams = {
+        q: query.trim(),
+        ...params
+      };
+
+      const response = await apiClient.get<DetailedShipment[]>(
+        API_ENDPOINTS.SHIPMENTS.SEARCH,
+        { params: searchParams }
+      );
+
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        throw new Error('Authentication required');
+      }
+      throw new Error(error.message || 'Failed to search shipments');
+    }
+  }
+
+  /**
    * Create a new shipment with sender/receiver addresses and package details
    */
   async createShipment(data: CreateShipmentRequest): Promise<CreateShipmentResponse> {

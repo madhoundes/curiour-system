@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
+import { ShippingLabelData } from '@/components/pdf/polished-shipping-label';
 
 // Types for shipment form data
 export interface ShipmentFormData {
@@ -51,7 +52,7 @@ interface ShipmentContextType {
   getFormData: () => ShipmentFormData;
   isFormValid: () => boolean;
   generateTrackingNumber: () => string;
-  getShippingLabelData: () => Record<string, unknown>; // For PDF generation
+  getShippingLabelData: () => ShippingLabelData; // For PDF generation
 }
 
 // Create context

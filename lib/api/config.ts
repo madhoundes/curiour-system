@@ -36,6 +36,7 @@ export const API_ENDPOINTS = {
   SHIPMENTS: {
     CREATE: '/shipments',
     LIST: '/shipments',
+    SEARCH: '/shipments/search',
     GET: '/shipments/:id',
     UPDATE: '/shipments/:id',
     DELETE: '/shipments/:id',

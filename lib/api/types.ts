@@ -247,7 +247,7 @@ export interface CreateShipmentRequest {
 
 export interface Shipment {
   id: number;
-  tracking_number: string;
+  user_id: number;
   tracking_code: string;
   status: 'draft' | 'paid' | 'in_transit' | 'delivered' | 'cancelled';
   sender_address: Address;
@@ -257,10 +257,11 @@ export interface Shipment {
   delivery_notes?: string;
   estimated_delivery_date?: string;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
 }
 
 export interface CreateShipmentResponse {
+  message: string;
   shipment: Shipment;
 }
 

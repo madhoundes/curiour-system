@@ -32,8 +32,9 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-import type { Shipment, ShipmentStatus } from "@/lib/mock/shipments";
-import { formatCurrency, getMockShipments } from "@/lib/mock/shipments";
+import { formatCurrency } from "@/lib/mock/shipments";
+import { ShippingService } from "@/lib/api/shipping";
+import type { DetailedShipment, ShipmentStatus } from "@/lib/api/types";
 import PrintLabelsModal from "./print-labels-modal";
 import CancelShipmentDialog from "./cancel-shipment-dialog";
 
@@ -81,6 +82,48 @@ const getStatusBadge = (status: ShipmentStatus) => {
       className: "bg-gray-50 text-gray-700 border-gray-300",
       label: "Cancelled",
       icon: "X"
+    },
+    DRAFT: {
+      variant: "outline" as const,
+      className: "bg-gray-50 text-gray-600 border-gray-200",
+      label: "Draft",
+      icon: "Edit"
+    },
+    PAID: {
+      variant: "default" as const,
+      className: "bg-green-50 text-green-800 border-green-200",
+      label: "Paid",
+      icon: "DollarSign"
+    },
+    PENDING_PAYMENT: {
+      variant: "outline" as const,
+      className: "bg-yellow-50 text-yellow-800 border-yellow-200",
+      label: "Pending Payment",
+      icon: "Clock"
+    },
+    LABEL_GENERATED: {
+      variant: "outline" as const,
+      className: "bg-purple-50 text-purple-800 border-purple-200",
+      label: "Label Generated",
+      icon: "FileText"
+    },
+    PICKED_UP: {
+      variant: "secondary" as const,
+      className: "bg-blue-50 text-blue-800 border-blue-200",
+      label: "Picked Up",
+      icon: "Package"
+    },
+    IN_WAREHOUSE: {
+      variant: "secondary" as const,
+      className: "bg-indigo-50 text-indigo-800 border-indigo-200",
+      label: "In Warehouse",
+      icon: "Warehouse"
+    },
+    UNDELIVERED: {
+      variant: "destructive" as const,
+      className: "bg-orange-50 text-orange-800 border-orange-200",
+      label: "Undelivered",
+      icon: "AlertTriangle"
     }
   };
 
@@ -97,14 +140,18 @@ const statusOptions = [
   { value: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
   { value: "FAILED", label: "Failed" },
   { value: "CANCELLED", label: "Cancelled" },
+  { value: "DRAFT", label: "Draft" },
+  { value: "PAID", label: "Paid" },
 ];
 
 export default function ShipmentsPage() {
   const router = useRouter();
   
   // Data loading state for consistent SSR/CSR
-  const [allShipments, setAllShipments] = useState<Shipment[]>([]);
+  const [allShipments, setAllShipments] = useState<DetailedShipment[]>([]);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   
   const [query, setQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
@@ -113,23 +160,61 @@ export default function ShipmentsPage() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showPrintLabelsModal, setShowPrintLabelsModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
-  const [shipmentToCancel, setShipmentToCancel] = useState<{ id: string; trackingNumber: string } | null>(null);
+  const [shipmentToCancel, setShipmentToCancel] = useState<{ id: number; tracking_code: string } | null>(null);
   const [showReorderDialog, setShowReorderDialog] = useState(false);
-  const [shipmentToReorder, setShipmentToReorder] = useState<Shipment | null>(null);
+  const [shipmentToReorder, setShipmentToReorder] = useState<DetailedShipment | null>(null);
   const [isReordering, setIsReordering] = useState(false);
 
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [pageSize, setPageSize] = useState<number>(25);
   const [pageIndex, setPageIndex] = useState<number>(0);
   
-  // Load data on client to prevent hydration mismatches
-  React.useEffect(() => {
-    const shipments = getMockShipments();
-    setAllShipments(shipments);
-    setIsDataLoaded(true);
-  }, []);
+  const shippingService = new ShippingService();
 
-  const handleToggleSelect = (id: string) => {
+  // Load shipments data from API
+  React.useEffect(() => {
+    const loadShipments = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        let shipments: DetailedShipment[];
+        
+        if (query.trim()) {
+          // Use search API when there's a search query
+          shipments = await shippingService.searchShipments(query, {
+            skip: pageIndex * pageSize,
+            limit: pageSize
+          });
+        } else {
+          // Use list API for normal loading
+          const params: any = {
+            skip: pageIndex * pageSize,
+            limit: pageSize
+          };
+          
+          if (selectedStatus !== "ALL") {
+            params.status = selectedStatus;
+          }
+          
+          shipments = await shippingService.getShipments(params);
+        }
+        
+        setAllShipments(shipments);
+        setIsDataLoaded(true);
+      } catch (err: any) {
+        console.error('Failed to load shipments:', err);
+        setError(err.message || 'Failed to load shipments');
+        setAllShipments([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadShipments();
+  }, [query, selectedStatus, pageIndex, pageSize]);
+
+  const handleToggleSelect = (id: number) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -138,7 +223,7 @@ export default function ShipmentsPage() {
     });
   };
 
-  const handleToggleSelectAllVisible = (ids: string[]) => {
+  const handleToggleSelectAllVisible = (ids: number[]) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       const allSelected = ids.every((id) => next.has(id));
@@ -151,35 +236,64 @@ export default function ShipmentsPage() {
     });
   };
 
-  const handleCancelShipment = (shipmentId: string) => {
+  const handleCancelShipment = async (shipmentId: number) => {
     try {
-      // Find the shipment and update its status to CANCELLED
-      const shipmentIndex = allShipments.findIndex(s => s.id === shipmentId);
-      if (shipmentIndex !== -1) {
-        allShipments[shipmentIndex].status = "CANCELLED";
-        allShipments[shipmentIndex].updatedAt = new Date().toISOString();
-        
-        // Force re-render by updating state
-        setQuery(query); // This will trigger a re-filter
-        
-        // Show success message
-        alert(`Shipment ${shipmentId} has been cancelled successfully.`);
-      } else {
-        throw new Error(`Shipment ${shipmentId} not found`);
-      }
-    } catch (error) {
+      // Use the API to update shipment status to CANCELLED
+      await shippingService.updateShipmentStatus(shipmentId, {
+        status: "CANCELLED",
+        change_reason: "Cancelled by user"
+      });
+      
+      // Reload the shipments data to reflect the change
+      const loadShipments = async () => {
+        try {
+          setIsLoading(true);
+          setError(null);
+          
+          let shipments: DetailedShipment[];
+          
+          if (query.trim()) {
+            shipments = await shippingService.searchShipments(query, {
+              skip: pageIndex * pageSize,
+              limit: pageSize
+            });
+          } else {
+            const params: any = {
+              skip: pageIndex * pageSize,
+              limit: pageSize
+            };
+            
+            if (selectedStatus !== "ALL") {
+              params.status = selectedStatus;
+            }
+            
+            shipments = await shippingService.getShipments(params);
+          }
+          
+          setAllShipments(shipments);
+        } catch (err: any) {
+          console.error('Failed to reload shipments:', err);
+          setError(err.message || 'Failed to reload shipments');
+        } finally {
+          setIsLoading(false);
+        }
+      };
+      
+      await loadShipments();
+      alert(`Shipment ${shipmentId} has been cancelled successfully.`);
+    } catch (error: any) {
       console.error("Failed to cancel shipment:", error);
-      alert(`Failed to cancel shipment ${shipmentId}. Please try again.`);
+      alert(`Failed to cancel shipment ${shipmentId}. ${error.message || 'Please try again.'}`);
     }
   };
 
-  const openCancelDialog = (shipment: Shipment) => {
-    setShipmentToCancel({ id: shipment.id, trackingNumber: shipment.trackingNumber });
+  const openCancelDialog = (shipment: DetailedShipment) => {
+    setShipmentToCancel({ id: shipment.id, tracking_code: shipment.tracking_code });
     setShowCancelDialog(true);
   };
 
   // Enhanced reorder functionality with better UX
-  const handleReorderShipment = async (shipment: Shipment) => {
+  const handleReorderShipment = async (shipment: DetailedShipment) => {
     setShipmentToReorder(shipment);
     setShowReorderDialog(true);
   };
@@ -195,16 +309,16 @@ export default function ShipmentsPage() {
       
       // Navigate to create shipment with pre-filled data
       const queryParams = new URLSearchParams({
-        from: shipmentToReorder.id,
-        recipient: shipmentToReorder.recipient.name,
-        address: shipmentToReorder.recipient.address1,
-        city: shipmentToReorder.recipient.city,
-        province: shipmentToReorder.recipient.province || '',
-        postalCode: shipmentToReorder.recipient.postalCode,
-        country: shipmentToReorder.recipient.country,
-        service: shipmentToReorder.service,
-        weight: shipmentToReorder.weightKg.toString(),
-        notes: `Reordered from shipment ${shipmentToReorder.trackingNumber}`
+        from: shipmentToReorder.id.toString(),
+        recipient: shipmentToReorder.receiver_address.contact_name,
+        address: shipmentToReorder.receiver_address.street_address,
+        city: shipmentToReorder.receiver_address.city,
+        province: shipmentToReorder.receiver_address.province || '',
+        postalCode: shipmentToReorder.receiver_address.postal_code,
+        country: shipmentToReorder.receiver_address.country,
+        service: 'standard', // Default service since it's not in DetailedShipment
+        weight: shipmentToReorder.package.weight.toString(),
+        notes: `Reordered from shipment ${shipmentToReorder.tracking_code}`
       });
 
       router.push(`/create-shipment?${queryParams.toString()}`);
@@ -243,13 +357,13 @@ export default function ShipmentsPage() {
     
     const rows = dataToExport.map((s) => ({
       id: s.id,
-      trackingNumber: s.trackingNumber,
-      date: s.createdAt,
-      recipient: s.recipient.name,
-      service: s.service,
+      trackingNumber: s.tracking_code,
+      date: s.created_at,
+      recipient: s.receiver_address.contact_name,
+      service: 'Standard', // Default service since it's not in DetailedShipment
       courier: "Parcego",
-      weightKg: s.weightKg,
-      cost: s.cost,
+      weight: s.package.weight,
+      cost: s.billing.amount,
       status: s.status,
     }));
     const header = Object.keys(rows[0] ?? {}).join(",");
@@ -274,30 +388,14 @@ export default function ShipmentsPage() {
   };
 
   const filtered = useMemo(() => {
-    // Return empty array while data is loading
-    if (!isDataLoaded || allShipments.length === 0) return [];
+    // Since we're now handling filtering server-side via API calls,
+    // we just return the allShipments data directly
+    if (!isDataLoaded || !Array.isArray(allShipments) || allShipments.length === 0) return [];
     
-    const q = query.trim().toLowerCase();
-    let list = allShipments;
-    if (q) {
-      list = list.filter((s) => {
-        return (
-          s.id.toLowerCase().includes(q) ||
-          s.trackingNumber.toLowerCase().includes(q) ||
-          s.recipient.name.toLowerCase().includes(q) ||
-          s.recipient.city.toLowerCase().includes(q) ||
-          (s.recipient.province?.toLowerCase() ?? "").includes(q) ||
-          s.recipient.address1.toLowerCase().includes(q)
-        );
-      });
-    }
-    if (selectedStatus && selectedStatus !== "ALL") {
-      list = list.filter((s) => s.status === selectedStatus);
-    }
-    // Sort: most recent first
-    list = list.slice().sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+    // Sort: most recent first (in case API doesn't sort)
+    const list = allShipments.slice().sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
     return list;
-  }, [query, selectedStatus, allShipments, isDataLoaded]);
+  }, [allShipments, isDataLoaded]);
 
   // Log selection changes for debugging (removed empty effect to prevent warnings)
   React.useEffect(() => {
@@ -361,6 +459,34 @@ export default function ShipmentsPage() {
     );
   }
 
+  // Show error state if there's an error
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          title="Shipments"
+          description="Manage and track all your shipments in one place"
+        />
+        <Card>
+          <CardContent className="p-6">
+            <div className="text-center">
+              <Icon name="AlertCircle" className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Failed to Load Shipments</h3>
+              <p className="text-gray-600 mb-4">{error}</p>
+              <Button 
+                onClick={() => window.location.reload()} 
+                variant="outline"
+              >
+                <Icon name="RefreshCw" className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -376,17 +502,23 @@ export default function ShipmentsPage() {
         </CardHeader>
         <CardContent>
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
+            <div className="flex-1 relative">
               <Input
                 placeholder="Search shipments by tracking number, recipient, or address..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="w-full"
                 id="parcego-shipments-search-input"
+                disabled={isLoading}
               />
+              {isLoading && (
+                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                  <Icon name="Loader2" className="h-4 w-4 animate-spin text-gray-400" />
+                </div>
+              )}
             </div>
             <div className="w-full sm:w-48">
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <Select value={selectedStatus} onValueChange={setSelectedStatus} disabled={isLoading}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
@@ -487,14 +619,14 @@ export default function ShipmentsPage() {
                         />
                       </td>
                       <td className="px-3 py-2 font-medium text-gray-900">{s.id}</td>
-                      <td className="px-3 py-2">{new Date(s.createdAt).toLocaleDateString()}</td>
-                      <td className="px-3 py-2">{s.recipient.name}</td>
-                      <td className="px-3 py-2">{s.service}</td>
+                      <td className="px-3 py-2">{new Date(s.created_at).toLocaleDateString()}</td>
+                      <td className="px-3 py-2">{s.receiver_address.contact_name}</td>
+                      <td className="px-3 py-2">Standard</td>
                       <td className="px-3 py-2">Parcego</td>
-                      <td className="px-3 py-2">{s.weightKg.toFixed(2)} kg</td>
+                      <td className="px-3 py-2">{s.package.weight.toFixed(2)} kg</td>
                       <td className="px-3 py-2">
                         {(() => {
-                          const badgeConfig = getStatusBadge(s.status);
+                          const badgeConfig = getStatusBadge(s.status as ShipmentStatus);
                           return (
                             <Badge 
                               variant={badgeConfig.variant}
@@ -507,7 +639,7 @@ export default function ShipmentsPage() {
                           );
                         })()}
                       </td>
-                      <td className="px-3 py-2">{formatCurrency(s.cost)}</td>
+                      <td className="px-3 py-2">{formatCurrency(parseFloat(s.billing.amount))}</td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1">
                           {/* View Details Button */}
@@ -700,20 +832,20 @@ export default function ShipmentsPage() {
               {shipmentToReorder && (
                 <div className="space-y-3">
                   <p>
-                    Create a new shipment based on <strong>{shipmentToReorder.trackingNumber}</strong>?
+                    Create a new shipment based on <strong>{shipmentToReorder.tracking_code}</strong>?
                   </p>
                   <div className="bg-white/40 p-3 rounded-lg space-y-2 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-600">Recipient:</span>
-                      <span className="font-medium">{shipmentToReorder.recipient.name}</span>
+                      <span className="font-medium">{shipmentToReorder.receiver_address.contact_name}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Service:</span>
-                      <span className="font-medium">{shipmentToReorder.service}</span>
+                      <span className="font-medium">Standard</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-600">Weight:</span>
-                      <span className="font-medium">{shipmentToReorder.weightKg.toFixed(2)} kg</span>
+                      <span className="font-medium">{shipmentToReorder.package.weight.toFixed(2)} kg</span>
                     </div>
                   </div>
                   <p className="text-xs text-gray-500">
@@ -759,7 +891,7 @@ export default function ShipmentsPage() {
       {shipmentToCancel && (
         <CancelShipmentDialog
           shipmentId={shipmentToCancel.id}
-          trackingNumber={shipmentToCancel.trackingNumber}
+          trackingNumber={shipmentToCancel.tracking_code}
           onCancel={handleCancelShipment}
           isOpen={showCancelDialog}
           onOpenChange={setShowCancelDialog}

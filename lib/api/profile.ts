@@ -21,11 +21,12 @@ export class ProfileService {
    */
   async getProfile(): Promise<UserProfile> {
     try {
-      const response = await apiClient.get<ApiSuccessResponse<UserProfile>>(
+      const response = await apiClient.get<UserProfile>(
         API_ENDPOINTS.USERS.PROFILE
       );
 
-      return response.data.data;
+      // The API returns the profile data directly, not wrapped in a data property
+      return response.data;
     } catch (error: any) {
       console.error('Get profile failed:', error);
       

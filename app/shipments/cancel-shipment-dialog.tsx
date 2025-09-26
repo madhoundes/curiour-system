@@ -14,9 +14,9 @@ import {
 import { Icon } from "@/components/ui/icon";
 
 interface CancelShipmentDialogProps {
-  shipmentId: string;
+  shipmentId: number;
   trackingNumber: string;
-  onCancel: (shipmentId: string) => void;
+  onCancel: (shipmentId: number) => void;
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }
