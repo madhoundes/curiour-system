@@ -52,7 +52,7 @@ interface ShipmentContextType {
   getFormData: () => ShipmentFormData;
   isFormValid: () => boolean;
   generateTrackingNumber: () => string;
-  getShippingLabelData: () => ShippingLabelData; // For PDF generation
+  getShippingLabelData: () => Promise<ShippingLabelData>; // For PDF generation - now async
 }
 
 // Create context
@@ -167,7 +167,8 @@ export const ShipmentProvider: React.FC<{ children: ReactNode }> = ({ children }
   }, []);
 
   // Get data formatted for shipping label PDF
-  const getShippingLabelData = useCallback(() => {
+  const getShippingLabelData = useCallback(async () => {
+    const { getSenderFromProfile } = await import('@/lib/shipping-label-service');
     const trackingNumber = generateTrackingNumber();
     const currentDate = new Date().toLocaleDateString('en-US', {
       month: 'numeric',
@@ -175,18 +176,12 @@ export const ShipmentProvider: React.FC<{ children: ReactNode }> = ({ children }
       year: 'numeric'
     });
 
+    // Get sender information from profile
+    const senderInfo = await getSenderFromProfile();
+
     return {
       trackingNumber,
-      sender: {
-        name: "John's Electronics Store",
-        company: "John's Electronics Store",
-        address: "123 Business St, Suite 100",
-        city: "Toronto",
-        state: "ON",
-        postalCode: "M5V3A8",
-        phone: "(555) 123-4567",
-        email: "john@electronicsstore.com"
-      },
+      sender: senderInfo,
       recipient: {
         name: formData.recipientName,
         company: formData.recipientCompany || undefined,

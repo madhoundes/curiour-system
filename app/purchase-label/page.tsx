@@ -66,6 +66,23 @@ export default function PurchaseLabelPage() {
   // Generate tracking number (deferred to client to avoid SSR hydration mismatch)
   const [trackingNumber, setTrackingNumber] = useState<string>("");
   const [senderData, setSenderData] = useState<UserProfile | null>(null);
+  
+  // Order data from quote-preview
+  const [orderData, setOrderData] = useState<OrderData | null>(null);
+
+  // Payment form validation state
+  const [validationErrors, setValidationErrors] = useState<{
+    cardNumber?: string;
+    expiryDate?: string;
+    cvv?: string;
+    cardholderName?: string;
+    billingAddress?: {
+      address?: string;
+      city?: string;
+      province?: string;
+      postalCode?: string;
+    };
+  }>({});
 
   useEffect(() => {
     if (!trackingNumber) {
@@ -74,6 +91,37 @@ export default function PurchaseLabelPage() {
       setTrackingNumber(`PCG${timestamp}${random}`);
     }
   }, [trackingNumber]);
+
+  // Load order data from localStorage
+  useEffect(() => {
+    const savedOrderData = localStorage.getItem('orderData');
+    if (savedOrderData) {
+      try {
+        const parsedOrderData = JSON.parse(savedOrderData);
+        setOrderData(parsedOrderData);
+        console.log('Order data loaded:', parsedOrderData);
+      } catch (error) {
+        console.error('Failed to parse order data:', error);
+        setShipmentError('Failed to load order information. Please go back and try again.');
+      }
+    } else {
+      setShipmentError('No order data found. Please go back to quote preview and try again.');
+    }
+  }, []);
+
+  // Calculate total cost based on order data
+  const calculateTotalCost = () => {
+    if (!orderData?.selectedQuote) return 0;
+    
+    let total = orderData.selectedQuote.price;
+    
+    // Add special handling fees
+    if (orderData.fragile) total += 3.00;
+    if (orderData.valuable) total += 5.00;
+    if (orderData.insurance) total += 8.00;
+    
+    return total;
+  };
 
   // Load sender profile data
   useEffect(() => {
@@ -99,20 +147,165 @@ export default function PurchaseLabelPage() {
     loadSenderData();
   }, []);
   
-  // Payment form state with high-quality dummy data
-  const [cardNumber, setCardNumber] = useState("4242 4242 4242 4242");
-  const [expiryDate, setExpiryDate] = useState("12/28");
-  const [cvv, setCvv] = useState("123");
-  const [cardholderName, setCardholderName] = useState("John A. Smith");
+  // Payment form state - Initialize with empty values for user input
+  const [cardNumber, setCardNumber] = useState("");
+  const [expiryDate, setExpiryDate] = useState("");
+  const [cvv, setCvv] = useState("");
+  const [cardholderName, setCardholderName] = useState("");
   const [billingAddress, setBillingAddress] = useState({
-    address: "123 Business Plaza, Suite 200",
-    city: "Toronto",
-    province: "ON",
-    postalCode: "M5V 3A8"
+    address: "",
+    city: "",
+    province: "",
+    postalCode: ""
   });
+
+  // Validation functions
+  const validateCardNumber = (cardNum: string): string | undefined => {
+    const cleaned = cardNum.replace(/\s/g, '');
+    if (!cleaned) return 'Card number is required';
+    if (cleaned.length < 13 || cleaned.length > 19) return 'Card number must be 13-19 digits';
+    if (!/^\d+$/.test(cleaned)) return 'Card number must contain only digits';
+    
+    // Basic Luhn algorithm check
+    let sum = 0;
+    let isEven = false;
+    for (let i = cleaned.length - 1; i >= 0; i--) {
+      let digit = parseInt(cleaned[i]);
+      if (isEven) {
+        digit *= 2;
+        if (digit > 9) digit -= 9;
+      }
+      sum += digit;
+      isEven = !isEven;
+    }
+    if (sum % 10 !== 0) return 'Invalid card number';
+    
+    return undefined;
+  };
+
+  const validateExpiryDate = (expiry: string): string | undefined => {
+    if (!expiry) return 'Expiry date is required';
+    const match = expiry.match(/^(\d{1,2})\/(\d{2,4})$/);
+    if (!match) return 'Expiry date must be in MM/YY format';
+    
+    const month = parseInt(match[1]);
+    const year = parseInt(match[2]) + (match[2].length === 2 ? 2000 : 0);
+    
+    if (month < 1 || month > 12) return 'Invalid month';
+    
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    
+    if (year < currentYear || (year === currentYear && month < currentMonth)) {
+      return 'Card has expired';
+    }
+    
+    return undefined;
+  };
+
+  const validateCVV = (cvvValue: string): string | undefined => {
+    if (!cvvValue) return 'CVV is required';
+    if (!/^\d{3,4}$/.test(cvvValue)) return 'CVV must be 3-4 digits';
+    return undefined;
+  };
+
+  const validateCardholderName = (name: string): string | undefined => {
+    if (!name.trim()) return 'Cardholder name is required';
+    if (name.trim().length < 2) return 'Name must be at least 2 characters';
+    if (!/^[a-zA-Z\s\-\.\']+$/.test(name)) return 'Name contains invalid characters';
+    return undefined;
+  };
+
+  const validateBillingAddress = (address: typeof billingAddress) => {
+    const errors: any = {};
+    
+    if (!address.address.trim()) errors.address = 'Address is required';
+    if (!address.city.trim()) errors.city = 'City is required';
+    if (!address.province.trim()) errors.province = 'Province is required';
+    
+    const postalCodeRegex = /^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/;
+    if (!address.postalCode.trim()) {
+      errors.postalCode = 'Postal code is required';
+    } else if (!postalCodeRegex.test(address.postalCode)) {
+      errors.postalCode = 'Invalid Canadian postal code format';
+    }
+    
+    return Object.keys(errors).length > 0 ? errors : undefined;
+  };
+
+  const validateAllFields = () => {
+    const errors: any = {};
+    
+    const cardError = validateCardNumber(cardNumber);
+    if (cardError) errors.cardNumber = cardError;
+    
+    const expiryError = validateExpiryDate(expiryDate);
+    if (expiryError) errors.expiryDate = expiryError;
+    
+    const cvvError = validateCVV(cvv);
+    if (cvvError) errors.cvv = cvvError;
+    
+    const nameError = validateCardholderName(cardholderName);
+    if (nameError) errors.cardholderName = nameError;
+    
+    const addressErrors = validateBillingAddress(billingAddress);
+    if (addressErrors) errors.billingAddress = addressErrors;
+    
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  // Real-time validation handlers
+  const handleCardNumberChange = (value: string) => {
+    // Format card number with spaces
+    const formatted = value.replace(/\s/g, '').replace(/(.{4})/g, '$1 ').trim();
+    setCardNumber(formatted);
+    
+    const error = validateCardNumber(value);
+    setValidationErrors(prev => ({ ...prev, cardNumber: error }));
+  };
+
+  const handleExpiryDateChange = (value: string) => {
+    // Auto-format expiry date
+    let formatted = value.replace(/\D/g, '');
+    if (formatted.length >= 2) {
+      formatted = formatted.substring(0, 2) + '/' + formatted.substring(2, 4);
+    }
+    setExpiryDate(formatted);
+    
+    const error = validateExpiryDate(formatted);
+    setValidationErrors(prev => ({ ...prev, expiryDate: error }));
+  };
+
+  const handleCVVChange = (value: string) => {
+    const cleaned = value.replace(/\D/g, '').substring(0, 4);
+    setCvv(cleaned);
+    
+    const error = validateCVV(cleaned);
+    setValidationErrors(prev => ({ ...prev, cvv: error }));
+  };
+
+  const handleCardholderNameChange = (value: string) => {
+    setCardholderName(value);
+    
+    const error = validateCardholderName(value);
+    setValidationErrors(prev => ({ ...prev, cardholderName: error }));
+  };
+
+  const handleBillingAddressChange = (field: string, value: string) => {
+    const newAddress = { ...billingAddress, [field]: value };
+    setBillingAddress(newAddress);
+    
+    const addressErrors = validateBillingAddress(newAddress);
+    setValidationErrors(prev => ({ 
+      ...prev, 
+      billingAddress: addressErrors 
+    }));
+  };
   
   // Mock order data for testing - DEPRECATED: Use formData instead
-  // This mock data is kept for fallback purposes only
+
   
   // Helper function to create shipment request from form data
   const createShipmentRequest = (): CreateShipmentRequest => {
@@ -120,12 +313,46 @@ export default function PurchaseLabelPage() {
       throw new Error('Missing shipment data or sender information');
     }
 
+    // Validate required sender fields
+    const requiredSenderFields = ['email', 'phone_number', 'street_address', 'city', 'province', 'postal_code'];
+    for (const field of requiredSenderFields) {
+      if (!senderData[field as keyof UserProfile] || String(senderData[field as keyof UserProfile]).trim() === '') {
+        throw new Error(`Sender ${field.replace('_', ' ')} is required but missing from your profile`);
+      }
+    }
+
+    // Validate required recipient fields
+    const requiredRecipientFields = [
+      { field: 'recipientName', label: 'recipient name' },
+      { field: 'recipientAddress', label: 'recipient address' },
+      { field: 'recipientCity', label: 'recipient city' },
+      { field: 'recipientProvince', label: 'recipient province' },
+      { field: 'recipientPostalCode', label: 'recipient postal code' },
+      { field: 'recipientPhone', label: 'recipient phone' },
+      { field: 'recipientEmail', label: 'recipient email' }
+    ];
+
+    for (const { field, label } of requiredRecipientFields) {
+      if (!formData[field as keyof typeof formData] || String(formData[field as keyof typeof formData]).trim() === '') {
+        throw new Error(`${label} is required but missing`);
+      }
+    }
+
+    // Validate package dimensions
+    const dimensions = ['weight', 'length', 'width', 'height'];
+    for (const dim of dimensions) {
+      const value = parseFloat(formData[dim as keyof typeof formData] as string);
+      if (isNaN(value) || value <= 0) {
+        throw new Error(`Package ${dim} must be a valid positive number`);
+      }
+    }
+
     return {
       sender_address: {
         contact_name: senderData.business_name || `${senderData.first_name} ${senderData.last_name}` || "Contact Name",
         company_name: senderData.business_name || "",
         street_address: senderData.street_address || "",
-        street_address_2: senderData.street_address_2 || "",
+        street_address_2: senderData.street_address_2 || "N/A",
         city: senderData.city || "",
         province: senderData.province || "",
         postal_code: senderData.postal_code || "",
@@ -137,7 +364,7 @@ export default function PurchaseLabelPage() {
         contact_name: formData.recipientName,
         company_name: formData.recipientCompany || "",
         street_address: formData.recipientAddress,
-        street_address_2: "",
+        street_address_2: "N/A",
         city: formData.recipientCity,
         province: formData.recipientProvince,
         postal_code: formData.recipientPostalCode,
@@ -158,36 +385,92 @@ export default function PurchaseLabelPage() {
         special_instructions: formData.specialInstructions || ""
       },
       special_instructions: formData.specialInstructions || "",
-      delivery_notes: ""
+      delivery_notes: formData.specialInstructions || "Standard delivery"
     };
   };
   
   // Handle payment submission
   const handlePayment = async () => {
-    if (!cardNumber || !expiryDate || !cvv || !cardholderName) {
+    // Validate all fields before processing
+    if (!validateAllFields()) {
+      setShipmentError('Please correct the validation errors before proceeding');
       return;
     }
-    
+
     setIsProcessing(true);
     setShipmentError(null);
-    
-    try {
-      // Create shipment request from context data
-      const shipmentRequest = createShipmentRequest();
 
-      // Create the shipment
-      const shipment = await shippingService.createShipment(shipmentRequest);
-      setCreatedShipment(shipment);
+    try {
+      console.log('Starting payment flow...');
       
-      // Generate label
-      const labelData = await shippingService.generateLabel(shipment.shipment.id, 'standard');
-      setTrackingNumber(labelData.tracking_number);
+      // Log the data we're about to send
+      const shipmentRequest = createShipmentRequest();
+      console.log('Shipment request data:', JSON.stringify(shipmentRequest, null, 2));
       
-      setIsProcessing(false);
-      setShowConfirmation(true);
-    } catch (error) {
-      console.error('Shipment creation failed:', error);
-      setShipmentError(error instanceof Error ? error.message : 'Failed to create shipment');
+      // Validate that all required fields are present
+      console.log('Validating sender data:', senderData);
+      console.log('Validating form data:', formData);
+      
+      if (!senderData) {
+        throw new Error('Sender profile data is missing. Please refresh the page and try again.');
+      }
+      
+      if (!formData) {
+        throw new Error('Shipment form data is missing. Please go back and fill out the form again.');
+      }
+
+      // Create shipment request from context data
+      const shippingFlow = await shippingService.createShippingFlow(shipmentRequest);
+
+      console.log('Shipping flow created successfully:', shippingFlow);
+      console.log('Checkout session object:', JSON.stringify(shippingFlow.checkoutSession, null, 2));
+      console.log('Checkout session keys:', Object.keys(shippingFlow.checkoutSession || {}));
+      console.log('Checkout URL value:', shippingFlow.checkoutSession?.checkout_url);
+
+      // Handle Stripe checkout session
+      // The backend should return either a checkout_url or client_secret for payment processing
+      if (shippingFlow.checkoutSession?.checkout_url) {
+        // If we have a direct checkout URL, redirect to it
+        console.log('Redirecting to Stripe checkout URL:', shippingFlow.checkoutSession.checkout_url);
+        window.location.href = shippingFlow.checkoutSession.checkout_url;
+      } else if (shippingFlow.checkoutSession?.client_secret) {
+        // If we have a client_secret, we need to use Stripe Elements (embedded checkout)
+        // For now, show an error as this requires additional Stripe setup
+        throw new Error('Payment integration requires Stripe Elements setup. Please contact support.');
+      } else {
+        throw new Error('No valid checkout URL or payment method received from payment processor');
+      }
+
+    } catch (error: any) {
+      console.error('Payment flow failed:', error);
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        response: error.response?.data
+      });
+
+      let errorMessage = 'Payment processing failed. ';
+      
+      if (error.message.includes('Authentication') || error.message.includes('401')) {
+        errorMessage = 'Authentication failed. Please log in and try again.';
+      } else if (error.message.includes('Invalid shipment data') || error.message.includes('validation')) {
+        errorMessage = 'Invalid shipment information. Please go back and check your details.';
+      } else if (error.message.includes('required')) {
+        errorMessage = `Missing required information: ${error.message}`;
+      } else if (error.message.includes('email')) {
+        errorMessage = 'Invalid email format. Please check your email addresses.';
+      } else if (error.message.includes('postal')) {
+        errorMessage = 'Invalid postal code format. Please check your postal codes.';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Server error occurred. Please try again in a few minutes.';
+      } else if (error.message.includes('Network')) {
+        errorMessage = 'Network error occurred. Please check your connection and try again.';
+      } else {
+        errorMessage = `Payment processing failed: ${error.message}`;
+      }
+
+      setShipmentError(errorMessage);
+    } finally {
       setIsProcessing(false);
     }
   };
@@ -416,8 +699,10 @@ export default function PurchaseLabelPage() {
                               id="parcego-card-number"
                               type="text"
                               value={cardNumber}
-                              onChange={(e) => setCardNumber(e.target.value)}
-                              className="pl-12 pr-4 h-12 text-lg font-mono tracking-wider border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                              onChange={(e) => handleCardNumberChange(e.target.value)}
+                              className={`pl-12 pr-4 h-12 text-lg font-mono tracking-wider border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
+                                validationErrors.cardNumber ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                              }`}
                               maxLength={19}
                               placeholder="0000 0000 0000 0000"
                             />
@@ -425,6 +710,12 @@ export default function PurchaseLabelPage() {
                               <Icon name="CreditCard" size={20} className="text-gray-400" />
                             </div>
                           </div>
+                          {validationErrors.cardNumber && (
+                            <p className="mt-1 text-sm text-red-600 flex items-center">
+                              <Icon name="AlertCircle" size={14} className="mr-1" />
+                              {validationErrors.cardNumber}
+                            </p>
+                          )}
                         </div>
                         
                         <div>
@@ -435,11 +726,19 @@ export default function PurchaseLabelPage() {
                             id="parcego-expiry-date"
                             type="text"
                             value={expiryDate}
-                            onChange={(e) => setExpiryDate(e.target.value)}
-                            className="h-12 text-lg font-mono tracking-wider border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                            onChange={(e) => handleExpiryDateChange(e.target.value)}
+                            className={`h-12 text-lg font-mono tracking-wider border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
+                              validationErrors.expiryDate ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                            }`}
                             maxLength={5}
                             placeholder="MM/YY"
                           />
+                          {validationErrors.expiryDate && (
+                            <p className="mt-1 text-sm text-red-600 flex items-center">
+                              <Icon name="AlertCircle" size={14} className="mr-1" />
+                              {validationErrors.expiryDate}
+                            </p>
+                          )}
                         </div>
                         
                         <div>
@@ -450,11 +749,19 @@ export default function PurchaseLabelPage() {
                             id="parcego-cvv"
                             type="text"
                             value={cvv}
-                            onChange={(e) => setCvv(e.target.value)}
-                            className="h-12 text-lg font-mono tracking-wider border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                            onChange={(e) => handleCVVChange(e.target.value)}
+                            className={`h-12 text-lg font-mono tracking-wider border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
+                              validationErrors.cvv ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                            }`}
                             maxLength={4}
                             placeholder="123"
                           />
+                          {validationErrors.cvv && (
+                            <p className="mt-1 text-sm text-red-600 flex items-center">
+                              <Icon name="AlertCircle" size={14} className="mr-1" />
+                              {validationErrors.cvv}
+                            </p>
+                          )}
                         </div>
                         
                         <div className="md:col-span-2">
@@ -465,10 +772,18 @@ export default function PurchaseLabelPage() {
                             id="parcego-cardholder-name"
                             type="text"
                             value={cardholderName}
-                            onChange={(e) => setCardholderName(e.target.value)}
-                            className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                            onChange={(e) => handleCardholderNameChange(e.target.value)}
+                            className={`h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
+                              validationErrors.cardholderName ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                            }`}
                             placeholder="John A. Smith"
                           />
+                          {validationErrors.cardholderName && (
+                            <p className="mt-1 text-sm text-red-600 flex items-center">
+                              <Icon name="AlertCircle" size={14} className="mr-1" />
+                              {validationErrors.cardholderName}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -487,11 +802,20 @@ export default function PurchaseLabelPage() {
                           </Label>
                           <Input
                             id="parcego-billing-address"
+                            type="text"
                             value={billingAddress.address}
-                            onChange={(e) => setBillingAddress({...billingAddress, address: e.target.value})}
-                            className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                            placeholder="123 Business Plaza, Suite 200"
+                            onChange={(e) => handleBillingAddressChange('address', e.target.value)}
+                            className={`h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
+                              validationErrors.billingAddress?.address ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                            }`}
+                            placeholder="Enter your billing address"
                           />
+                          {validationErrors.billingAddress?.address && (
+                            <p className="mt-1 text-sm text-red-600 flex items-center">
+                              <Icon name="AlertCircle" size={14} className="mr-1" />
+                              {validationErrors.billingAddress.address}
+                            </p>
+                          )}
                         </div>
                         
                         <div>
@@ -501,10 +825,18 @@ export default function PurchaseLabelPage() {
                           <Input
                             id="parcego-billing-city"
                             value={billingAddress.city}
-                            onChange={(e) => setBillingAddress({...billingAddress, city: e.target.value})}
-                            className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                            placeholder="Toronto"
+                            onChange={(e) => handleBillingAddressChange('city', e.target.value)}
+                            className={`h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
+                              validationErrors.billingAddress?.city ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                            }`}
+                            placeholder="Enter city"
                           />
+                          {validationErrors.billingAddress?.city && (
+                            <p className="mt-1 text-sm text-red-600 flex items-center">
+                              <Icon name="AlertCircle" size={14} className="mr-1" />
+                              {validationErrors.billingAddress.city}
+                            </p>
+                          )}
                         </div>
                         
                         <div>
@@ -514,10 +846,18 @@ export default function PurchaseLabelPage() {
                           <Input
                             id="parcego-billing-province"
                             value={billingAddress.province}
-                            onChange={(e) => setBillingAddress({...billingAddress, province: e.target.value})}
-                            className="h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                            placeholder="ON"
+                            onChange={(e) => handleBillingAddressChange('province', e.target.value)}
+                            className={`h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
+                              validationErrors.billingAddress?.province ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                            }`}
+                            placeholder="Province/State"
                           />
+                          {validationErrors.billingAddress?.province && (
+                            <p className="mt-1 text-sm text-red-600 flex items-center">
+                              <Icon name="AlertCircle" size={14} className="mr-1" />
+                              {validationErrors.billingAddress.province}
+                            </p>
+                          )}
                         </div>
                         
                         <div>
@@ -527,10 +867,18 @@ export default function PurchaseLabelPage() {
                           <Input
                             id="parcego-billing-postal"
                             value={billingAddress.postalCode}
-                            onChange={(e) => setBillingAddress({...billingAddress, postalCode: e.target.value})}
-                            className="h-12 font-mono tracking-wider border-gray-300 focus:border-blue-500 focus:ring-blue-500"
-                            placeholder="M5V 3A8"
+                            onChange={(e) => handleBillingAddressChange('postalCode', e.target.value)}
+                            className={`h-12 font-mono tracking-wider border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
+                              validationErrors.billingAddress?.postalCode ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                            }`}
+                            placeholder="Postal Code"
                           />
+                          {validationErrors.billingAddress?.postalCode && (
+                            <p className="mt-1 text-sm text-red-600 flex items-center">
+                              <Icon name="AlertCircle" size={14} className="mr-1" />
+                              {validationErrors.billingAddress.postalCode}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -551,14 +899,35 @@ export default function PurchaseLabelPage() {
                 <CardContent className="space-y-4">
                   <div className="space-y-2 text-sm">
                     <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">Shipping cost</span>
-                      <span className="font-medium">$0.00</span>
+                      <span className="text-muted-foreground">Base shipping cost</span>
+                      <span className="font-medium">${orderData?.selectedQuote?.price?.toFixed(2) || '0.00'}</span>
                     </div>
+                    
+                    {orderData?.fragile && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Fragile handling</span>
+                        <span className="font-medium">$3.00</span>
+                      </div>
+                    )}
+                    
+                    {orderData?.valuable && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">High value handling</span>
+                        <span className="font-medium">$5.00</span>
+                      </div>
+                    )}
+                    
+                    {orderData?.insurance && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Additional insurance</span>
+                        <span className="font-medium">$8.00</span>
+                      </div>
+                    )}
                   </div>
                   <Separator />
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold">Total</span>
-                    <span className="text-xl font-bold">$0.00</span>
+                    <span className="text-xl font-bold">${calculateTotalCost().toFixed(2)}</span>
                   </div>
 
                   {/* Error Display */}

@@ -272,7 +272,10 @@ export interface CreateBillingRequest {
 export interface BillingRecord {
   id: number;
   shipment_id: number;
-  amount: number;
+  subtotal: string;
+  tax_amount: string;
+  tax_rate: string;
+  amount: string;
   currency: string;
   payment_method: string;
   payment_status: 'pending' | 'paid' | 'failed' | 'cancelled';
@@ -285,13 +288,57 @@ export interface BillingRecord {
 }
 
 export interface CreateCheckoutSessionRequest {
-  billing_id: number;
+  // billing_id is now passed as query parameter, not in request body
 }
 
 export interface CreateCheckoutSessionResponse {
   checkout_session_id: string;
   client_secret: string;
   checkout_url: string;
+}
+
+// Session status types
+export interface GetSessionStatusParams {
+  session_id: string;
+}
+
+export interface SessionStatusResponse {
+  [key: string]: any; // Generic response as per specification
+}
+
+// Billing records list types
+export interface GetBillingRecordsParams {
+  page?: number;
+  per_page?: number;
+  status?: 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled' | 'refunded';
+}
+
+export interface BillingRecordsListResponse {
+  items: BillingRecord[];
+  total: number;
+  page: number;
+  per_page: number;
+  pages: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
+// Billing report generation types
+export interface GenerateBillingReportRequest {
+  report_type: 'monthly' | 'yearly';
+  year: number;
+  month?: number;
+}
+
+export interface GenerateBillingReportResponse {
+  success: boolean;
+  message: string;
+  report_url: string;
+  report_type: 'monthly' | 'yearly';
+  year: number;
+  month?: number;
+  generated_at: string;
+  file_size: number;
 }
 
 export interface GenerateLabelResponse {

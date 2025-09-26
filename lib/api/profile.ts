@@ -64,6 +64,7 @@ export class ProfileService {
       }
       
       if (error.response?.status === 422) {
+        console.log('Validation error details:', error.response.data);
         const validationErrors = error.response.data?.detail || [];
         const errorMessages = validationErrors.map((err: any) => err.msg).join(', ');
         throw new Error(`Validation error: ${errorMessages}`);

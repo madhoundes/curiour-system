@@ -594,7 +594,7 @@ export default function ShipmentDetailPage() {
                   </div>
                   <div className="flex justify-between font-semibold">
                     <span>Total:</span>
-                    <span>${shipment.billing.amount}</span>
+                    <span>{formatCurrency(parseFloat(shipment.billing.amount))}</span>
                   </div>
                 </div>
               </CardContent>

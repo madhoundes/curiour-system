@@ -67,7 +67,10 @@ export const API_ENDPOINTS = {
   },
   BILLING: {
     CREATE: '/billing',
+    LIST: '/billing',
     CREATE_CHECKOUT_SESSION: '/billing/create-checkout-session',
+    SESSION_STATUS: '/billing/session-status',
+    GENERATE_REPORT: '/billing/reports/generate',
   },
   LABELS: {
     DOWNLOAD: '/labels/download/:shipment_id',

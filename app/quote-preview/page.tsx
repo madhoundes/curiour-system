@@ -184,7 +184,7 @@ const ShipmentSummary = ({ formData }: { formData: ShipmentData }) => {
 
     setIsPreviewLoading(true);
     try {
-      const shippingData = getShippingLabelData();
+      const shippingData = await getShippingLabelData();
       // Import dynamically to avoid SSR issues
       const { generateShippingLabelBlob } = await import('@/lib/pdf-generator');
       const blob = await generateShippingLabelBlob(shippingData);
@@ -214,7 +214,7 @@ const ShipmentSummary = ({ formData }: { formData: ShipmentData }) => {
 
     setIsPreviewLoading(true);
     try {
-      const shippingData = getShippingLabelData();
+      const shippingData = await getShippingLabelData();
       // Import dynamically to avoid SSR issues
       const { generateShippingLabelBlob } = await import('@/lib/pdf-generator');
       const blob = await generateShippingLabelBlob(shippingData);
@@ -305,7 +305,7 @@ const ShipmentSummary = ({ formData }: { formData: ShipmentData }) => {
               ) : senderData ? (
                 <>
                   <p className="font-medium text-gray-900 text-sm">
-                    {senderData.business_name || `${senderData.first_name} ${senderData.last_name}`}
+                    {`${senderData.first_name} ${senderData.last_name}`}
                   </p>
                   {senderData.business_name && (
                     <p className="text-xs text-gray-600">{senderData.business_name}</p>

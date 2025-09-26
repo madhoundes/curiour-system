@@ -22,12 +22,13 @@ export class QuotesService {
    */
   async getEstimate(request: QuoteEstimateRequest): Promise<QuoteEstimateResponse> {
     try {
-      const response = await apiClient.post<ApiSuccessResponse<QuoteEstimateResponse>>(
+      const response = await apiClient.post<QuoteEstimateResponse>(
         API_ENDPOINTS.QUOTES.ESTIMATE,
         request
       );
 
-      return response.data.data;
+      // The API returns quote data directly in response.data
+      return response.data;
     } catch (error: any) {
       console.error('Quote estimation failed:', error);
       
