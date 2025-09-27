@@ -363,7 +363,7 @@ export default function ShipmentsPage() {
       service: 'Standard', // Default service since it's not in DetailedShipment
       courier: "Parcego",
       weight: s.package.weight,
-      cost: s.billing.amount,
+      cost: s.billing?.amount || 'N/A',
       status: s.status,
     }));
     const header = Object.keys(rows[0] ?? {}).join(",");
@@ -639,7 +639,7 @@ export default function ShipmentsPage() {
                           );
                         })()}
                       </td>
-                      <td className="px-3 py-2">{formatCurrency(parseFloat(s.billing.amount))}</td>
+                      <td className="px-3 py-2">{s.billing ? formatCurrency(parseFloat(s.billing.amount)) : 'N/A'}</td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1">
                           {/* View Details Button */}

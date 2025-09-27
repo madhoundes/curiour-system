@@ -1,7 +1,7 @@
 "use client";
 
 // import { ClaimReportPDF } from './claim-report-pdf';
-import type { Claim } from '@/app/claims/history/page';
+import type { Claim } from '@/lib/api/types';
 
 // Helper function to generate print-friendly content
 export const generatePrintContent = (claim: Claim): string => {
@@ -195,7 +195,7 @@ export const generatePrintContent = (claim: Claim): string => {
             <div><strong>Email:</strong> support@parcego.com</div>
             <div><strong>Claim ID:</strong> ${claim.id}</div>
             <div><strong>Phone:</strong> 1-800-PARCEGO</div>
-            <div><strong>Shipment ID:</strong> ${claim.shipmentNumber}</div>
+            <div><strong>Shipment ID:</strong> ${claim.shipment_tracking_code}</div>
             <div><strong>Generated:</strong> ${new Date().toLocaleDateString()}</div>
           </div>
         </div>
@@ -205,7 +205,7 @@ export const generatePrintContent = (claim: Claim): string => {
           <div class="section-title">Basic Information</div>
           <div class="info-row">
             <div class="info-label">Claim Type</div>
-            <div class="info-value">${claim.claimType.charAt(0).toUpperCase() + claim.claimType.slice(1)}</div>
+            <div class="info-value">${claim.reason.charAt(0).toUpperCase() + claim.reason.slice(1)}</div>
           </div>
           <div class="info-row">
             <div class="info-label">Status</div>
@@ -213,20 +213,20 @@ export const generatePrintContent = (claim: Claim): string => {
           </div>
           <div class="info-row">
             <div class="info-label">Claimed Amount</div>
-            <div class="info-value">${claim.amount}</div>
+            <div class="info-value">N/A</div>
           </div>
           <div class="info-row">
             <div class="info-label">Payout Amount</div>
-            <div class="info-value">${claim.payoutAmount}</div>
+            <div class="info-value">N/A</div>
           </div>
           <div class="info-row">
             <div class="info-label">Submitted Date</div>
-            <div class="info-value">${new Date(claim.submittedDate).toLocaleDateString()}</div>
+            <div class="info-value">${new Date(claim.created_at).toLocaleDateString()}</div>
           </div>
-          ${claim.resolvedDate ? `
+          ${claim.updated_at ? `
           <div class="info-row">
             <div class="info-label">Resolved Date</div>
-            <div class="info-value">${new Date(claim.resolvedDate).toLocaleDateString()}</div>
+            <div class="info-value">${new Date(claim.updated_at).toLocaleDateString()}</div>
           </div>
           ` : ''}
         </div>
@@ -236,11 +236,11 @@ export const generatePrintContent = (claim: Claim): string => {
           <div class="section-title">Incident Details</div>
           <div class="info-row">
             <div class="info-label">Incident Date</div>
-            <div class="info-value">${new Date(claim.incidentDate).toLocaleDateString()}</div>
+            <div class="info-value">${new Date(claim.created_at).toLocaleDateString()}</div>
           </div>
           <div class="info-row">
             <div class="info-label">Location</div>
-            <div class="info-value">${claim.incidentLocation}</div>
+            <div class="info-value">N/A</div>
           </div>
           <div class="info-row">
             <div class="info-label">Description</div>
@@ -253,19 +253,19 @@ export const generatePrintContent = (claim: Claim): string => {
           <div class="section-title">Contact Information</div>
           <div class="info-row">
             <div class="info-label">Contact Name</div>
-            <div class="info-value">${claim.contactName}</div>
+            <div class="info-value">${claim.user_email}</div>
           </div>
           <div class="info-row">
             <div class="info-label">Business Name</div>
-            <div class="info-value">${claim.businessName || 'N/A'}</div>
+            <div class="info-value">N/A</div>
           </div>
           <div class="info-row">
             <div class="info-label">Phone</div>
-            <div class="info-value">${claim.contactPhone}</div>
+            <div class="info-value">N/A</div>
           </div>
           <div class="info-row">
             <div class="info-label">Email</div>
-            <div class="info-value">${claim.contactEmail}</div>
+            <div class="info-value">${claim.user_email}</div>
           </div>
         </div>
 
@@ -283,7 +283,7 @@ export const generatePrintContent = (claim: Claim): string => {
               </tr>
             </thead>
             <tbody>
-              ${claim.documents.map((doc, index) => {
+              ${claim.photos?.map((doc: string, index: number) => {
                 const extension = doc.split('.').pop()?.toLowerCase() || 'unknown';
                 
                 // Generate realistic file size based on document type
@@ -310,7 +310,7 @@ export const generatePrintContent = (claim: Claim): string => {
                 }
                 
                 // Generate realistic upload date based on claim submission
-                const submittedDate = new Date(claim.submittedDate);
+                const submittedDate = new Date(claim.created_at);
                 const daysBeforeSubmission = Math.min(index, 3);
                 const documentDate = new Date(submittedDate.getTime() - (daysBeforeSubmission * 24 * 60 * 60 * 1000));
                 

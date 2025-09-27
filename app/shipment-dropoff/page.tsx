@@ -1,125 +1,113 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Icon } from "@/components/ui/icon";
-
-// Mock drop-off location data for shipment flow
-const mockShipmentDropoffLocations = [
-  {
-    id: "loc-001",
-    name: "FedEx Office - Manhattan",
-    address: "456 Broadway, New York, NY 10013",
-    phone: "(212) 555-0123",
-    distance: "0.8 miles",
-    rating: 4.8,
-    hours: {
-      weekday: "8:00 AM - 8:00 PM",
-      weekend: "9:00 AM - 6:00 PM"
-    },
-    isOpen: true,
-    type: "fedex",
-    services: ["Drop-off", "Packaging", "Printing"],
-    estimatedTime: "15-20 min"
-  },
-  {
-    id: "loc-002", 
-    name: "UPS Store - SoHo",
-    address: "789 Spring St, New York, NY 10012",
-    phone: "(212) 555-0456",
-    distance: "1.2 miles",
-    rating: 4.6,
-    hours: {
-      weekday: "7:00 AM - 9:00 PM",
-      weekend: "8:00 AM - 7:00 PM"
-    },
-    isOpen: true,
-    type: "ups",
-    services: ["Drop-off", "Packaging", "Notary"],
-    estimatedTime: "20-25 min"
-  },
-  {
-    id: "loc-003",
-    name: "USPS Post Office - Village",
-    address: "321 West 4th St, New York, NY 10014",
-    phone: "(212) 555-0789",
-    distance: "1.5 miles",
-    rating: 4.3,
-    hours: {
-      weekday: "9:00 AM - 5:00 PM",
-      weekend: "9:00 AM - 3:00 PM"
-    },
-    isOpen: false,
-    type: "usps",
-    services: ["Drop-off", "Mail Services"],
-    estimatedTime: "25-30 min"
-  },
-  {
-    id: "loc-004",
-    name: "Pack & Ship Express",
-    address: "654 6th Ave, New York, NY 10010",
-    phone: "(212) 555-0321",
-    distance: "2.1 miles",
-    rating: 4.9,
-    hours: {
-      weekday: "8:00 AM - 7:00 PM",
-      weekend: "9:00 AM - 5:00 PM"
-    },
-    isOpen: true,
-    type: "independent",
-    services: ["Drop-off", "Packaging", "Printing", "Notary"],
-    estimatedTime: "30-35 min"
-  },
-  {
-    id: "loc-005",
-    name: "Amazon Hub Counter - Whole Foods",
-    address: "95 E Houston St, New York, NY 10012",
-    phone: "(212) 555-0654",
-    distance: "2.3 miles",
-    rating: 4.4,
-    hours: {
-      weekday: "7:00 AM - 10:00 PM",
-      weekend: "7:00 AM - 10:00 PM"
-    },
-    isOpen: true,
-    type: "amazon",
-    services: ["Drop-off", "Returns"],
-    estimatedTime: "35-40 min"
-  }
-];
-
-interface ShipmentDropoffLocation {
-  id: string;
-  name: string;
-  address: string;
-  phone: string;
-  distance: string;
-  rating: number;
-  hours: {
-    weekday: string;
-    weekend: string;
-  };
-  isOpen: boolean;
-  type: string;
-  services: string[];
-  estimatedTime: string;
-}
+import { locationsService } from "@/lib/api/locations";
+import type { DropoffLocation } from "@/lib/api/types";
 
 export default function ShipmentDropoffPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("all");
   const [showMap, setShowMap] = useState(false);
-  const [filteredLocations, setFilteredLocations] = useState<ShipmentDropoffLocation[]>(mockShipmentDropoffLocations);
+  const [locations, setLocations] = useState<DropoffLocation[]>([]);
+  const [filteredLocations, setFilteredLocations] = useState<DropoffLocation[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [gettingLocation, setGettingLocation] = useState(false);
+
+  // Load drop-off locations on component mount
+  useEffect(() => {
+    loadDropoffLocations();
+  }, []);
+
+  // Load locations from API
+  const loadDropoffLocations = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const response = await locationsService.getDropoffLocations({
+        limit: 50
+      });
+      
+      setLocations(response.locations);
+      setFilteredLocations(response.locations);
+    } catch (err: any) {
+      console.error('Failed to load drop-off locations:', err);
+      setError(err.message || 'Failed to load drop-off locations');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Get user's current location
+  const getCurrentLocation = async () => {
+    try {
+      setGettingLocation(true);
+      const location = await locationsService.getCurrentLocation();
+      setUserLocation(location);
+      
+      // Load nearby locations
+      const response = await locationsService.getNearbyLocations({
+        latitude: location.latitude,
+        longitude: location.longitude,
+        radius: 25, // 25km radius
+        limit: 50
+      });
+      
+      setLocations(response.locations);
+      setFilteredLocations(response.locations);
+    } catch (err: any) {
+      console.error('Failed to get current location:', err);
+      setError(err.message || 'Failed to get your location');
+    } finally {
+      setGettingLocation(false);
+    }
+  };
+
+  // Search locations using API
+  const searchLocations = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setFilteredLocations(locations);
+      return;
+    }
+
+    try {
+      const response = await locationsService.searchLocations({
+        query: query.trim(),
+        limit: 50
+      });
+      
+      setFilteredLocations(response.locations);
+    } catch (err: any) {
+      console.error('Search failed:', err);
+      // Fallback to local filtering if API search fails
+      const filtered = locations.filter(location =>
+        location.name.toLowerCase().includes(query.toLowerCase()) ||
+        location.address.toLowerCase().includes(query.toLowerCase())
+      );
+      setFilteredLocations(filtered);
+    }
+  }, [locations]);
 
   // Filter locations based on search and filter criteria
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    filterLocations(query, selectedFilter);
+    
+    if (query.trim()) {
+      // Use API search for non-empty queries
+      searchLocations(query);
+    } else {
+      // Apply local filters for empty search
+      filterLocations("", selectedFilter);
+    }
   };
 
   const handleFilterChange = (filter: string) => {
@@ -128,15 +116,7 @@ export default function ShipmentDropoffPage() {
   };
 
   const filterLocations = (query: string, filter: string) => {
-    let filtered = mockShipmentDropoffLocations;
-
-    // Apply text search
-    if (query) {
-      filtered = filtered.filter(location =>
-        location.name.toLowerCase().includes(query.toLowerCase()) ||
-        location.address.toLowerCase().includes(query.toLowerCase())
-      );
-    }
+    let filtered = query.trim() ? filteredLocations : locations;
 
     // Apply filter
     switch (filter) {
@@ -158,7 +138,7 @@ export default function ShipmentDropoffPage() {
     setFilteredLocations(filtered);
   };
 
-  const handleSelectLocation = (location: ShipmentDropoffLocation) => {
+  const handleSelectLocation = (location: DropoffLocation) => {
     // Store selected location for the shipment flow
     localStorage.setItem('selectedShipmentDropoffLocation', JSON.stringify(location));
     // Route to the next step in shipment creation (drop-off confirmation)
@@ -213,6 +193,18 @@ export default function ShipmentDropoffPage() {
                 <Icon name="Map" size={16} className="mr-2" />
                 {showMap ? "Hide Map" : "Show Map"}
               </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={getCurrentLocation}
+                disabled={gettingLocation}
+                id="parcego-shipment-location-btn"
+                className="parcego-dropoff__location-btn"
+              >
+                <Icon name={gettingLocation ? "Loader2" : "MapPin"} size={16} className={`mr-2 ${gettingLocation ? 'animate-spin' : ''}`} />
+                {gettingLocation ? "Getting Location..." : "Use My Location"}
+              </Button>
             </div>
           </div>
         </div>
@@ -220,6 +212,29 @@ export default function ShipmentDropoffPage() {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-6">
+          {/* Error State */}
+          {error && (
+            <Card className="parcego-card parcego-card--error bg-red-50 border-red-200">
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <Icon name="AlertCircle" size={20} className="text-red-600" />
+                  <div>
+                    <h3 className="font-medium text-red-900">Error Loading Locations</h3>
+                    <p className="text-sm text-red-700">{error}</p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={loadDropoffLocations}
+                      className="mt-2"
+                    >
+                      <Icon name="RefreshCw" size={16} className="mr-2" />
+                      Try Again
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Shipment Context Banner */}
           <Card className="parcego-card parcego-card--shipment-context bg-blue-50 border-blue-200">
@@ -230,6 +245,11 @@ export default function ShipmentDropoffPage() {
                   <h3 className="font-medium text-blue-900">Shipment in Progress</h3>
                   <p className="text-sm text-blue-700">
                     Select a drop-off location to complete your shipment. Your package will be ready for pickup.
+                    {userLocation && (
+                      <span className="block mt-1 font-medium">
+                        Showing locations near your current position
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -294,19 +314,52 @@ export default function ShipmentDropoffPage() {
             <div className="lg:col-span-2 space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-lg font-semibold text-gray-900">
-                  {filteredLocations.length} locations found
+                  {loading ? "Loading locations..." : `${filteredLocations.length} locations found`}
                 </h2>
                 <p className="text-sm text-gray-600">
-                  Sorted by distance
+                  {userLocation ? "Sorted by distance from your location" : "Sorted by distance"}
                 </p>
               </div>
 
-              {filteredLocations.length === 0 ? (
+              {loading ? (
+                <div className="space-y-4">
+                  {[...Array(3)].map((_, index) => (
+                    <Card key={index} className="parcego-card animate-pulse">
+                      <CardContent className="p-6">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 space-y-3">
+                            <div className="h-6 bg-gray-200 rounded w-3/4"></div>
+                            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+                            <div className="h-4 bg-gray-200 rounded w-2/3"></div>
+                          </div>
+                          <div className="h-10 w-24 bg-gray-200 rounded"></div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : filteredLocations.length === 0 ? (
                 <Card className="parcego-card parcego-card--no-results">
                   <CardContent className="p-8 text-center">
                     <Icon name="MapPin" size={48} className="mx-auto mb-4 text-gray-400" />
                     <h3 className="text-lg font-medium text-gray-900 mb-2">No locations found</h3>
-                    <p className="text-gray-600">Try adjusting your search or filters to find drop-off locations.</p>
+                    <p className="text-gray-600 mb-4">
+                      {searchQuery 
+                        ? "Try adjusting your search or filters to find drop-off locations."
+                        : "No drop-off locations are available in your area."
+                      }
+                    </p>
+                    {searchQuery && (
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setSearchQuery("");
+                          setFilteredLocations(locations);
+                        }}
+                      >
+                        Clear Search
+                      </Button>
+                    )}
                   </CardContent>
                 </Card>
               ) : (
@@ -345,45 +398,65 @@ export default function ShipmentDropoffPage() {
                                   <div className="flex items-center space-x-2">
                                     <Icon name="MapPin" size={16} />
                                     <span>{location.address}</span>
-                                    <span className="text-blue-600 font-medium">({location.distance})</span>
+                                    {location.distance && (
+                                      <span className="text-blue-600 font-medium">
+                                        ({typeof location.distance === 'number' 
+                                          ? locationsService.formatDistance(location.distance)
+                                          : location.distance
+                                        })
+                                      </span>
+                                    )}
                                   </div>
                                   
-                                  <div className="flex items-center space-x-2">
-                                    <Icon name="Phone" size={16} />
-                                    <span>{location.phone}</span>
-                                  </div>
+                                  {location.phone && (
+                                    <div className="flex items-center space-x-2">
+                                      <Icon name="Phone" size={16} />
+                                      <span>{location.phone}</span>
+                                    </div>
+                                  )}
 
                                   <div className="flex items-center space-x-2">
                                     <Icon name="Clock" size={16} />
                                     <span>
-                                      Weekdays: {location.hours.weekday} | 
-                                      Weekends: {location.hours.weekend}
+                                      {location.hours ? (
+                                        typeof location.hours === 'string' 
+                                          ? location.hours
+                                          : `Weekdays: ${location.hours.weekday} | Weekends: ${location.hours.weekend}`
+                                      ) : (
+                                        "Hours not available"
+                                      )}
                                     </span>
                                   </div>
 
-                                  <div className="flex items-center space-x-2">
-                                    <Icon name="Star" size={16} className="text-yellow-500" />
-                                    <span>{location.rating} rating</span>
-                                  </div>
+                                  {location.rating && (
+                                    <div className="flex items-center space-x-2">
+                                      <Icon name="Star" size={16} className="text-yellow-500" />
+                                      <span>{location.rating} rating</span>
+                                    </div>
+                                  )}
 
-                                  <div className="flex items-center space-x-2">
-                                    <Icon name="Timer" size={16} className="text-orange-500" />
-                                    <span className="font-medium">Estimated drop-off time: {location.estimatedTime}</span>
-                                  </div>
+                                  {location.estimatedTime && (
+                                    <div className="flex items-center space-x-2">
+                                      <Icon name="Timer" size={16} className="text-orange-500" />
+                                      <span className="font-medium">Estimated drop-off time: {location.estimatedTime}</span>
+                                    </div>
+                                  )}
                                 </div>
 
-                                <div className="mt-3">
-                                  <div className="flex flex-wrap gap-1">
-                                    {location.services.map((service, index) => (
-                                      <span
-                                        key={index}
-                                        className="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-gray-700 text-xs"
-                                      >
-                                        {service}
-                                      </span>
-                                    ))}
+                                {location.services && location.services.length > 0 && (
+                                  <div className="mt-3">
+                                    <div className="flex flex-wrap gap-1">
+                                      {location.services.map((service, index) => (
+                                        <span
+                                          key={index}
+                                          className="inline-flex items-center px-2 py-1 rounded-md bg-gray-100 text-gray-700 text-xs"
+                                        >
+                                          {service}
+                                        </span>
+                                      ))}
+                                    </div>
                                   </div>
-                                </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -401,6 +474,15 @@ export default function ShipmentDropoffPage() {
                               size="sm"
                               className="parcego-action-btn parcego-action-btn--directions"
                               id={`parcego-shipment-directions-${location.id}`}
+                              onClick={() => {
+                                if (location.latitude && location.longitude) {
+                                  const url = `https://www.google.com/maps/dir/?api=1&destination=${location.latitude},${location.longitude}`;
+                                  window.open(url, '_blank');
+                                } else {
+                                  const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(location.address)}`;
+                                  window.open(url, '_blank');
+                                }
+                              }}
                             >
                               <Icon name="Navigation" size={12} className="mr-1" />
                               Directions

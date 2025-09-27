@@ -29,7 +29,11 @@ import {
 // Mock data types
 import { type Payment, type Invoice, type PaymentMethod, type TaxDocument } from "./types"
 
-// Mock data
+// Real API imports
+import { shippingService } from "@/lib/api/shipping"
+import type { BillingRecord, BillingRecordsListResponse } from "@/lib/api/types"
+
+// Mock data (fallback only)
 import { mockPayments, mockInvoices, mockPaymentMethods, mockTaxDocuments } from "./mock-data"
 
 // Logo utility functions for PDF generation
@@ -121,12 +125,80 @@ type PaymentFormData = {
 // Temporary storage for payment methods (frontend only)
 const tempPaymentStorage: PaymentMethod[] = [...mockPaymentMethods]
 
+// Transformation functions to map API data to local types
+const transformBillingRecordToPayment = (billing: BillingRecord): Payment => {
+  return {
+    id: `pmt-${billing.id}`,
+    date: billing.created_at,
+    amount: parseFloat(billing.amount),
+    currency: billing.currency,
+    status: billing.payment_status === 'paid' ? 'paid' : 
+            billing.payment_status === 'pending' ? 'pending' :
+            billing.payment_status === 'failed' ? 'failed' : 
+            billing.payment_status === 'cancelled' ? 'failed' : 'pending',
+    method: billing.payment_method || 'Unknown',
+    invoiceId: `inv-${billing.id}`,
+    downloadUrl: `/api/billing/${billing.id}/receipt`
+  }
+}
+
+const transformBillingRecordToInvoice = (billing: BillingRecord): Invoice => {
+  return {
+    id: `inv-${billing.id}`,
+    date: billing.created_at,
+    dueDate: billing.created_at, // For now, same as created date
+    amount: parseFloat(billing.amount),
+    currency: billing.currency,
+    status: billing.payment_status === 'paid' ? 'paid' : 
+            billing.payment_status === 'pending' ? 'due' : 'overdue',
+    downloadUrl: `/api/billing/${billing.id}/invoice`,
+    lineItems: [
+      { description: 'Shipping Service', amount: parseFloat(billing.subtotal) },
+      { description: 'Tax', amount: parseFloat(billing.tax_amount) }
+    ]
+  }
+}
+
 export function BillingPage() {
   const [activeTab, setActiveTab] = useState<string>('payment-history')
-  const [payments] = useState<Payment[]>(mockPayments)
-  const [invoices] = useState<Invoice[]>(mockInvoices)
+  const [payments, setPayments] = useState<Payment[]>([])
+  const [invoices, setInvoices] = useState<Invoice[]>([])
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(tempPaymentStorage)
   const [taxDocuments] = useState<TaxDocument[]>(mockTaxDocuments)
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Fetch billing data from API
+  useEffect(() => {
+    const fetchBillingData = async () => {
+      try {
+        setIsLoading(true)
+        setError(null)
+        
+        const billingResponse = await shippingService.getBillingRecords({
+          page: 1,
+          per_page: 50
+        })
+        
+        // Transform API data to local types
+        const transformedPayments = billingResponse.items.map(transformBillingRecordToPayment)
+        const transformedInvoices = billingResponse.items.map(transformBillingRecordToInvoice)
+        
+        setPayments(transformedPayments)
+        setInvoices(transformedInvoices)
+      } catch (err) {
+        console.error('Failed to fetch billing data:', err)
+        setError('Failed to load billing data')
+        // Fallback to mock data on error
+        setPayments(mockPayments)
+        setInvoices(mockInvoices)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchBillingData()
+  }, [])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -204,11 +276,65 @@ export function BillingPage() {
           </TabsList>
 
           <TabsContent value="payment-history" className="mt-6">
-            <PaymentHistoryTab payments={payments} />
+            {isLoading ? (
+              <Card>
+                <CardContent className="flex items-center justify-center py-12">
+                  <div className="flex items-center gap-2">
+                    <Icon name="Loader2" size={20} className="animate-spin" />
+                    <span>Loading payment history...</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : error ? (
+              <Card>
+                <CardContent className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <Icon name="AlertCircle" size={24} className="text-red-500 mx-auto mb-2" />
+                    <p className="text-red-600 mb-2">{error}</p>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => window.location.reload()}
+                      className="text-sm"
+                    >
+                      Try Again
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <PaymentHistoryTab payments={payments} />
+            )}
           </TabsContent>
 
           <TabsContent value="invoices" className="mt-6">
-            <InvoicesTab invoices={invoices} />
+            {isLoading ? (
+              <Card>
+                <CardContent className="flex items-center justify-center py-12">
+                  <div className="flex items-center gap-2">
+                    <Icon name="Loader2" size={20} className="animate-spin" />
+                    <span>Loading invoices...</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : error ? (
+              <Card>
+                <CardContent className="flex items-center justify-center py-12">
+                  <div className="text-center">
+                    <Icon name="AlertCircle" size={24} className="text-red-500 mx-auto mb-2" />
+                    <p className="text-red-600 mb-2">{error}</p>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => window.location.reload()}
+                      className="text-sm"
+                    >
+                      Try Again
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <InvoicesTab invoices={invoices} />
+            )}
           </TabsContent>
 
           <TabsContent value="payment-methods" className="mt-6">

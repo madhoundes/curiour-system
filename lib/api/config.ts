@@ -59,8 +59,16 @@ export const API_ENDPOINTS = {
   },
   ANALYTICS: {
     DASHBOARD: '/analytics/dashboard',
-    SHIPMENTS: '/analytics/shipments',
-    REVENUE: '/analytics/revenue',
+    REPORTS: '/analytics/reports',
+    EXPORT: '/analytics/export',
+  },
+  CLAIMS: {
+    CREATE: '/claims',
+    LIST: '/claims',
+    GET: '/claims/:claim_id',
+    UPLOAD_PHOTO: '/claims/:claim_id/photos',
+    ADMIN_LIST_ALL: '/claims/admin/all',
+    UPDATE_STATUS: '/claims/:claim_id/status',
   },
   QUOTES: {
     ESTIMATE: '/quotes/estimate',
@@ -74,6 +82,12 @@ export const API_ENDPOINTS = {
   },
   LABELS: {
     DOWNLOAD: '/labels/download/:shipment_id',
+  },
+  LOCATIONS: {
+    DROPOFF_LOCATIONS: '/locations/dropoff',
+    SEARCH_LOCATIONS: '/locations/search',
+    GET_LOCATION: '/locations/:location_id',
+    NEARBY_LOCATIONS: '/locations/nearby',
   },
 } as const;
 

@@ -16,6 +16,7 @@ import type {
   SessionStatusResponse,
   GenerateLabelResponse,
   DetailedShipment,
+  ShipmentsListResponse,
   UpdateShipmentStatusRequest,
   ShipmentStatusChange,
   ShippingErrorResponse,
@@ -41,12 +42,13 @@ export class ShippingService {
     status?: string;
   }): Promise<DetailedShipment[]> {
     try {
-      const response = await apiClient.get<DetailedShipment[]>(
+      const response = await apiClient.get<ShipmentsListResponse>(
         API_ENDPOINTS.SHIPMENTS.LIST,
         { params }
       );
 
-      return response.data;
+      // Return just the shipments array from the paginated response
+      return response.data.shipments;
     } catch (error: any) {
       if (error.response?.status === 401) {
         throw new Error('Authentication required');

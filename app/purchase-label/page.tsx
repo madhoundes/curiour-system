@@ -16,6 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Separator } from "@/components/ui/separator";
 import type { ShippingLabelData } from "@/components/pdf/polished-shipping-label";
 import type { CreateShipmentRequest, UserProfile } from "@/lib/api/types";
+import { StripePaymentForm } from "@/components/ui/stripe-payment-form";
 
 
 interface OrderData {
@@ -69,6 +70,10 @@ export default function PurchaseLabelPage() {
   
   // Order data from quote-preview
   const [orderData, setOrderData] = useState<OrderData | null>(null);
+
+  // Stripe payment state
+  const [showStripePayment, setShowStripePayment] = useState(false);
+  const [checkoutSession, setCheckoutSession] = useState<any>(null);
 
   // Payment form validation state
   const [validationErrors, setValidationErrors] = useState<{
@@ -425,20 +430,20 @@ export default function PurchaseLabelPage() {
       console.log('Shipping flow created successfully:', shippingFlow);
       console.log('Checkout session object:', JSON.stringify(shippingFlow.checkoutSession, null, 2));
       console.log('Checkout session keys:', Object.keys(shippingFlow.checkoutSession || {}));
-      console.log('Checkout URL value:', shippingFlow.checkoutSession?.checkout_url);
+      console.log('Client secret value:', shippingFlow.checkoutSession?.client_secret);
 
-      // Handle Stripe checkout session
-      // The backend should return either a checkout_url or client_secret for payment processing
-      if (shippingFlow.checkoutSession?.checkout_url) {
-        // If we have a direct checkout URL, redirect to it
+      // Handle Stripe checkout session with client_secret
+      if (shippingFlow.checkoutSession?.client_secret) {
+        // Store checkout session data and show Stripe payment form
+        setCheckoutSession(shippingFlow.checkoutSession);
+        setShowStripePayment(true);
+        console.log('Showing Stripe Elements payment form with client_secret');
+      } else if (shippingFlow.checkoutSession?.checkout_url) {
+        // Fallback: If we have a direct checkout URL, redirect to it
         console.log('Redirecting to Stripe checkout URL:', shippingFlow.checkoutSession.checkout_url);
         window.location.href = shippingFlow.checkoutSession.checkout_url;
-      } else if (shippingFlow.checkoutSession?.client_secret) {
-        // If we have a client_secret, we need to use Stripe Elements (embedded checkout)
-        // For now, show an error as this requires additional Stripe setup
-        throw new Error('Payment integration requires Stripe Elements setup. Please contact support.');
       } else {
-        throw new Error('No valid checkout URL or payment method received from payment processor');
+        throw new Error('No valid payment method received from payment processor');
       }
 
     } catch (error: any) {
@@ -661,62 +666,80 @@ export default function PurchaseLabelPage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             {/* Left Column - Payment Form */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Payment Information Card */}
-              <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
-                <CardHeader className="pb-4">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-xl font-semibold text-gray-900">Payment Information</CardTitle>
-                      <CardDescription className="text-gray-600 mt-1">
-                        Complete your payment to generate your shipping label
-                      </CardDescription>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                        <Icon name="Shield" size={16} className="text-green-600" />
+              {/* Stripe Elements Payment Form */}
+              {showStripePayment && checkoutSession?.client_secret ? (
+                <StripePaymentForm
+                  clientSecret={checkoutSession.client_secret}
+                  onSuccess={() => {
+                    console.log('Payment successful');
+                    setShowStripePayment(false);
+                    setShowConfirmation(true);
+                  }}
+                  onError={(error) => {
+                    console.error('Payment failed:', error);
+                    setShipmentError(error || 'Payment failed. Please try again.');
+                    setShowStripePayment(false);
+                  }}
+                  amount={Math.round(calculateTotalCost() * 100)}
+                  currency="cad"
+                />
+              ) : (
+                /* Original Payment Form - Fallback */
+                <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
+                  <CardHeader className="pb-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="text-xl font-semibold text-gray-900">Payment Information</CardTitle>
+                        <CardDescription className="text-gray-600 mt-1">
+                          Complete your payment to generate your shipping label
+                        </CardDescription>
                       </div>
-                      <span className="text-sm font-medium text-green-700">Secure</span>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-6">
-
-                  <form className="space-y-8">
-                    {/* Credit Card Information Section */}
-                    <div className="space-y-4">
-                      <div className="flex items-center space-x-2 mb-4">
-                        <Icon name="CreditCard" size={20} className="text-blue-600" />
-                        <h3 className="text-lg font-medium text-gray-900">Credit Card Details</h3>
-                      </div>
-                      
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="md:col-span-2">
-                          <Label htmlFor="parcego-card-number" className="text-sm font-medium text-gray-700 mb-2 block">
-                            Card Number
-                          </Label>
-                          <div className="relative">
-                            <Input
-                              id="parcego-card-number"
-                              type="text"
-                              value={cardNumber}
-                              onChange={(e) => handleCardNumberChange(e.target.value)}
-                              className={`pl-12 pr-4 h-12 text-lg font-mono tracking-wider border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
-                                validationErrors.cardNumber ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
-                              }`}
-                              maxLength={19}
-                              placeholder="0000 0000 0000 0000"
-                            />
-                            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                              <Icon name="CreditCard" size={20} className="text-gray-400" />
-                            </div>
-                          </div>
-                          {validationErrors.cardNumber && (
-                            <p className="mt-1 text-sm text-red-600 flex items-center">
-                              <Icon name="AlertCircle" size={14} className="mr-1" />
-                              {validationErrors.cardNumber}
-                            </p>
-                          )}
+                      <div className="flex items-center space-x-2">
+                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                          <Icon name="Shield" size={16} className="text-green-600" />
                         </div>
+                        <span className="text-sm font-medium text-green-700">Secure</span>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+
+                    <form className="space-y-8">
+                      {/* Credit Card Information Section */}
+                      <div className="space-y-4">
+                        <div className="flex items-center space-x-2 mb-4">
+                          <Icon name="CreditCard" size={20} className="text-blue-600" />
+                          <h3 className="text-lg font-medium text-gray-900">Credit Card Details</h3>
+                        </div>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="md:col-span-2">
+                            <Label htmlFor="parcego-card-number" className="text-sm font-medium text-gray-700 mb-2 block">
+                              Card Number
+                            </Label>
+                            <div className="relative">
+                              <Input
+                                id="parcego-card-number"
+                                type="text"
+                                value={cardNumber}
+                                onChange={(e) => handleCardNumberChange(e.target.value)}
+                                className={`pl-12 pr-4 h-12 text-lg font-mono tracking-wider border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
+                                  validationErrors.cardNumber ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
+                                }`}
+                                maxLength={19}
+                                placeholder="0000 0000 0000 0000"
+                              />
+                              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                                <Icon name="CreditCard" size={20} className="text-gray-400" />
+                              </div>
+                            </div>
+                            {validationErrors.cardNumber && (
+                              <p className="mt-1 text-sm text-red-600 flex items-center">
+                                <Icon name="AlertCircle" size={14} className="mr-1" />
+                                {validationErrors.cardNumber}
+                              </p>
+                            )}
+                          </div>
                         
                         <div>
                           <Label htmlFor="parcego-expiry-date" className="text-sm font-medium text-gray-700 mb-2 block">
@@ -886,6 +909,7 @@ export default function PurchaseLabelPage() {
                   </form>
                 </CardContent>
               </Card>
+              )}
             </div>
 
             {/* Right Column - Order Summary & Payment */}

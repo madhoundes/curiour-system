@@ -5,10 +5,9 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
-import { recentShipments } from "@/lib/mock/dashboard"
+import { shippingService } from "@/lib/api/shipping"
 import { useState, useEffect } from "react"
-import { api } from "@/lib/api"
-import type { Shipment } from "@/lib/mock/shipments"
+import type { DetailedShipment } from "@/lib/api/types"
 
 interface RecentShipment {
   id: string
@@ -17,6 +16,22 @@ interface RecentShipment {
   date: string
   cost: string
   status: string
+}
+
+// Transform DetailedShipment to RecentShipment format
+const transformShipmentData = (shipment: DetailedShipment): RecentShipment => {
+  return {
+    id: shipment.tracking_code,
+    recipient: shipment.receiver_address.contact_name,
+    location: `${shipment.receiver_address.city}, ${shipment.receiver_address.province}`,
+    date: new Date(shipment.created_at).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    }),
+    cost: shipment.billing ? `$${shipment.billing.amount}` : 'N/A',
+    status: shipment.status.toUpperCase()
+  }
 }
 
 const getStatusIcon = (status: string) => {
@@ -75,34 +90,21 @@ export function RecentShipments() {
       setIsLoading(true)
       setError(null)
       
-      // Try to fetch from shipping API (if available)
-      // For now, we'll simulate an API call and use mock data as fallback
-      await new Promise(resolve => setTimeout(resolve, 1000)) // Simulate API delay
+      // Fetch recent shipments from the API (limit to 5 for dashboard)
+      const apiShipments = await shippingService.getShipments({ 
+        limit: 5,
+        skip: 0 
+      })
       
-      // Transform mock data to match our interface
-      const transformedShipments: RecentShipment[] = recentShipments.map(shipment => ({
-        id: shipment.id,
-        recipient: shipment.recipient,
-        location: shipment.location,
-        date: shipment.date,
-        cost: shipment.cost,
-        status: shipment.status
-      }))
+      // Transform API data to match our interface
+      const transformedShipments: RecentShipment[] = apiShipments.map(transformShipmentData)
       
       setShipments(transformedShipments)
     } catch (err) {
       console.error('Error fetching recent shipments:', err)
       setError('Failed to load recent shipments')
-      // Fallback to mock data
-      const transformedShipments: RecentShipment[] = recentShipments.map(shipment => ({
-        id: shipment.id,
-        recipient: shipment.recipient,
-        location: shipment.location,
-        date: shipment.date,
-        cost: shipment.cost,
-        status: shipment.status
-      }))
-      setShipments(transformedShipments)
+      // Set empty array on error instead of fallback to mock data
+      setShipments([])
     } finally {
       setIsLoading(false)
     }

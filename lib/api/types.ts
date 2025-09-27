@@ -372,13 +372,21 @@ export interface DetailedShipment {
     paid_at?: string;
     created_at: string;
     updated_at: string;
-  };
+  } | null;
   special_instructions?: string;
   delivery_notes?: string;
   estimated_delivery_date?: string;
   actual_delivery_date?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ShipmentsListResponse {
+  shipments: DetailedShipment[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
 }
 
 // Shipment status update types
@@ -451,7 +459,89 @@ export interface InitializeStatusTrackingResponse {
   [key: string]: any;
 }
 
-// Request/Response wrapper types
+// Claims Types
+export interface CreateClaimRequest {
+  description: string;
+  reason: 'damaged' | 'lost' | 'delayed' | 'other';
+  shipment_id: number;
+}
+
+export interface Claim {
+  id: number;
+  billing_id: number;
+  created_at: string;
+  description: string;
+  photos: string[];
+  reason: 'damaged' | 'lost' | 'delayed' | 'other';
+  shipment_id: number;
+  shipment_tracking_code: string;
+  status: 'pending' | 'approved' | 'rejected' | 'resolved';
+  updated_at: string;
+  user_email: string;
+  user_id: number;
+}
+
+export interface CreateClaimResponse {
+  billing_id: number;
+  created_at: string;
+  description: string;
+  id: number;
+  photos: string[];
+  reason: 'damaged' | 'lost' | 'delayed' | 'other';
+  shipment_id: number;
+  shipment_tracking_code: string;
+  status: 'pending' | 'approved' | 'rejected' | 'resolved';
+  updated_at: string;
+  user_email: string;
+  user_id: number;
+}
+
+export interface GetClaimsParams {
+  page?: number;
+  per_page?: number;
+  status?: 'pending' | 'approved' | 'rejected' | 'resolved' | null;
+}
+
+export interface ClaimsListResponse {
+  claims: Claim[];
+  page: number;
+  per_page: number;
+  total: number;
+  total_pages: number;
+}
+
+// Photo Upload Types
+export interface UploadClaimPhotoRequest {
+  photo: File | Blob;
+  description?: string;
+}
+
+export interface UploadClaimPhotoResponse {
+  message: string;
+  photo_id: number;
+  photo_url: string;
+  success: boolean;
+}
+
+// Admin Claims Types
+export interface GetAllClaimsAdminParams {
+  page?: number;
+  per_page?: number;
+  status?: 'pending' | 'approved' | 'rejected' | 'resolved' | null;
+  reason?: 'damaged' | 'lost' | 'delayed' | 'other' | null;
+  user_id?: number | null;
+}
+
+export interface UpdateClaimStatusRequest {
+  status: 'pending' | 'approved' | 'rejected' | 'resolved';
+  admin_notes?: string;
+}
+
+export interface UpdateClaimStatusResponse extends Claim {
+  // Same as Claim interface but returned after status update
+}
+
+// API Request Configuration Typeswrapper types
 export interface ApiRequestConfig {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   url: string;
@@ -472,4 +562,62 @@ export interface ApiErrorResponse {
   message: string;
   status: number;
   details?: ApiError | ValidationError[];
+}
+
+// Location Types
+export interface DropoffLocation {
+  id: string;
+  name: string;
+  address: string;
+  phone: string;
+  distance: string;
+  rating: number;
+  hours: {
+    weekday: string;
+    weekend: string;
+  };
+  isOpen: boolean;
+  type: 'fedex' | 'ups' | 'usps' | 'amazon' | 'independent' | 'parcego';
+  services: string[];
+  estimatedTime: string;
+  latitude?: number;
+  longitude?: number;
+  features?: string[];
+  description?: string;
+}
+
+export interface GetDropoffLocationsParams {
+  latitude?: number;
+  longitude?: number;
+  radius?: number; // in kilometers
+  type?: 'fedex' | 'ups' | 'usps' | 'amazon' | 'independent' | 'parcego' | 'all';
+  isOpen?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface SearchLocationsParams {
+  query: string;
+  latitude?: number;
+  longitude?: number;
+  radius?: number;
+  type?: 'fedex' | 'ups' | 'usps' | 'amazon' | 'independent' | 'parcego' | 'all';
+  limit?: number;
+  offset?: number;
+}
+
+export interface DropoffLocationsResponse {
+  locations: DropoffLocation[];
+  total: number;
+  page: number;
+  per_page: number;
+  has_next: boolean;
+  has_prev: boolean;
+}
+
+export interface NearbyLocationsParams {
+  latitude: number;
+  longitude: number;
+  radius?: number; // in kilometers, default 10
+  limit?: number; // default 20
 }

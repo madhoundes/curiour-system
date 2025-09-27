@@ -299,11 +299,15 @@ export default function ShipmentDetailPage() {
             
             <div className="mt-8">
               <h2 className="text-xl font-bold border-b pb-2 mb-4">Billing Information</h2>
-              <div className="space-y-2">
-                <p><strong>Subtotal:</strong> {formatCurrency(parseFloat(shipment.billing.subtotal))}</p>
-                <p><strong>Tax:</strong> {formatCurrency(parseFloat(shipment.billing.tax_amount))}</p>
-                <p><strong>Total:</strong> <span className="font-semibold">{formatCurrency(parseFloat(shipment.billing.amount))}</span></p>
-              </div>
+              {shipment.billing ? (
+                <div className="space-y-2">
+                  <p><strong>Subtotal:</strong> {formatCurrency(parseFloat(shipment.billing.subtotal))}</p>
+                  <p><strong>Tax:</strong> {formatCurrency(parseFloat(shipment.billing.tax_amount))}</p>
+                  <p><strong>Total:</strong> <span className="font-semibold">{formatCurrency(parseFloat(shipment.billing.amount))}</span></p>
+                </div>
+              ) : (
+                <p className="text-gray-500">No billing information available</p>
+              )}
             </div>
           </div>
         </div>
@@ -364,7 +368,7 @@ export default function ShipmentDetailPage() {
                 <CardHeader>
                   <CardTitle>Package</CardTitle>
                 </CardHeader>
-                <CardContent className="text-sm text-gray-700">{shipment.package.weight} kg • {formatCurrency(parseFloat(shipment.billing.amount))}</CardContent>
+                <CardContent className="text-sm text-gray-700">{shipment.package.weight} kg • {shipment.billing ? formatCurrency(parseFloat(shipment.billing.amount)) : 'N/A'}</CardContent>
               </Card>
             </div>
           </TabsContent>
@@ -524,6 +528,11 @@ export default function ShipmentDetailPage() {
                 <Button 
                   variant="outline" 
                   onClick={async () => {
+                    if (!shipment.billing) {
+                      alert('No billing information available for this shipment.');
+                      return;
+                    }
+                    
                     try {
                       await generatePdfInvoice({
                         invoiceNumber: `INV-${shipment.tracking_code.replace('-', '')}`,
@@ -583,20 +592,24 @@ export default function ShipmentDetailPage() {
                 <CardTitle>Payment Summary</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>Subtotal:</span>
-                    <span>${shipment.billing.subtotal}</span>
+                {shipment.billing ? (
+                  <div className="space-y-2">
+                    <div className="flex justify-between">
+                      <span>Subtotal:</span>
+                      <span>${shipment.billing.subtotal}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Tax:</span>
+                      <span>${shipment.billing.tax_amount}</span>
+                    </div>
+                    <div className="flex justify-between font-semibold">
+                      <span>Total:</span>
+                      <span>{formatCurrency(parseFloat(shipment.billing.amount))}</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Tax:</span>
-                    <span>${shipment.billing.tax_amount}</span>
-                  </div>
-                  <div className="flex justify-between font-semibold">
-                    <span>Total:</span>
-                    <span>{formatCurrency(parseFloat(shipment.billing.amount))}</span>
-                  </div>
-                </div>
+                ) : (
+                  <p className="text-gray-500">No billing information available</p>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
