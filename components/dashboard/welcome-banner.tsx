@@ -19,29 +19,8 @@ export function WelcomeBanner() {
         setUserProfile(userProfileData)
       } catch (error) {
         console.error('Failed to fetch user profile:', error)
-        // Fallback to mock data if API fails
-        setUserProfile({
-          id: 1,
-          first_name: 'John',
-          last_name: 'Merchant',
-          email: 'john@electronicsstore.com',
-          phone_number: '+1 (555) 123-4567',
-          business_name: "John's Electronics Store",
-          street_address: '123 Main St',
-          city: 'Toronto',
-          province: 'ON',
-          postal_code: 'M5V 3A8',
-          country: 'Canada',
-          preferred_timezone: 'America/Toronto',
-          preferred_date_format: 'MM/DD/YYYY',
-          enable_email_updates: true,
-          enable_sms_updates: true,
-          role: 'user',
-          is_active: true,
-          is_verified: true,
-          created_at: '2024-01-01T00:00:00Z',
-          updated_at: '2024-01-01T00:00:00Z'
-        })
+        // Set userProfile to null if API fails - no fallback mock data
+        setUserProfile(null)
       } finally {
         setIsLoading(false)
       }

@@ -11,10 +11,12 @@ import type {
   CreateShipmentResponse,
   CreateBillingRequest,
   BillingRecord,
-  CreateCheckoutSessionRequest,
   CreateCheckoutSessionResponse,
+  GetSessionStatusParams,
+  SessionStatusResponse,
   GenerateLabelResponse,
   DetailedShipment,
+  ShipmentsListResponse,
   UpdateShipmentStatusRequest,
   ShipmentStatusChange,
   ShippingErrorResponse,
@@ -24,9 +26,97 @@ import type {
   ShipmentsByStatusDurationParams,
   InitializeStatusTrackingResponse,
   ShipmentStatus,
+  GetBillingRecordsParams,
+  BillingRecordsListResponse,
+  GenerateBillingReportRequest,
+  GenerateBillingReportResponse,
 } from './types';
 
 export class ShippingService {
+  /**
+   * Get list of user shipments with optional pagination
+   */
+  async getShipments(params?: {
+    skip?: number;
+    limit?: number;
+    status?: string;
+  }): Promise<DetailedShipment[]> {
+    try {
+      const response = await apiClient.get<ShipmentsListResponse>(
+        API_ENDPOINTS.SHIPMENTS.LIST,
+        { params }
+      );
+
+      // Return just the shipments array from the paginated response
+      return response.data.shipments;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        throw new Error('Authentication required');
+      }
+      throw new Error(error.message || 'Failed to get shipments');
+    }
+  }
+
+  /**
+   * Get the status of a checkout session
+   */
+  async getSessionStatus(session_id: string): Promise<SessionStatusResponse> {
+    try {
+      if (!session_id || session_id.trim() === '') {
+        throw new Error('Session ID is required');
+      }
+
+      const response = await apiClient.get<SessionStatusResponse>(
+        API_ENDPOINTS.BILLING.SESSION_STATUS,
+        { params: { session_id } }
+      );
+
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 400) {
+        throw new Error('Session ID required');
+      }
+      if (error.response?.status === 401) {
+        throw new Error('Authentication required');
+      }
+      if (error.response?.status === 422) {
+        throw new Error('Validation error');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Search user shipments by tracking code or ID
+   */
+  async searchShipments(query: string, params?: {
+    skip?: number;
+    limit?: number;
+  }): Promise<DetailedShipment[]> {
+    try {
+      if (!query || query.trim() === '') {
+        throw new Error('Search query is required');
+      }
+
+      const searchParams = {
+        q: query.trim(),
+        ...params
+      };
+
+      const response = await apiClient.get<DetailedShipment[]>(
+        API_ENDPOINTS.SHIPMENTS.SEARCH,
+        { params: searchParams }
+      );
+
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        throw new Error('Authentication required');
+      }
+      throw new Error(error.message || 'Failed to search shipments');
+    }
+  }
+
   /**
    * Create a new shipment with sender/receiver addresses and package details
    */
@@ -46,6 +136,29 @@ export class ShippingService {
         const errorData = error.response.data as ShippingErrorResponse;
         throw new Error(errorData.detail.message || 'Invalid shipment data');
       }
+      
+      // Handle 422 validation errors specifically
+      if (error.response?.status === 422) {
+        console.error('🔍 422 Validation Error in createShipment:');
+        console.error('Status:', error.response.status);
+        console.error('Response data:', error.response.data);
+        
+        // Log each validation error if details array exists
+        if (error.response.data?.details) {
+          console.error('📋 Validation Details:');
+          error.response.data.details.forEach((detail: any, index: number) => {
+            console.error(`❌ Validation Error ${index + 1}:`, detail);
+          });
+        }
+        
+        // Create a structured error object that preserves the validation details
+        const validationError = new Error('Validation Error');
+        (validationError as any).status = 422;
+        (validationError as any).details = error.response.data?.details || [];
+        (validationError as any).response = error.response;
+        throw validationError;
+      }
+      
       throw error;
     }
   }
@@ -157,23 +270,93 @@ export class ShippingService {
   /**
    * Create a Stripe checkout session for payment processing
    */
-  async createCheckoutSession(data: CreateCheckoutSessionRequest): Promise<CreateCheckoutSessionResponse> {
+  async createCheckoutSession(billing_id: number): Promise<CreateCheckoutSessionResponse> {
     try {
-      if (!data.billing_id || data.billing_id <= 0) {
+      if (!billing_id || billing_id <= 0) {
         throw new Error('Valid billing ID is required');
       }
 
       const response = await apiClient.post<CreateCheckoutSessionResponse>(
         API_ENDPOINTS.BILLING.CREATE_CHECKOUT_SESSION,
+        {}, // Empty request body
+        { params: { billing_id } } // Pass billing_id as query parameter
+      );
+
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 400) {
+        throw new Error('Billing not found or invalid status');
+      }
+      if (error.response?.status === 401) {
+        throw new Error('Authentication required');
+      }
+      if (error.response?.status === 422) {
+        throw new Error('Validation error');
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get paginated list of user's billing records with optional status filtering
+   */
+  async getBillingRecords(params?: GetBillingRecordsParams): Promise<BillingRecordsListResponse> {
+    try {
+      const response = await apiClient.get<BillingRecordsListResponse>(
+        API_ENDPOINTS.BILLING.LIST,
+        { params }
+      );
+
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 401) {
+        throw new Error('Authentication required');
+      }
+      if (error.response?.status === 422) {
+        throw new Error('Invalid parameters provided');
+      }
+      throw new Error(error.message || 'Failed to get billing records');
+    }
+  }
+
+  /**
+   * Generate monthly or yearly billing report in PDF format
+   */
+  async generateBillingReport(data: GenerateBillingReportRequest): Promise<GenerateBillingReportResponse> {
+    try {
+      if (!data.report_type || !data.year) {
+        throw new Error('Report type and year are required');
+      }
+
+      if (data.report_type === 'monthly' && !data.month) {
+        throw new Error('Month is required for monthly reports');
+      }
+
+      if (data.year < 2020 || data.year > new Date().getFullYear()) {
+        throw new Error('Invalid year provided');
+      }
+
+      if (data.month && (data.month < 1 || data.month > 12)) {
+        throw new Error('Invalid month provided (must be 1-12)');
+      }
+
+      const response = await apiClient.post<GenerateBillingReportResponse>(
+        API_ENDPOINTS.BILLING.GENERATE_REPORT,
         data
       );
 
       return response.data;
     } catch (error: any) {
-      if (error.response?.status === 404) {
-        throw new Error('Billing record not found');
+      if (error.response?.status === 400) {
+        throw new Error('Invalid report parameters');
       }
-      throw error;
+      if (error.response?.status === 401) {
+        throw new Error('Authentication required');
+      }
+      if (error.response?.status === 422) {
+        throw new Error('Validation error in report parameters');
+      }
+      throw new Error(error.message || 'Failed to generate billing report');
     }
   }
 
@@ -219,26 +402,70 @@ export class ShippingService {
     checkoutSession: CreateCheckoutSessionResponse;
   }> {
     try {
+      console.log('🚀 Starting shipping flow with data:', JSON.stringify(shipmentData, null, 2));
+      
       // Step 1: Create shipment
+      console.log('📦 Step 1: Creating shipment...');
       const shipment = await this.createShipment(shipmentData);
+      console.log('✅ Step 1 completed: Shipment created with ID:', shipment.shipment.id);
 
       // Step 2: Create billing
+      console.log('💰 Step 2: Creating billing record...');
       const billing = await this.createBilling({
         shipment_id: shipment.shipment.id
       });
+      console.log('✅ Step 2 completed: Billing created with ID:', billing.id);
 
       // Step 3: Create checkout session
-      const checkoutSession = await this.createCheckoutSession({
-        billing_id: billing.id
-      });
+      console.log('💳 Step 3: Creating checkout session...');
+      const checkoutSession = await this.createCheckoutSession(billing.id);
+      console.log('✅ Step 3 completed: Checkout session created');
 
+      console.log('🎉 Shipping flow completed successfully');
       return {
         shipment,
         billing,
         checkoutSession
       };
     } catch (error) {
-      throw new Error(`Shipping flow failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('❌ Shipping flow failed at step:', error);
+      
+      // Enhanced error logging for validation errors
+      if ((error as any)?.response?.status === 422) {
+        console.error('🔍 422 Validation Error Details:');
+        console.error('Status:', (error as any)?.response?.status);
+        console.error('Data:', (error as any)?.response?.data);
+        console.error('Details array:', (error as any)?.response?.data?.details);
+        
+        // Log each validation error individually
+        if ((error as any)?.response?.data?.details) {
+          (error as any).response.data.details.forEach((detail: any, index: number) => {
+            console.error(`❌ Validation Error ${index + 1}:`, detail);
+          });
+        }
+      }
+      
+      console.error('❌ Error details:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : 'No stack trace',
+        response: (error as any)?.response?.data || 'No response data',
+        status: (error as any)?.response?.status || 'No status code'
+      });
+      
+      // Provide more specific error messages based on the error type
+      if (error instanceof Error) {
+        if (error.message.includes('Authentication')) {
+          throw new Error(`Shipping flow failed: Authentication required - ${error.message}`);
+        } else if (error.message.includes('validation')) {
+          throw new Error(`Shipping flow failed: Data validation error - ${error.message}`);
+        } else if (error.message.includes('Network')) {
+          throw new Error(`Shipping flow failed: Network error - ${error.message}`);
+        } else {
+          throw new Error(`Shipping flow failed: ${error.message}`);
+        }
+      }
+      
+      throw new Error(`Shipping flow failed: Unknown error`);
     }
   }
 

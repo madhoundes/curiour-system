@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,8 @@ import { Icon } from "@/components/ui/icon";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { api } from "@/lib/api";
+import type { UserProfile } from "@/lib/api/types";
 
 interface UnifiedHeaderProps {
   onSidebarToggle?: () => void;
@@ -15,6 +17,7 @@ interface UnifiedHeaderProps {
 
 export function UnifiedHeader({ onSidebarToggle }: UnifiedHeaderProps) {
   const router = useRouter();
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [notifications] = useState([
     { id: 1, message: "Shipment ASH-20250101-ABC123 has been delivered", time: "2 min ago", unread: true },
     { id: 2, message: "New invoice available for download", time: "1 hour ago", unread: true },
@@ -22,6 +25,29 @@ export function UnifiedHeader({ onSidebarToggle }: UnifiedHeaderProps) {
   ]);
 
   const unreadCount = notifications.filter(n => n.unread).length;
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const userProfileData = await api.profile.getProfile()
+        setUserProfile(userProfileData)
+      } catch (error) {
+        console.error('Failed to fetch user profile:', error)
+        // Set userProfile to null if API fails - no fallback mock data
+        setUserProfile(null)
+      }
+    }
+
+    fetchUserProfile()
+  }, [])
+
+  const displayName = userProfile 
+    ? `${userProfile.first_name} ${userProfile.last_name}`
+    : 'Loading...'
+  
+  const userInitials = userProfile 
+    ? `${userProfile.first_name[0]}${userProfile.last_name[0]}`
+    : 'JD'
 
   const handleLogout = () => {
     // Clear the mock authentication cookie
@@ -150,11 +176,11 @@ export function UnifiedHeader({ onSidebarToggle }: UnifiedHeaderProps) {
                 <Avatar className="h-8 w-8">
                   <AvatarImage src="/api/placeholder/32/32" alt="User avatar" />
                   <AvatarFallback className="bg-blue-100 text-blue-600 text-sm font-medium">
-                    JD
+                    {userInitials}
                   </AvatarFallback>
                 </Avatar>
                 <div className="hidden sm:block text-left">
-                  <p className="text-sm font-medium text-gray-900">John Doe</p>
+                  <p className="text-sm font-medium text-gray-900">{displayName}</p>
                   <p className="text-xs text-gray-500">Merchant</p>
                 </div>
               </Button>
@@ -162,9 +188,9 @@ export function UnifiedHeader({ onSidebarToggle }: UnifiedHeaderProps) {
             <DropdownMenuContent align="end" className="w-56">
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-1">
-                  <p className="text-sm font-medium leading-none">John Doe</p>
+                  <p className="text-sm font-medium leading-none">{displayName}</p>
                   <p className="text-xs leading-none text-muted-foreground">
-                    john.doe@example.com
+                    {userProfile?.email || 'Loading...'}
                   </p>
                 </div>
               </DropdownMenuLabel>

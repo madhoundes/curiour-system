@@ -36,6 +36,7 @@ export const API_ENDPOINTS = {
   SHIPMENTS: {
     CREATE: '/shipments',
     LIST: '/shipments',
+    SEARCH: '/shipments/search',
     GET: '/shipments/:id',
     UPDATE: '/shipments/:id',
     DELETE: '/shipments/:id',
@@ -58,18 +59,39 @@ export const API_ENDPOINTS = {
   },
   ANALYTICS: {
     DASHBOARD: '/analytics/dashboard',
-    SHIPMENTS: '/analytics/shipments',
-    REVENUE: '/analytics/revenue',
+    REPORTS: '/analytics/reports',
+    EXPORT: '/analytics/export',
+  },
+  CLAIMS: {
+    CREATE: '/claims',
+    LIST: '/claims',
+    GET: '/claims/:claim_id',
+    UPLOAD_PHOTO: '/claims/:claim_id/photos',
+    ADMIN_LIST_ALL: '/claims/admin/all',
+    UPDATE_STATUS: '/claims/:claim_id/status',
   },
   QUOTES: {
     ESTIMATE: '/quotes/estimate',
   },
   BILLING: {
     CREATE: '/billing',
+    LIST: '/billing',
     CREATE_CHECKOUT_SESSION: '/billing/create-checkout-session',
+    SESSION_STATUS: '/billing/session-status',
+    GENERATE_REPORT: '/billing/reports/generate',
   },
   LABELS: {
     DOWNLOAD: '/labels/download/:shipment_id',
+  },
+  LOCATIONS: {
+    DROPOFF_LOCATIONS: '/locations/dropoff',
+    SEARCH_LOCATIONS: '/locations/search',
+    GET_LOCATION: '/locations/:location_id',
+    NEARBY_LOCATIONS: '/locations/nearby',
+  },
+  CONTACT: {
+    SEND_MESSAGE: '/contact',
+    GET_INFO: '/contact/info',
   },
 } as const;
 

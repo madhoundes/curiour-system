@@ -46,8 +46,8 @@ const Login03Page = () => {
 
   const loginForm = useForm<z.infer<typeof loginFormSchema>>({
     defaultValues: {
-      email: "merchant@business.com",
-      password: "password123",
+      email: "",
+      password: "",
     },
     resolver: zodResolver(loginFormSchema),
   });
@@ -289,7 +289,7 @@ const Login03Page = () => {
                         <FormControl>
                           <Input
                             type="email"
-                            placeholder="merchant@business.com"
+                            placeholder=""
                             className="w-full h-11"
                             {...field}
                           />
@@ -307,7 +307,7 @@ const Login03Page = () => {
                         <FormControl>
                           <Input
                             type="password"
-                            placeholder="••••••••"
+                            placeholder=""
                             className="w-full h-11"
                             {...field}
                           />
@@ -417,7 +417,7 @@ const Login03Page = () => {
                         <FormControl>
                           <Input
                             type="email"
-                            placeholder="merchant@business.com"
+                            placeholder=""
                             className="w-full h-11"
                             {...field}
                           />
@@ -436,7 +436,7 @@ const Login03Page = () => {
                         <FormControl>
                           <Input
                             type="password"
-                            placeholder="••••••••"
+                            placeholder=""
                             className="w-full h-11"
                             {...field}
                           />

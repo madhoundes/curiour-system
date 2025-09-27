@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Icon } from "@/components/ui/icon"
 import { getTrackingData, isValidTrackingNumber, formatTrackingNumber } from "@/lib/mock/tracking"
+import { recentShipments } from "@/lib/mock/dashboard"
 import type { ShipmentSummary } from "@/lib/mock/tracking"
 
 export function DashboardSearch() {
@@ -19,12 +20,12 @@ export function DashboardSearch() {
       setRecentSearches(JSON.parse(saved))
     }
 
-    // Set up quick search suggestions based on mock tracking data
-    setQuickSearchSuggestions([
-      'ASH-20250910-ABC123',
-      'ASH-20250911-DEF456', 
-      'ASH-20250912-GHI789'
-    ])
+    // Set up quick search suggestions based on recent shipments data
+    const suggestions = recentShipments
+      .slice(0, 3) // Take first 3 shipments
+      .map(shipment => shipment.id) // Use shipment IDs as suggestions
+    
+    setQuickSearchSuggestions(suggestions)
   }, [])
 
   const saveRecentSearch = (query: string) => {

@@ -8,18 +8,40 @@ import { Shipment } from '@/lib/mock/shipments';
  * Ensures consistent branding, data formatting, and generation logic
  */
 
+import { profileService } from './api/profile';
+
 /**
- * Default sender information for all shipping labels
+ * Get sender information from user profile
  */
-const DEFAULT_SENDER = {
-  name: "Parcego Courier Services",
-  company: "Parcego Inc.",
-  address: "123 Business Ave, Suite 100",
-  city: "Toronto",
-  state: "ON",
-  postalCode: "M5V 2H1",
-  phone: "1-800-PARCEGO",
-  email: "support@parcego.com"
+export const getSenderFromProfile = async () => {
+  try {
+    const profile = await profileService.getProfile();
+    return {
+      name: profile.first_name && profile.last_name 
+        ? `${profile.first_name} ${profile.last_name}` 
+        : profile.business_name || "Your Name",
+      company: profile.business_name || "",
+      address: profile.street_address || "Your Address",
+      city: profile.city || "Your City",
+      state: profile.province || "Your Province",
+      postalCode: profile.postal_code || "Your Postal Code",
+      phone: profile.phone_number || "Your Phone",
+      email: profile.email || "your@email.com"
+    };
+  } catch (error) {
+    console.error('Failed to load profile for sender info:', error);
+    // Return empty defaults if profile loading fails
+    return {
+      name: "",
+      company: "",
+      address: "",
+      city: "",
+      state: "",
+      postalCode: "",
+      phone: "",
+      email: ""
+    };
+  }
 };
 
 /**
@@ -39,7 +61,7 @@ const SERVICE_DESCRIPTIONS: Record<string, string> = {
 /**
  * Converts form data to shipping label data with consistent formatting
  */
-export const createShippingLabelData = (params: {
+export const createShippingLabelData = async (params: {
   trackingNumber: string;
   recipient: {
     name: string;
@@ -60,8 +82,11 @@ export const createShippingLabelData = (params: {
     dimensions: string;
     type: string;
   };
-  sender?: Partial<typeof DEFAULT_SENDER>;
-}): ShippingLabelData => {
+  sender?: Partial<Awaited<ReturnType<typeof getSenderFromProfile>>>;
+}): Promise<ShippingLabelData> => {
+  // Get sender information from profile
+  const defaultSender = await getSenderFromProfile();
+  
   // Normalize service type
   const serviceType = params.service.type.toUpperCase();
   const serviceDescription = params.service.description || 
@@ -72,7 +97,7 @@ export const createShippingLabelData = (params: {
   return {
     trackingNumber: params.trackingNumber,
     sender: {
-      ...DEFAULT_SENDER,
+      ...defaultSender,
       ...params.sender
     },
     recipient: {
@@ -101,8 +126,8 @@ export const createShippingLabelData = (params: {
 /**
  * Converts shipment data to shipping label data
  */
-export const createShippingLabelFromShipment = (shipment: Shipment): ShippingLabelData => {
-  return createShippingLabelData({
+export const createShippingLabelFromShipment = async (shipment: Shipment): Promise<ShippingLabelData> => {
+  return await createShippingLabelData({
     trackingNumber: shipment.trackingNumber,
     recipient: {
       name: shipment.recipient.name,
@@ -129,7 +154,7 @@ export const createShippingLabelFromShipment = (shipment: Shipment): ShippingLab
 /**
  * Converts form order data to shipping label data
  */
-export const createShippingLabelFromOrderData = (params: {
+export const createShippingLabelFromOrderData = async (params: {
   trackingNumber: string;
   recipientName: string;
   recipientCompany?: string;
@@ -150,7 +175,7 @@ export const createShippingLabelFromOrderData = (params: {
   selectedQuote?: {
     deliveryTime?: string;
   };
-}): ShippingLabelData => {
+}): Promise<ShippingLabelData> => {
   // Format dimensions
   const dimensions = params.length && params.width && params.height
     ? `${params.length}" × ${params.width}" × ${params.height}" ${params.dimensionUnit || 'in'}`
@@ -161,7 +186,7 @@ export const createShippingLabelFromOrderData = (params: {
     ? `${params.weight} ${params.weightUnit}`
     : '2.5 lbs';
 
-  return createShippingLabelData({
+  return await createShippingLabelData({
     trackingNumber: params.trackingNumber,
     recipient: {
       name: params.recipientName,

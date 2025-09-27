@@ -175,7 +175,6 @@ const HighQualityQRCode: React.FC<{ value: string; preGeneratedDataUrl?: string 
           </svg>
         `)}
         style={styles.qrCode}
-        alt="QR Code Loading"
       />
     );
   }
@@ -184,7 +183,6 @@ const HighQualityQRCode: React.FC<{ value: string; preGeneratedDataUrl?: string 
     <Image
       src={qrDataUrl}
       style={styles.qrCode}
-      alt="QR Code"
     />
   );
 };
@@ -555,7 +553,6 @@ const PolishedShippingLabel: React.FC<PolishedShippingLabelProps> = ({ data }) =
             <Image
               src={logoDataUri}
               style={styles.logo}
-              alt="Parcego Logo"
             />
           </View>
         </View>
@@ -573,8 +570,10 @@ const PolishedShippingLabel: React.FC<PolishedShippingLabelProps> = ({ data }) =
         {/* FROM Section */}
           <View style={styles.fromSection}>
             <Text style={styles.sectionHeader}>FROM</Text>
-            <Text style={styles.companyName}>Parcego Logistics Services</Text>
-            <Text style={styles.contactName}>Parcego Inc.</Text>
+            <Text style={styles.companyName}>{data.sender.name}</Text>
+            {data.sender.company && (
+              <Text style={styles.contactName}>{data.sender.company}</Text>
+            )}
             {/* Address, location, and zip code hidden for first stage */}
             {/* <Text style={styles.addressLine}>{data.sender.address}</Text>
             <Text style={styles.addressLine}>
@@ -641,7 +640,6 @@ const PolishedShippingLabel: React.FC<PolishedShippingLabelProps> = ({ data }) =
                     </svg>
                   `)}
                   style={styles.qrCode}
-                  alt="QR Code Error"
                 />
               }
             >

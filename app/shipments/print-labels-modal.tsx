@@ -6,14 +6,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Icon } from "@/components/ui/icon";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import type { Shipment } from "@/lib/mock/shipments";
-import { shippingService } from "@/lib/api/shipping";
+import type { DetailedShipment } from "@/lib/api/types";
+import { ShippingService } from "@/lib/api/shipping";
 
 interface PrintLabelsModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  selectedShipmentIds: string[];
-  shipments: Shipment[];
+  selectedShipmentIds: number[];
+  shipments: DetailedShipment[];
 }
 
 const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({
@@ -23,9 +23,11 @@ const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({
   shipments,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
+  const shippingService = new ShippingService();
 
   // Filter shipments based on selected IDs
   const selectedShipments = useMemo(() => {
+    if (!Array.isArray(shipments)) return [];
     return shipments.filter(shipment => selectedShipmentIds.includes(shipment.id));
   }, [shipments, selectedShipmentIds]);
 
@@ -39,13 +41,8 @@ const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({
       // Generate labels for each selected shipment using real API
       const labelPromises = selectedShipments.map(async (shipment) => {
         try {
-          // Convert string ID to number for API call
-          const shipmentId = parseInt(shipment.id, 10);
-          if (isNaN(shipmentId)) {
-            throw new Error(`Invalid shipment ID: ${shipment.id}`);
-          }
-          
-          const labelResponse = await shippingService.generateLabel(shipmentId);
+          // shipment.id is already a number, no need to convert
+          const labelResponse = await shippingService.generateLabel(shipment.id);
           if (labelResponse.label_url) {
             // Open each label in a new tab
             window.open(labelResponse.label_url, '_blank');
@@ -149,7 +146,7 @@ const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({
                   <div className="flex items-start justify-between">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-2">
-                        <h4 className="font-medium truncate">{shipment.trackingNumber}</h4>
+                        <h4 className="font-medium truncate">{shipment.tracking_code}</h4>
                         <Badge 
                           variant="secondary" 
                           className={`text-xs ${getStatusColor(shipment.status)}`}
@@ -161,16 +158,16 @@ const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({
                       <div className="grid grid-cols-2 gap-4 text-sm">
                         <div>
                           <p className="text-gray-600 mb-1">To:</p>
-                          <p className="font-medium">{shipment.recipient.name}</p>
+                          <p className="font-medium">{shipment.receiver_address.contact_name}</p>
                           <p className="text-gray-600">
-                            {shipment.recipient.city}, {shipment.recipient.province || 'ON'}
+                            {shipment.receiver_address.city}, {shipment.receiver_address.province}
                           </p>
                         </div>
                         
                         <div>
                           <p className="text-gray-600 mb-1">Service:</p>
-                          <p className="font-medium">{shipment.service}</p>
-                          <p className="text-gray-600">{shipment.weightKg} kg</p>
+                          <p className="font-medium">Standard</p>
+                          <p className="text-gray-600">{shipment.package.weight} kg</p>
                         </div>
                       </div>
                     </div>
@@ -178,7 +175,7 @@ const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({
                     <div className="ml-4 text-right">
                       <p className="text-sm text-gray-600">Created</p>
                       <p className="text-sm font-medium">
-                        {new Date(shipment.createdAt).toLocaleDateString()}
+                        {new Date(shipment.created_at).toLocaleDateString()}
                       </p>
                     </div>
                   </div>

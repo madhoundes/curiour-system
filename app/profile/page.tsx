@@ -28,12 +28,12 @@ const BusinessInfoSchema = z.object({
   businessName: z.string().min(2, "Business name is required"),
   contactName: z.string().min(2, "Contact name is required"),
   email: z.string().email("Enter a valid email"),
-  phone: z.string().min(7, "Enter a valid phone number"),
+  phone: z.string().regex(/^\d{10,}$/, "Phone number must have at least 10 digits"),
   addressLine1: z.string().min(2, "Address is required"),
   addressLine2: z.string().optional(),
   city: z.string().min(2, "City is required"),
   state: z.string().min(2, "State is required"),
-  zip: z.string().min(3, "ZIP is required"),
+  zip: z.string().regex(/^[A-Za-z]\d[A-Za-z] \d[A-Za-z]\d$/, "Invalid postal code format. Use Canadian format: A1A 1A1"),
   country: z.string().min(2, "Country is required"),
 });
 
@@ -220,18 +220,26 @@ export default function ProfileAccountPage() {
         const businessData = data as BusinessInfo;
         
         // Map form data to API format
-        const updateData = {
+        const nameParts = businessData.contactName.split(' ');
+        const firstName = nameParts[0] || "";
+        const lastName = nameParts.slice(1).join(' ') || "";
+        
+        const updateData: any = {
           business_name: businessData.businessName,
-          first_name: businessData.contactName.split(' ')[0] || "",
-          last_name: businessData.contactName.split(' ').slice(1).join(' ') || "",
+          first_name: firstName,
+          last_name: lastName,
           phone_number: businessData.phone,
           street_address: businessData.addressLine1,
-          street_address_2: businessData.addressLine2,
           city: businessData.city,
           province: businessData.state,
           postal_code: businessData.zip,
           country: businessData.country,
         };
+
+        // Only include optional fields if they have values
+        if (businessData.addressLine2 && businessData.addressLine2.trim()) {
+          updateData.street_address_2 = businessData.addressLine2;
+        }
         
         await profileService.updateProfile(updateData);
         

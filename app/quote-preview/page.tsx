@@ -10,6 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { createStepperSteps, Stepper } from "@/components/ui/stepper";
+import { quotesService } from "@/lib/api/quotes";
+import { profileService } from "@/lib/api/profile";
+import type { QuoteEstimateRequest, QuoteEstimateResponse, UserProfile } from "@/lib/api/types";
 
 interface ShipmentData {
   recipientName: string;
@@ -44,22 +47,15 @@ interface QuoteOption {
   recommended?: boolean;
 }
 
-// Mock merchant data - in real app this would come from auth context
-const mockMerchantData = {
-  businessName: "John's Electronics Store",
-  contactName: "John Merchant",
-  address: "123 Business St, Suite 100",
-  city: "Toronto",
-  province: "ON",
-  postalCode: "M5V3A8",
-  phone: "(555) 123-4567",
-  email: "john@electronicsstore.com"
-};
-
 // Enhanced Shipment Summary Component with Reorder Info and Shipping Label Preview
 const ShipmentSummary = ({ formData }: { formData: ShipmentData }) => {
   const { generateTrackingNumber, updateMultipleFields, getShippingLabelData, isFormValid } = useShipment();
+  const router = useRouter();
   const searchParams = useSearchParams();
+  
+  // State for sender data
+  const [senderData, setSenderData] = useState<UserProfile | null>(null);
+  const [senderError, setSenderError] = useState<string | null>(null);
   const [isReorderMode, setIsReorderMode] = useState(false);
   const [reorderSource, setReorderSource] = useState<string | null>(null);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
@@ -70,6 +66,30 @@ const ShipmentSummary = ({ formData }: { formData: ShipmentData }) => {
   // Set client flag after hydration
   useEffect(() => {
     setIsClient(true);
+  }, []);
+
+  // Load sender data on component mount
+  useEffect(() => {
+    const loadSenderData = async () => {
+      try {
+        const profile = await profileService.getProfile();
+        setSenderData(profile);
+        console.log('Profile loaded successfully:', profile);
+      } catch (error) {
+        console.error('Failed to load sender profile:', error);
+        
+        // Set error state instead of fallback data
+        if (error instanceof Error && error.message.includes('Authentication')) {
+          setSenderError('Please log in to access your profile information.');
+        } else {
+          setSenderError('Failed to load profile information. Please try refreshing the page.');
+        }
+        
+        // Don't set fallback data - require real profile data
+        setSenderData(null);
+      }
+    };
+    loadSenderData();
   }, []);
 
   // Handle reorder data from URL parameters
@@ -83,28 +103,28 @@ const ShipmentSummary = ({ formData }: { formData: ShipmentData }) => {
       const reorderData: Record<string, string> = {};
       
       if (searchParams.get('recipient')) {
-        reorderData.recipientName = searchParams.get('recipient');
+        reorderData.recipientName = searchParams.get('recipient') || '';
       }
       if (searchParams.get('address')) {
-        reorderData.recipientAddress = searchParams.get('address');
+        reorderData.recipientAddress = searchParams.get('address') || '';
       }
       if (searchParams.get('city')) {
-        reorderData.recipientCity = searchParams.get('city');
+        reorderData.recipientCity = searchParams.get('city') || '';
       }
       if (searchParams.get('province')) {
-        reorderData.recipientProvince = searchParams.get('province');
+        reorderData.recipientProvince = searchParams.get('province') || '';
       }
       if (searchParams.get('postalCode')) {
-        reorderData.recipientPostalCode = searchParams.get('postalCode');
+        reorderData.recipientPostalCode = searchParams.get('postalCode') || '';
       }
       if (searchParams.get('service')) {
         reorderData.serviceType = searchParams.get('service')?.toLowerCase() || 'standard';
       }
       if (searchParams.get('weight')) {
-        reorderData.weight = searchParams.get('weight');
+        reorderData.weight = searchParams.get('weight') || '';
       }
       if (searchParams.get('notes')) {
-        reorderData.specialInstructions = searchParams.get('notes');
+        reorderData.specialInstructions = searchParams.get('notes') || '';
       }
       
       // Update form with reorder data
@@ -164,7 +184,7 @@ const ShipmentSummary = ({ formData }: { formData: ShipmentData }) => {
 
     setIsPreviewLoading(true);
     try {
-      const shippingData = getShippingLabelData();
+      const shippingData = await getShippingLabelData();
       // Import dynamically to avoid SSR issues
       const { generateShippingLabelBlob } = await import('@/lib/pdf-generator');
       const blob = await generateShippingLabelBlob(shippingData);
@@ -194,7 +214,7 @@ const ShipmentSummary = ({ formData }: { formData: ShipmentData }) => {
 
     setIsPreviewLoading(true);
     try {
-      const shippingData = getShippingLabelData();
+      const shippingData = await getShippingLabelData();
       // Import dynamically to avoid SSR issues
       const { generateShippingLabelBlob } = await import('@/lib/pdf-generator');
       const blob = await generateShippingLabelBlob(shippingData);
@@ -280,11 +300,27 @@ const ShipmentSummary = ({ formData }: { formData: ShipmentData }) => {
               FROM
             </Label>
             <div className="space-y-1">
-              <p className="font-medium text-gray-900 text-sm">{mockMerchantData.businessName}</p>
-              <p className="text-xs text-gray-600">{mockMerchantData.address}</p>
-              <p className="text-xs text-gray-600">
-                {mockMerchantData.city}, {mockMerchantData.province} {mockMerchantData.postalCode}
-              </p>
+              {senderError ? (
+                <p className="text-xs text-red-600">{senderError}</p>
+              ) : senderData ? (
+                <>
+                  <p className="font-medium text-gray-900 text-sm">
+                    {`${senderData.first_name} ${senderData.last_name}`}
+                  </p>
+                  {senderData.business_name && (
+                    <p className="text-xs text-gray-600">{senderData.business_name}</p>
+                  )}
+                  <p className="text-xs text-gray-600">{senderData.street_address}</p>
+                  <p className="text-xs text-gray-600">
+                    {senderData.city}, {senderData.province} {senderData.postal_code}
+                  </p>
+                </>
+              ) : (
+                <div className="flex items-center space-x-2">
+                  <Icon name="Loader2" className="h-4 w-4 animate-spin" />
+                  <p className="text-xs text-gray-600">Loading sender information...</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -443,19 +479,38 @@ export default function QuotePreviewPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedQuote, setSelectedQuote] = useState<string>('standard');
   const [formData, setFormData] = useState<ShipmentData | null>(null);
+  const [quoteOptions, setQuoteOptions] = useState<QuoteOption[]>([]);
+  const [quoteError, setQuoteError] = useState<string | null>(null);
 
-  // Mock quote options based on service type and package details
-  const generateQuoteOptions = (data: ShipmentData): QuoteOption[] => {
-    const basePrice = 12.50;
-    const weight = parseFloat(data.weight) || 1;
-    const weightMultiplier = weight * 2.5;
+  // Map form data to API request format
+  const mapFormDataToQuoteRequest = (data: ShipmentData): QuoteEstimateRequest => {
+    // Map package type to API package size
+    const packageSizeMap: Record<string, 'small' | 'medium' | 'large'> = {
+      'envelope': 'small',
+      'box': 'medium',
+      'tube': 'medium',
+      'pallet': 'large'
+    };
+
+    return {
+      package_size: packageSizeMap[data.packageType] || 'medium',
+      weight: parseFloat(data.weight) || 1,
+      destination_postal_code: data.recipientPostalCode
+    };
+  };
+
+  // Convert API response to quote options format
+  const mapApiResponseToQuoteOptions = (apiResponse: QuoteEstimateResponse): QuoteOption[] => {
+    if (!apiResponse) {
+      throw new Error('Invalid API response');
+    }
     
     return [
       {
         id: 'standard',
         name: 'Parcego Standard',
-        description: 'Reliable delivery for everyday shipments',
-        price: basePrice + weightMultiplier,
+        description: `Reliable delivery to ${apiResponse.service_area || 'your destination'}`,
+        price: apiResponse.estimated_price || 0,
         deliveryTime: '3-5 business days',
         features: ['Basic tracking', 'Standard handling', 'Email notifications'],
         recommended: true
@@ -463,15 +518,21 @@ export default function QuotePreviewPage() {
     ];
   };
 
-  const [quoteOptions, setQuoteOptions] = useState<QuoteOption[]>([]);
-
-  // Load form data and generate quotes
-  useEffect(() => {
-    const savedData = localStorage.getItem('shipmentFormData');
-    if (savedData) {
-      const data = JSON.parse(savedData);
-      setFormData(data);
-      const quotes = generateQuoteOptions(data);
+  // Fetch quote from API
+  const fetchQuoteEstimate = async (data: ShipmentData) => {
+    try {
+      setQuoteError(null);
+      const request = mapFormDataToQuoteRequest(data);
+      console.log('Sending quote request:', request);
+      
+      const response = await quotesService.getEstimate(request);
+      console.log('Received quote response:', response);
+      
+      if (!response) {
+        throw new Error('No response received from quotes API');
+      }
+      
+      const quotes = mapApiResponseToQuoteOptions(response);
       setQuoteOptions(quotes);
       
       // Set the recommended option as selected
@@ -479,6 +540,36 @@ export default function QuotePreviewPage() {
       if (recommended) {
         setSelectedQuote(recommended.id);
       }
+    } catch (error: any) {
+      console.error('Failed to fetch quote:', error);
+      setQuoteError(error.message || 'Failed to get shipping quote');
+      
+      // Fallback to basic quote structure on error
+      const fallbackQuote: QuoteOption[] = [
+        {
+          id: 'standard',
+          name: 'Parcego Standard',
+          description: 'Reliable delivery for everyday shipments',
+          price: 15.99, // Basic fallback price
+          deliveryTime: '3-5 business days',
+          features: ['Basic tracking', 'Standard handling', 'Email notifications'],
+          recommended: true
+        }
+      ];
+      setQuoteOptions(fallbackQuote);
+      setSelectedQuote('standard');
+    }
+  };
+
+  // Load form data and generate quotes
+  useEffect(() => {
+    const savedData = localStorage.getItem('parcego-shipment-form-data');
+    if (savedData) {
+      const data = JSON.parse(savedData);
+      setFormData(data);
+      
+      // Fetch real quote from API
+      fetchQuoteEstimate(data);
     } else {
       router.push('/create-shipment');
     }
@@ -573,7 +664,42 @@ export default function QuotePreviewPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {quoteOptions.map((quote) => (
+              {/* Error State */}
+              {quoteError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <div className="flex items-start space-x-3">
+                    <Icon name="AlertCircle" size={20} className="text-red-600 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-red-900 mb-1">Quote Error</h4>
+                      <p className="text-red-700 text-sm mb-2">
+                        {quoteError}
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => formData && fetchQuoteEstimate(formData)}
+                        className="bg-white hover:bg-red-50 border-red-300 text-red-700"
+                      >
+                        <Icon name="RefreshCw" size={16} className="mr-2" />
+                        Retry Quote
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Loading State */}
+              {quoteOptions.length === 0 && !quoteError && (
+                <div className="flex items-center justify-center py-8">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600">Getting shipping quote...</p>
+                  </div>
+                </div>
+              )}
+
+              {/* Quote Options Display */}
+              {quoteOptions.length > 0 && quoteOptions.map((quote) => (
                 <div
                   key={quote.id}
                   className="parcego-quote-option relative p-6 border-2 border-blue-500 bg-blue-50 rounded-lg"
