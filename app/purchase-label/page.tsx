@@ -434,10 +434,25 @@ export default function PurchaseLabelPage() {
 
       // Handle Stripe checkout session with client_secret
       if (shippingFlow.checkoutSession?.client_secret) {
-        // Store checkout session data and show Stripe payment form
-        setCheckoutSession(shippingFlow.checkoutSession);
+        let clientSecret = shippingFlow.checkoutSession.client_secret;
+        
+        // Decode the URL-encoded client secret
+        try {
+          clientSecret = decodeURIComponent(clientSecret);
+          console.log('Original client secret:', shippingFlow.checkoutSession.client_secret);
+          console.log('Decoded client secret:', clientSecret);
+        } catch (e) {
+          console.warn('Failed to decode client secret:', e);
+          clientSecret = shippingFlow.checkoutSession.client_secret;
+        }
+        
+        // Store checkout session data with decoded client secret and show Stripe payment form
+        setCheckoutSession({
+          ...shippingFlow.checkoutSession,
+          client_secret: clientSecret
+        });
         setShowStripePayment(true);
-        console.log('Showing Stripe Elements payment form with client_secret');
+        console.log('Showing Stripe Elements payment form with decoded client_secret');
       } else if (shippingFlow.checkoutSession?.checkout_url) {
         // Fallback: If we have a direct checkout URL, redirect to it
         console.log('Redirecting to Stripe checkout URL:', shippingFlow.checkoutSession.checkout_url);

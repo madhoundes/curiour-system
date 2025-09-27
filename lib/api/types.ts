@@ -621,3 +621,31 @@ export interface NearbyLocationsParams {
   radius?: number; // in kilometers, default 10
   limit?: number; // default 20
 }
+
+// Contact Types
+export interface SendContactMessageRequest {
+  message: string;
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+  subject: string;
+}
+
+export interface SendContactMessageResponse {
+  message: string;
+  success: boolean;
+  ticket_id: string;
+}
+
+export interface ContactInfoResponse {
+  phone: string;
+  email: string;
+  address: string;
+  business_hours: {
+    weekdays: string;
+    weekends: string;
+  };
+  support_hours: {
+    weekdays: string;
+    weekends: string;
+  };
+  emergency_contact?: string;
+}

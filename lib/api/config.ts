@@ -89,6 +89,10 @@ export const API_ENDPOINTS = {
     GET_LOCATION: '/locations/:location_id',
     NEARBY_LOCATIONS: '/locations/nearby',
   },
+  CONTACT: {
+    SEND_MESSAGE: '/contact',
+    GET_INFO: '/contact/info',
+  },
 } as const;
 
 export const HTTP_STATUS = {

@@ -30,6 +30,9 @@ export { shippingService } from './shipping';
 // Claims service
 export { claimsService } from './claims';
 
+// Contact service
+export { contactService } from './contact';
+
 // Locations service
 export { locationsService, LocationsService } from './locations';
 
@@ -41,6 +44,7 @@ import { quotesService } from './quotes';
 import { profileService } from './profile';
 import { shippingService } from './shipping';
 import { claimsService } from './claims';
+import { contactService } from './contact';
 import { locationsService } from './locations';
 
 // Utility functions for API integration
@@ -52,6 +56,7 @@ export const api = {
   profile: profileService,
   shipping: shippingService,
   claims: claimsService,
+  contact: contactService,
   locations: locationsService,
 };
 

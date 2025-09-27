@@ -20,6 +20,10 @@ import { toast } from "sonner";
 import type { FAQCategory } from '@/lib/mock/support';
 import { mockFAQs, mockHelpArticles, mockVideoTutorials, helpCategories } from '@/lib/mock/support';
 
+// Import contact API service
+import { contactService } from '@/lib/api/contact';
+import { profileService } from '@/lib/api/profile';
+
 // Mock data is now imported from the support library
 
 export default function SupportHelpCenter() {
@@ -33,8 +37,11 @@ export default function SupportHelpCenter() {
     email: '',
     subject: '',
     message: '',
-    priority: 'normal'
+    priority: 'normal' as 'low' | 'normal' | 'high' | 'urgent'
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [isLoadingProfile, setIsLoadingProfile] = useState(false);
 
   // Filter FAQs based on category only
   const filteredFAQs = useMemo(() => {
@@ -73,14 +80,83 @@ export default function SupportHelpCenter() {
     router.push(`/support/article/${articleId}`);
   };
 
-  const handleContactSubmit = (e: React.FormEvent) => {
+  // Load user profile data when contact form is opened
+  const loadUserProfile = async () => {
+    if (contactForm.name || contactForm.email) {
+      // Don't reload if form already has data
+      return;
+    }
+
+    setIsLoadingProfile(true);
+    try {
+      const profile = await profileService.getProfile();
+      if (profile) {
+        setContactForm(prev => ({
+          ...prev,
+          name: profile.first_name && profile.last_name 
+            ? `${profile.first_name} ${profile.last_name}` 
+            : prev.name,
+          email: profile.email || prev.email
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to load profile for contact form:', error);
+      // Don't show error to user, just continue with empty form
+    } finally {
+      setIsLoadingProfile(false);
+    }
+  };
+
+  const handleContactSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock submission - in real app, this would send to backend
-    console.log('Contact form submitted:', contactForm);
-    setShowContactForm(false);
-    setContactForm({ name: '', email: '', subject: '', message: '', priority: 'normal' });
-    // Show success message
-    toast.success('Thank you for your message! We\'ll get back to you within 24 hours.');
+    setIsSubmitting(true);
+    setSubmitError(null);
+    
+    try {
+      // Validate form data
+      if (!contactForm.name.trim()) {
+        throw new Error('Name is required');
+      }
+      if (!contactForm.email.trim()) {
+        throw new Error('Email is required');
+      }
+      if (!contactForm.subject.trim()) {
+        throw new Error('Subject is required');
+      }
+      if (!contactForm.message.trim()) {
+        throw new Error('Message is required');
+      }
+      if (contactForm.message.trim().length < 10) {
+        throw new Error('Message must be at least 10 characters long');
+      }
+
+      // Submit to contact API
+      const response = await contactService.sendMessage({
+        message: contactForm.message.trim(),
+        subject: contactForm.subject.trim(),
+        priority: contactForm.priority
+      });
+
+      // Reset form and close modal on success
+      setContactForm({ 
+        name: '', 
+        email: '', 
+        subject: '', 
+        message: '', 
+        priority: 'normal' 
+      });
+      setShowContactForm(false);
+      
+      // Show success message with ticket ID
+      toast.success(`Message sent successfully! Your ticket ID is: ${response.ticket_id}`);
+      
+    } catch (error: any) {
+      console.error('Failed to send contact message:', error);
+      setSubmitError(error.message || 'Failed to send message. Please try again.');
+      toast.error(error.message || 'Failed to send message. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -135,7 +211,10 @@ export default function SupportHelpCenter() {
               <div className="flex flex-wrap gap-4">
                 <Button 
                   variant="outline" 
-                  onClick={() => setShowContactForm(true)}
+                  onClick={() => {
+                    setShowContactForm(true);
+                    loadUserProfile();
+                  }}
                   className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/30 hover:text-white transition-all duration-200"
                 >
                   Contact Support
@@ -396,6 +475,11 @@ export default function SupportHelpCenter() {
             </DialogDescription>
           </DialogHeader>
           <form id="parcego-support-contact-form" onSubmit={handleContactSubmit} className="space-y-6">
+            {submitError && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-md">
+                <p className="text-sm text-red-600">{submitError}</p>
+              </div>
+            )}
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-sm font-medium text-gray-700">Name</Label>
@@ -403,6 +487,8 @@ export default function SupportHelpCenter() {
                   id="name"
                   value={contactForm.name}
                   onChange={(e) => setContactForm(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder={isLoadingProfile ? "Loading..." : "Your full name"}
+                  disabled={isLoadingProfile}
                   required
                 />
               </div>
@@ -413,6 +499,8 @@ export default function SupportHelpCenter() {
                   type="email"
                   value={contactForm.email}
                   onChange={(e) => setContactForm(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder={isLoadingProfile ? "Loading..." : "your.email@example.com"}
+                  disabled={isLoadingProfile}
                   required
                 />
               </div>
@@ -430,7 +518,7 @@ export default function SupportHelpCenter() {
               <Label htmlFor="priority" className="text-sm font-medium text-gray-700">Priority</Label>
               <Select
                 value={contactForm.priority}
-                onValueChange={(value) => {
+                onValueChange={(value: 'low' | 'normal' | 'high' | 'urgent') => {
                   console.log('Priority changed to:', value);
                   setContactForm(prev => ({ ...prev, priority: value }));
                 }}
@@ -447,26 +535,50 @@ export default function SupportHelpCenter() {
               </Select>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="message" className="text-sm font-medium text-gray-700">Message</Label>
+              <div className="flex justify-between items-center">
+                <Label htmlFor="message" className="text-sm font-medium text-gray-700">Message</Label>
+                <span className={`text-xs ${contactForm.message.length < 10 ? 'text-red-500' : 'text-gray-500'}`}>
+                  {contactForm.message.length}/10 min
+                </span>
+              </div>
               <Textarea
                 id="message"
                 rows={4}
                 value={contactForm.message}
                 onChange={(e) => setContactForm(prev => ({ ...prev, message: e.target.value }))}
                 required
-                placeholder="Describe your issue or question in detail..."
+                placeholder="Describe your issue or question in detail... (minimum 10 characters)"
+                className={contactForm.message.length > 0 && contactForm.message.length < 10 ? 'border-red-300 focus:border-red-500' : ''}
               />
+              {contactForm.message.length > 0 && contactForm.message.length < 10 && (
+                <p className="text-xs text-red-500">Message must be at least 10 characters long</p>
+              )}
             </div>
             <div className="flex justify-end space-x-3 pt-4">
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => setShowContactForm(false)}
+                onClick={() => {
+                  setShowContactForm(false);
+                  setSubmitError(null);
+                  setContactForm({ 
+                    name: '', 
+                    email: '', 
+                    subject: '', 
+                    message: '', 
+                    priority: 'normal' 
+                  });
+                }}
+                disabled={isSubmitting}
               >
                 Cancel
               </Button>
-              <Button type="submit">
-                Send Message
+              <Button 
+                type="submit"
+                className="bg-blue-600 hover:bg-blue-700"
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? 'Sending...' : 'Send Message'}
               </Button>
             </div>
           </form>
