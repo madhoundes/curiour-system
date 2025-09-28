@@ -401,72 +401,7 @@ const ShipmentSummary = ({ formData }: { formData: ShipmentData }) => {
           )}
         </div>
 
-        {/* Shipping Label Preview Section - Merged into Summary */}
-        <div className="bg-sky-50 border border-sky-200 rounded-lg p-4">
-          <div className="flex items-center space-x-2 mb-3">
-            <Icon name="FileText" size={18} className="text-sky-600" />
-            <span className="text-sm font-semibold text-sky-800">
-              Shipping Label Ready
-            </span>
-          </div>
-          <p className="text-sm text-sky-700 mb-4">
-            Your complete shipping label is ready for preview and download. All package details, 
-            addresses, and handling instructions are included.
-          </p>
-          
-          <div className="flex flex-wrap gap-3">
-            <Button
-              variant="outline"
-              onClick={handlePreviewPDF}
-              disabled={isPreviewLoading || !isFormValid()}
-              className="parcego-pdf-preview-btn bg-white hover:bg-sky-50 border-sky-300"
-              id="parcego-preview-pdf-btn"
-            >
-              {isPreviewLoading ? (
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-sky-600 border-t-transparent"></div>
-                  <span>Generating...</span>
-                </div>
-              ) : (
-                <>
-                  <Icon name="Eye" size={16} className="mr-2" />
-                  Preview PDF
-                </>
-              )}
-            </Button>
-            
-            <Button
-              variant="outline"
-              onClick={handleDownloadPDF}
-              disabled={isPreviewLoading || !isFormValid()}
-              className="parcego-pdf-download-btn bg-white hover:bg-sky-50 border-sky-300"
-              id="parcego-download-pdf-btn"
-            >
-              {isPreviewLoading ? (
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-sky-600 border-t-transparent"></div>
-                  <span>Generating...</span>
-                </div>
-              ) : (
-                <>
-                  <Icon name="Download" size={16} className="mr-2" />
-                  Download PDF
-                </>
-              )}
-            </Button>
-          </div>
-          
-          {isFormValid() && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-3">
-              <div className="flex items-center space-x-2">
-                <Icon name="CheckCircle" size={16} className="text-green-600" />
-                <span className="text-sm font-medium text-green-800">
-                  All Details Complete - Ready for Label Generation
-                </span>
-              </div>
-            </div>
-          )}
-        </div>
+
 
       </CardContent>
     </Card>

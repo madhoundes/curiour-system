@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { Separator } from "@/components/ui/separator";
+import { ShippingLabelReady } from "@/components/ui/shipping-label-ready";
 
 function PaymentSuccessContent() {
   const router = useRouter();
@@ -272,6 +273,17 @@ function PaymentSuccessContent() {
               )}
             </CardContent>
           </Card>
+
+          {/* Shipping Label Ready Section */}
+          {labelData && !isGeneratingLabel && (
+            <ShippingLabelReady
+              shipmentId={shipmentData?.id}
+              trackingNumber={shipmentData?.tracking_code}
+              shipmentData={shipmentData}
+              onDownload={handleDownloadLabel}
+              className="mb-6"
+            />
+          )}
 
           {/* Next Steps Card */}
           <Card>
