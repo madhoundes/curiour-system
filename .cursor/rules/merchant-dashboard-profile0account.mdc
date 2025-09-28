@@ -34,7 +34,7 @@ Design and implement the Merchant Profile & Account UI at `/profile` using Next.
 ## Data & Validation (Zod)
 Define schemas to validate and mock UI fields:
 - BusinessInfoSchema:
-  - businessName: string().min(2)
+  - business_name: string().min(2)
   - contactName: string().min(2)
   - email: string().email()
   - phone: string().min(7)

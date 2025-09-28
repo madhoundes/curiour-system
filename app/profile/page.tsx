@@ -25,7 +25,7 @@ import {
 import { PageHeader } from "@/components/ui/page-header";
 
 const BusinessInfoSchema = z.object({
-  businessName: z.string().min(2, "Business name is required"),
+  business_name: z.string().min(2, "Business name is required"),
   contactName: z.string().min(2, "Contact name is required"),
   email: z.string().email("Enter a valid email"),
   phone: z.string().regex(/^\d{10,}$/, "Phone number must have at least 10 digits"),
@@ -83,7 +83,7 @@ export default function ProfileAccountPage() {
 
   const defaultBusiness: BusinessInfo = useMemo(
     () => ({
-      businessName: "",
+      business_name: "",
       contactName: "",
       email: "",
       phone: "",
@@ -162,7 +162,7 @@ export default function ProfileAccountPage() {
         
         // Map API response to form data
         const businessData: BusinessInfo = {
-          businessName: profileData.business_name || "",
+          business_name: profileData.business_name || "",
           contactName: `${profileData.first_name || ""} ${profileData.last_name || ""}`.trim(),
           email: profileData.email || "",
           phone: profileData.phone_number || "",
@@ -225,7 +225,7 @@ export default function ProfileAccountPage() {
         const lastName = nameParts.slice(1).join(' ') || "";
         
         const updateData: any = {
-          business_name: businessData.businessName,
+          business_name: businessData.business_name,
           first_name: firstName,
           last_name: lastName,
           phone_number: businessData.phone,
@@ -365,7 +365,7 @@ export default function ProfileAccountPage() {
                     >
                       <FormField
                         control={businessForm.control}
-                        name="businessName"
+                        name="business_name"
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>Business Name</FormLabel>

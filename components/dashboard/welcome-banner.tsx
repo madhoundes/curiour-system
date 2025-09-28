@@ -33,7 +33,7 @@ export function WelcomeBanner() {
     ? `${userProfile.first_name} ${userProfile.last_name}`
     : 'Loading...'
   
-  const businessName = userProfile?.business_name || 'Your Business'
+  const business_name = userProfile?.business_name || 'Your Business'
   const location = userProfile?.city && userProfile?.province && userProfile?.country
     ? `${userProfile.city}, ${userProfile.province}, ${userProfile.country}`
     : 'Loading...'
@@ -52,7 +52,7 @@ export function WelcomeBanner() {
                 Here&apos;s what&apos;s happening with your shipments today.
               </p>
               <p className="text-sm text-gray-500 mt-2">
-                {businessName}
+                {business_name}
               </p>
             </div>
             

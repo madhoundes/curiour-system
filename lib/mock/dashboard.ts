@@ -172,7 +172,7 @@ export const recentActivities: RecentActivity[] = [
 
 export const merchantInfo = {
   name: "John Merchant",
-  businessName: "John's Electronics Store",
+  business_name: "John's Electronics Store",
   email: "john@electronicsstore.com",
   phone: "+1 (555) 123-4567",
   location: "Toronto, ON, Canada"

@@ -31,7 +31,7 @@ const loginFormSchema = z.object({
 const signupFormSchema = z.object({
   firstName: z.string().min(2, "First name must be at least 2 characters"),
   lastName: z.string().min(2, "Last name must be at least 2 characters"),
-  businessName: z.string().min(2, "Business name must be at least 2 characters"),
+  business_name: z.string().min(2, "Business name must be at least 2 characters"),
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters long"),
 });
@@ -56,7 +56,7 @@ const Login03Page = () => {
     defaultValues: {
       firstName: "",
       lastName: "",
-      businessName: "",
+      business_name: "",
       email: "",
       password: "",
     },
@@ -140,7 +140,7 @@ const Login03Page = () => {
         email: data.email,
         first_name: data.firstName,
         last_name: data.lastName,
-        business_name: data.businessName,
+        business_name: data.business_name,
         password: data.password,
       };
 
@@ -177,7 +177,7 @@ const Login03Page = () => {
             } else if (err.field === 'last_name') {
               signupForm.setError('lastName', { message: err.message });
             } else if (err.field === 'business_name') {
-              signupForm.setError('businessName', { message: err.message });
+              signupForm.setError('business_name', { message: err.message });
             } else if (err.field === 'password') {
               signupForm.setError('password', { message: err.message });
             }
@@ -396,7 +396,7 @@ const Login03Page = () => {
                   
                   <FormField
                     control={signupForm.control}
-                    name="businessName"
+                    name="business_name"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Business Name</FormLabel>

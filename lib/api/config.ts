@@ -27,6 +27,12 @@ export const API_ENDPOINTS = {
     ADMIN_CREATE_USER: '/auth/admin/create-user',
     ADMIN_LIST_USERS: '/auth/admin/users',
     ADMIN_UPDATE_USER_ROLE: '/auth/admin/users/:user_id/role',
+    ADMIN_ASSIGNMENTS_TODAY: '/admin/assignments/today',
+    ADMIN_ASSIGNMENTS_BY_DATE: '/admin/assignments/:assignment_date',
+    ADMIN_ASSIGNMENT_STATISTICS: '/admin/assignments/statistics/:assignment_date',
+    ADMIN_REASSIGN_ASSIGNMENT: '/admin/assignments/:assignment_id/reassign',
+    ADMIN_MANUAL_ASSIGNMENT: '/admin/assignments/manual',
+    ADMIN_RUN_AUTOMATED_ASSIGNMENT: '/admin/assignments/run-automated',
   },
   USERS: {
     PROFILE: '/profile',
@@ -47,6 +53,7 @@ export const API_ENDPOINTS = {
     STATUS_DURATION: '/shipments/:id/status-duration/:status',
     BY_STATUS_DURATION: '/shipments/by-status-duration/:status',
     INITIALIZE_STATUS_TRACKING: '/shipments/initialize-status-tracking',
+    ADMIN_MOVE_TO_WAREHOUSE: '/admin/shipments/move-to-warehouse',
   },
   TRACKING: {
     TRACK: '/tracking/:trackingNumber',
@@ -92,6 +99,11 @@ export const API_ENDPOINTS = {
   CONTACT: {
     SEND_MESSAGE: '/contact',
     GET_INFO: '/contact/info',
+  },
+  STATS: {
+    ADMIN_DRIVER_STATS: '/stats/admin/driver/:driver_id',
+    ADMIN_USER_STATS: '/stats/admin/user/:user_id',
+    ADMIN_STATS: '/stats/admin',
   },
 } as const;
 
