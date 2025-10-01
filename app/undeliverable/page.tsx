@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 // import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { mockUndeliverablePackages } from "@/lib/mock/undeliverable";
 import { UndeliverablePackage, Status } from "@/lib/mock/undeliverable";
 import { PackageDetailsModal } from "./package-details-modal";
+import { UndeliverableService } from "@/lib/api/undeliverable";
+import { transformUndeliverablePackages, transformUndeliverableStats } from "@/lib/api/undeliverable-adapter";
+import { apiClient } from "@/lib/api/client";
 
 export default function UndeliverablePage() {
   // const router = useRouter();
@@ -21,7 +24,40 @@ export default function UndeliverablePage() {
   const [statusFilter, setStatusFilter] = useState<Status | "all">("all");
   const [selectedPackage, setSelectedPackage] = useState<UndeliverablePackage | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
-  const [packages, setPackages] = useState(mockUndeliverablePackages);
+  const [packages, setPackages] = useState<UndeliverablePackage[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Initialize the undeliverable service
+  const undeliverableService = new UndeliverableService(apiClient);
+
+  // Fetch undeliverable packages from API
+  useEffect(() => {
+    const fetchUndeliverablePackages = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+        
+        const response = await undeliverableService.getUndeliverablePackages({
+          page: 1,
+          per_page: 50
+        });
+        
+        // Transform API data to UI format
+        const transformedPackages = transformUndeliverablePackages(response.packages);
+        setPackages(transformedPackages);
+      } catch (err) {
+        console.error('Failed to fetch undeliverable packages:', err);
+        setError('Failed to load undeliverable packages');
+        // Fallback to mock data on error
+        setPackages(mockUndeliverablePackages);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUndeliverablePackages();
+  }, []);
 
   // Filter packages based on search and status
   const filteredPackages = useMemo(() => {
@@ -42,18 +78,37 @@ export default function UndeliverablePage() {
     setShowDetailsModal(true);
   };
 
-  const handleStatusUpdate = (packageId: string, newStatus: Status) => {
-    // Update the local state to move packages between tabs
-    setPackages(prevPackages => 
-      prevPackages.map(pkg => 
-        pkg.id === packageId 
-          ? { ...pkg, status: newStatus, updatedAt: new Date().toISOString() }
-          : pkg
-      )
-    );
-    
-    // In a real app, this would update the backend
-    console.log(`Updating package ${packageId} status to ${newStatus}`);
+  const handleStatusUpdate = async (packageId: string, newStatus: Status) => {
+    try {
+      // Map UI status to API status
+      const apiStatusMap: Record<Status, string> = {
+        'pending': 'UNDELIVERED',
+        'in_progress': 'IN_TRANSIT',
+        'resolved': 'DELIVERED'
+      };
+
+      // Update status via API - use the correct method name
+      await undeliverableService.updateUndeliverableStatus(parseInt(packageId), {
+        status: apiStatusMap[newStatus] as 'IN_TRANSIT' | 'DELIVERED' | 'CANCELLED',
+        change_reason: `Status updated to ${newStatus} via UI`,
+        notes: `Package status changed from UI on ${new Date().toISOString()}`
+      });
+      
+      // Update the local state to move packages between tabs
+      setPackages(prevPackages => 
+        prevPackages.map(pkg => 
+          pkg.id === packageId 
+            ? { ...pkg, status: newStatus, updatedAt: new Date().toISOString() }
+            : pkg
+        )
+      );
+      
+      console.log(`Successfully updated package ${packageId} status to ${newStatus}`);
+    } catch (err) {
+      console.error(`Failed to update package ${packageId} status:`, err);
+      // Show error to user (you might want to add a toast notification here)
+      alert('Failed to update package status. Please try again.');
+    }
   };
 
   const getStatusBadge = (status: Status) => {
@@ -100,88 +155,123 @@ export default function UndeliverablePage() {
         description="Manage and resolve undeliverable package issues"
       />
 
-      {/* Stats Overview - Match Dashboard Style */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card className="hover:shadow-md transition-shadow duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-lg font-semibold text-gray-600">
-              Total Issues
-            </CardTitle>
-            <div className="p-2 rounded-lg bg-red-50">
-              <Icon 
-                name="AlertTriangle" 
-                size={24} 
-                className="text-red-600" 
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-gray-900">
-              {stats.total}
+      {/* Loading State */}
+      {isLoading && (
+        <Card>
+          <CardContent className="flex items-center justify-center py-12">
+            <div className="flex items-center space-x-2">
+              <Icon name="Loader2" className="h-6 w-6 animate-spin" />
+              <span>Loading undeliverable packages...</span>
             </div>
           </CardContent>
         </Card>
+      )}
 
-        <Card className="hover:shadow-md transition-shadow duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-lg font-semibold text-gray-600">
-              Pending Review
-            </CardTitle>
-            <div className="p-2 rounded-lg bg-orange-50">
-              <Icon 
-                name="Clock" 
-                size={24} 
-                className="text-orange-600" 
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-gray-900">
-              {stats.pending}
+      {/* Error State */}
+      {error && !isLoading && (
+        <Card className="border-red-200 bg-red-50">
+          <CardContent className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <Icon name="AlertTriangle" className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h3 className="text-lg font-semibold text-red-800 mb-2">Error Loading Data</h3>
+              <p className="text-red-600 mb-4">{error}</p>
+              <Button 
+                onClick={() => window.location.reload()} 
+                variant="outline"
+                className="border-red-300 text-red-700 hover:bg-red-100"
+              >
+                Try Again
+              </Button>
             </div>
           </CardContent>
         </Card>
+      )}
 
-        <Card className="hover:shadow-md transition-shadow duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-lg font-semibold text-gray-600">
-              In Progress
-            </CardTitle>
-            <div className="p-2 rounded-lg bg-blue-50">
-              <Icon 
-                name="Loader2" 
-                size={24} 
-                className="text-blue-600" 
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-gray-900">
-              {stats.inProgress}
-            </div>
-          </CardContent>
-        </Card>
+      {/* Main Content - Only show when not loading */}
+      {!isLoading && (
+        <>
+          {/* Stats Overview - Match Dashboard Style */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <Card className="hover:shadow-md transition-shadow duration-200">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-lg font-semibold text-gray-600">
+                  Total Issues
+                </CardTitle>
+                <div className="p-2 rounded-lg bg-red-50">
+                  <Icon 
+                    name="AlertTriangle" 
+                    size={24} 
+                    className="text-red-600" 
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-gray-900">
+                  {stats.total}
+                </div>
+              </CardContent>
+            </Card>
 
-        <Card className="hover:shadow-md transition-shadow duration-200">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-lg font-semibold text-gray-600">
-              Resolved
-            </CardTitle>
-            <div className="p-2 rounded-lg bg-green-50">
-              <Icon 
-                name="CheckCircle" 
-                size={24} 
-                className="text-green-600" 
-              />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold text-gray-900">
-              {stats.resolved}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+            <Card className="hover:shadow-md transition-shadow duration-200">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-lg font-semibold text-gray-600">
+                  Pending Review
+                </CardTitle>
+                <div className="p-2 rounded-lg bg-orange-50">
+                  <Icon 
+                    name="Clock" 
+                    size={24} 
+                    className="text-orange-600" 
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-gray-900">
+                  {stats.pending}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-md transition-shadow duration-200">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-lg font-semibold text-gray-600">
+                  In Progress
+                </CardTitle>
+                <div className="p-2 rounded-lg bg-blue-50">
+                  <Icon 
+                    name="Loader2" 
+                    size={24} 
+                    className="text-blue-600" 
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-gray-900">
+                  {stats.inProgress}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="hover:shadow-md transition-shadow duration-200">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-lg font-semibold text-gray-600">
+                  Resolved
+                </CardTitle>
+                <div className="p-2 rounded-lg bg-green-50">
+                  <Icon 
+                    name="CheckCircle" 
+                    size={24} 
+                    className="text-green-600" 
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-3xl font-bold text-gray-900">
+                  {stats.resolved}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
 
       {/* Search & Filter (aligned with other pages) */}
       <Card>
@@ -304,6 +394,8 @@ export default function UndeliverablePage() {
           onClose={() => setShowDetailsModal(false)}
           onStatusUpdate={handleStatusUpdate}
         />
+      )}
+        </>
       )}
     </div>
   );

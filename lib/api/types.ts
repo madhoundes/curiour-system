@@ -399,8 +399,8 @@ export interface UpdateShipmentStatusRequest {
 export interface ShipmentStatusChange {
   id: number;
   shipment_id: number;
-  status: 'DRAFT' | 'PAID' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELLED';
-  previous_status: 'DRAFT' | 'PAID' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELLED';
+  status: ShipmentStatus;
+  previous_status: ShipmentStatus;
   changed_by_user_id: number;
   changed_by_user_name: string;
   change_reason: string;

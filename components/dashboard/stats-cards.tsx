@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Icon } from "@/components/ui/icon"
 import { dashboardStats } from "@/lib/mock/dashboard"
+import { adminService } from "@/lib/api/admin"
+import type { UserStatisticsResponse } from "@/lib/api/types"
 
 interface DashboardStats {
   totalShipments: string
@@ -11,6 +13,23 @@ interface DashboardStats {
   deliveredToday: string
   revenue: string
 }
+
+// Helper function to convert API response to dashboard stats format
+const convertApiStatsToDisplay = (apiStats: UserStatisticsResponse): DashboardStats => {
+  // Calculate total shipments from all categories
+  const total = apiStats.delivered_shipments + 
+                apiStats.in_transit_shipments + 
+                apiStats.in_warehouse_shipments + 
+                apiStats.undelivered_shipments + 
+                apiStats.unfulfilled_shipments;
+
+  return {
+    totalShipments: total.toString(),
+    activeShipments: apiStats.in_transit_shipments.toString(),
+    deliveredToday: apiStats.delivered_shipments.toString(),
+    revenue: "$2,450" // Keep revenue as mock for now since it's not in the API response
+  };
+};
 
 const statsConfig = [
   {
@@ -33,31 +52,33 @@ const statsConfig = [
     icon: "CheckCircle",
     iconColor: "text-green-600",
     bgColor: "bg-green-50"
-  },
-  {
-    title: "Revenue",
-    key: "revenue" as keyof DashboardStats,
-    icon: "BarChart3",
-    iconColor: "text-purple-600",
-    bgColor: "bg-purple-50"
   }
+  // Revenue card removed - was previously here
 ]
 
 export function StatsCards() {
   const [stats, setStats] = useState<DashboardStats>(dashboardStats)
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        // Simulate API call - replace with real API when available
-        // const response = await api.analyticsService.getDashboardStats()
+        setIsLoading(true)
+        setError(null)
         
-        // For now, use mock data with simulated loading
-        await new Promise(resolve => setTimeout(resolve, 1000))
-        setStats(dashboardStats)
+        // Call the new user statistics API endpoint
+        const response = await adminService.getCurrentUserStatistics()
+        
+        if (response.data) {
+          const displayStats = convertApiStatsToDisplay(response.data)
+          setStats(displayStats)
+        } else {
+          throw new Error('No data received from API')
+        }
       } catch (error) {
         console.error('Failed to fetch dashboard stats:', error)
+        setError('Failed to load statistics')
         // Fallback to mock data
         setStats(dashboardStats)
       } finally {
@@ -87,10 +108,17 @@ export function StatsCards() {
             <div className="text-3xl font-bold text-gray-900">
               {isLoading ? (
                 <div className="animate-pulse bg-gray-200 h-8 w-16 rounded"></div>
+              ) : error ? (
+                <div className="text-red-500 text-sm">Error</div>
               ) : (
                 stats[stat.key]
               )}
             </div>
+            {error && (
+              <div className="text-xs text-red-500 mt-1">
+                {error}
+              </div>
+            )}
           </CardContent>
         </Card>
       ))}

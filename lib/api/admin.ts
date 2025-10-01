@@ -344,6 +344,28 @@ export class AdminService {
        throw error;
      }
    }
+
+   /**
+    * Get current user statistics including delivered, in transit, and unfulfilled shipments
+    */
+   async getCurrentUserStatistics(
+     params?: StatisticsParams
+   ): Promise<ApiSuccessResponse<UserStatisticsResponse>> {
+     try {
+       const response = await apiClient.get<UserStatisticsResponse>(
+         API_ENDPOINTS.STATS.USER_STATS,
+         { 
+           requiresAuth: true,
+           params: params
+         }
+       );
+       
+       return response;
+     } catch (error) {
+       console.error('Get current user statistics failed:', error);
+       throw error;
+     }
+   }
 }
 
 // Export singleton instance

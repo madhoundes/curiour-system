@@ -104,6 +104,7 @@ export const API_ENDPOINTS = {
     ADMIN_DRIVER_STATS: '/stats/admin/driver/:driver_id',
     ADMIN_USER_STATS: '/stats/admin/user/:user_id',
     ADMIN_STATS: '/stats/admin',
+    USER_STATS: '/stats/user',
   },
 } as const;
 
