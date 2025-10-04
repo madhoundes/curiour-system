@@ -107,62 +107,11 @@ export function UnifiedHeader({ onSidebarToggle }: UnifiedHeaderProps) {
 
         {/* Right Section - Actions and User Menu */}
         <div className="flex items-center gap-3">
-          {/* Notifications */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="relative p-2"
-                aria-label="Notifications"
-                id="parcego-header-notifications-btn"
-              >
-                <Icon name="Bell" size={20} />
-                {unreadCount > 0 && (
-                  <Badge 
-                    variant="destructive" 
-                    className="absolute -top-1 -right-1 h-5 w-5 rounded-full p-0 text-xs flex items-center justify-center"
-                  >
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </Badge>
-                )}
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80">
-              <DropdownMenuLabel className="flex items-center justify-between">
-                <span>Notifications</span>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleNotificationsClick}
-                  className="text-xs text-blue-600 hover:text-blue-700"
-                >
-                  View All
-                </Button>
-              </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              {notifications.length > 0 ? (
-                notifications.map((notification) => (
-                  <DropdownMenuItem key={notification.id} className="flex flex-col items-start p-3">
-                    <div className="flex items-start gap-3 w-full">
-                      <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${notification.unread ? 'bg-blue-500' : 'bg-gray-300'}`} />
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm ${notification.unread ? 'font-medium text-gray-900' : 'text-gray-600'}`}>
-                          {notification.message}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">{notification.time}</p>
-                      </div>
-                    </div>
-                  </DropdownMenuItem>
-                ))
-              ) : (
-                <div className="p-4 text-center text-gray-500">
-                  <Icon name="Bell" size={32} className="mx-auto mb-2 text-gray-300" />
-                  <p className="text-sm">No notifications</p>
-                </div>
-              )}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {/* Notifications - Hidden per user request */}
+          {/* 
+          Notifications dropdown menu code removed to prevent TypeScript parsing issues.
+          The notifications functionality has been commented out as requested.
+          */}
 
           {/* User Menu */}
           <DropdownMenu>

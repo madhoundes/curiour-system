@@ -31,7 +31,7 @@ interface ClaimFormData {
   contactName: string;
   contactPhone: string;
   contactEmail: string;
-  businessName: string;
+  business_name: string;
   documents: File[];
 }
 
@@ -113,7 +113,7 @@ export default function ClaimsPage() {
     contactName: "",
     contactPhone: "",
     contactEmail: "",
-    businessName: "",
+    business_name: "",
     documents: []
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -147,7 +147,7 @@ export default function ClaimsPage() {
               : prev.contactName,
             contactEmail: profile.email || prev.contactEmail,
             contactPhone: profile.phone_number || prev.contactPhone,
-            businessName: profile.business_name || prev.businessName
+            business_name: profile.business_name || prev.business_name
           }));
         }
       } catch (error) {
@@ -503,8 +503,8 @@ export default function ClaimsPage() {
                 <Input
                   id="parcego-claims-business-name"
                   placeholder={profileLoading ? "Loading..." : "Your business name"}
-                  value={formData.businessName}
-                  onChange={(e) => handleInputChange("businessName", e.target.value)}
+                  value={formData.business_name}
+                  onChange={(e) => handleInputChange("business_name", e.target.value)}
                   className="mt-2"
                   disabled={profileLoading}
                 />
@@ -562,7 +562,7 @@ export default function ClaimsPage() {
                 </div>
                 <div>
                   <p><strong>Contact:</strong> {formData.contactName}</p>
-                  <p><strong>Business:</strong> {formData.businessName}</p>
+                  <p><strong>Business:</strong> {formData.business_name}</p>
                   <p><strong>Phone:</strong> {formData.contactPhone}</p>
                   <p><strong>Email:</strong> {formData.contactEmail}</p>
                 </div>

@@ -399,8 +399,8 @@ export interface UpdateShipmentStatusRequest {
 export interface ShipmentStatusChange {
   id: number;
   shipment_id: number;
-  status: 'DRAFT' | 'PAID' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELLED';
-  previous_status: 'DRAFT' | 'PAID' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELLED';
+  status: ShipmentStatus;
+  previous_status: ShipmentStatus;
   changed_by_user_id: number;
   changed_by_user_name: string;
   change_reason: string;
@@ -648,4 +648,137 @@ export interface ContactInfoResponse {
     weekends: string;
   };
   emergency_contact?: string;
+}
+
+// Assignment Types
+export interface Assignment {
+  id: number;
+  driver_id: number;
+  driver_name: string;
+  shipment_id: number;
+  tracking_number: string;
+  status: 'assigned' | 'in_progress' | 'completed' | 'cancelled';
+  assigned_at: string;
+  completed_at?: string;
+  pickup_address: string;
+  delivery_address: string;
+  estimated_delivery: string;
+  priority: 'low' | 'normal' | 'high' | 'urgent';
+}
+
+export interface AssignmentsResponse {
+  assignments: Assignment[];
+  date: string;
+  total: number;
+  total_drivers: number;
+  total_packages: number;
+}
+
+// Assignment Statistics Types
+export interface DriverStatistics {
+  assigned: number;
+  cancelled: number;
+  completed: number;
+  in_progress: number;
+  total_assignments: number;
+}
+
+export interface AssignmentStatisticsResponse {
+  date: string;
+  driver_statistics: Record<string, DriverStatistics>;
+  total_assignments: number;
+  total_drivers: number;
+}
+
+// Assignment Reassignment Types
+export interface ReassignAssignmentRequest {
+  new_driver_id: number;
+  notes: string;
+}
+
+export interface ReassignAssignmentResponse {
+  assignment_id: number;
+  message: string;
+  new_driver_id: number;
+  new_driver_name: string;
+  notes: string;
+  old_driver_id: number;
+  old_driver_name: string;
+  reassigned_at: string;
+  success: boolean;
+}
+
+// Manual Assignment Types
+export interface ManualAssignmentRequest {
+  driver_id: number;
+  notes: string;
+  shipment_id: number;
+}
+
+export interface ManualAssignmentResponse {
+  assigned_date: string;
+  assignment_id: number;
+  driver_id: number;
+  driver_name: string;
+  message: string;
+  notes: string;
+  shipment_id: number;
+  success: boolean;
+  tracking_code: string;
+}
+
+// Automated Assignment Types
+export interface AutomatedAssignmentParams {
+  assignment_date?: string;
+}
+
+// Warehouse Operations Types
+export interface MoveToWarehouseResponse {
+  message: string;
+  moved_count: number;
+  success: boolean;
+}
+
+// Statistics Types
+export interface StatisticsParams {
+  date_start?: string;
+  date_end?: string;
+}
+
+export interface DriverStatisticsResponse {
+  date_end: string;
+  date_start: string;
+  items_in_transit: number;
+  items_in_warehouse: number;
+  total_deliveries: number;
+  undelivered_shipments: number;
+}
+
+export interface UserStatisticsResponse {
+  date_end: string;
+  date_start: string;
+  delivered_shipments: number;
+  in_transit_shipments: number;
+  in_warehouse_shipments: number;
+  undelivered_shipments: number;
+  unfulfilled_shipments: number;
+}
+
+// Admin Statistics Types
+export interface AdminStatisticsParams {
+  date_start?: string;
+  date_end?: string;
+}
+
+export interface AdminStatisticsResponse {
+  cancelled_shipments: number;
+  date_end: string;
+  date_start: string;
+  delivered_shipments: number;
+  draft_shipments: number;
+  in_transit_shipments: number;
+  in_warehouse_shipments: number;
+  paid_shipments: number;
+  total_shipments: number;
+  undelivered_shipments: number;
 }

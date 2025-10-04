@@ -46,8 +46,7 @@ const navigationSections: NavigationSection[] = [
     id: "account",
     title: "Account & Profile",
     items: [
-      { id: "profile", label: "Account Profile", href: "/profile", icon: "User", description: "Update account details" },
-      { id: "notifications", label: "Notifications", href: "/notifications", icon: "Bell", description: "View all notifications" }
+      { id: "profile", label: "Account Profile", href: "/profile", icon: "User", description: "Update account details" }
     ]
   },
   {

@@ -17,7 +17,7 @@ import type { UserProfile } from "@/lib/api/types";
 
 // Default fallback data if profile loading fails
 const defaultSenderData = {
-  businessName: "Your Business",
+  business_name: "Your Business",
   contactName: "Contact Name",
   address: "Business Address",
   city: "City",
@@ -56,7 +56,7 @@ export default function CreateShipmentPage() {
         if (profile) {
           // Map profile data to sender data format
           setSenderData({
-            businessName: profile.business_name || (profile.first_name && profile.last_name ? `${profile.first_name} ${profile.last_name}` : "Your Business"),
+            business_name: profile.business_name || (profile.first_name && profile.last_name ? `${profile.first_name} ${profile.last_name}` : "Your Business"),
             contactName: (profile.first_name && profile.last_name ? `${profile.first_name} ${profile.last_name}` : "Contact Name"),
             address: profile.street_address || "Business Address",
             city: profile.city || "City",
@@ -173,7 +173,7 @@ export default function CreateShipmentPage() {
                   <Label htmlFor="parcego-sender-business-name">Business Name</Label>
                   <Input
                     id="parcego-sender-business-name"
-                    value={profileLoading ? "Loading..." : senderData.businessName}
+                    value={profileLoading ? "Loading..." : senderData.business_name}
                     readOnly
                     className="parcego-form__input parcego-form__input--readonly bg-gray-50"
                   />
