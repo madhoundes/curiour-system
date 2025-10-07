@@ -1,0 +1,102 @@
+---
+alwaysApply: true
+---
+# Parcego Merchant Landing Page – UI Implementation Rule
+
+## Objective
+
+Build a visually premium, conversion-focused landing page for Parcego, targeting merchants, using only the provided design tokens and style guide. The page must be as visually compelling and merchant-centric as Stallion’s, but with Parcego’s unique value, branding, and accessibility standards.
+
+---
+
+## 1. Technology & Design System
+
+- **Framework:** Next.js 14+ (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS only (no custom CSS)
+- **UI Components:** shadcn/ui (https://ui.shadcn.com/)
+- **Design Tokens:** Use only the provided color, font, spacing, border, and shadow tokens.
+- **Transitions:** Use premium, subtle transitions (see below).
+- **Accessibility:** All UI must be accessible (ARIA, keyboard navigation, color contrast).
+
+---
+
+## 2. Page Structure & Content
+
+### Hero Section
+- Parcego SVG logo (merchant version, prominent)
+- Headline: Large, bold, merchant-focused
+- Subheadline: Short, benefit-driven
+- Primary CTA: “Get Started Free” (primary button)
+- Secondary CTA: “See How It Works” (secondary button)
+- Clean background, subtle accent or illustration
+
+### Feature Highlights
+- 3–4 cards, each with icon, title, and description
+- Use card tokens for styling
+
+### How It Works
+- 3–4 step process, each with icon/illustration and text
+
+### Rate Calculator (Mock)
+- Simple form: From, To, Package type, Weight, Dimensions
+- “Get Estimate” button (mock result)
+- Show sample rate and delivery time
+
+### Testimonials/Trust
+- 2–3 merchant testimonials (mock)
+- Supported platform logos
+
+### Comparison Banner
+- “Why Parcego vs. Stallion?” (short, factual)
+- Table or bullet points: Parcego advantages
+
+### Call to Action (Footer)
+- Main CTA: “Join Parcego Free”
+- Secondary links: Contact, Support, Terms, Privacy
+
+---
+
+## 3. Design & Implementation Rules
+
+- **Brand Colors:** Use only tokens (primary: #007bff, dark: #0056b3, etc.)
+- **Typography:** Use only provided font families, sizes, and weights.
+- **Spacing:** Use only provided spacing tokens.
+- **Buttons:** Use component tokens for primary/secondary.
+- **Cards:** Use card tokens for background, radius, shadow.
+- **Accessibility:** All elements must have ARIA labels, keyboard navigation, and color contrast compliance.
+- **Responsiveness:** Mobile-first, fully responsive.
+- **Transitions:** Use only transform: scale, opacity, color, and shadow for hover/active states. **Do not use translateY(-2px) on hover.** Respect prefers-reduced-motion.
+- **No dead code, no TODOs, no placeholders.**
+- **All IDs and classes must use the `parcego-` prefix and follow the global naming rules.**
+- **All icons must be rendered as `<span>` with kebab-case classes and data-icon attributes.**
+- **No Shopify-specific flows or forms.**
+
+---
+
+## 4. Accessibility & Testing
+
+- All interactive elements must be accessible by keyboard and screen reader.
+- All color contrast must meet WCAG AA.
+- All forms must have proper labels and error states.
+- Test with reduced motion enabled.
+
+---
+
+## 5. Deliverables
+
+- Complete landing page at `/` (or `/landing` if `/` is reserved)
+- All components and assets (SVG logo, icons, etc.)
+- README update with run instructions
+
+---
+
+## 6. Enforcement
+
+- Code reviews must verify strict adherence to this rule file and referenced standards.
+- Any deviation must be documented and approved by the project lead.
+
+---
+
+**Goal:**  
+Deliver a pixel-perfect, accessible, and modern merchant landing page for Parcego, ready for future backend/API integration, and visually superior to Stallion’s offering.

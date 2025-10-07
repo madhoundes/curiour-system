@@ -350,6 +350,37 @@ export default function CourierLogin() {
         <div className="text-center text-xs text-gray-500 space-y-1">
           <p>© 2025 Parcego. All rights reserved.</p>
           <p>Secure courier portal for delivery professionals</p>
+          
+          {/* Footer Links */}
+          <div className="flex items-center justify-center space-x-4 mt-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/support')}
+              className="text-xs text-gray-500 hover:text-gray-700 h-auto py-1 px-2"
+              id="parcego-courier-login-footer-support-btn"
+            >
+              Help & Support
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/privacy-policy')}
+              className="text-xs text-gray-500 hover:text-gray-700 h-auto py-1 px-2"
+              id="parcego-courier-login-footer-privacy-btn"
+            >
+              Privacy Policy
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push('/terms-conditions')}
+              className="text-xs text-gray-500 hover:text-gray-700 h-auto py-1 px-2"
+              id="parcego-courier-login-footer-terms-btn"
+            >
+              Terms & Conditions
+            </Button>
+          </div>
         </div>
       </div>
     </div>

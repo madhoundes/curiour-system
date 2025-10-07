@@ -58,6 +58,14 @@ const navigationSections: NavigationSection[] = [
       { id: "claims-history", label: "Claims History", href: "/claims/history", icon: "History", description: "View claim history" },
       { id: "undeliverable", label: "Undeliverable Packages", href: "/undeliverable", icon: "PackageX", description: "Resolve delivery issues" }
     ]
+  },
+  {
+    id: "legal",
+    title: "Legal & Policies",
+    items: [
+      { id: "privacy-policy", label: "Privacy Policy", href: "/privacy-policy", icon: "Shield", description: "How we protect your data" },
+      { id: "terms-conditions", label: "Terms & Conditions", href: "/terms-conditions", icon: "FileText", description: "Service terms and conditions" }
+    ]
   }
 ];
 

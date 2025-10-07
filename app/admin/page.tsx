@@ -54,6 +54,8 @@ import { z } from "zod";
 import { exportAnalyticsToPDF as exportPDF } from "@/lib/pdf-export";
 import { useToast, ToastContainer } from "@/components/ui/toast";
 import NotificationDropdown from "@/components/admin/NotificationDropdown";
+import CourierCreationModal from "@/components/admin/CourierCreationModal";
+import { mockCouriers as initialMockCouriers, createMockCourier, type Courier } from "@/lib/mock/couriers";
 
 // Zod schema for courier edit form validation
 const courierEditSchema = z.object({
@@ -541,7 +543,29 @@ export default function SuperAdminDashboard() {
   ];
 
   // Mock data for couriers
-  const mockCouriers = [
+  // Use imported mock couriers data with state management
+  const [mockCouriers, setMockCouriers] = useState(initialMockCouriers);
+
+  // Compatibility helper for legacy property names
+  const getCourierProperty = (courier: any, property: string) => {
+    switch (property) {
+      case 'completedDeliveries':
+        return courier.totalDeliveries || 0;
+      case 'vehicle':
+        return courier.vehicleType || 'car';
+      case 'lastLogin':
+        return courier.lastActive || courier.joinedDate;
+      case 'joinDate':
+        return courier.joinedDate || courier.joinDate;
+      case 'tags':
+        return courier.tags || [];
+      default:
+        return courier[property];
+    }
+  };
+  
+  // Legacy mock couriers array (keeping for compatibility) - will be removed
+  const legacyMockCouriers = [
     {
       id: "C001",
       fullName: "David Rodriguez",
@@ -834,6 +858,9 @@ export default function SuperAdminDashboard() {
   const [editingCourier, setEditingCourier] = useState<typeof mockCouriers[0] | null>(null);
   const [isSavingCourier, setIsSavingCourier] = useState(false);
 
+  // Courier creation modal state
+  const [isCourierCreationOpen, setIsCourierCreationOpen] = useState(false);
+
   // Debounced search handler
   const handleMerchantSearch = useMemo(() => {
     return (query: string) => {
@@ -878,7 +905,7 @@ export default function SuperAdminDashboard() {
               courier.phone.toLowerCase().includes(searchTerm) ||
               courier.status.toLowerCase().includes(searchTerm) ||
               courier.city.toLowerCase().includes(searchTerm) ||
-              courier.vehicle.toLowerCase().includes(searchTerm) ||
+              courier.vehicleType.toLowerCase().includes(searchTerm) ||
               courier.id.toLowerCase().includes(searchTerm)
             );
           });
@@ -1020,8 +1047,7 @@ export default function SuperAdminDashboard() {
       // Update courier status in mock data
       const updatedCourier: typeof mockCouriers[0] = {
         ...selectedCourierForAction,
-        status: 'suspended',
-        suspensionNotes: courierActionNotes.trim() || selectedCourierForAction.suspensionNotes
+        status: 'suspended'
       };
 
       // Update the couriers array
@@ -1091,10 +1117,7 @@ export default function SuperAdminDashboard() {
       // Revert the courier status
       const revertedCourier: typeof mockCouriers[0] = {
         ...lastCourierAction.courier,
-        status: lastCourierAction.previousStatus,
-        suspensionNotes: lastCourierAction.previousStatus === 'suspended'
-          ? lastCourierAction.notes || lastCourierAction.courier.suspensionNotes
-          : undefined
+        status: lastCourierAction.previousStatus as any
       };
 
       // Update the couriers array
@@ -1192,6 +1215,37 @@ export default function SuperAdminDashboard() {
   const handleCourierEditCancel = () => {
     setIsCourierEditOpen(false);
     setEditingCourier(null);
+  };
+
+  // Courier creation handlers
+  const handleCourierCreationSuccess = (newCourier: Courier) => {
+    // Add the new courier to the mock couriers list
+    setMockCouriers(prev => [...prev, newCourier]);
+    
+    // Update filtered couriers if search is active
+    if (courierSearchQuery) {
+      const searchTerm = courierSearchQuery.toLowerCase();
+      const matchesSearch = (
+        newCourier.fullName.toLowerCase().includes(searchTerm) ||
+        newCourier.email.toLowerCase().includes(searchTerm) ||
+        newCourier.phone.toLowerCase().includes(searchTerm) ||
+        newCourier.city.toLowerCase().includes(searchTerm) ||
+        newCourier.status.toLowerCase().includes(searchTerm) ||
+        newCourier.vehicleType.toLowerCase().includes(searchTerm)
+      );
+      
+      if (matchesSearch) {
+        setFilteredCouriers(prev => [...prev, newCourier]);
+      }
+    } else {
+      setFilteredCouriers(prev => [...prev, newCourier]);
+    }
+    
+    // Show success feedback
+    showSuccessToast(
+      "Courier Account Created Successfully!",
+      `${newCourier.fullName} has been added to the system and is pending verification.`
+    );
   };
 
   // Authentication check
@@ -2131,7 +2185,7 @@ export default function SuperAdminDashboard() {
             <div className="flex items-center gap-4">
               <div className="text-center">
                 <p className="text-lg font-semibold text-gray-900">
-                  {courier.completedDeliveries.toLocaleString()}
+                  {getCourierProperty(courier, 'completedDeliveries').toLocaleString()}
                 </p>
                 <p className="text-xs text-gray-500">Deliveries</p>
               </div>
@@ -2198,13 +2252,13 @@ export default function SuperAdminDashboard() {
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Location</p>
                   <p className="text-sm text-gray-900 mt-1">{courier.city}, BC</p>
-                  <p className="text-sm text-gray-600">{courier.vehicle}</p>
+                  <p className="text-sm text-gray-600">{getCourierProperty(courier, 'vehicle')}</p>
                 </div>
               </div>
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Last Login</p>
                 <p className="text-sm text-gray-900 mt-1">
-                  {courier.lastLogin ? new Date(courier.lastLogin).toLocaleDateString() : 'Never'}
+                  {getCourierProperty(courier, 'lastLogin') ? new Date(getCourierProperty(courier, 'lastLogin')).toLocaleDateString() : 'Never'}
                 </p>
               </div>
             </div>
@@ -2268,6 +2322,17 @@ export default function SuperAdminDashboard() {
                   </div>
                 )}
               </div>
+
+              {/* Create Courier Button */}
+              <Button
+                onClick={() => setIsCourierCreationOpen(true)}
+                className="bg-blue-600 hover:bg-blue-700 text-white h-12 px-6 font-medium transition-all duration-200 shadow-sm hover:shadow-md"
+                id="parcego-couriers-create-btn"
+                aria-label="Create new courier account"
+              >
+                <Icon name="UserPlus" size={18} className="mr-2" />
+                Create Courier
+              </Button>
 
             </div>
           </div>
@@ -2381,7 +2446,7 @@ export default function SuperAdminDashboard() {
                           </td>
                           <td className="p-4">
                             <span className="font-medium text-gray-900">
-                              {courier.completedDeliveries.toLocaleString()}
+                              {getCourierProperty(courier, 'completedDeliveries').toLocaleString()}
                             </span>
                           </td>
                           <td className="p-4">
@@ -4293,7 +4358,7 @@ export default function SuperAdminDashboard() {
 
     // Mock revenue data for the selected courier
     const revenueData = {
-      totalRevenue: selectedCourier.completedDeliveries * 25.50, // Mock: $25.50 per delivery
+      totalRevenue: getCourierProperty(selectedCourier, 'completedDeliveries') * 25.50, // Mock: $25.50 per delivery
       recentPayouts: [
         { date: "2025-01-15", amount: 485.50, deliveries: 19 },
         { date: "2025-01-08", amount: 612.75, deliveries: 24 },
@@ -4461,7 +4526,7 @@ export default function SuperAdminDashboard() {
                 </div>
                 <div className="flex items-center gap-3 text-sm text-gray-600">
                   <Icon name="Truck" size={20} />
-                  {selectedCourier.vehicle}
+                  {getCourierProperty(selectedCourier, 'vehicle')}
                 </div>
               </div>
             </div>
@@ -4478,7 +4543,7 @@ export default function SuperAdminDashboard() {
                     <p className="text-xs text-gray-500 uppercase tracking-wider">Deliveries</p>
                   </div>
                   <p className="text-2xl font-bold text-gray-900">
-                    {selectedCourier.completedDeliveries.toLocaleString()}
+                    {getCourierProperty(selectedCourier, 'completedDeliveries').toLocaleString()}
                   </p>
                 </Card>
                 <Card className="p-4">
@@ -4487,7 +4552,7 @@ export default function SuperAdminDashboard() {
                     <p className="text-xs text-gray-500 uppercase tracking-wider">Join Date</p>
                   </div>
                   <p className="text-sm font-medium text-gray-900">
-                    {formatDate(selectedCourier.joinDate)}
+                    {formatDate(getCourierProperty(selectedCourier, 'joinDate'))}
                   </p>
                 </Card>
                 <Card className="p-4">
@@ -4496,9 +4561,9 @@ export default function SuperAdminDashboard() {
                     <p className="text-xs text-gray-500 uppercase tracking-wider">Last Active</p>
                   </div>
                   <p className="text-sm font-medium text-gray-900">
-                    {formatDate(selectedCourier.lastLogin)}
+                    {formatDate(getCourierProperty(selectedCourier, 'lastLogin'))}
                     <span className="block text-xs text-gray-500">
-                      {formatTime(selectedCourier.lastLogin)}
+                      {formatTime(getCourierProperty(selectedCourier, 'lastLogin'))}
                     </span>
                   </p>
                 </Card>
@@ -4511,9 +4576,9 @@ export default function SuperAdminDashboard() {
                 Tags & Notes
               </h3>
               <div className="space-y-4 bg-gray-50 p-4 rounded-lg">
-                {selectedCourier.tags && selectedCourier.tags.length > 0 && (
+                {getCourierProperty(selectedCourier, 'tags') && getCourierProperty(selectedCourier, 'tags').length > 0 && (
                   <div className="flex flex-wrap gap-2">
-                    {selectedCourier.tags.map((tag, index) => (
+                    {getCourierProperty(selectedCourier, 'tags').map((tag: string, index: number) => (
                       <Badge
                         key={index}
                         variant="outline"
@@ -5266,6 +5331,13 @@ export default function SuperAdminDashboard() {
 
       {/* Courier Edit Modal */}
       {(isCourierEditOpen || !!editingCourier) && <CourierEditModal />}
+
+      {/* Courier Creation Modal */}
+      <CourierCreationModal
+        isOpen={isCourierCreationOpen}
+        onClose={() => setIsCourierCreationOpen(false)}
+        onSuccess={handleCourierCreationSuccess}
+      />
 
       {/* Shopify OAuth Modal */}
       {renderShopifyOAuthModal()}
