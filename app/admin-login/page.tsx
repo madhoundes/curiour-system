@@ -13,6 +13,8 @@ import { Badge } from "@/components/ui/badge";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { authService } from "@/lib/api/auth";
+import { apiClient } from "@/lib/api/client";
 
 // Form validation schema
 const adminLoginSchema = z.object({
@@ -22,29 +24,53 @@ const adminLoginSchema = z.object({
 
 type AdminLoginFormData = z.infer<typeof adminLoginSchema>;
 
-// Mock authentication function for admin
-const mockAdminAuthenticate = async (email: string, password: string) => {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 1200));
-  
-  // Mock admin authentication logic - predefined admin accounts
-  const validAdminCredentials = [
-    { email: "admin@parcego.com", password: "admin123" },
-    { email: "superadmin@parcego.com", password: "super123" },
-    { email: "system@parcego.com", password: "system123" },
-    { email: "root@parcego.com", password: "root123" },
-  ];
-  
-  const isValid = validAdminCredentials.some(cred => 
-    cred.email === email && cred.password === password
-  );
-  
-  if (isValid) {
-    return { success: true };
-  } else if (!email || !password) {
-    return { success: false, error: "Please enter both email and password" };
-  } else {
-    return { success: false, error: "Invalid admin credentials. Access denied." };
+/**
+ * Authenticate admin through backend API
+ * 
+ * NOTE: To create an admin user in the backend, use the admin creation endpoint:
+ * POST /auth/admin/create-user with role: 'admin' or 'courier'
+ * 
+ * This function:
+ * 1. Authenticates the user via the backend API
+ * 2. Verifies the user has admin or courier role
+ * 3. Returns the JWT token for subsequent API calls
+ */
+const authenticateAdmin = async (email: string, password: string) => {
+  try {
+    // Call the actual authentication API
+    const response = await authService.login({
+      username: email, // OAuth2PasswordRequestForm expects 'username'
+      password: password,
+      grant_type: "password"
+    });
+    
+    // Check if user has admin or courier role (both can access admin panel)
+    if (response.data.user.role !== 'admin' && response.data.user.role !== 'courier') {
+      return { 
+        success: false, 
+        error: "Access denied. Administrator privileges required." 
+      };
+    }
+    
+    return { 
+      success: true, 
+      token: response.data.access_token,
+      user: response.data.user
+    };
+  } catch (error: any) {
+    console.error('Admin authentication error:', error);
+    
+    if (error.status === 401) {
+      return { 
+        success: false, 
+        error: "Invalid admin credentials. Access denied." 
+      };
+    }
+    
+    return { 
+      success: false, 
+      error: error.message || "Authentication failed. Please try again." 
+    };
   }
 };
 
@@ -54,11 +80,11 @@ export default function AdminLogin() {
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  // Initialize form with auto-filled admin credentials for quick access
+  // Initialize form
   const form = useForm<AdminLoginFormData>({
     defaultValues: {
-      email: "admin@parcego.com",
-      password: "admin123",
+      email: "",
+      password: "",
     },
     resolver: zodResolver(adminLoginSchema),
   });
@@ -68,20 +94,24 @@ export default function AdminLogin() {
     setIsLoading(true);
 
     try {
-      const result = await mockAdminAuthenticate(data.email, data.password);
+      const result = await authenticateAdmin(data.email, data.password);
       
-      if (result.success) {
+      if (result.success && result.token && result.user) {
+        // Store authentication token for API calls
+        apiClient.setAuthToken(result.token);
+        
         // Store admin authentication state
         if (typeof window !== 'undefined') {
           localStorage.setItem("admin_authenticated", "true");
           localStorage.setItem("admin_email", data.email);
+          localStorage.setItem("admin_role", result.user.role);
           localStorage.setItem("admin_login_time", new Date().toISOString());
           
           // Set admin authentication cookie
           const adminCookieValue = `admin_authenticated=true; path=/; max-age=86400; SameSite=Lax`;
           document.cookie = adminCookieValue;
           
-          console.log('Admin authentication successful');
+          console.log('Admin authentication successful. Role:', result.user.role);
           
           // Redirect to admin dashboard
           setTimeout(() => {
@@ -176,7 +206,7 @@ export default function AdminLogin() {
                   <Input
                     id="admin-email"
                     type="email"
-                    placeholder="admin@parcego.com"
+                    placeholder="Enter your admin email"
                     className={`pl-10 h-11 ${form.formState.errors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'}`}
                     {...form.register("email")}
                     disabled={isLoading}

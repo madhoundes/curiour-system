@@ -8,32 +8,33 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-// removed unused multi-step UI imports
-// import { Textarea } from "@/components/ui/textarea";
-// import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-// import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-// import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Icon } from "@/components/ui/icon";
-// import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
-// import { Separator } from "@/components/ui/separator";
-// import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
-import { createMockCourier } from "@/lib/mock/couriers";
+import { AdminService } from "@/lib/api/admin";
+import { AdminCreateUserRequest } from "@/lib/api/types";
 
-// Minimal single-step schema for Super Admin creation
+// Schema matching AdminCreateUserRequest interface
 const courierCreationSchema = z.object({
-  fullName: z
+  first_name: z
     .string()
-    .min(2, "Name must be at least 2 characters")
-    .max(100, "Name must be less than 100 characters"),
+    .min(2, "First name must be at least 2 characters")
+    .max(50, "First name must be less than 50 characters"),
+  last_name: z
+    .string()
+    .min(2, "Last name must be at least 2 characters")
+    .max(50, "Last name must be less than 50 characters"),
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
-  phone: z
+  business_name: z
     .string()
-    .regex(/^\+?[\d\s\-\(\)]+$/, "Please enter a valid phone number")
-    .min(10, "Phone number must be at least 10 characters")
+    .min(2, "Business name must be at least 2 characters")
+    .max(100, "Business name must be less than 100 characters"),
+  role: z.enum(["user", "driver", "admin"]).refine(val => val !== undefined, {
+    message: "Please select a role"
+  })
 });
 
 type CourierCreationFormData = z.infer<typeof courierCreationSchema>;
@@ -41,10 +42,8 @@ type CourierCreationFormData = z.infer<typeof courierCreationSchema>;
 interface CourierCreationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: (courier: any) => void;
+  onSuccess: (user: any) => void;
 }
-
-// Single-step only: no additional steps or selection datasets required
 
 export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCreationModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,12 +54,17 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
     register,
     handleSubmit,
     formState: { errors },
-    reset
+    reset,
+    setValue,
+    watch
   } = useForm<CourierCreationFormData>({
-    resolver: zodResolver(courierCreationSchema)
+    resolver: zodResolver(courierCreationSchema),
+    defaultValues: {
+      role: "driver" // Default to driver role for courier creation
+    }
   });
 
-  // no next/previous in single-step
+  const selectedRole = watch("role");
 
   const handleClose = () => {
     if (isSubmitting) return;
@@ -75,45 +79,67 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
     setSubmitProgress(0);
 
     try {
-      // Simulate account creation process with progress updates
+      // Progress updates for better UX
       const steps = [
-        { progress: 20, message: "Validating courier information..." },
-        { progress: 40, message: "Creating courier account..." },
-        { progress: 60, message: "Setting up service area..." },
-        { progress: 80, message: "Configuring availability..." },
+        { progress: 20, message: "Validating user information..." },
+        { progress: 40, message: "Creating user account..." },
+        { progress: 60, message: "Setting up permissions..." },
+        { progress: 80, message: "Finalizing account..." },
         { progress: 100, message: "Account created successfully!" }
       ];
 
       for (const step of steps) {
-        await new Promise(resolve => setTimeout(resolve, 800));
+        await new Promise(resolve => setTimeout(resolve, 500));
         setSubmitProgress(step.progress);
       }
 
-      // Create minimal courier with defaults
-      const parts = data.fullName.trim().split(/\s+/);
-      const firstName = parts[0] || "";
-      const lastName = parts.slice(1).join(" ");
-      const username = data.email.split("@")[0];
-      const newCourier = createMockCourier({
-        firstName,
-        lastName,
+      // Create user using AdminService
+      const adminService = new AdminService();
+      const createUserRequest: AdminCreateUserRequest = {
         email: data.email,
-        phone: data.phone,
-        username,
-        status: "pending_verification"
-      });
+        first_name: data.first_name,
+        last_name: data.last_name,
+        business_name: data.business_name,
+        role: data.role,
+        password: data.password
+      };
+
+      const response = await adminService.createUser(createUserRequest);
 
       showSuccessToast(
-        "Courier Account Created Successfully!",
-        { duration: 4000, showProgressBar: true, showCloseButton: true }
+        `${data.role === 'driver' ? 'Courier' : 'User'} Account Created Successfully!`,
+        { 
+          duration: 4000, 
+          showProgressBar: true, 
+          showCloseButton: true 
+        }
       );
 
-      onSuccess(newCourier);
+      onSuccess(response);
       handleClose();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      
+      let errorMessage = "Error Creating Account";
+      let errorDescription = "Please try again.";
+
+      // Handle specific API errors
+      if (error?.response?.status === 422) {
+        errorMessage = "Validation Error";
+        errorDescription = "Please check your input and try again.";
+      } else if (error?.response?.status === 409) {
+        errorMessage = "Email Already Exists";
+        errorDescription = "A user with this email already exists.";
+      } else if (error?.message) {
+        errorDescription = error.message;
+      }
+
       showErrorToast(
-        "Error Creating Courier Account",
-        { duration: 5000, showCloseButton: true }
+        `${errorMessage}: ${errorDescription}`,
+        { 
+          duration: 5000, 
+          showCloseButton: true
+        }
       );
     } finally {
       setIsSubmitting(false);
@@ -122,23 +148,38 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
   };
 
   const isValidSingleStep = () => {
-    return !errors.fullName && !errors.email && !errors.password && !errors.phone;
+    return !errors.first_name && !errors.last_name && !errors.email && !errors.password && !errors.business_name && !errors.role;
   };
 
   const renderStepContent = () => {
     return (
       <div className="space-y-6">
-        <div className="space-y-2">
-          <Label htmlFor="fullName">Full Name *</Label>
-          <Input
-            id="fullName"
-            {...register("fullName")}
-            className={errors.fullName ? "border-red-500" : ""}
-            placeholder="Enter full name"
-          />
-          {errors.fullName && (
-            <p className="text-sm text-red-600">{errors.fullName.message}</p>
-          )}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="first_name">First Name *</Label>
+            <Input
+              id="first_name"
+              {...register("first_name")}
+              className={errors.first_name ? "border-red-500" : ""}
+              placeholder="Enter first name"
+            />
+            {errors.first_name && (
+              <p className="text-sm text-red-600">{errors.first_name.message}</p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="last_name">Last Name *</Label>
+            <Input
+              id="last_name"
+              {...register("last_name")}
+              className={errors.last_name ? "border-red-500" : ""}
+              placeholder="Enter last name"
+            />
+            {errors.last_name && (
+              <p className="text-sm text-red-600">{errors.last_name.message}</p>
+            )}
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -156,6 +197,39 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
         </div>
 
         <div className="space-y-2">
+          <Label htmlFor="business_name">Business Name *</Label>
+          <Input
+            id="business_name"
+            {...register("business_name")}
+            className={errors.business_name ? "border-red-500" : ""}
+            placeholder="Enter business name"
+          />
+          {errors.business_name && (
+            <p className="text-sm text-red-600">{errors.business_name.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="role">Role *</Label>
+          <Select
+            value={selectedRole}
+            onValueChange={(value) => setValue("role", value as "user" | "driver" | "admin")}
+          >
+            <SelectTrigger className={errors.role ? "border-red-500" : ""}>
+              <SelectValue placeholder="Select a role" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="driver">Driver/Courier</SelectItem>
+              <SelectItem value="user">User/Customer</SelectItem>
+              <SelectItem value="admin">Administrator</SelectItem>
+            </SelectContent>
+          </Select>
+          {errors.role && (
+            <p className="text-sm text-red-600">{errors.role.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="password">Password *</Label>
           <Input
             id="password"
@@ -168,20 +242,6 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
             <p className="text-sm text-red-600">{errors.password.message}</p>
           )}
         </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="phone">Phone Number *</Label>
-          <Input
-            id="phone"
-            type="tel"
-            {...register("phone")}
-            className={errors.phone ? "border-red-500" : ""}
-            placeholder="Enter phone number"
-          />
-          {errors.phone && (
-            <p className="text-sm text-red-600">{errors.phone.message}</p>
-          )}
-        </div>
       </div>
     );
   };
@@ -192,10 +252,10 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
         <DialogHeader className="space-y-4">
           <DialogTitle className="text-2xl font-bold flex items-center gap-2">
             <Icon name="UserPlus" size={24} />
-            Create New Courier Account
+            Create New User Account
           </DialogTitle>
           <DialogDescription>
-            Add a new courier to the Parcego platform. Fill out all required information to create their account.
+            Add a new user to the Parcego platform. Fill out all required information to create their account.
           </DialogDescription>
         </DialogHeader>
 
@@ -218,7 +278,7 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
             <Separator />
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span>Creating courier account...</span>
+                <span>Creating user account...</span>
                 <span>{submitProgress}%</span>
               </div>
               <Progress value={submitProgress} className="h-2" />
@@ -244,7 +304,7 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
               disabled={!isValidSingleStep() || isSubmitting}
               className="bg-blue-600 hover:bg-blue-700"
             >
-              {isSubmitting ? "Creating Account..." : "Create Courier Account"}
+              {isSubmitting ? "Creating Account..." : `Create ${watch('role') === 'driver' ? 'Courier' : watch('role') === 'admin' ? 'Admin' : 'User'} Account`}
             </Button>
           </div>
         </div>

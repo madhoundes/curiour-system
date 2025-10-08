@@ -55,7 +55,8 @@ import { exportAnalyticsToPDF as exportPDF } from "@/lib/pdf-export";
 import { useToast, ToastContainer } from "@/components/ui/toast";
 import NotificationDropdown from "@/components/admin/NotificationDropdown";
 import CourierCreationModal from "@/components/admin/CourierCreationModal";
-import { mockCouriers as initialMockCouriers, createMockCourier, type Courier } from "@/lib/mock/couriers";
+import { adminService } from "@/lib/api/admin";
+import type { User, UserStatisticsResponse } from "@/lib/api/types";
 
 // Zod schema for courier edit form validation
 const courierEditSchema = z.object({
@@ -542,308 +543,63 @@ export default function SuperAdminDashboard() {
     }
   ];
 
-  // Mock data for couriers
-  // Use imported mock couriers data with state management
-  const [mockCouriers, setMockCouriers] = useState(initialMockCouriers);
+  // Real courier data from API
+  const [couriers, setCouriers] = useState<User[]>([]);
+  const [couriersLoading, setCouriersLoading] = useState(false);
+  const [couriersError, setCouriersError] = useState<string | null>(null);
 
   // Compatibility helper for legacy property names
-  const getCourierProperty = (courier: any, property: string) => {
+  const getCourierProperty = (courier: User, property: string): string | number | boolean | string[] | null => {
     switch (property) {
       case 'completedDeliveries':
-        return courier.totalDeliveries || 0;
+        return 0; // Will be updated when statistics API is integrated
       case 'vehicle':
-        return courier.vehicleType || 'car';
+        return 'car'; // Default value, will be updated when vehicle info is available
       case 'lastLogin':
-        return courier.lastActive || courier.joinedDate;
+        return courier.created_at;
       case 'joinDate':
-        return courier.joinedDate || courier.joinDate;
+        return courier.created_at;
       case 'tags':
-        return courier.tags || [];
+        return [];
+      case 'fullName':
+        return `${courier.first_name || ''} ${courier.last_name || ''}`.trim() || 'Unknown User';
+      case 'phone':
+        return '+1 (555) 000-0000'; // Placeholder until phone field is available
+      case 'city':
+        return 'Vancouver'; // Default city, will be updated when location info is available
+      case 'rating':
+        return 0;
+      case 'notes':
+        return '';
+      case 'status':
+        return courier.is_active ? 'active' : 'inactive';
       default:
-        return courier[property];
+        const value = courier[property as keyof User];
+        return value !== undefined && value !== null ? String(value) : '';
     }
   };
   
-  // Legacy mock couriers array (keeping for compatibility) - will be removed
-  const legacyMockCouriers = [
-    {
-      id: "C001",
-      fullName: "David Rodriguez",
-      email: "david.r@parcego.com",
-      phone: "+1 (555) 123-4567",
-      status: "active",
-      rating: 4.8,
-      completedDeliveries: 1245,
-      joinDate: "2023-08-15",
-      vehicle: "Van",
-      city: "Vancouver",
-      lastLogin: "2024-01-20T14:30:00Z",
-      notes: "Top performer this quarter, excellent customer feedback",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=david",
-      tags: ["Top Performer", "Reliable"],
-      suspensionNotes: undefined as string | undefined
-    },
-    {
-      id: "C002",
-      fullName: "Lisa Thompson",
-      email: "lisa.t@parcego.com",
-      phone: "+1 (555) 987-6543",
-      status: "active",
-      rating: null,
-      completedDeliveries: 0,
-      joinDate: "2024-03-25",
-      vehicle: "Motorcycle",
-      city: "Toronto",
-      lastLogin: "2024-01-18T09:15:00Z",
-      notes: "New driver, completed orientation, waiting for vehicle assignment",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=lisa",
-      tags: ["New", "Training Complete"],
-      suspensionNotes: undefined as string | undefined
-    },
-    {
-      id: "C003",
-      fullName: "James Mitchell",
-      email: "james.m@parcego.com",
-      phone: "+1 (555) 456-7890",
-      status: "inactive",
-      rating: 4.6,
-      completedDeliveries: 892,
-      joinDate: "2023-12-02",
-      vehicle: "Car",
-      city: "Montreal",
-      lastLogin: "2024-01-10T16:45:00Z",
-      notes: "On temporary leave, returns next week",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=james",
-      tags: ["Experienced", "On Leave"],
-      suspensionNotes: undefined as string | undefined
-    },
-    {
-      id: "C004",
-      fullName: "Maria Garcia",
-      email: "maria.g@parcego.com",
-      phone: "+1 (555) 234-5678",
-      status: "active",
-      rating: 4.9,
-      completedDeliveries: 756,
-      joinDate: "2023-06-10",
-      vehicle: "Bicycle",
-      city: "Vancouver",
-      lastLogin: "2024-01-21T11:20:00Z",
-      notes: "Eco-friendly delivery specialist, excellent in urban areas",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=maria",
-      tags: ["Eco Driver", "Urban Specialist"],
-      suspensionNotes: undefined as string | undefined
-    },
-    {
-      id: "C005",
-      fullName: "Robert Chen",
-      email: "robert.c@parcego.com",
-      phone: "+1 (555) 345-6789",
-      status: "active",
-      rating: 4.2,
-      completedDeliveries: 234,
-      joinDate: "2024-01-15",
-      vehicle: "Van",
-      city: "Calgary",
-      lastLogin: "2024-01-21T08:45:00Z",
-      notes: "Improving performance, needs more training on route optimization",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=robert",
-      tags: ["Improving", "Needs Training"],
-      suspensionNotes: undefined as string | undefined
-    },
-    {
-      id: "C006",
-      fullName: "Sarah Johnson",
-      email: "sarah.j@parcego.com",
-      phone: "+1 (555) 456-7891",
-      status: "suspended",
-      rating: 3.8,
-      completedDeliveries: 145,
-      joinDate: "2023-09-20",
-      vehicle: "Car",
-      city: "Edmonton",
-      lastLogin: "2024-01-15T13:30:00Z",
-      notes: "Suspended for policy violation, under review",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=sarah",
-      tags: ["Suspended", "Under Review"],
-      suspensionNotes: "Multiple customer complaints about delivery delays and poor communication. Under review by management." as string | undefined
-    },
-    {
-      id: "C007",
-      fullName: "Ahmed Hassan",
-      email: "ahmed.h@parcego.com",
-      phone: "+1 (555) 567-8901",
-      status: "active",
-      rating: 4.7,
-      completedDeliveries: 967,
-      joinDate: "2023-11-08",
-      vehicle: "Truck",
-      city: "Toronto",
-      lastLogin: "2024-01-21T10:15:00Z",
-      notes: "Specializes in large item deliveries, very reliable",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=ahmed",
-      tags: ["Heavy Load Specialist", "Reliable"],
-      suspensionNotes: undefined as string | undefined
-    },
-    {
-      id: "C008",
-      fullName: "Jennifer Wu",
-      email: "jennifer.w@parcego.com",
-      phone: "+1 (555) 678-9012",
-      status: "active",
-      rating: null,
-      completedDeliveries: 23,
-      joinDate: "2024-03-10",
-      vehicle: "Motorcycle",
-      city: "Vancouver",
-      lastLogin: "2024-01-20T15:45:00Z",
-      notes: "New driver, still building rating, shows promise",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=jennifer",
-      tags: ["New", "Promising"],
-      suspensionNotes: undefined as string | undefined
-    },
-    {
-      id: "C009",
-      fullName: "Michael Brown",
-      email: "michael.b@parcego.com",
-      phone: "+1 (555) 789-0123",
-      status: "active",
-      rating: 4.5,
-      completedDeliveries: 1456,
-      joinDate: "2023-05-12",
-      vehicle: "Van",
-      city: "Montreal",
-      lastLogin: "2024-01-21T12:00:00Z",
-      notes: "Veteran driver, mentor to new recruits",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=michael",
-      tags: ["Veteran", "Mentor"],
-      suspensionNotes: undefined as string | undefined
-    },
-    {
-      id: "C010",
-      fullName: "Emma Davis",
-      email: "emma.d@parcego.com",
-      phone: "+1 (555) 890-1234",
-      status: "pending",
-      rating: null,
-      completedDeliveries: 0,
-      joinDate: "2024-03-18",
-      vehicle: "Car",
-      city: "Calgary",
-      lastLogin: "2024-01-19T14:20:00Z",
-      notes: "Background check in progress, enthusiastic candidate",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=emma",
-      tags: ["Background Check", "Enthusiastic"],
-      suspensionNotes: undefined as string | undefined
-    },
-    {
-      id: "C011",
-      fullName: "Carlos Rodriguez",
-      email: "carlos.r@parcego.com",
-      phone: "+1 (555) 901-2345",
-      status: "active",
-      rating: 4.3,
-      completedDeliveries: 678,
-      joinDate: "2023-10-25",
-      vehicle: "Motorcycle",
-      city: "Toronto",
-      lastLogin: "2024-01-21T09:30:00Z",
-      notes: "Excellent in rush hour traffic, fast delivery times",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=carlos",
-      tags: ["Rush Hour Expert", "Fast Delivery"],
-      suspensionNotes: undefined as string | undefined
-    },
-    {
-      id: "C012",
-      fullName: "Priya Patel",
-      email: "priya.p@parcego.com",
-      phone: "+1 (555) 012-3456",
-      status: "inactive",
-      rating: 4.4,
-      completedDeliveries: 892,
-      joinDate: "2023-07-15",
-      vehicle: "Car",
-      city: "Edmonton",
-      lastLogin: "2024-01-05T11:45:00Z",
-      notes: "Extended leave for personal reasons, expected back in 2 weeks",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=priya",
-      tags: ["On Extended Leave"],
-      suspensionNotes: undefined as string | undefined
-    },
-    {
-      id: "C013",
-      fullName: "John Smith",
-      email: "john.s@parcego.com",
-      phone: "+1 (555) 123-4568",
-      status: "active",
-      rating: 4.1,
-      completedDeliveries: 345,
-      joinDate: "2024-02-01",
-      vehicle: "Bicycle",
-      city: "Vancouver",
-      lastLogin: "2024-01-21T13:15:00Z",
-      notes: "Focuses on downtown deliveries, good with high-value packages",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=john",
-      tags: ["Downtown Specialist", "High Value"],
-      suspensionNotes: undefined as string | undefined
-    },
-    {
-      id: "C014",
-      fullName: "Anna Kim",
-      email: "anna.k@parcego.com",
-      phone: "+1 (555) 234-5679",
-      status: "suspended",
-      rating: 3.5,
-      completedDeliveries: 156,
-      joinDate: "2023-08-30",
-      vehicle: "Van",
-      city: "Montreal",
-      lastLogin: "2024-01-12T10:30:00Z",
-      notes: "Performance improvement plan required, customer complaints",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=anna",
-      tags: ["Performance Plan", "Needs Improvement"],
-      suspensionNotes: "Consistently late deliveries and failure to meet performance metrics. Requires additional training." as string | undefined
-    },
-    {
-      id: "C015",
-      fullName: "Diego Martinez",
-      email: "diego.m@parcego.com",
-      phone: "+1 (555) 345-6780",
-      status: "active",
-      rating: 4.8,
-      completedDeliveries: 1876,
-      joinDate: "2023-04-20",
-      vehicle: "Truck",
-      city: "Calgary",
-      lastLogin: "2024-01-21T14:00:00Z",
-      notes: "Outstanding performance, handles complex logistics flawlessly",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=diego",
-      tags: ["Outstanding", "Logistics Expert"],
-      suspensionNotes: undefined as string | undefined
-    }
-  ];
-
   // Merchant search functionality
   const [filteredMerchants, setFilteredMerchants] = useState(mockMerchants);
 
   // Courier state management
   const [courierSearchQuery, setCourierSearchQuery] = useState("");
   const [isCourierSearchLoading, setIsCourierSearchLoading] = useState(false);
-  const [filteredCouriers, setFilteredCouriers] = useState(mockCouriers);
-  const [selectedCourier, setSelectedCourier] = useState<typeof mockCouriers[0] | null>(null);
+  const [filteredCouriers, setFilteredCouriers] = useState<User[]>([]);
+  const [selectedCourier, setSelectedCourier] = useState<User | null>(null);
   const [isCourierProfileOpen, setIsCourierProfileOpen] = useState(false);
   const [expandedCourierCards, setExpandedCourierCards] = useState<Set<string>>(new Set());
 
   // Modal state for courier approval/suspension
   const [courierActionModalOpen, setCourierActionModalOpen] = useState(false);
   const [courierActionType, setCourierActionType] = useState<'approve' | 'suspend' | null>(null);
-  const [selectedCourierForAction, setSelectedCourierForAction] = useState<typeof mockCouriers[0] | null>(null);
+  const [selectedCourierForAction, setSelectedCourierForAction] = useState<User | null>(null);
   const [courierActionNotes, setCourierActionNotes] = useState("");
   const [isProcessingCourierAction, setIsProcessingCourierAction] = useState(false);
 
   // Undo functionality state
   const [lastCourierAction, setLastCourierAction] = useState<{
-    courier: typeof mockCouriers[0];
+    courier: User;
     previousStatus: string;
     newStatus: string;
     notes?: string;
@@ -855,7 +611,7 @@ export default function SuperAdminDashboard() {
 
   // Courier edit modal state
   const [isCourierEditOpen, setIsCourierEditOpen] = useState(false);
-  const [editingCourier, setEditingCourier] = useState<typeof mockCouriers[0] | null>(null);
+  const [editingCourier, setEditingCourier] = useState<User | null>(null);
   const [isSavingCourier, setIsSavingCourier] = useState(false);
 
   // Courier creation modal state
@@ -895,18 +651,25 @@ export default function SuperAdminDashboard() {
       // Simulate async search operation
       setTimeout(() => {
         if (!query.trim()) {
-          setFilteredCouriers(mockCouriers);
+          setFilteredCouriers(couriers);
         } else {
-          const filtered = mockCouriers.filter((courier) => {
+          const filtered = couriers.filter((courier) => {
             const searchTerm = query.toLowerCase();
+            const fullName = getCourierProperty(courier, 'fullName');
+            const phone = getCourierProperty(courier, 'phone');
+            const city = getCourierProperty(courier, 'city');
+            const status = courier.is_active ? 'active' : 'inactive';
+            
             return (
-              courier.fullName.toLowerCase().includes(searchTerm) ||
+              (typeof fullName === 'string' && fullName.toLowerCase().includes(searchTerm)) ||
               courier.email.toLowerCase().includes(searchTerm) ||
-              courier.phone.toLowerCase().includes(searchTerm) ||
-              courier.status.toLowerCase().includes(searchTerm) ||
-              courier.city.toLowerCase().includes(searchTerm) ||
-              courier.vehicleType.toLowerCase().includes(searchTerm) ||
-              courier.id.toLowerCase().includes(searchTerm)
+              (typeof phone === 'string' && phone.toLowerCase().includes(searchTerm)) ||
+              status.toLowerCase().includes(searchTerm) ||
+              (typeof city === 'string' && city.toLowerCase().includes(searchTerm)) ||
+              courier.id.toString().toLowerCase().includes(searchTerm) ||
+              (courier.first_name && courier.first_name.toLowerCase().includes(searchTerm)) ||
+              (courier.last_name && courier.last_name.toLowerCase().includes(searchTerm)) ||
+              (courier.business_name && courier.business_name.toLowerCase().includes(searchTerm))
             );
           });
           setFilteredCouriers(filtered);
@@ -914,7 +677,7 @@ export default function SuperAdminDashboard() {
         setIsCourierSearchLoading(false);
       }, query.trim() ? 300 : 0); // Add delay for actual searches, instant for clearing
     };
-  }, []);
+  }, [couriers]);
 
   // Handle courier search input changes with debouncing
   const handleCourierSearchInputChange = (value: string) => {
@@ -937,7 +700,7 @@ export default function SuperAdminDashboard() {
   // Clear courier search functionality
   const handleClearCourierSearch = () => {
     setCourierSearchQuery("");
-    setFilteredCouriers(mockCouriers);
+    setFilteredCouriers(couriers);
   };
 
   // Handle courier card expansion toggle
@@ -1025,7 +788,7 @@ export default function SuperAdminDashboard() {
   };
 
   // Courier action handlers
-  const handleCourierAction = (courier: typeof mockCouriers[0], action: 'suspend') => {
+  const handleCourierAction = (courier: User, action: 'suspend') => {
     setSelectedCourierForAction(courier);
     setCourierActionType(action);
     setCourierActionNotes("");
@@ -1038,39 +801,31 @@ export default function SuperAdminDashboard() {
     setIsProcessingCourierAction(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
       // Store previous state for undo functionality
-      const previousStatus = selectedCourierForAction.status;
+      const previousStatus = String(getCourierProperty(selectedCourierForAction, 'status'));
 
-      // Update courier status in mock data
-      const updatedCourier: typeof mockCouriers[0] = {
-        ...selectedCourierForAction,
-        status: 'suspended'
-      };
+      // Update courier status via API
+      const isActive = courierActionType === 'suspend' ? false : selectedCourierForAction.is_active;
 
-      // Update the couriers array
-      const updatedCouriers = mockCouriers.map(c =>
-        c.id === selectedCourierForAction.id ? updatedCourier : c
-      );
+      const updatedCourierResponse = await adminService.toggleUserStatus(selectedCourierForAction.id, isActive);
+      const updatedCourier = updatedCourierResponse.data;
 
-      // Update filtered couriers as well
-      setFilteredCouriers(prev =>
-        prev.map(c => c.id === selectedCourierForAction.id ? updatedCourier : c)
-      );
+      // Refresh the courier list to ensure consistency
+      const response = await adminService.listUsers({});
+      const couriersList = response.data.filter(u => u.role === 'courier');
+      setFilteredCouriers(couriersList);
 
       // Store action for undo functionality
       setLastCourierAction({
         courier: updatedCourier,
-        previousStatus,
-        newStatus: updatedCourier.status,
+        previousStatus: previousStatus,
+        newStatus: String(getCourierProperty(updatedCourier, 'status')),
         notes: courierActionType === 'suspend' ? courierActionNotes : undefined,
         timestamp: Date.now()
       });
 
       // Set animation state for visual feedback
-      setRecentlyUpdatedCourierId(selectedCourierForAction.id);
+      setRecentlyUpdatedCourierId(updatedCourier.id.toString());
       setTimeout(() => setRecentlyUpdatedCourierId(null), 3000); // Clear after 3 seconds
 
       // Close modal and reset state
@@ -1081,21 +836,13 @@ export default function SuperAdminDashboard() {
 
       // Show success toast
       showSuccessToast(
-        'Courier suspended successfully!',
-        {
-          duration: 5000,
-          showProgressBar: true,
-          showCloseButton: true
-        }
+        'Courier suspended successfully!'
       );
 
     } catch (error) {
+      console.error('Failed to process courier action:', error);
       showErrorToast(
-        'Failed to suspend courier. Please try again.',
-        {
-          duration: 5000,
-          showCloseButton: true
-        }
+        'Failed to suspend courier. Please try again.'
       );
     } finally {
       setIsProcessingCourierAction(false);
@@ -1114,51 +861,37 @@ export default function SuperAdminDashboard() {
     if (!lastCourierAction) return;
 
     try {
-      // Revert the courier status
-      const revertedCourier: typeof mockCouriers[0] = {
-        ...lastCourierAction.courier,
-        status: lastCourierAction.previousStatus as any
-      };
+      // Revert the courier status via API
+      const isActive = lastCourierAction.previousStatus === 'active';
 
-      // Update the couriers array
-      const updatedCouriers = mockCouriers.map(c =>
-        c.id === revertedCourier.id ? revertedCourier : c
-      );
+      await adminService.toggleUserStatus(lastCourierAction.courier.id, isActive);
 
-      // Update filtered couriers
-      setFilteredCouriers(prev =>
-        prev.map(c => c.id === revertedCourier.id ? revertedCourier : c)
-      );
+      // Refresh the courier list to ensure consistency
+      const response = await adminService.listUsers({});
+      const couriersList = response.data.filter(u => u.role === 'courier');
+      setFilteredCouriers(couriersList);
 
       // Set animation state for visual feedback
-      setRecentlyUpdatedCourierId(revertedCourier.id);
+      setRecentlyUpdatedCourierId(lastCourierAction.courier.id.toString());
       setTimeout(() => setRecentlyUpdatedCourierId(null), 3000); // Clear after 3 seconds
 
       // Clear last action
       setLastCourierAction(null);
 
       showSuccessToast(
-        'Action undone successfully!',
-        {
-          duration: 3000,
-          showProgressBar: true,
-          showCloseButton: true
-        }
+        'Action undone successfully!'
       );
 
     } catch (error) {
+      console.error('Failed to undo courier action:', error);
       showErrorToast(
-        'Failed to undo action. Please refresh the page.',
-        {
-          duration: 5000,
-          showCloseButton: true
-        }
+        'Failed to undo action. Please refresh the page.'
       );
     }
   };
 
   // Courier edit modal handlers
-  const handleCourierEdit = (courier: typeof mockCouriers[0]) => {
+  const handleCourierEdit = (courier: User) => {
     setEditingCourier(courier);
     setIsCourierEditOpen(true);
   };
@@ -1168,44 +901,29 @@ export default function SuperAdminDashboard() {
 
     setIsSavingCourier(true);
     try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Update courier status via API (only status is currently supported)
+      const isActive = formData.status === 'active';
+      const updatedCourierResponse = await adminService.toggleUserStatus(editingCourier.id, isActive);
+      const updatedCourier = updatedCourierResponse.data;
 
-      const updatedCourier: typeof mockCouriers[0] = {
-        ...editingCourier,
-        ...formData
-      };
-
-      const updatedCouriers = mockCouriers.map(c =>
-        c.id === editingCourier.id ? updatedCourier : c
-      );
-
-      // Update the filtered list as well
-      const updatedFilteredCouriers = filteredCouriers.map(c =>
-        c.id === editingCourier.id ? updatedCourier : c
-      );
-
-      setFilteredCouriers(updatedFilteredCouriers);
-      setRecentlyUpdatedCourierId(updatedCourier.id);
+      // Refresh the courier list to ensure consistency
+      const response = await adminService.listUsers({});
+      const couriersList = response.data.filter(u => u.role === 'courier');
+      setFilteredCouriers(couriersList);
+      
+      setRecentlyUpdatedCourierId(updatedCourier.id.toString());
       setTimeout(() => setRecentlyUpdatedCourierId(null), 3000);
 
+      const courierFullName = String(getCourierProperty(updatedCourier, 'fullName'));
       showSuccessToast(
-        `Successfully updated ${updatedCourier.fullName}'s information`,
-        {
-          duration: 3000,
-          showProgressBar: true,
-          showCloseButton: true
-        }
+        `Successfully updated ${courierFullName}'s information`
       );
       setIsCourierEditOpen(false);
       setEditingCourier(null);
     } catch (error) {
+      console.error('Failed to update courier:', error);
       showErrorToast(
-        "Failed to update courier. Please try again.",
-        {
-          duration: 5000,
-          showCloseButton: true
-        }
+        "Failed to update courier. Please try again."
       );
     } finally {
       setIsSavingCourier(false);
@@ -1218,34 +936,49 @@ export default function SuperAdminDashboard() {
   };
 
   // Courier creation handlers
-  const handleCourierCreationSuccess = (newCourier: Courier) => {
-    // Add the new courier to the mock couriers list
-    setMockCouriers(prev => [...prev, newCourier]);
-    
-    // Update filtered couriers if search is active
-    if (courierSearchQuery) {
-      const searchTerm = courierSearchQuery.toLowerCase();
-      const matchesSearch = (
-        newCourier.fullName.toLowerCase().includes(searchTerm) ||
-        newCourier.email.toLowerCase().includes(searchTerm) ||
-        newCourier.phone.toLowerCase().includes(searchTerm) ||
-        newCourier.city.toLowerCase().includes(searchTerm) ||
-        newCourier.status.toLowerCase().includes(searchTerm) ||
-        newCourier.vehicleType.toLowerCase().includes(searchTerm)
-      );
+  const handleCourierCreationSuccess = async (newCourier: User) => {
+    try {
+      // Refresh the courier list from API to ensure we have the latest data
+      const response = await adminService.listUsers({});
+      const couriersList = response.data.filter(u => u.role === 'courier');
+      setFilteredCouriers(couriersList);
       
-      if (matchesSearch) {
+      // Show success feedback
+      const courierFullName = String(getCourierProperty(newCourier, 'fullName'));
+      showSuccessToast(
+        `${courierFullName} has been added to the system and is pending verification.`
+      );
+    } catch (error) {
+      console.error('Failed to refresh courier list after creation:', error);
+      // Fallback to adding the new courier to the existing list
+      if (courierSearchQuery) {
+        const searchTerm = courierSearchQuery.toLowerCase();
+        const fullName = getCourierProperty(newCourier, 'fullName');
+        const phone = getCourierProperty(newCourier, 'phone');
+        const city = getCourierProperty(newCourier, 'city');
+        const status = newCourier.is_active ? 'active' : 'inactive';
+        
+        const matchesSearch = (
+          (typeof fullName === 'string' && fullName.toLowerCase().includes(searchTerm)) ||
+          newCourier.email.toLowerCase().includes(searchTerm) ||
+          (typeof phone === 'string' && phone.toLowerCase().includes(searchTerm)) ||
+          (typeof city === 'string' && city.toLowerCase().includes(searchTerm)) ||
+          status.toLowerCase().includes(searchTerm)
+        );
+        
+        if (matchesSearch) {
+          setFilteredCouriers(prev => [...prev, newCourier]);
+        }
+      } else {
         setFilteredCouriers(prev => [...prev, newCourier]);
       }
-    } else {
-      setFilteredCouriers(prev => [...prev, newCourier]);
+      
+      // Show success feedback even if refresh failed
+      const courierFullName = String(getCourierProperty(newCourier, 'fullName'));
+      showSuccessToast(
+        `${courierFullName} has been added to the system and is pending verification.`
+      );
     }
-    
-    // Show success feedback
-    showSuccessToast(
-      "Courier Account Created Successfully!",
-      `${newCourier.fullName} has been added to the system and is pending verification.`
-    );
   };
 
   // Authentication check
@@ -1266,6 +999,29 @@ export default function SuperAdminDashboard() {
 
     checkAdminAuth();
   }, [router]);
+
+  // Load couriers from API
+  useEffect(() => {
+    const loadCouriers = async () => {
+      if (!isAuthenticated) return;
+      
+      try {
+        setIsCourierSearchLoading(true);
+        const response = await adminService.listUsers({});
+        const couriersList = response.data.filter(u => u.role === 'courier');
+        setFilteredCouriers(couriersList);
+      } catch (error) {
+        console.error('Failed to load couriers:', error);
+        showErrorToast(
+          "Unable to fetch courier data. Please try refreshing the page."
+        );
+      } finally {
+        setIsCourierSearchLoading(false);
+      }
+    };
+
+    loadCouriers();
+  }, [isAuthenticated]);
 
   // Handle timeframe selection
   const handleTimeframeChange = (timeframe: string) => {
@@ -2138,11 +1894,11 @@ export default function SuperAdminDashboard() {
 
   const renderCouriers = () => {
     // Mobile Card Component
-    const CourierCard = ({ courier, isExpanded, onToggle }: { courier: typeof mockCouriers[0], isExpanded: boolean, onToggle: () => void }) => (
+    const CourierCard = ({ courier, isExpanded, onToggle }: { courier: User, isExpanded: boolean, onToggle: () => void }) => (
       <Card
         className={cn(
           "transition-all duration-300 touch-manipulation",
-          recentlyUpdatedCourierId === courier.id && "ring-2 ring-green-200 bg-green-50"
+          recentlyUpdatedCourierId === courier.id.toString() && "ring-2 ring-green-200 bg-green-50"
         )}
         id={`parcego-courier-card-${courier.id}`}
       >
@@ -2152,18 +1908,18 @@ export default function SuperAdminDashboard() {
             <div className="flex items-center space-x-3 flex-1 min-w-0">
               <Avatar className="h-12 w-12 flex-shrink-0">
                 <AvatarFallback className="text-sm font-medium">
-                  {courier.fullName.split(' ').map(n => n[0]).join('')}
+                  {String(getCourierProperty(courier, 'fullName')).split(' ').map(n => n[0]).join('')}
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
                 <h3 className="font-semibold text-base text-gray-900 truncate">
-                  {courier.fullName}
+                  {getCourierProperty(courier, 'fullName')}
                 </h3>
                 <p className="text-sm text-gray-500 truncate">ID: {courier.id}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">
-              {getStatusBadge(courier.status)}
+              {getStatusBadge(String(getCourierProperty(courier, 'status')))}
               <Button
                 variant="ghost"
                 size="sm"
@@ -2185,13 +1941,13 @@ export default function SuperAdminDashboard() {
             <div className="flex items-center gap-4">
               <div className="text-center">
                 <p className="text-lg font-semibold text-gray-900">
-                  {getCourierProperty(courier, 'completedDeliveries').toLocaleString()}
+                  {Number(getCourierProperty(courier, 'completedDeliveries')).toLocaleString()}
                 </p>
                 <p className="text-xs text-gray-500">Deliveries</p>
               </div>
               <div className="text-center">
                 <p className="text-lg font-semibold text-green-600">
-                  {courier.rating?.toFixed(1) || 'N/A'}
+                  {Number(getCourierProperty(courier, 'rating')).toFixed(1) || 'N/A'}
                 </p>
                 <p className="text-xs text-gray-500">Rating</p>
               </div>
@@ -2208,7 +1964,7 @@ export default function SuperAdminDashboard() {
                   setIsCourierProfileOpen(true);
                 }}
                 className="h-9 px-3 touch-manipulation min-w-[44px]"
-                aria-label={`View details for ${courier.fullName}`}
+                aria-label={`View details for ${getCourierProperty(courier, 'fullName')}`}
               >
                 <Icon name="Eye" size={16} />
                 <span className="hidden sm:inline ml-1">View</span>
@@ -2219,19 +1975,19 @@ export default function SuperAdminDashboard() {
                 id={`parcego-courier-edit-mobile-${courier.id}`}
                 onClick={() => handleCourierEdit(courier)}
                 className="h-9 px-3 touch-manipulation min-w-[44px] hover:bg-gray-50"
-                aria-label={`Edit courier ${courier.fullName}`}
+                aria-label={`Edit courier ${getCourierProperty(courier, 'fullName')}`}
               >
                 <Icon name="Edit" size={16} />
                 <span className="hidden sm:inline ml-1">Edit</span>
               </Button>
-              {courier.status === "active" && (
+              {getCourierProperty(courier, 'status') === "active" && (
                 <Button
                   variant="outline"
                   size="sm"
                   className="text-red-600 h-9 px-3 touch-manipulation min-w-[44px]"
                   id={`parcego-courier-deactivate-mobile-${courier.id}`}
                   onClick={() => handleCourierAction(courier, 'suspend')}
-                  aria-label={`Suspend courier ${courier.fullName}`}
+                  aria-label={`Suspend courier ${getCourierProperty(courier, 'fullName')}`}
                 >
                   <Icon name="UserX" size={16} />
                   <span className="hidden sm:inline ml-1">Suspend</span>
@@ -2247,18 +2003,21 @@ export default function SuperAdminDashboard() {
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Contact</p>
                   <p className="text-sm text-gray-900 mt-1">{courier.email}</p>
-                  <p className="text-sm text-gray-600">{courier.phone}</p>
+                  <p className="text-sm text-gray-600">{getCourierProperty(courier, 'phone')}</p>
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Location</p>
-                  <p className="text-sm text-gray-900 mt-1">{courier.city}, BC</p>
+                  <p className="text-sm text-gray-900 mt-1">{getCourierProperty(courier, 'city')}, BC</p>
                   <p className="text-sm text-gray-600">{getCourierProperty(courier, 'vehicle')}</p>
                 </div>
               </div>
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Last Login</p>
                 <p className="text-sm text-gray-900 mt-1">
-                  {getCourierProperty(courier, 'lastLogin') ? new Date(getCourierProperty(courier, 'lastLogin')).toLocaleDateString() : 'Never'}
+                  {(() => {
+                    const lastLogin = getCourierProperty(courier, 'lastLogin');
+                    return lastLogin && typeof lastLogin === 'string' ? new Date(lastLogin).toLocaleDateString() : 'Never';
+                  })()}
                 </p>
               </div>
             </div>
@@ -2276,7 +2035,7 @@ export default function SuperAdminDashboard() {
               <h2 className="text-xl font-bold text-gray-900">Manage Couriers</h2>
               {courierSearchQuery && (
                 <p className="text-sm text-gray-600 mt-1 transition-all duration-200 ease-out">
-                  <span className="font-medium text-gray-900">{filteredCouriers.length}</span> of {mockCouriers.length} couriers
+                  <span className="font-medium text-gray-900">{filteredCouriers.length}</span> of {couriers.length} couriers
                   <span className="ml-1 text-gray-500">for &ldquo;{courierSearchQuery}&rdquo;</span>
                 </p>
               )}
@@ -2367,8 +2126,8 @@ export default function SuperAdminDashboard() {
                 <CourierCard
                   key={courier.id}
                   courier={courier}
-                  isExpanded={expandedCourierCards.has(courier.id)}
-                  onToggle={() => handleCourierCardToggle(courier.id)}
+                  isExpanded={expandedCourierCards.has(String(courier.id))}
+                  onToggle={() => handleCourierCardToggle(String(courier.id))}
                 />
               ))
             )}
@@ -2418,7 +2177,7 @@ export default function SuperAdminDashboard() {
                           key={courier.id}
                           className={cn(
                             "border-b hover:bg-gray-50 transition-all duration-200",
-                            recentlyUpdatedCourierId === courier.id && "bg-green-50 animate-pulse border-green-200"
+                            recentlyUpdatedCourierId === courier.id.toString() && "bg-green-50 animate-pulse border-green-200"
                           )}
                           id={`parcego-courier-row-${courier.id}`}
                         >
@@ -2426,11 +2185,14 @@ export default function SuperAdminDashboard() {
                             <div className="flex items-center space-x-3">
                               <Avatar className="h-10 w-10">
                                 <AvatarFallback className="text-sm font-medium">
-                                  {courier.fullName.split(' ').map(n => n[0]).join('')}
+                                  {(() => {
+                                    const fullName = String(getCourierProperty(courier, 'fullName'));
+                                    return fullName.split(' ').map(n => n.charAt(0)).join('');
+                                  })()}
                                 </AvatarFallback>
                               </Avatar>
                               <div>
-                                <p className="font-medium text-gray-900">{courier.fullName}</p>
+                                <p className="font-medium text-gray-900">{getCourierProperty(courier, 'fullName')}</p>
                                 <p className="text-sm text-gray-500">ID: {courier.id}</p>
                               </div>
                             </div>
@@ -2438,15 +2200,15 @@ export default function SuperAdminDashboard() {
                           <td className="p-4">
                             <div>
                               <p className="text-sm text-gray-900">{courier.email}</p>
-                              <p className="text-sm text-gray-500">{courier.phone}</p>
+                              <p className="text-sm text-gray-500">{getCourierProperty(courier, 'phone')}</p>
                             </div>
                           </td>
                           <td className="p-4">
-                            {getStatusBadge(courier.status)}
+                            {getStatusBadge(String(getCourierProperty(courier, 'status')))}
                           </td>
                           <td className="p-4">
                             <span className="font-medium text-gray-900">
-                              {getCourierProperty(courier, 'completedDeliveries').toLocaleString()}
+                              {Number(getCourierProperty(courier, 'completedDeliveries')).toLocaleString()}
                             </span>
                           </td>
                           <td className="p-4">
@@ -2460,7 +2222,7 @@ export default function SuperAdminDashboard() {
                                   setIsCourierProfileOpen(true);
                                 }}
                                 className="h-8 w-8 p-0 touch-manipulation"
-                                aria-label={`View details for ${courier.fullName}`}
+                                aria-label={`View details for ${getCourierProperty(courier, 'fullName')}`}
                               >
                                 <Icon name="Eye" size={14} />
                               </Button>
@@ -2470,18 +2232,18 @@ export default function SuperAdminDashboard() {
                                 id={`parcego-courier-edit-${courier.id}`}
                                 onClick={() => handleCourierEdit(courier)}
                                 className="h-8 w-8 p-0 touch-manipulation"
-                                aria-label={`Edit courier ${courier.fullName}`}
+                                aria-label={`Edit courier ${getCourierProperty(courier, 'fullName')}`}
                               >
                                 <Icon name="Edit" size={14} />
                               </Button>
-                              {courier.status === "active" && (
+                              {getCourierProperty(courier, 'status') === "active" && (
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   className="text-red-600 h-8 w-8 p-0 touch-manipulation"
                                   id={`parcego-courier-deactivate-${courier.id}`}
                                   onClick={() => handleCourierAction(courier, 'suspend')}
-                                  aria-label={`Suspend courier ${courier.fullName}`}
+                                  aria-label={`Suspend courier ${getCourierProperty(courier, 'fullName')}`}
                                 >
                                   <Icon name="UserX" size={14} />
                                 </Button>
@@ -3972,7 +3734,7 @@ export default function SuperAdminDashboard() {
                   {actionTitle}
                 </DialogTitle>
                 <DialogDescription className="text-gray-600 mt-1">
-                  Confirm action for {selectedCourierForAction.fullName}
+                  Confirm action for {getCourierProperty(selectedCourierForAction, 'fullName')}
                 </DialogDescription>
               </div>
             </div>
@@ -3996,7 +3758,7 @@ export default function SuperAdminDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div>
                   <span className="text-gray-500">Name:</span>
-                  <p className="font-medium">{selectedCourierForAction.fullName}</p>
+                  <p className="font-medium">{getCourierProperty(selectedCourierForAction, 'fullName')}</p>
                 </div>
                 <div>
                   <span className="text-gray-500">Email:</span>
@@ -4008,15 +3770,15 @@ export default function SuperAdminDashboard() {
                 </div>
                 <div>
                   <span className="text-gray-500">Vehicle:</span>
-                  <p className="font-medium">{selectedCourierForAction.vehicle}</p>
+                  <p className="font-medium">{getCourierProperty(selectedCourierForAction, 'vehicle')}</p>
                 </div>
                 <div>
                   <span className="text-gray-500">City:</span>
-                  <p className="font-medium">{selectedCourierForAction.city}</p>
+                  <p className="font-medium">{getCourierProperty(selectedCourierForAction, 'city')}</p>
                 </div>
                 <div>
                   <span className="text-gray-500">Current Status:</span>
-                  {getStatusBadge(selectedCourierForAction.status)}
+                  {getStatusBadge(String(getCourierProperty(selectedCourierForAction, 'status')))}
                 </div>
               </div>
             </div>
@@ -4085,12 +3847,12 @@ export default function SuperAdminDashboard() {
     const { register, handleSubmit, formState: { errors, isDirty }, reset, watch } = useForm<CourierEditFormData>({
       resolver: zodResolver(courierEditSchema),
       defaultValues: editingCourier ? {
-        fullName: editingCourier.fullName,
+        fullName: String(getCourierProperty(editingCourier, 'fullName')),
         email: editingCourier.email,
-        phone: editingCourier.phone,
-        status: editingCourier.status as "active" | "inactive" | "suspended",
-        city: editingCourier.city,
-        notes: editingCourier.notes || ""
+        phone: String(getCourierProperty(editingCourier, 'phone')),
+        status: getCourierProperty(editingCourier, 'status') as "active" | "inactive" | "suspended",
+        city: String(getCourierProperty(editingCourier, 'city')),
+        notes: String(getCourierProperty(editingCourier, 'notes') || "")
       } : undefined
     });
 
@@ -4110,7 +3872,10 @@ export default function SuperAdminDashboard() {
             <div className="flex items-start gap-4">
               <Avatar className="h-16 w-16 border-2 border-gray-100">
                 <AvatarFallback className="text-lg bg-indigo-100 text-indigo-600">
-                  {editingCourier.fullName.split(' ').map(n => n[0]).join('')}
+                  {(() => {
+                    const fullName = String(getCourierProperty(editingCourier, 'fullName'));
+                    return fullName.split(' ').map((n: string) => n.charAt(0)).join('');
+                  })()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
@@ -4118,14 +3883,14 @@ export default function SuperAdminDashboard() {
                   Edit Courier Information
                 </DialogTitle>
                 <DialogDescription className="text-sm text-gray-600">
-                  Update {editingCourier.fullName}'s profile information and settings
+                  Update {getCourierProperty(editingCourier, 'fullName')}'s profile information and settings
                 </DialogDescription>
                 <div className="flex items-center gap-2 mt-2">
                   <Badge className="font-normal">
                     ID: {editingCourier.id}
                   </Badge>
                   <Badge className="font-normal bg-blue-50 text-blue-700">
-                    {editingCourier.completedDeliveries} deliveries
+                    {getCourierProperty(editingCourier, 'completedDeliveries')} deliveries
                   </Badge>
                 </div>
               </div>
@@ -4358,7 +4123,7 @@ export default function SuperAdminDashboard() {
 
     // Mock revenue data for the selected courier
     const revenueData = {
-      totalRevenue: getCourierProperty(selectedCourier, 'completedDeliveries') * 25.50, // Mock: $25.50 per delivery
+      totalRevenue: Number(getCourierProperty(selectedCourier, 'completedDeliveries') || 0) * 25.50, // Mock: $25.50 per delivery
       recentPayouts: [
         { date: "2025-01-15", amount: 485.50, deliveries: 19 },
         { date: "2025-01-08", amount: 612.75, deliveries: 24 },
@@ -4385,26 +4150,35 @@ export default function SuperAdminDashboard() {
             <div className="flex items-start gap-4">
               <Avatar className="h-16 w-16 border-2 border-gray-100">
                 <AvatarFallback className="text-lg bg-indigo-100 text-indigo-600">
-                  {selectedCourier.fullName.split(' ').map(n => n[0]).join('')}
+                  {(() => {
+                    const fullName = String(getCourierProperty(selectedCourier, 'fullName'));
+                    return fullName.split(' ').map((n: string) => n.charAt(0)).join('');
+                  })()}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
                 <DialogTitle className="text-xl font-bold text-gray-900 mb-1">
-                  {selectedCourier.fullName}
+                  {getCourierProperty(selectedCourier, 'fullName')}
                 </DialogTitle>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge variant="outline" className="font-normal">
                     ID: {selectedCourier.id}
                   </Badge>
-                  <Badge className={cn("font-normal", getStatusColor(selectedCourier.status))}>
-                    {selectedCourier.status.charAt(0).toUpperCase() + selectedCourier.status.slice(1)}
+                  <Badge className={cn("font-normal", getStatusColor(String(getCourierProperty(selectedCourier, 'status'))))}>
+                    {(() => {
+                      const status = String(getCourierProperty(selectedCourier, 'status'));
+                      return status.charAt(0).toUpperCase() + status.slice(1);
+                    })()}
                   </Badge>
-                  {selectedCourier.rating && (
-                    <Badge className="bg-yellow-50 text-yellow-700 border-yellow-200 font-normal">
-                      <Icon name="Star" size={12} className="mr-1" />
-                      {selectedCourier.rating.toFixed(1)}
-                    </Badge>
-                  )}
+                  {(() => {
+                    const rating = Number(getCourierProperty(selectedCourier, 'rating'));
+                    return rating > 0 ? (
+                      <Badge className="bg-yellow-50 text-yellow-700 border-yellow-200 font-normal">
+                        <Icon name="Star" size={12} className="mr-1" />
+                        {rating.toFixed(1)}
+                      </Badge>
+                    ) : null;
+                  })()}
                 </div>
               </div>
             </div>
@@ -4513,16 +4287,16 @@ export default function SuperAdminDashboard() {
                 </div>
                 <div>
                   <a
-                    href={`tel:${selectedCourier.phone}`}
+                    href={`tel:${getCourierProperty(selectedCourier, 'phone')}`}
                     className="flex items-center gap-3 text-sm text-blue-600 hover:text-blue-700 transition-colors"
                   >
                     <Icon name="Phone" size={20} />
-                    {selectedCourier.phone}
+                    {getCourierProperty(selectedCourier, 'phone')}
                   </a>
                 </div>
                 <div className="flex items-center gap-3 text-sm text-gray-600">
                   <Icon name="MapPin" size={20} />
-                  {selectedCourier.city}
+                  {getCourierProperty(selectedCourier, 'city')}
                 </div>
                 <div className="flex items-center gap-3 text-sm text-gray-600">
                   <Icon name="Truck" size={20} />
@@ -4543,7 +4317,7 @@ export default function SuperAdminDashboard() {
                     <p className="text-xs text-gray-500 uppercase tracking-wider">Deliveries</p>
                   </div>
                   <p className="text-2xl font-bold text-gray-900">
-                    {getCourierProperty(selectedCourier, 'completedDeliveries').toLocaleString()}
+                    {Number(getCourierProperty(selectedCourier, 'completedDeliveries')).toLocaleString()}
                   </p>
                 </Card>
                 <Card className="p-4">
@@ -4552,7 +4326,7 @@ export default function SuperAdminDashboard() {
                     <p className="text-xs text-gray-500 uppercase tracking-wider">Join Date</p>
                   </div>
                   <p className="text-sm font-medium text-gray-900">
-                    {formatDate(getCourierProperty(selectedCourier, 'joinDate'))}
+                    {formatDate(String(getCourierProperty(selectedCourier, 'joinDate')))}
                   </p>
                 </Card>
                 <Card className="p-4">
@@ -4561,9 +4335,9 @@ export default function SuperAdminDashboard() {
                     <p className="text-xs text-gray-500 uppercase tracking-wider">Last Active</p>
                   </div>
                   <p className="text-sm font-medium text-gray-900">
-                    {formatDate(getCourierProperty(selectedCourier, 'lastLogin'))}
+                    {formatDate(String(getCourierProperty(selectedCourier, 'lastLogin')))}
                     <span className="block text-xs text-gray-500">
-                      {formatTime(getCourierProperty(selectedCourier, 'lastLogin'))}
+                      {formatTime(String(getCourierProperty(selectedCourier, 'lastLogin')))}
                     </span>
                   </p>
                 </Card>
@@ -4576,24 +4350,30 @@ export default function SuperAdminDashboard() {
                 Tags & Notes
               </h3>
               <div className="space-y-4 bg-gray-50 p-4 rounded-lg">
-                {getCourierProperty(selectedCourier, 'tags') && getCourierProperty(selectedCourier, 'tags').length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {getCourierProperty(selectedCourier, 'tags').map((tag: string, index: number) => (
-                      <Badge
-                        key={index}
-                        variant="outline"
-                        className="bg-white font-normal"
-                      >
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                )}
-                {selectedCourier.notes && (
-                  <div className="text-sm text-gray-600 bg-white p-3 rounded border">
-                    {selectedCourier.notes}
-                  </div>
-                )}
+                {(() => {
+                  const tags = getCourierProperty(selectedCourier, 'tags');
+                  return Array.isArray(tags) && tags.length > 0 ? (
+                    <div className="flex flex-wrap gap-2">
+                      {tags.map((tag: string, index: number) => (
+                        <Badge
+                          key={index}
+                          variant="outline"
+                          className="bg-white font-normal"
+                        >
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : null;
+                })()}
+                {(() => {
+                  const notes = getCourierProperty(selectedCourier, 'notes');
+                  return notes ? (
+                    <div className="text-sm text-gray-600 bg-white p-3 rounded border">
+                      {notes}
+                    </div>
+                  ) : null;
+                })()}
               </div>
             </div>
           </div>
