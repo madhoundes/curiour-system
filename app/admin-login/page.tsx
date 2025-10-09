@@ -32,20 +32,37 @@ type AdminLoginFormData = z.infer<typeof adminLoginSchema>;
  * 
  * This function:
  * 1. Authenticates the user via the backend API
- * 2. Verifies the user has admin or courier role
- * 3. Returns the JWT token for subsequent API calls
+ * 2. Fetches the current user information
+ * 3. Verifies the user has admin or courier role
+ * 4. Returns the JWT token for subsequent API calls
  */
 const authenticateAdmin = async (email: string, password: string) => {
   try {
-    // Call the actual authentication API
-    const response = await authService.login({
+    // Step 1: Call the authentication API to get the token
+    const loginResponse = await authService.login({
       username: email, // OAuth2PasswordRequestForm expects 'username'
       password: password,
       grant_type: "password"
     });
     
-    // Check if user has admin or courier role (both can access admin panel)
-    if (response.data.user.role !== 'admin' && response.data.user.role !== 'courier') {
+    // Step 2: Get the JWT token
+    const token = loginResponse.data.access_token;
+    if (!token) {
+      return { 
+        success: false, 
+        error: "Authentication failed. No token received." 
+      };
+    }
+    
+    // Step 3: Fetch current user information using the token
+    // The token is already set by authService.login(), so we can make authenticated requests
+    const userResponse = await authService.getCurrentUser();
+    const user = userResponse.data;
+    
+    // Step 4: Check if user has admin or courier role (both can access admin panel)
+    if (user.role !== 'admin' && user.role !== 'courier') {
+      // Remove the token since user doesn't have proper permissions
+      apiClient.removeAuthToken();
       return { 
         success: false, 
         error: "Access denied. Administrator privileges required." 
@@ -54,11 +71,14 @@ const authenticateAdmin = async (email: string, password: string) => {
     
     return { 
       success: true, 
-      token: response.data.access_token,
-      user: response.data.user
+      token: token,
+      user: user
     };
   } catch (error: any) {
     console.error('Admin authentication error:', error);
+    
+    // Clean up token on error
+    apiClient.removeAuthToken();
     
     if (error.status === 401) {
       return { 
@@ -97,21 +117,26 @@ export default function AdminLogin() {
       const result = await authenticateAdmin(data.email, data.password);
       
       if (result.success && result.token && result.user) {
-        // Store authentication token for API calls
+        // Token is already set by authService.login(), but we'll ensure it's set
         apiClient.setAuthToken(result.token);
         
         // Store admin authentication state
         if (typeof window !== 'undefined') {
           localStorage.setItem("admin_authenticated", "true");
           localStorage.setItem("admin_email", data.email);
+          localStorage.setItem("admin_user_id", String(result.user.id));
           localStorage.setItem("admin_role", result.user.role);
+          localStorage.setItem("admin_name", `${result.user.first_name} ${result.user.last_name}`);
           localStorage.setItem("admin_login_time", new Date().toISOString());
           
           // Set admin authentication cookie
           const adminCookieValue = `admin_authenticated=true; path=/; max-age=86400; SameSite=Lax`;
           document.cookie = adminCookieValue;
           
-          console.log('Admin authentication successful. Role:', result.user.role);
+          console.log('✅ Admin authentication successful!');
+          console.log('User:', result.user.first_name, result.user.last_name);
+          console.log('Role:', result.user.role);
+          console.log('Token stored:', result.token.substring(0, 20) + '...');
           
           // Redirect to admin dashboard
           setTimeout(() => {

@@ -106,16 +106,11 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
 
       const response = await adminService.createUser(createUserRequest);
 
-      showSuccessToast(
-        `${data.role === 'driver' ? 'Courier' : 'User'} Account Created Successfully!`,
-        { 
-          duration: 4000, 
-          showProgressBar: true, 
-          showCloseButton: true 
-        }
-      );
-
-      onSuccess(response);
+      // Don't show toast here - let the parent component handle it
+      // to avoid duplicate toasts
+      
+      // Pass the created user data to parent
+      onSuccess(response.data);
       handleClose();
     } catch (error: any) {
       console.error('Error creating user:', error);
@@ -162,6 +157,7 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
               {...register("first_name")}
               className={errors.first_name ? "border-red-500" : ""}
               placeholder="Enter first name"
+              autoComplete="off"
             />
             {errors.first_name && (
               <p className="text-sm text-red-600">{errors.first_name.message}</p>
@@ -175,6 +171,7 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
               {...register("last_name")}
               className={errors.last_name ? "border-red-500" : ""}
               placeholder="Enter last name"
+              autoComplete="off"
             />
             {errors.last_name && (
               <p className="text-sm text-red-600">{errors.last_name.message}</p>
@@ -189,7 +186,8 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
             type="email"
             {...register("email")}
             className={errors.email ? "border-red-500" : ""}
-            placeholder="Enter email address"
+            placeholder="user@example.com"
+            autoComplete="off"
           />
           {errors.email && (
             <p className="text-sm text-red-600">{errors.email.message}</p>
@@ -203,6 +201,7 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
             {...register("business_name")}
             className={errors.business_name ? "border-red-500" : ""}
             placeholder="Enter business name"
+            autoComplete="off"
           />
           {errors.business_name && (
             <p className="text-sm text-red-600">{errors.business_name.message}</p>
@@ -236,7 +235,8 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
             type="password"
             {...register("password")}
             className={errors.password ? "border-red-500" : ""}
-            placeholder="Enter a password"
+            placeholder="Create a secure password"
+            autoComplete="new-password"
           />
           {errors.password && (
             <p className="text-sm text-red-600">{errors.password.message}</p>

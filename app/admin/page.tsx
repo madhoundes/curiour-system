@@ -126,12 +126,33 @@ export default function SuperAdminDashboard() {
   const [customRangeOpen, setCustomRangeOpen] = useState(false);
   const [merchantSearchQuery, setMerchantSearchQuery] = useState("");
   const [isMerchantSearchLoading, setIsMerchantSearchLoading] = useState(false);
-  const [selectedMerchant, setSelectedMerchant] = useState<(typeof mockMerchants)[0] | null>(null);
+  const [merchants, setMerchants] = useState<User[]>([]);
+  const [merchantsLoading, setMerchantsLoading] = useState(false);
+  const [selectedMerchant, setSelectedMerchant] = useState<User | null>(null);
+  const [merchantStats, setMerchantStats] = useState<{
+    totalShipments: number;
+    delivered: number;
+    inTransit: number;
+    inWarehouse: number;
+  } | null>(null);
+  
+  // Admin statistics from API
+  const [adminStats, setAdminStats] = useState<{
+    totalShipments: number;
+    deliveredShipments: number;
+    inTransitShipments: number;
+    inWarehouseShipments: number;
+    cancelledShipments: number;
+    undeliveredShipments: number;
+    draftShipments: number;
+    paidShipments: number;
+  } | null>(null);
+  const [statsLoading, setStatsLoading] = useState(false);
 
   // Modal state for merchant approval/suspension
   const [actionModalOpen, setActionModalOpen] = useState(false);
   const [actionType, setActionType] = useState<'approve' | 'suspend' | null>(null);
-  const [selectedMerchantForAction, setSelectedMerchantForAction] = useState<(typeof mockMerchants)[0] | null>(null);
+  const [selectedMerchantForAction, setSelectedMerchantForAction] = useState<User | null>(null);
   const [actionNotes, setActionNotes] = useState("");
   const [isProcessingAction, setIsProcessingAction] = useState(false);
 
@@ -162,386 +183,87 @@ export default function SuperAdminDashboard() {
   const { toasts, showSuccessToast, showErrorToast, dismissToast } = useToast();
 
   // Mock data for merchants
-  const mockMerchants = [
-    {
-      id: "M001",
-      businessName: "TechParts Solutions",
-      contactName: "Sarah Johnson",
-      email: "sarah@techparts.com",
-      status: "active",
-      joinDate: "2024-01-15",
-      totalShipments: 1245,
-      monthlyRevenue: 12450,
-      shopifyIntegration: {
-        connected: true,
-        shopDomain: "techparts-solutions.myshopify.com",
-        lastSync: "2024-01-20T10:30:00Z",
-        syncStatus: "success",
-        productsSynced: 245,
-        ordersSynced: 89,
-        webhooks: {
-          ordersCreate: { registered: true, lastTriggered: "2024-01-20T09:15:00Z" },
-          ordersUpdate: { registered: true, lastTriggered: "2024-01-19T16:45:00Z" },
-          productsUpdate: { registered: true, lastTriggered: "2024-01-20T08:30:00Z" },
-          inventoryUpdate: { registered: true, lastTriggered: "2024-01-20T07:20:00Z" }
-        }
-      }
-    },
-    {
-      id: "M002",
-      businessName: "Green Garden Supply",
-      contactName: "Mike Chen",
-      email: "mike@greengarden.com",
-      status: "pending",
-      joinDate: "2024-03-20",
-      totalShipments: 0,
-      monthlyRevenue: 0,
-      shopifyIntegration: {
-        connected: false,
-        shopDomain: null,
-        lastSync: null,
-        syncStatus: null,
-        productsSynced: 0,
-        ordersSynced: 0
-      }
-    },
-    {
-      id: "M003",
-      businessName: "Fashion Forward LLC",
-      contactName: "Emma Wilson",
-      email: "emma@fashionforward.com",
-      status: "suspended",
-      joinDate: "2023-11-08",
-      totalShipments: 2156,
-      monthlyRevenue: 8900,
-      shopifyIntegration: {
-        connected: false,
-        shopDomain: null,
-        lastSync: null,
-        syncStatus: null,
-        productsSynced: 0,
-        ordersSynced: 0
-      }
-    },
-    {
-      id: "M004",
-      businessName: "BookWorld Distributors",
-      contactName: "David Rodriguez",
-      email: "david@bookworld.com",
-      status: "active",
-      joinDate: "2023-08-12",
-      totalShipments: 3247,
-      monthlyRevenue: 28900,
-      shopifyIntegration: {
-        connected: true,
-        shopDomain: "bookworld-distributors.myshopify.com",
-        lastSync: "2024-01-18T15:45:00Z",
-        syncStatus: "success",
-        productsSynced: 456,
-        ordersSynced: 123,
-        webhooks: {
-          ordersCreate: { registered: true, lastTriggered: "2024-01-18T14:20:00Z" },
-          ordersUpdate: { registered: true, lastTriggered: "2024-01-17T11:30:00Z" },
-          productsUpdate: { registered: true, lastTriggered: "2024-01-18T13:15:00Z" },
-          inventoryUpdate: { registered: true, lastTriggered: "2024-01-18T12:45:00Z" }
-        }
-      }
-    },
-    {
-      id: "M005",
-      businessName: "Smart Gadgets Inc",
-      contactName: "Lisa Park",
-      email: "lisa@smartgadgets.com",
-      status: "active",
-      joinDate: "2024-02-28",
-      totalShipments: 856,
-      monthlyRevenue: 45600,
-      shopifyIntegration: {
-        connected: true,
-        shopDomain: "smart-gadgets-inc.myshopify.com",
-        lastSync: "2024-01-19T08:15:00Z",
-        syncStatus: "success",
-        productsSynced: 189,
-        ordersSynced: 67,
-        webhooks: {
-          ordersCreate: { registered: true, lastTriggered: "2024-01-19T07:45:00Z" },
-          ordersUpdate: { registered: true, lastTriggered: "2024-01-18T14:20:00Z" },
-          productsUpdate: { registered: true, lastTriggered: "2024-01-19T06:30:00Z" },
-          inventoryUpdate: { registered: true, lastTriggered: "2024-01-19T05:15:00Z" }
-        }
-      }
-    },
-    {
-      id: "M006",
-      businessName: "Organic Foods Market",
-      contactName: "James Thompson",
-      email: "james@organicfoods.com",
-      status: "active",
-      joinDate: "2023-12-05",
-      totalShipments: 1892,
-      monthlyRevenue: 15200,
-      shopifyIntegration: {
-        connected: false,
-        shopDomain: null,
-        lastSync: null,
-        syncStatus: null,
-        productsSynced: 0,
-        ordersSynced: 0
-      }
-    },
-    {
-      id: "M007",
-      businessName: "Artisan Crafts Co",
-      contactName: "Maria Garcia",
-      email: "maria@artisancrafts.com",
-      status: "pending",
-      joinDate: "2024-03-15",
-      totalShipments: 45,
-      monthlyRevenue: 320,
-      shopifyIntegration: {
-        connected: false,
-        shopDomain: null,
-        lastSync: null,
-        syncStatus: null,
-        productsSynced: 0,
-        ordersSynced: 0
-      }
-    },
-    {
-      id: "M008",
-      businessName: "Medical Supplies Plus",
-      contactName: "Dr. Robert Kim",
-      email: "robert@medsupplies.com",
-      status: "active",
-      joinDate: "2023-06-20",
-      totalShipments: 4567,
-      monthlyRevenue: 78900,
-      shopifyIntegration: {
-        connected: true,
-        shopDomain: "medical-supplies-plus.myshopify.com",
-        lastSync: "2024-01-17T12:20:00Z",
-        syncStatus: "success",
-        productsSynced: 678,
-        ordersSynced: 234,
-        webhooks: {
-          ordersCreate: { registered: true, lastTriggered: "2024-01-17T11:45:00Z" },
-          ordersUpdate: { registered: true, lastTriggered: "2024-01-16T09:30:00Z" },
-          productsUpdate: { registered: true, lastTriggered: "2024-01-17T10:15:00Z" },
-          inventoryUpdate: { registered: true, lastTriggered: "2024-01-17T08:45:00Z" }
-        }
-      }
-    },
-    {
-      id: "M009",
-      businessName: "Sports Equipment Hub",
-      contactName: "Alex Johnson",
-      email: "alex@sportshub.com",
-      status: "active",
-      joinDate: "2023-09-10",
-      totalShipments: 2789,
-      monthlyRevenue: 34200,
-      shopifyIntegration: {
-        connected: true,
-        shopDomain: "sports-equipment-hub.myshopify.com",
-        lastSync: "2024-01-16T14:30:00Z",
-        syncStatus: "success",
-        productsSynced: 345,
-        ordersSynced: 156,
-        webhooks: {
-          ordersCreate: { registered: true, lastTriggered: "2024-01-16T13:45:00Z" },
-          ordersUpdate: { registered: true, lastTriggered: "2024-01-15T10:20:00Z" },
-          productsUpdate: { registered: true, lastTriggered: "2024-01-16T12:15:00Z" },
-          inventoryUpdate: { registered: true, lastTriggered: "2024-01-16T11:30:00Z" }
-        }
-      }
-    },
-    {
-      id: "M010",
-      businessName: "Home Decor Warehouse",
-      contactName: "Sophie Brown",
-      email: "sophie@homedecor.com",
-      status: "suspended",
-      joinDate: "2023-07-25",
-      totalShipments: 1456,
-      monthlyRevenue: 12800,
-      shopifyIntegration: {
-        connected: false,
-        shopDomain: null,
-        lastSync: null,
-        syncStatus: null,
-        productsSynced: 0,
-        ordersSynced: 0
-      }
-    },
-    {
-      id: "M011",
-      businessName: "Pet Supplies Online",
-      contactName: "Chris Wilson",
-      email: "chris@petsupplies.com",
-      status: "active",
-      joinDate: "2024-01-08",
-      totalShipments: 967,
-      monthlyRevenue: 18700,
-      shopifyIntegration: {
-        connected: true,
-        shopDomain: "pet-supplies-online.myshopify.com",
-        lastSync: "2024-01-21T09:45:00Z",
-        syncStatus: "success",
-        productsSynced: 123,
-        ordersSynced: 45,
-        webhooks: {
-          ordersCreate: { registered: true, lastTriggered: "2024-01-21T08:30:00Z" },
-          ordersUpdate: { registered: true, lastTriggered: "2024-01-20T15:45:00Z" },
-          productsUpdate: { registered: true, lastTriggered: "2024-01-21T07:15:00Z" },
-          inventoryUpdate: { registered: true, lastTriggered: "2024-01-21T06:20:00Z" }
-        }
-      }
-    },
-    {
-      id: "M012",
-      businessName: "Beauty & Wellness",
-      contactName: "Amanda Lee",
-      email: "amanda@beautywellness.com",
-      status: "active",
-      joinDate: "2023-11-30",
-      totalShipments: 2134,
-      monthlyRevenue: 25600,
-      shopifyIntegration: {
-        connected: false,
-        shopDomain: null,
-        lastSync: null,
-        syncStatus: null,
-        productsSynced: 0,
-        ordersSynced: 0
-      }
-    },
-    {
-      id: "M013",
-      businessName: "Auto Parts Direct",
-      contactName: "Tom Anderson",
-      email: "tom@autopartsdirect.com",
-      status: "pending",
-      joinDate: "2024-03-10",
-      totalShipments: 23,
-      monthlyRevenue: 150,
-      shopifyIntegration: {
-        connected: false,
-        shopDomain: null,
-        lastSync: null,
-        syncStatus: null,
-        productsSynced: 0,
-        ordersSynced: 0
-      }
-    },
-    {
-      id: "M014",
-      businessName: "Kitchen Essentials",
-      contactName: "Rachel Davis",
-      email: "rachel@kitchenessentials.com",
-      status: "active",
-      joinDate: "2023-10-18",
-      totalShipments: 3456,
-      monthlyRevenue: 41200,
-      shopifyIntegration: {
-        connected: true,
-        shopDomain: "kitchen-essentials.myshopify.com",
-        lastSync: "2024-01-15T16:20:00Z",
-        syncStatus: "success",
-        productsSynced: 567,
-        ordersSynced: 189,
-        webhooks: {
-          ordersCreate: { registered: true, lastTriggered: "2024-01-15T15:45:00Z" },
-          ordersUpdate: { registered: true, lastTriggered: "2024-01-14T12:30:00Z" },
-          productsUpdate: { registered: true, lastTriggered: "2024-01-15T14:15:00Z" },
-          inventoryUpdate: { registered: true, lastTriggered: "2024-01-15T13:20:00Z" }
-        }
-      }
-    },
-    {
-      id: "M015",
-      businessName: "Outdoor Adventure Gear",
-      contactName: "Mark Johnson",
-      email: "mark@outdooradventure.com",
-      status: "active",
-      joinDate: "2023-05-14",
-      totalShipments: 5678,
-      monthlyRevenue: 67800,
-      shopifyIntegration: {
-        connected: true,
-        shopDomain: "outdoor-adventure-gear.myshopify.com",
-        lastSync: "2024-01-14T11:10:00Z",
-        syncStatus: "success",
-        productsSynced: 789,
-        ordersSynced: 298,
-        webhooks: {
-          ordersCreate: { registered: true, lastTriggered: "2024-01-14T10:45:00Z" },
-          ordersUpdate: { registered: true, lastTriggered: "2024-01-13T08:30:00Z" },
-          productsUpdate: { registered: true, lastTriggered: "2024-01-14T09:15:00Z" },
-          inventoryUpdate: { registered: true, lastTriggered: "2024-01-14T08:20:00Z" }
-        }
-      }
-    },
-    {
-      id: "M016",
-      businessName: "Jewelry & Accessories",
-      contactName: "Isabella Martinez",
-      email: "isabella@jewelryacc.com",
-      status: "suspended",
-      joinDate: "2023-08-30",
-      totalShipments: 892,
-      monthlyRevenue: 45600,
-      shopifyIntegration: {
-        connected: false,
-        shopDomain: null,
-        lastSync: null,
-        syncStatus: null,
-        productsSynced: 0,
-        ordersSynced: 0
-      }
-    },
-    {
-      id: "M017",
-      businessName: "Fitness Equipment Pro",
-      contactName: "Kevin Wright",
-      email: "kevin@fitnessequip.com",
-      status: "active",
-      joinDate: "2024-02-12",
-      totalShipments: 1234,
-      monthlyRevenue: 52300,
-      shopifyIntegration: {
-        connected: true,
-        shopDomain: "fitness-equipment-pro.myshopify.com",
-        lastSync: "2024-01-22T13:35:00Z",
-        syncStatus: "success",
-        productsSynced: 234,
-        ordersSynced: 78,
-        webhooks: {
-          ordersCreate: { registered: true, lastTriggered: "2024-01-22T12:45:00Z" },
-          ordersUpdate: { registered: true, lastTriggered: "2024-01-21T09:30:00Z" },
-          productsUpdate: { registered: true, lastTriggered: "2024-01-22T11:15:00Z" },
-          inventoryUpdate: { registered: true, lastTriggered: "2024-01-22T10:20:00Z" }
-        }
-      }
-    },
-    {
-      id: "M018",
-      businessName: "Garden Tools & Supplies",
-      contactName: "Jennifer Taylor",
-      email: "jennifer@gardentools.com",
-      status: "active",
-      joinDate: "2023-12-22",
-      totalShipments: 1789,
-      monthlyRevenue: 23400,
-      shopifyIntegration: {
-        connected: false,
-        shopDomain: null,
-        lastSync: null,
-        syncStatus: null,
-        productsSynced: 0,
-        ordersSynced: 0
-      }
+  // Helper function to get merchant properties
+  const getMerchantProperty = (merchant: User, property: string): string | number | boolean => {
+    switch (property) {
+      case 'businessName':
+        return merchant.business_name;
+      case 'contactName':
+        return `${merchant.first_name} ${merchant.last_name}`.trim();
+      case 'status':
+        return merchant.is_active ? (merchant.is_verified ? 'active' : 'pending') : 'suspended';
+      case 'joinDate':
+        return merchant.created_at;
+      case 'totalShipments':
+        return 0; // TODO: Will come from shipment stats API
+      case 'monthlyRevenue':
+        return 0; // TODO: Will come from billing stats API
+      default:
+        return '';
     }
-  ];
+  };
+  
+  // Removed merchants - now using real data from API
+  
+  // Merchant search functionality
+  const [filteredMerchants, setFilteredMerchants] = useState<User[]>([]);
+  
+  // Load merchants from API
+  useEffect(() => {
+    const loadMerchants = async () => {
+      if (!isAuthenticated) return;
+      
+      try {
+        setMerchantsLoading(true);
+        const response = await adminService.listUsers({});
+        const merchantsList = response.data.filter(u => u.role === 'user');
+        setMerchants(merchantsList);
+        setFilteredMerchants(merchantsList);
+      } catch (error) {
+        console.error('Failed to load merchants:', error);
+        showErrorToast(
+          "Unable to fetch merchant data. Please try refreshing the page."
+        );
+      } finally {
+        setMerchantsLoading(false);
+      }
+    };
+
+    loadMerchants();
+  }, [isAuthenticated]);
+  
+  // Load admin statistics from API
+  useEffect(() => {
+    const loadAdminStats = async () => {
+      if (!isAuthenticated) return;
+      
+      try {
+        setStatsLoading(true);
+        const response = await adminService.getAdminStatistics();
+        const stats = response.data;
+        
+        setAdminStats({
+          totalShipments: stats.total_shipments,
+          deliveredShipments: stats.delivered_shipments,
+          inTransitShipments: stats.in_transit_shipments,
+          inWarehouseShipments: stats.in_warehouse_shipments,
+          cancelledShipments: stats.cancelled_shipments,
+          undeliveredShipments: stats.undelivered_shipments,
+          draftShipments: stats.draft_shipments,
+          paidShipments: stats.paid_shipments
+        });
+      } catch (error) {
+        console.error('Failed to load admin statistics:', error);
+        showErrorToast(
+          "Unable to fetch admin statistics. Please try refreshing the page."
+        );
+      } finally {
+        setStatsLoading(false);
+      }
+    };
+
+    loadAdminStats();
+  }, [isAuthenticated]);
 
   // Real courier data from API
   const [couriers, setCouriers] = useState<User[]>([]);
@@ -580,7 +302,6 @@ export default function SuperAdminDashboard() {
   };
   
   // Merchant search functionality
-  const [filteredMerchants, setFilteredMerchants] = useState(mockMerchants);
 
   // Courier state management
   const [courierSearchQuery, setCourierSearchQuery] = useState("");
@@ -622,18 +343,23 @@ export default function SuperAdminDashboard() {
     return (query: string) => {
       setIsMerchantSearchLoading(true);
 
-      // Simulate async search operation
+      // Search merchants
       setTimeout(() => {
         if (!query.trim()) {
-          setFilteredMerchants(mockMerchants);
+          setFilteredMerchants(merchants);
         } else {
-          const filtered = mockMerchants.filter((merchant) => {
+          const filtered = merchants.filter((merchant) => {
             const searchTerm = query.toLowerCase();
+            const businessName = String(getMerchantProperty(merchant, 'businessName')).toLowerCase();
+            const contactName = String(getMerchantProperty(merchant, 'contactName')).toLowerCase();
+            const email = merchant.email.toLowerCase();
+            const status = String(getMerchantProperty(merchant, 'status')).toLowerCase();
+            
             return (
-              merchant.businessName.toLowerCase().includes(searchTerm) ||
-              merchant.contactName.toLowerCase().includes(searchTerm) ||
-              merchant.email.toLowerCase().includes(searchTerm) ||
-              merchant.status.toLowerCase().includes(searchTerm)
+              businessName.includes(searchTerm) ||
+              contactName.includes(searchTerm) ||
+              email.includes(searchTerm) ||
+              status.includes(searchTerm)
             );
           });
           setFilteredMerchants(filtered);
@@ -641,7 +367,7 @@ export default function SuperAdminDashboard() {
         setIsMerchantSearchLoading(false);
       }, query.trim() ? 300 : 0); // Add delay for actual searches, instant for clearing
     };
-  }, []);
+  }, [merchants]);
 
   // Debounced courier search handler
   const handleCourierSearch = useMemo(() => {
@@ -694,7 +420,7 @@ export default function SuperAdminDashboard() {
   // Clear search functionality
   const handleClearSearch = () => {
     setMerchantSearchQuery("");
-    setFilteredMerchants(mockMerchants);
+    setFilteredMerchants(merchants);
   };
 
   // Clear courier search functionality
@@ -717,7 +443,7 @@ export default function SuperAdminDashboard() {
   };
 
   // Handle merchant action modal
-  const handleMerchantAction = (merchant: typeof mockMerchants[0], action: 'approve' | 'suspend') => {
+  const handleMerchantAction = (merchant: User, action: 'approve' | 'suspend') => {
     setSelectedMerchantForAction(merchant);
     setActionType(action);
     setActionNotes("");
@@ -731,24 +457,24 @@ export default function SuperAdminDashboard() {
     setIsProcessingAction(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Call admin API to toggle user status
+      await adminService.toggleUserStatus(selectedMerchantForAction.id, actionType === 'approve');
 
-      // Update merchant status in mock data
-      const updatedMerchant = {
-        ...selectedMerchantForAction,
-        status: actionType === 'approve' ? 'active' : 'suspended'
-      };
-
-      // Update the merchants array
-      const updatedMerchants = mockMerchants.map(m =>
-        m.id === selectedMerchantForAction.id ? updatedMerchant : m
+      // Update local merchants array
+      const updatedMerchants = merchants.map(m =>
+        m.id === selectedMerchantForAction.id 
+          ? { ...m, is_active: actionType === 'approve', is_verified: actionType === 'approve' }
+          : m
       );
-
-      // Update filtered merchants as well
-      setFilteredMerchants(prev =>
-        prev.map(m => m.id === selectedMerchantForAction.id ? updatedMerchant : m)
+      setMerchants(updatedMerchants);
+      
+      // Update filtered merchants
+      const updatedFilteredMerchants = filteredMerchants.map(m =>
+        m.id === selectedMerchantForAction.id 
+          ? { ...m, is_active: actionType === 'approve', is_verified: actionType === 'approve' }
+          : m
       );
+      setFilteredMerchants(updatedFilteredMerchants);
 
       // Close modal and reset state
       setActionModalOpen(false);
@@ -757,13 +483,9 @@ export default function SuperAdminDashboard() {
       setActionNotes("");
 
       // Show success toast
+      const merchantName = `${selectedMerchantForAction.first_name} ${selectedMerchantForAction.last_name}`.trim();
       showSuccessToast(
-        `Merchant ${actionType === 'approve' ? 'approved' : 'suspended'} successfully!`,
-        {
-          duration: 4000,
-          showProgressBar: true,
-          showCloseButton: true
-        }
+        `${merchantName} has been ${actionType === 'approve' ? 'approved' : 'suspended'} successfully!`
       );
 
     } catch (error) {
@@ -936,47 +658,33 @@ export default function SuperAdminDashboard() {
   };
 
   // Courier creation handlers
-  const handleCourierCreationSuccess = async (newCourier: User) => {
+  const handleCourierCreationSuccess = async (newCourier: any) => {
     try {
+      // Build the full name from the response
+      const firstName = newCourier.first_name || '';
+      const lastName = newCourier.last_name || '';
+      const fullName = `${firstName} ${lastName}`.trim() || 'New User';
+      
       // Refresh the courier list from API to ensure we have the latest data
       const response = await adminService.listUsers({});
       const couriersList = response.data.filter(u => u.role === 'courier');
       setFilteredCouriers(couriersList);
       
       // Show success feedback
-      const courierFullName = String(getCourierProperty(newCourier, 'fullName'));
       showSuccessToast(
-        `${courierFullName} has been added to the system and is pending verification.`
+        `${fullName} has been added to the system and is pending verification.`
       );
     } catch (error) {
       console.error('Failed to refresh courier list after creation:', error);
-      // Fallback to adding the new courier to the existing list
-      if (courierSearchQuery) {
-        const searchTerm = courierSearchQuery.toLowerCase();
-        const fullName = getCourierProperty(newCourier, 'fullName');
-        const phone = getCourierProperty(newCourier, 'phone');
-        const city = getCourierProperty(newCourier, 'city');
-        const status = newCourier.is_active ? 'active' : 'inactive';
-        
-        const matchesSearch = (
-          (typeof fullName === 'string' && fullName.toLowerCase().includes(searchTerm)) ||
-          newCourier.email.toLowerCase().includes(searchTerm) ||
-          (typeof phone === 'string' && phone.toLowerCase().includes(searchTerm)) ||
-          (typeof city === 'string' && city.toLowerCase().includes(searchTerm)) ||
-          status.toLowerCase().includes(searchTerm)
-        );
-        
-        if (matchesSearch) {
-          setFilteredCouriers(prev => [...prev, newCourier]);
-        }
-      } else {
-        setFilteredCouriers(prev => [...prev, newCourier]);
-      }
+      
+      // Build the full name from the response
+      const firstName = newCourier.first_name || '';
+      const lastName = newCourier.last_name || '';
+      const fullName = `${firstName} ${lastName}`.trim() || 'New User';
       
       // Show success feedback even if refresh failed
-      const courierFullName = String(getCourierProperty(newCourier, 'fullName'));
       showSuccessToast(
-        `${courierFullName} has been added to the system and is pending verification.`
+        `${fullName} has been added to the system and is pending verification.`
       );
     }
   };
@@ -1063,14 +771,24 @@ export default function SuperAdminDashboard() {
   };
 
   // Mock data for platform overview
-  const platformStats = {
-    totalMerchants: 1248,
-    activeCouriers: 342,
-    totalShipments: 25678,
-    monthlyRevenue: 145890,
-    systemHealth: 99.2,
-    pendingApprovals: 23
-  };
+  // Compute platform stats from real data
+  const platformStats = useMemo(() => {
+    const totalMerchants = merchants.length;
+    const activeCouriers = couriers.filter(c => c.is_active).length;
+    const totalShipments = adminStats?.totalShipments || 0;
+    const pendingApprovals = merchants.filter(m => !m.is_verified).length + 
+                            couriers.filter(c => !c.is_verified).length;
+    
+    return {
+      totalMerchants,
+      activeCouriers,
+      totalShipments,
+      pendingApprovals,
+      // These are not available in the current API, kept for export compatibility
+      monthlyRevenue: 0,
+      systemHealth: 99.0
+    };
+  }, [merchants, couriers, adminStats]);
 
   // Mock data for recent activity
   const recentActivity = [
@@ -1351,8 +1069,14 @@ export default function SuperAdminDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl xl:text-3xl font-bold">{platformStats.totalMerchants.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">+12% from last month</p>
+            {statsLoading || merchantsLoading ? (
+              <Skeleton className="h-9 w-24 mb-2" />
+            ) : (
+              <>
+                <div className="text-2xl xl:text-3xl font-bold">{platformStats.totalMerchants.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">All registered merchants</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -1364,8 +1088,14 @@ export default function SuperAdminDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl xl:text-3xl font-bold">{platformStats.activeCouriers.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">+8% from last month</p>
+            {statsLoading || couriersLoading ? (
+              <Skeleton className="h-9 w-24 mb-2" />
+            ) : (
+              <>
+                <div className="text-2xl xl:text-3xl font-bold">{platformStats.activeCouriers.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">Currently active drivers</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -1377,12 +1107,19 @@ export default function SuperAdminDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl xl:text-3xl font-bold">{platformStats.totalShipments.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">+23% from last month</p>
+            {statsLoading ? (
+              <Skeleton className="h-9 w-24 mb-2" />
+            ) : (
+              <>
+                <div className="text-2xl xl:text-3xl font-bold">{platformStats.totalShipments.toLocaleString()}</div>
+                <p className="text-xs text-muted-foreground">All time shipments</p>
+              </>
+            )}
           </CardContent>
         </Card>
 
-        <Card id="parcego-admin-stat-revenue" className="relative overflow-hidden">
+        {/* Monthly Revenue card hidden - not available in current API */}
+        {/* <Card id="parcego-admin-stat-revenue" className="relative overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-base font-bold">Monthly Revenue</CardTitle>
             <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center shadow-sm">
@@ -1393,7 +1130,7 @@ export default function SuperAdminDashboard() {
             <div className="text-2xl xl:text-3xl font-bold">${platformStats.monthlyRevenue.toLocaleString()}</div>
             <p className="text-xs text-muted-foreground">+15% from last month</p>
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* <Card id="parcego-admin-stat-health" className="relative overflow-hidden">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -1416,8 +1153,14 @@ export default function SuperAdminDashboard() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl xl:text-3xl font-bold">{platformStats.pendingApprovals}</div>
-            <p className="text-xs text-amber-600">Requires attention</p>
+            {statsLoading || merchantsLoading || couriersLoading ? (
+              <Skeleton className="h-9 w-24 mb-2" />
+            ) : (
+              <>
+                <div className="text-2xl xl:text-3xl font-bold">{platformStats.pendingApprovals}</div>
+                <p className="text-xs text-amber-600">{platformStats.pendingApprovals > 0 ? 'Requires attention' : 'All verified'}</p>
+              </>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -1450,7 +1193,7 @@ export default function SuperAdminDashboard() {
 
   const renderMerchants = () => {
     // Mobile Card Component
-    const MerchantCard = ({ merchant }: { merchant: typeof mockMerchants[0] }) => {
+    const MerchantCard = ({ merchant }: { merchant: typeof merchants[0] }) => {
       const [isExpanded, setIsExpanded] = useState(false);
 
       return (
@@ -1458,11 +1201,11 @@ export default function SuperAdminDashboard() {
           <CardContent className="py-0 px-4">
             <div className="flex items-start justify-between mb-1.5">
               <div className="flex-1 min-w-0">
-                <h3 className="font-bold text-base text-gray-900 truncate leading-tight">{merchant.businessName}</h3>
+                <h3 className="font-bold text-base text-gray-900 truncate leading-tight">{getMerchantProperty(merchant, 'businessName')}</h3>
                 <p className="text-sm text-gray-500">ID: {merchant.id}</p>
               </div>
               <div className="ml-3 flex items-center gap-2">
-                {getStatusBadge(merchant.status)}
+                {getStatusBadge(String(getMerchantProperty(merchant, 'status')))}
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1480,12 +1223,12 @@ export default function SuperAdminDashboard() {
             <div className="grid grid-cols-2 gap-2.5 mb-1.5">
               <div className="space-y-0.5">
                 <p className="text-xs font-medium text-gray-700 uppercase tracking-wider">Contact</p>
-                <p className="text-sm font-semibold text-gray-900 leading-tight">{merchant.contactName}</p>
+                <p className="text-sm font-semibold text-gray-900 leading-tight">{getMerchantProperty(merchant, 'contactName')}</p>
                 <p className="text-xs text-gray-600 truncate">{merchant.email}</p>
               </div>
               <div className="space-y-0.5">
                 <p className="text-xs font-medium text-gray-700 uppercase tracking-wider">Shipments</p>
-                <p className="text-base font-bold text-blue-600">{merchant.totalShipments.toLocaleString()}</p>
+                <p className="text-base font-bold text-blue-600">{getMerchantProperty(merchant, 'totalShipments').toLocaleString()}</p>
               </div>
             </div>
 
@@ -1494,11 +1237,11 @@ export default function SuperAdminDashboard() {
               <div className="border-t border-gray-200 pt-1.5 mt-1.5 space-y-1.5 animate-in slide-in-from-top-2 duration-200">
                 <div>
                   <p className="text-xs font-medium text-gray-700 uppercase tracking-wider">Monthly Revenue</p>
-                  <p className="text-lg font-bold text-green-600">${merchant.monthlyRevenue.toLocaleString()}</p>
+                  <p className="text-lg font-bold text-green-600">${getMerchantProperty(merchant, 'monthlyRevenue').toLocaleString()}</p>
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-700 uppercase tracking-wider">Join Date</p>
-                  <p className="text-sm font-medium text-gray-900">{new Date(merchant.joinDate).toLocaleDateString()}</p>
+                  <p className="text-sm font-medium text-gray-900">{new Date(merchant.created_at).toLocaleDateString()}</p>
                 </div>
 
                 {/* Action Buttons - Only visible when expanded */}
@@ -1510,7 +1253,7 @@ export default function SuperAdminDashboard() {
                         size="sm"
                         onClick={() => setSelectedMerchant(merchant)}
                         className="h-9 px-3 touch-manipulation text-sm font-medium"
-                        aria-label={`View details for ${merchant.businessName}`}
+                        aria-label={`View details for ${getMerchantProperty(merchant, 'businessName')}`}
                         id={`parcego-merchant-view-mobile-${merchant.id}`}
                       >
                         <Icon name="Eye" size={14} className="mr-1.5" />
@@ -1518,26 +1261,26 @@ export default function SuperAdminDashboard() {
                       </Button>
                     </div>
                     <div className="flex items-center gap-2">
-                      {merchant.status === "pending" && (
+                      {getMerchantProperty(merchant, 'status') === "pending" && (
                       <Button
                         variant="default"
                         size="sm"
                         className="bg-green-600 hover:bg-green-700 h-9 px-3 touch-manipulation text-sm font-medium"
                         onClick={() => handleMerchantAction(merchant, 'approve')}
-                        aria-label={`Approve ${merchant.businessName}`}
+                        aria-label={`Approve ${getMerchantProperty(merchant, 'businessName')}`}
                         id={`parcego-merchant-approve-mobile-${merchant.id}`}
                       >
                         <Icon name="UserCheck" size={14} className="mr-1.5" />
                         Approve
                       </Button>
                       )}
-                      {merchant.status === "active" && (
+                      {getMerchantProperty(merchant, 'status') === "active" && (
                         <Button
                           variant="destructive"
                           size="sm"
                           className="h-9 px-3 touch-manipulation text-sm font-medium"
                           onClick={() => handleMerchantAction(merchant, 'suspend')}
-                          aria-label={`Suspend ${merchant.businessName}`}
+                          aria-label={`Suspend ${getMerchantProperty(merchant, 'businessName')}`}
                           id={`parcego-merchant-suspend-mobile-${merchant.id}`}
                         >
                           <Icon name="Ban" size={14} className="mr-1.5" />
@@ -1561,7 +1304,7 @@ export default function SuperAdminDashboard() {
             <h2 className="text-xl font-bold">Manage Merchants</h2>
             {merchantSearchQuery && (
               <p className="text-sm text-gray-600 mt-1 transition-all duration-200 ease-out">
-                <span className="font-medium text-gray-900">{filteredMerchants.length}</span> of {mockMerchants.length} merchants
+                <span className="font-medium text-gray-900">{filteredMerchants.length}</span> of {merchants.length} merchants
                 <span className="ml-1 text-gray-500">for &ldquo;{merchantSearchQuery}&rdquo;</span>
               </p>
             )}
@@ -1697,19 +1440,19 @@ export default function SuperAdminDashboard() {
                         <tr key={merchant.id} className="border-b hover:bg-gray-50" id={`parcego-merchant-row-${merchant.id}`}>
                           <td className="p-3">
                             <div className="min-w-0">
-                              <p className="font-medium text-sm truncate">{merchant.businessName}</p>
-                              <p className="text-xs text-gray-500 truncate">{merchant.contactName}</p>
+                              <p className="font-medium text-sm truncate">{getMerchantProperty(merchant, 'businessName')}</p>
+                              <p className="text-xs text-gray-500 truncate">{getMerchantProperty(merchant, 'contactName')}</p>
                               <p className="text-xs text-gray-400 truncate">{merchant.email}</p>
                             </div>
                           </td>
                           <td className="p-3">
-                            {getStatusBadge(merchant.status)}
+                            {getStatusBadge(String(getMerchantProperty(merchant, 'status')))}
                           </td>
                           <td className="p-3">
-                            <span className="text-sm font-medium">{merchant.totalShipments.toLocaleString()}</span>
+                            <span className="text-sm font-medium">{getMerchantProperty(merchant, 'totalShipments').toLocaleString()}</span>
                           </td>
                           <td className="p-3">
-                            <span className="text-sm font-medium text-green-600">${merchant.monthlyRevenue.toLocaleString()}</span>
+                            <span className="text-sm font-medium text-green-600">${getMerchantProperty(merchant, 'monthlyRevenue').toLocaleString()}</span>
                           </td>
                           <td className="p-3">
                             <div className="flex items-center gap-1">
@@ -1719,7 +1462,7 @@ export default function SuperAdminDashboard() {
                                 id={`parcego-merchant-view-${merchant.id}`}
                                 onClick={() => setSelectedMerchant(merchant)}
                                 className="h-8 w-8 p-0 touch-manipulation"
-                                aria-label={`View details for ${merchant.businessName}`}
+                                aria-label={`View details for ${getMerchantProperty(merchant, 'businessName')}`}
                               >
                                 <Icon name="Eye" size={14} />
                               </Button>
@@ -1732,30 +1475,30 @@ export default function SuperAdminDashboard() {
                                   setIsEditingMerchant(true);
                                 }}
                                 className="h-8 w-8 p-0 touch-manipulation"
-                                aria-label={`Edit ${merchant.businessName}`}
+                                aria-label={`Edit ${getMerchantProperty(merchant, 'businessName')}`}
                               >
                                 <Icon name="Edit" size={14} />
                               </Button>
-                              {merchant.status === "pending" && (
+                              {getMerchantProperty(merchant, 'status') === "pending" && (
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   className="text-green-600 h-8 w-8 p-0 touch-manipulation"
                                   id={`parcego-merchant-approve-${merchant.id}`}
                                   onClick={() => handleMerchantAction(merchant, 'approve')}
-                                  aria-label={`Approve ${merchant.businessName}`}
+                                  aria-label={`Approve ${getMerchantProperty(merchant, 'businessName')}`}
                                 >
                                   <Icon name="UserCheck" size={14} />
                                 </Button>
                               )}
-                              {merchant.status === "active" && (
+                              {getMerchantProperty(merchant, 'status') === "active" && (
                                 <Button
                                   variant="outline"
                                   size="sm"
                                   className="text-red-600 h-8 w-8 p-0 touch-manipulation"
                                   id={`parcego-merchant-suspend-${merchant.id}`}
                                   onClick={() => handleMerchantAction(merchant, 'suspend')}
-                                  aria-label={`Suspend ${merchant.businessName}`}
+                                  aria-label={`Suspend ${getMerchantProperty(merchant, 'businessName')}`}
                                 >
                                   <Icon name="Ban" size={14} />
                                 </Button>
@@ -1812,22 +1555,22 @@ export default function SuperAdminDashboard() {
                         <tr key={merchant.id} className="border-b hover:bg-gray-50" id={`parcego-merchant-row-${merchant.id}`}>
                           <td className="p-4">
                             <div>
-                              <p className="font-medium">{merchant.businessName}</p>
+                              <p className="font-medium">{getMerchantProperty(merchant, 'businessName')}</p>
                               <p className="text-sm text-gray-500">ID: {merchant.id}</p>
                             </div>
                           </td>
                           <td className="p-4">
                             <div>
-                              <p className="font-medium">{merchant.contactName}</p>
+                              <p className="font-medium">{getMerchantProperty(merchant, 'contactName')}</p>
                               <p className="text-sm text-gray-500">{merchant.email}</p>
                             </div>
                           </td>
                           <td className="p-4">
-                            {getStatusBadge(merchant.status)}
+                            {getStatusBadge(String(getMerchantProperty(merchant, 'status')))}
                           </td>
-                          <td className="p-4">{merchant.totalShipments.toLocaleString()}</td>
+                          <td className="p-4">{getMerchantProperty(merchant, 'totalShipments').toLocaleString()}</td>
                           <td className="p-4">
-                            <span className="font-medium text-green-600">${merchant.monthlyRevenue.toLocaleString()}</span>
+                            <span className="font-medium text-green-600">${getMerchantProperty(merchant, 'monthlyRevenue').toLocaleString()}</span>
                           </td>
                           <td className="p-4">
                             <div className="flex items-center gap-2">
@@ -1837,7 +1580,7 @@ export default function SuperAdminDashboard() {
                                 id={`parcego-merchant-view-${merchant.id}`}
                                 onClick={() => setSelectedMerchant(merchant)}
                                 className="h-8 w-8 p-0"
-                                aria-label={`View details for ${merchant.businessName}`}
+                                aria-label={`View details for ${getMerchantProperty(merchant, 'businessName')}`}
                               >
                                 <Icon name="Eye" size={16} />
                               </Button>
@@ -1853,26 +1596,26 @@ export default function SuperAdminDashboard() {
                               >
                                 <Icon name="Edit" size={16} />
                               </Button>
-                              {merchant.status === "pending" && (
+                              {getMerchantProperty(merchant, 'status') === "pending" && (
                               <Button
                                 variant="outline"
                                 size="sm"
                                 className="text-green-600 h-8 w-8 p-0 touch-manipulation"
                                 id={`parcego-merchant-approve-${merchant.id}`}
                                 onClick={() => handleMerchantAction(merchant, 'approve')}
-                                aria-label={`Approve merchant ${merchant.businessName}`}
+                                aria-label={`Approve merchant ${getMerchantProperty(merchant, 'businessName')}`}
                               >
                                 <Icon name="UserCheck" size={16} />
                               </Button>
                               )}
-                              {merchant.status === "active" && (
+                              {getMerchantProperty(merchant, 'status') === "active" && (
                               <Button
                                 variant="outline"
                                 size="sm"
                                 className="text-red-600 h-8 w-8 p-0 touch-manipulation"
                                 id={`parcego-merchant-suspend-${merchant.id}`}
                                 onClick={() => handleMerchantAction(merchant, 'suspend')}
-                                aria-label={`Suspend merchant ${merchant.businessName}`}
+                                aria-label={`Suspend merchant ${getMerchantProperty(merchant, 'businessName')}`}
                               >
                                 <Icon name="Ban" size={16} />
                               </Button>
@@ -2781,7 +2524,7 @@ export default function SuperAdminDashboard() {
       const updatedMerchant = { ...selectedMerchant, ...editFormData };
 
       // Update in mock data
-      const updatedMerchants = mockMerchants.map(m =>
+      const updatedMerchants = merchants.map(m =>
         m.id === selectedMerchant.id ? updatedMerchant : m
       );
       setFilteredMerchants(prev =>
@@ -2811,11 +2554,11 @@ export default function SuperAdminDashboard() {
     if (!selectedMerchant) return;
 
     setEditFormData({
-      businessName: selectedMerchant.businessName,
-      contactName: selectedMerchant.contactName,
+      businessName: selectedMerchant.business_name,
+      contactName: `${selectedMerchant.first_name} ${selectedMerchant.last_name}`,
       email: selectedMerchant.email,
-      status: selectedMerchant.status as 'active' | 'pending' | 'suspended',
-      joinDate: selectedMerchant.joinDate
+      status: (selectedMerchant.is_active ? (selectedMerchant.is_verified ? 'active' : 'pending') : 'suspended') as 'active' | 'pending' | 'suspended',
+      joinDate: selectedMerchant.created_at
     });
     setMerchantFormErrors({});
     setIsEditingMerchant(false);
@@ -2824,7 +2567,7 @@ export default function SuperAdminDashboard() {
   // Shopify OAuth modal state
   const [shopifyOAuthModal, setShopifyOAuthModal] = useState<{
     open: boolean;
-    merchant: typeof mockMerchants[0] | null;
+    merchant: typeof merchants[0] | null;
     step: 'install' | 'credentials' | 'webhooks' | 'authorize' | 'complete';
   }>({
     open: false,
@@ -2848,7 +2591,7 @@ export default function SuperAdminDashboard() {
   const [isTestingWebhooks, setIsTestingWebhooks] = useState(false);
 
   // Shopify integration functions
-  const handleShopifyConnect = async (merchant: typeof mockMerchants[0]) => {
+  const handleShopifyConnect = async (merchant: typeof merchants[0]) => {
     // Reset form data and open OAuth modal
     setShopifyFormData({
       apiKey: 'a1b2c3d4e5f6789012345678901234ab',
@@ -2970,7 +2713,7 @@ export default function SuperAdminDashboard() {
 
       } else if (step === 'complete') {
         // Step 5: Complete setup and connect
-        const shopDomain = `${merchant.businessName.toLowerCase().replace(/[^a-z0-9]/g, '-')}.myshopify.com`;
+        const shopDomain = `${String(getMerchantProperty(merchant, 'businessName')).toLowerCase().replace(/[^a-z0-9]/g, '-')}.myshopify.com`;
         const updatedMerchant = {
           ...merchant,
           shopifyIntegration: {
@@ -2987,10 +2730,10 @@ export default function SuperAdminDashboard() {
               inventoryUpdate: { registered: true, lastTriggered: new Date(Date.now() - 7200000).toISOString() }
             }
           }
-        } as unknown as typeof mockMerchants[0];
+        } as unknown as typeof merchants[0];
 
         // Update merchant data
-        const updatedMerchants = mockMerchants.map(m =>
+        const updatedMerchants = merchants.map(m =>
           m.id === merchant.id ? updatedMerchant : m
         );
         setFilteredMerchants(prev =>
@@ -3015,7 +2758,7 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const handleShopifyDisconnect = async (merchant: typeof mockMerchants[0]) => {
+  const handleShopifyDisconnect = async (merchant: typeof merchants[0]) => {
     setIsDisconnectingShopify(true);
 
     try {
@@ -3032,10 +2775,10 @@ export default function SuperAdminDashboard() {
           productsSynced: 0,
           ordersSynced: 0
         }
-      } as unknown as typeof mockMerchants[0];
+      } as unknown as typeof merchants[0];
 
       // Update merchant data
-      const updatedMerchants = mockMerchants.map(m =>
+      const updatedMerchants = merchants.map(m =>
         m.id === merchant.id ? updatedMerchant : m
       );
       setFilteredMerchants(prev =>
@@ -3058,7 +2801,7 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const handleShopifySync = async (merchant: typeof mockMerchants[0]) => {
+  const handleShopifySync = async (merchant: typeof merchants[0]) => {
     setIsSyncingShopify(true);
 
     try {
@@ -3093,10 +2836,10 @@ export default function SuperAdminDashboard() {
               }
             }
           }
-        } as unknown as typeof mockMerchants[0];
+        } as unknown as typeof merchants[0];
 
       // Update merchant data
-      const updatedMerchants = mockMerchants.map(m =>
+      const updatedMerchants = merchants.map(m =>
         m.id === merchant.id ? updatedMerchant : m
       );
       setFilteredMerchants(prev =>
@@ -3119,15 +2862,49 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  // Fetch merchant statistics when selected
+  useEffect(() => {
+    const fetchMerchantStats = async () => {
+      if (!selectedMerchant) {
+        setMerchantStats(null);
+        return;
+      }
+      
+      try {
+        const response = await adminService.getUserStatistics(selectedMerchant.id);
+        const stats = response.data;
+        
+        setMerchantStats({
+          totalShipments: stats.delivered_shipments + stats.in_transit_shipments + 
+                         stats.in_warehouse_shipments + stats.undelivered_shipments + 
+                         stats.unfulfilled_shipments,
+          delivered: stats.delivered_shipments,
+          inTransit: stats.in_transit_shipments,
+          inWarehouse: stats.in_warehouse_shipments
+        });
+      } catch (error) {
+        console.error('Failed to fetch merchant statistics:', error);
+        setMerchantStats({
+          totalShipments: 0,
+          delivered: 0,
+          inTransit: 0,
+          inWarehouse: 0
+        });
+      }
+    };
+
+    fetchMerchantStats();
+  }, [selectedMerchant]);
+
   // Initialize form data when merchant is selected
   useEffect(() => {
     if (selectedMerchant && !isEditingMerchant) {
       setEditFormData({
-        businessName: selectedMerchant.businessName,
-        contactName: selectedMerchant.contactName,
+        businessName: selectedMerchant.business_name,
+        contactName: `${selectedMerchant.first_name} ${selectedMerchant.last_name}`,
         email: selectedMerchant.email,
-        status: selectedMerchant.status as 'active' | 'pending' | 'suspended',
-        joinDate: selectedMerchant.joinDate
+        status: (selectedMerchant.is_active ? (selectedMerchant.is_verified ? 'active' : 'pending') : 'suspended') as 'active' | 'pending' | 'suspended',
+        joinDate: selectedMerchant.created_at
       });
     }
   }, [selectedMerchant, isEditingMerchant]);
@@ -3139,13 +2916,13 @@ export default function SuperAdminDashboard() {
     const stats = [
       {
         label: "Total Shipments",
-        value: selectedMerchant.totalShipments.toLocaleString(),
+        value: merchantStats ? merchantStats.totalShipments.toLocaleString() : '0',
         icon: "Package",
         color: "text-blue-600 bg-blue-100"
       },
       {
         label: "Member Since",
-        value: new Date(selectedMerchant.joinDate).toLocaleDateString('en-US', {
+        value: new Date(selectedMerchant.created_at).toLocaleDateString('en-US', {
           year: 'numeric',
           month: 'long',
           day: 'numeric'
@@ -3178,12 +2955,12 @@ export default function SuperAdminDashboard() {
               <div className="flex items-center gap-2">
                 <span className="truncate">Merchant Details</span>
                 <div className="flex-shrink-0">
-                  {getStatusBadge(selectedMerchant.status)}
+                  {getStatusBadge(String(getMerchantProperty(selectedMerchant, 'status')))}
                 </div>
               </div>
             </DialogTitle>
             <DialogDescription className="text-sm sm:text-base">
-              {isEditingMerchant ? 'Edit merchant information below' : `Detailed information about ${selectedMerchant.businessName}`}
+              {isEditingMerchant ? 'Edit merchant information below' : `Detailed information about ${getMerchantProperty(selectedMerchant, 'businessName')}`}
             </DialogDescription>
           </DialogHeader>
 
@@ -3211,7 +2988,7 @@ export default function SuperAdminDashboard() {
                       aria-describedby={isEditingMerchant && merchantFormErrors.businessName ? `business-name-error-${selectedMerchant.id}` : undefined}
                     />
                   ) : (
-                    <p className="font-medium py-2">{selectedMerchant.businessName}</p>
+                    <p className="font-medium py-2">{getMerchantProperty(selectedMerchant, 'businessName')}</p>
                   )}
                   {isEditingMerchant && merchantFormErrors.businessName && (
                     <p id={`business-name-error-${selectedMerchant.id}`} className="text-sm text-red-600" role="alert">
@@ -3250,7 +3027,7 @@ export default function SuperAdminDashboard() {
                       </SelectContent>
                     </Select>
                   ) : (
-                    <div className="py-2">{getStatusBadge(selectedMerchant.status)}</div>
+                    <div className="py-2">{getStatusBadge(String(getMerchantProperty(selectedMerchant, 'status')))}</div>
                   )}
                   {isEditingMerchant && merchantFormErrors.status && (
                     <p className="text-sm text-red-600" role="alert">
@@ -3276,7 +3053,7 @@ export default function SuperAdminDashboard() {
                     />
                   ) : (
                     <p className="font-medium py-2">
-                      {new Date(selectedMerchant.joinDate).toLocaleDateString('en-US', {
+                      {new Date(selectedMerchant.created_at).toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric'
@@ -3315,7 +3092,7 @@ export default function SuperAdminDashboard() {
                       aria-describedby={isEditingMerchant && merchantFormErrors.contactName ? `contact-name-error-${selectedMerchant.id}` : undefined}
                     />
                   ) : (
-                    <p className="font-medium py-2">{selectedMerchant.contactName}</p>
+                    <p className="font-medium py-2">{getMerchantProperty(selectedMerchant, 'contactName')}</p>
                   )}
                   {isEditingMerchant && merchantFormErrors.contactName && (
                     <p id={`contact-name-error-${selectedMerchant.id}`} className="text-sm text-red-600" role="alert">
@@ -4173,10 +3950,10 @@ export default function SuperAdminDashboard() {
                   {(() => {
                     const rating = Number(getCourierProperty(selectedCourier, 'rating'));
                     return rating > 0 ? (
-                      <Badge className="bg-yellow-50 text-yellow-700 border-yellow-200 font-normal">
-                        <Icon name="Star" size={12} className="mr-1" />
+                    <Badge className="bg-yellow-50 text-yellow-700 border-yellow-200 font-normal">
+                      <Icon name="Star" size={12} className="mr-1" />
                         {rating.toFixed(1)}
-                      </Badge>
+                    </Badge>
                     ) : null;
                   })()}
                 </div>
@@ -4353,25 +4130,25 @@ export default function SuperAdminDashboard() {
                 {(() => {
                   const tags = getCourierProperty(selectedCourier, 'tags');
                   return Array.isArray(tags) && tags.length > 0 ? (
-                    <div className="flex flex-wrap gap-2">
+                  <div className="flex flex-wrap gap-2">
                       {tags.map((tag: string, index: number) => (
-                        <Badge
-                          key={index}
-                          variant="outline"
-                          className="bg-white font-normal"
-                        >
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
+                      <Badge
+                        key={index}
+                        variant="outline"
+                        className="bg-white font-normal"
+                      >
+                        {tag}
+                      </Badge>
+                    ))}
+                  </div>
                   ) : null;
                 })()}
                 {(() => {
                   const notes = getCourierProperty(selectedCourier, 'notes');
                   return notes ? (
-                    <div className="text-sm text-gray-600 bg-white p-3 rounded border">
+                  <div className="text-sm text-gray-600 bg-white p-3 rounded border">
                       {notes}
-                    </div>
+                  </div>
                   ) : null;
                 })()}
               </div>
@@ -4461,7 +4238,7 @@ export default function SuperAdminDashboard() {
                   {actionTitle}
                 </DialogTitle>
                 <DialogDescription className="text-gray-600 mt-1">
-                  Confirm action for {selectedMerchantForAction.businessName}
+                  Confirm action for {getMerchantProperty(selectedMerchantForAction, 'businessName')}
                 </DialogDescription>
               </div>
             </div>
@@ -4492,11 +4269,11 @@ export default function SuperAdminDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                 <div>
                   <span className="text-gray-500">Business:</span>
-                  <p className="font-medium">{selectedMerchantForAction.businessName}</p>
+                  <p className="font-medium">{getMerchantProperty(selectedMerchantForAction, 'businessName')}</p>
                 </div>
                 <div>
                   <span className="text-gray-500">Contact:</span>
-                  <p className="font-medium">{selectedMerchantForAction.contactName}</p>
+                  <p className="font-medium">{getMerchantProperty(selectedMerchantForAction, 'contactName')}</p>
                 </div>
                 <div>
                   <span className="text-gray-500">ID:</span>
@@ -4504,7 +4281,7 @@ export default function SuperAdminDashboard() {
                 </div>
                 <div>
                   <span className="text-gray-500">Current Status:</span>
-                  {getStatusBadge(selectedMerchantForAction.status)}
+                  {getStatusBadge(String(getMerchantProperty(selectedMerchantForAction, 'status')))}
                 </div>
               </div>
             </div>
@@ -4913,9 +4690,9 @@ export default function SuperAdminDashboard() {
               <div className="space-y-4">
                 <div className="bg-emerald-50 rounded-lg p-4">
                   <h4 className="text-sm font-medium text-emerald-900 mb-2">Connection established for:</h4>
-                  <p className="text-sm text-emerald-800">{merchant.businessName}</p>
+                  <p className="text-sm text-emerald-800">{getMerchantProperty(merchant, 'businessName')}</p>
                   <p className="text-xs text-emerald-700 mt-1">
-                    Store: {merchant.businessName.toLowerCase().replace(/[^a-z0-9]/g, '-')}.myshopify.com
+                    Store: {String(getMerchantProperty(merchant, 'businessName')).toLowerCase().replace(/[^a-z0-9]/g, '-')}.myshopify.com
                   </p>
                 </div>
 
