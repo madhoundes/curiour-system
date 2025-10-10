@@ -2,11 +2,11 @@
 
 Fast, reliable, and affordable delivery solutions for small businesses.
 
-## 🚀 Current Version: v3.1.0
+## 🚀 Current Version: v3.2.0
 
-**Status**: Production Ready - Courier Tracking System Implemented & Deployed
+**Status**: Production Ready - Google Maps Integration Complete
 
-**Latest Update**: January 15, 2025 - Courier tracking system fully implemented with real-time package tracking, proof of delivery, and enhanced user experience. All ESLint errors resolved, TypeScript types properly defined, and ready for Vercel deployment.
+**Latest Update**: January 15, 2025 - Enhanced Google Maps integration for drop-off locations with interactive maps, automatic geocoding, and location markers. Courier tracking system fully implemented with real-time package tracking, proof of delivery, and enhanced user experience.
 
 ## 🏗️ Technology Stack
 
@@ -79,7 +79,11 @@ Fast, reliable, and affordable delivery solutions for small businesses.
 - Accessibility features (ARIA, keyboard navigation)
 - **Code Quality**: All ESLint errors resolved, ready for deployment
 
-### 🆕 Latest Features (v3.1.0)
+### 🆕 Latest Features (v3.2.0)
+- **Google Maps Integration**: Interactive maps with automatic geocoding
+- **Location Markers**: Custom markers with info windows for drop-off locations
+- **Fallback Mode**: Embedded maps work without API key for basic functionality
+- **Reusable Map Component**: `GoogleMap` component available throughout the app
 - **Package Tracking System**: Complete real-time tracking implementation
 - **Interactive Timeline**: Visual tracking history with status updates
 - **Proof of Delivery**: Image gallery with delivery confirmations

@@ -17,6 +17,7 @@ import { PackageDetailsModal } from "./package-details-modal";
 import { UndeliverableService } from "@/lib/api/undeliverable";
 import { transformUndeliverablePackages, transformUndeliverableStats } from "@/lib/api/undeliverable-adapter";
 import { apiClient } from "@/lib/api/client";
+import { generateMockShipments } from "@/lib/mock/shipments";
 
 export default function UndeliverablePage() {
   // const router = useRouter();
@@ -49,8 +50,58 @@ export default function UndeliverablePage() {
       } catch (err) {
         console.error('Failed to fetch undeliverable packages:', err);
         setError('Failed to load undeliverable packages');
-        // Fallback to mock data on error
-        setPackages(mockUndeliverablePackages);
+        
+        // Fallback: Use actual shipments and filter for FAILED status only
+        const allShipments = generateMockShipments(120);
+        const failedShipments = allShipments.filter(s => s.status === 'FAILED');
+        
+        // Convert failed shipments to UndeliverablePackage format
+        const undeliverablePackages: UndeliverablePackage[] = failedShipments.map(shipment => ({
+          id: shipment.id,
+          trackingNumber: shipment.trackingNumber,
+          sender: {
+            name: "Merchant", // Mock sender info
+            address: "123 Business Ave, Toronto, ON",
+            contact: {
+              phone: "+1 (416) 555-0000",
+              email: "merchant@parcego.com"
+            }
+          },
+          recipient: {
+            name: shipment.recipient.name,
+            address: `${shipment.recipient.address1}, ${shipment.recipient.city}, ${shipment.recipient.province} ${shipment.recipient.postalCode}`,
+            contact: {
+              phone: shipment.recipient.phone || "+1 (000) 000-0000",
+              email: shipment.recipient.email || "customer@email.com"
+            }
+          },
+          packageDetails: {
+            type: "Package",
+            weight: shipment.weightKg,
+            weightUnit: "kg",
+            dimensions: {
+              length: 30,
+              width: 20,
+              height: 15,
+              unit: "cm"
+            },
+            fragile: shipment.tags?.includes('fragile') || false,
+            valuable: false,
+            insurance: false
+          },
+          issueType: "Delivery Failed",
+          issueDescription: "Package delivery attempt failed. Requires investigation and resolution.",
+          priority: "high",
+          status: "pending",
+          notes: shipment.notes || "Delivery failed - needs attention",
+          reportedBy: `Courier - ${shipment.courier}`,
+          reportedAt: shipment.updatedAt,
+          createdAt: shipment.createdAt,
+          updatedAt: shipment.updatedAt,
+          customerContactAttempts: 0
+        }));
+        
+        setPackages(undeliverablePackages);
       } finally {
         setIsLoading(false);
       }
@@ -420,9 +471,9 @@ function PackageList({
   if (packages.length === 0) {
     return (
       <div className="text-center py-12" id="parcego-undeliverable-empty-state">
-        <Icon name="PackageX" size={48} className="mx-auto text-gray-400 mb-4" />
-        <h3 className="text-lg font-medium text-gray-900 mb-2">No packages found</h3>
-        <p className="text-gray-500">Try adjusting your search or filter criteria</p>
+        <Icon name="CheckCircle" size={48} className="mx-auto text-green-400 mb-4" />
+        <h3 className="text-lg font-medium text-gray-900 mb-2">No undeliverable packages</h3>
+        <p className="text-gray-500">All shipments are being delivered successfully</p>
       </div>
     );
   }

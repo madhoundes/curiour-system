@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
+import { GoogleMap } from "@/components/ui/google-map";
 
 // Main business location data
 const mainDropoffLocation = {
@@ -198,18 +199,32 @@ export default function FindDropoffPage() {
                   Interactive map showing our main drop-off location
                 </CardDescription>
               </CardHeader>
-              <CardContent>
-                <div className="bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg h-96 flex items-center justify-center">
-                  <div className="text-center text-gray-500">
-                    <Icon name="Map" size={48} className="mx-auto mb-4" />
-                    <p className="text-sm font-medium mb-2">Google Maps Integration</p>
-                    <p className="text-xs text-gray-400 mb-4">
-                      Interactive map showing exact location
-                    </p>
-                    <div className="text-xs text-gray-600 space-y-1">
-                      <p><strong>Address:</strong> {mainDropoffLocation.address}</p>
-                      <p><strong>City:</strong> {mainDropoffLocation.city}, {mainDropoffLocation.province}</p>
-                      <p><strong>Postal Code:</strong> {mainDropoffLocation.postalCode}</p>
+              <CardContent className="p-0">
+                <div className="h-96 w-full rounded-lg overflow-hidden">
+                  <GoogleMap
+                    address={mainDropoffLocation.address}
+                    city={mainDropoffLocation.city}
+                    province={mainDropoffLocation.province}
+                    postalCode={mainDropoffLocation.postalCode}
+                    name={mainDropoffLocation.name}
+                    className="h-full w-full"
+                    zoom={16}
+                  />
+                </div>
+                
+                {/* Quick Info Below Map */}
+                <div className="p-6 border-t border-gray-200 bg-gray-50">
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Distance from you:</span>
+                      <span className="font-medium text-gray-900">{mainDropoffLocation.distance}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-600">Status:</span>
+                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                        <span className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5"></span>
+                        Open Now
+                      </span>
                     </div>
                   </div>
                 </div>
