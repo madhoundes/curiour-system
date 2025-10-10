@@ -148,6 +148,19 @@ export default function SuperAdminDashboard() {
     paidShipments: number;
   } | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
+  
+  // Assignments state
+  const [assignments, setAssignments] = useState<any[]>([]);
+  const [assignmentStats, setAssignmentStats] = useState<any>(null);
+  const [assignmentsLoading, setAssignmentsLoading] = useState(false);
+  const [selectedAssignmentDate, setSelectedAssignmentDate] = useState<Date>(new Date());
+  const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
+  const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
+  const [isManualAssignmentOpen, setIsManualAssignmentOpen] = useState(false);
+  
+  // Warehouse state
+  const [isMovingToWarehouse, setIsMovingToWarehouse] = useState(false);
+  const [isRunningAutomation, setIsRunningAutomation] = useState(false);
 
   // Modal state for merchant approval/suspension
   const [actionModalOpen, setActionModalOpen] = useState(false);
@@ -181,6 +194,10 @@ export default function SuperAdminDashboard() {
   
   // Toast management
   const { toasts, showSuccessToast, showErrorToast, dismissToast } = useToast();
+  
+  // Admin user information from localStorage
+  const [adminName, setAdminName] = useState<string>("Admin User");
+  const [adminEmail, setAdminEmail] = useState<string>("admin@parcego.com");
 
   // Mock data for merchants
   // Helper function to get merchant properties
@@ -264,6 +281,33 @@ export default function SuperAdminDashboard() {
 
     loadAdminStats();
   }, [isAuthenticated]);
+  
+  // Load assignments when date changes
+  useEffect(() => {
+    const loadAssignments = async () => {
+      if (!isAuthenticated) return;
+      
+      try {
+        setAssignmentsLoading(true);
+        const dateStr = format(selectedAssignmentDate, 'yyyy-MM-dd');
+        
+        // Fetch assignments for the selected date
+        const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
+        setAssignments(assignmentsResponse.data.assignments || []);
+        
+        // Fetch statistics for the selected date
+        const statsResponse = await adminService.getAssignmentStatistics(dateStr);
+        setAssignmentStats(statsResponse.data);
+      } catch (error) {
+        console.error('Failed to load assignments:', error);
+        showErrorToast("Unable to fetch assignment data. Please try again.");
+      } finally {
+        setAssignmentsLoading(false);
+      }
+    };
+
+    loadAssignments();
+  }, [isAuthenticated, selectedAssignmentDate]);
 
   // Real courier data from API
   const [couriers, setCouriers] = useState<User[]>([]);
@@ -688,6 +732,81 @@ export default function SuperAdminDashboard() {
       );
     }
   };
+  
+  // Warehouse operations
+  const handleMoveToWarehouse = async () => {
+    try {
+      setIsMovingToWarehouse(true);
+      await adminService.moveShipmentsToWarehouse();
+      
+      showSuccessToast("Paid shipments successfully moved to warehouse!");
+      
+      // Reload admin stats to reflect changes
+      const response = await adminService.getAdminStatistics();
+      setAdminStats({
+        totalShipments: response.data.total_shipments,
+        deliveredShipments: response.data.delivered_shipments,
+        inTransitShipments: response.data.in_transit_shipments,
+        inWarehouseShipments: response.data.in_warehouse_shipments,
+        cancelledShipments: response.data.cancelled_shipments,
+        undeliveredShipments: response.data.undelivered_shipments,
+        draftShipments: response.data.draft_shipments,
+        paidShipments: response.data.paid_shipments
+      });
+    } catch (error) {
+      console.error('Failed to move shipments to warehouse:', error);
+      showErrorToast("Failed to move shipments to warehouse. Please try again.");
+    } finally {
+      setIsMovingToWarehouse(false);
+    }
+  };
+  
+  // Run automated assignment
+  const handleRunAutomation = async () => {
+    try {
+      setIsRunningAutomation(true);
+      const dateStr = format(selectedAssignmentDate, 'yyyy-MM-dd');
+      await adminService.runAutomatedAssignment({ assignment_date: dateStr });
+      
+      showSuccessToast("Automated assignment completed successfully!");
+      
+      // Reload assignments to show updated data
+      const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
+      setAssignments(assignmentsResponse.data.assignments || []);
+      
+      const statsResponse = await adminService.getAssignmentStatistics(dateStr);
+      setAssignmentStats(statsResponse.data);
+    } catch (error) {
+      console.error('Failed to run automated assignment:', error);
+      showErrorToast("Failed to run automated assignment. Please try again.");
+    } finally {
+      setIsRunningAutomation(false);
+    }
+  };
+  
+  // Reassign assignment
+  const handleReassignAssignment = async (newDriverId: number, notes?: string) => {
+    if (!selectedAssignment) return;
+    
+    try {
+      await adminService.reassignAssignment(selectedAssignment.id, {
+        new_driver_id: newDriverId,
+        notes: notes || ''
+      });
+      
+      showSuccessToast("Assignment successfully reassigned!");
+      setIsReassignModalOpen(false);
+      setSelectedAssignment(null);
+      
+      // Reload assignments
+      const dateStr = format(selectedAssignmentDate, 'yyyy-MM-dd');
+      const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
+      setAssignments(assignmentsResponse.data.assignments || []);
+    } catch (error) {
+      console.error('Failed to reassign assignment:', error);
+      showErrorToast("Failed to reassign assignment. Please try again.");
+    }
+  };
 
   // Authentication check
   useEffect(() => {
@@ -698,6 +817,13 @@ export default function SuperAdminDashboard() {
         
         if (adminAuth === "true" || adminCookie) {
           setIsAuthenticated(true);
+          
+          // Load admin user information from localStorage
+          const name = localStorage.getItem("admin_name");
+          const email = localStorage.getItem("admin_email");
+          
+          if (name) setAdminName(name);
+          if (email) setAdminEmail(email);
         } else {
           console.log("Admin not authenticated, redirecting to login...");
           router.push("/admin-login");
@@ -790,37 +916,6 @@ export default function SuperAdminDashboard() {
     };
   }, [merchants, couriers, adminStats]);
 
-  // Mock data for recent activity
-  const recentActivity = [
-    {
-      id: "A001",
-      type: "merchant_joined",
-      message: "New merchant 'Green Garden Supply' registered",
-      timestamp: "2 hours ago",
-      status: "pending"
-    },
-    {
-      id: "A002", 
-      type: "courier_verified",
-      message: "Courier David Rodriguez completed verification",
-      timestamp: "4 hours ago",
-      status: "completed"
-    },
-    {
-      id: "A003",
-      type: "system_alert",
-      message: "Server maintenance scheduled for tonight",
-      timestamp: "1 day ago",
-      status: "alert"
-    },
-    {
-      id: "A004",
-      type: "payment_processed",
-      message: "Monthly payout of $45,890 processed to couriers",
-      timestamp: "2 days ago", 
-      status: "completed"
-    }
-  ];
 
   // Mock data generators for analytics
   const generateRevenueData = (days: number) => {
@@ -1006,7 +1101,6 @@ export default function SuperAdminDashboard() {
       title: "",
       items: [
         { id: "overview", label: "Overview", icon: "BarChart3", description: "Platform statistics" },
-        { id: "analytics", label: "Analytics", icon: "TrendingUp", description: "Detailed analytics" },
       ]
     },
     {
@@ -1015,6 +1109,14 @@ export default function SuperAdminDashboard() {
       items: [
         { id: "merchants", label: "Merchants", icon: "Users", description: "Manage merchant accounts" },
         { id: "couriers", label: "Drivers", icon: "Truck", description: "Manage driver accounts" },
+      ]
+      },
+      {
+        id: "operations",
+        title: "Operations",
+        items: [
+          { id: "assignments", label: "Assignments", icon: "ClipboardList", description: "Manage driver assignments" },
+          { id: "warehouse", label: "Warehouse", icon: "Warehouse", description: "Warehouse operations" },
       ]
     },
     {
@@ -1073,7 +1175,7 @@ export default function SuperAdminDashboard() {
               <Skeleton className="h-9 w-24 mb-2" />
             ) : (
               <>
-                <div className="text-2xl xl:text-3xl font-bold">{platformStats.totalMerchants.toLocaleString()}</div>
+            <div className="text-2xl xl:text-3xl font-bold">{platformStats.totalMerchants.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">All registered merchants</p>
               </>
             )}
@@ -1092,7 +1194,7 @@ export default function SuperAdminDashboard() {
               <Skeleton className="h-9 w-24 mb-2" />
             ) : (
               <>
-                <div className="text-2xl xl:text-3xl font-bold">{platformStats.activeCouriers.toLocaleString()}</div>
+            <div className="text-2xl xl:text-3xl font-bold">{platformStats.activeCouriers.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">Currently active drivers</p>
               </>
             )}
@@ -1111,7 +1213,7 @@ export default function SuperAdminDashboard() {
               <Skeleton className="h-9 w-24 mb-2" />
             ) : (
               <>
-                <div className="text-2xl xl:text-3xl font-bold">{platformStats.totalShipments.toLocaleString()}</div>
+            <div className="text-2xl xl:text-3xl font-bold">{platformStats.totalShipments.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">All time shipments</p>
               </>
             )}
@@ -1157,7 +1259,7 @@ export default function SuperAdminDashboard() {
               <Skeleton className="h-9 w-24 mb-2" />
             ) : (
               <>
-                <div className="text-2xl xl:text-3xl font-bold">{platformStats.pendingApprovals}</div>
+            <div className="text-2xl xl:text-3xl font-bold">{platformStats.pendingApprovals}</div>
                 <p className="text-xs text-amber-600">{platformStats.pendingApprovals > 0 ? 'Requires attention' : 'All verified'}</p>
               </>
             )}
@@ -1165,29 +1267,6 @@ export default function SuperAdminDashboard() {
         </Card>
       </div>
 
-      {/* Recent Activity */}
-      <Card id="parcego-admin-activity-card">
-        <CardHeader>
-          <CardTitle>Recent Platform Activity</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            {recentActivity.map((activity) => (
-              <div key={activity.id} className="flex items-center space-x-4 p-3 rounded-lg bg-gray-50" id={`parcego-activity-item-${activity.id}`}>
-                <div className="flex-shrink-0">
-                  {activity.status === "completed" && <Icon name="CheckCircle" size={20} className="text-green-500" />}
-                  {activity.status === "pending" && <Icon name="Clock" size={20} className="text-yellow-500" />}
-                  {activity.status === "alert" && <Icon name="AlertCircle" size={20} className="text-red-500" />}
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{activity.message}</p>
-                  <p className="text-xs text-gray-500">{activity.timestamp}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 
@@ -2018,6 +2097,298 @@ export default function SuperAdminDashboard() {
     );
   };
 
+  const renderAssignments = () => {
+    return (
+      <div className="space-y-4 xl:space-y-6" id="parcego-admin-assignments-section">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-xl font-bold">Driver Assignments</h2>
+            <p className="text-sm text-gray-600 mt-1">Manage and optimize driver assignments</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="touch-manipulation">
+                  <Icon name="Calendar" size={16} className="mr-2" />
+                  {format(selectedAssignmentDate, 'MMM dd, yyyy')}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="end">
+                <Calendar
+                  mode="single"
+                  selected={selectedAssignmentDate}
+                  onSelect={(date) => date && setSelectedAssignmentDate(date)}
+                />
+              </PopoverContent>
+            </Popover>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRunAutomation}
+              disabled={isRunningAutomation}
+              className="touch-manipulation"
+            >
+              {isRunningAutomation ? (
+                <>
+                  <Icon name="Loader" size={16} className="mr-2 animate-spin" />
+                  Running...
+                </>
+              ) : (
+                <>
+                  <Icon name="Zap" size={16} className="mr-2" />
+                  Run Automation
+                </>
+              )}
+            </Button>
+            <Button
+              size="sm"
+              onClick={() => setIsManualAssignmentOpen(true)}
+              className="touch-manipulation"
+            >
+              <Icon name="Plus" size={16} className="mr-2" />
+              Manual Assignment
+            </Button>
+          </div>
+        </div>
+
+        {/* Statistics Cards */}
+        {assignmentStats && (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Total Assignments</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{assignmentStats.total_assignments || 0}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Assigned</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">{assignmentStats.assigned || 0}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">In Progress</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-orange-600">{assignmentStats.in_progress || 0}</div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-gray-600">Completed</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">{assignmentStats.completed || 0}</div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Assignments List */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Assignments for {format(selectedAssignmentDate, 'MMMM dd, yyyy')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {assignmentsLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+                <Skeleton className="h-16 w-full" />
+              </div>
+            ) : assignments.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <Icon name="ClipboardList" size={48} className="mx-auto mb-4 opacity-50" />
+                <p>No assignments found for this date</p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsManualAssignmentOpen(true)}
+                  className="mt-4"
+                >
+                  Create Manual Assignment
+                </Button>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className="border-b bg-gray-50">
+                    <tr>
+                      <th className="text-left p-4 font-semibold">Driver</th>
+                      <th className="text-left p-4 font-semibold">Shipment</th>
+                      <th className="text-left p-4 font-semibold">Status</th>
+                      <th className="text-left p-4 font-semibold">Priority</th>
+                      <th className="text-right p-4 font-semibold">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {assignments.map((assignment: any) => (
+                      <tr key={assignment.id} className="border-b hover:bg-gray-50">
+                        <td className="p-4">
+                          <div className="font-medium">{assignment.driver_name || 'Unassigned'}</div>
+                          <div className="text-sm text-gray-500">{assignment.driver_email}</div>
+                        </td>
+                        <td className="p-4">
+                          <div className="font-medium">{assignment.shipment_tracking_number}</div>
+                          <div className="text-sm text-gray-500">{assignment.destination}</div>
+                        </td>
+                        <td className="p-4">
+                          <Badge variant={
+                            assignment.status === 'completed' ? 'default' :
+                            assignment.status === 'in_progress' ? 'secondary' :
+                            'outline'
+                          }>
+                            {assignment.status}
+                          </Badge>
+                        </td>
+                        <td className="p-4">
+                          <Badge variant={assignment.priority === 'high' ? 'destructive' : 'outline'}>
+                            {assignment.priority || 'normal'}
+                          </Badge>
+                        </td>
+                        <td className="p-4 text-right">
+                          {assignment.status !== 'completed' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedAssignment(assignment);
+                                setIsReassignModalOpen(true);
+                              }}
+                            >
+                              Reassign
+                            </Button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
+  const renderWarehouse = () => {
+    return (
+      <div className="space-y-4 xl:space-y-6" id="parcego-admin-warehouse-section">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-xl font-bold">Warehouse Operations</h2>
+            <p className="text-sm text-gray-600 mt-1">Manage shipment warehouse operations</p>
+          </div>
+        </div>
+
+        {/* Warehouse Stats */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">In Warehouse</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-blue-600">
+                {adminStats?.inWarehouseShipments || 0}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Shipments in warehouse</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">Paid Shipments</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {adminStats?.paidShipments || 0}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Ready to move to warehouse</p>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-gray-600">Draft Shipments</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-orange-600">
+                {adminStats?.draftShipments || 0}
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Awaiting payment</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Warehouse Actions */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Warehouse Actions</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Alert>
+              <Icon name="Info" size={16} className="mr-2" />
+              <AlertDescription>
+                This action will move all paid shipments to the warehouse, making them available for driver assignment.
+              </AlertDescription>
+            </Alert>
+            
+            <Button
+              size="lg"
+              onClick={handleMoveToWarehouse}
+              disabled={isMovingToWarehouse || (adminStats?.paidShipments || 0) === 0}
+              className="w-full sm:w-auto"
+            >
+              {isMovingToWarehouse ? (
+                <>
+                  <Icon name="Loader" size={20} className="mr-2 animate-spin" />
+                  Moving to Warehouse...
+                </>
+              ) : (
+                <>
+                  <Icon name="Warehouse" size={20} className="mr-2" />
+                  Move {adminStats?.paidShipments || 0} Paid Shipments to Warehouse
+                </>
+              )}
+            </Button>
+
+            <div className="mt-6 pt-6 border-t">
+              <h3 className="font-semibold mb-4">Warehouse Statistics</h3>
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Total Shipments:</span>
+                  <span className="font-semibold">{adminStats?.totalShipments || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Delivered:</span>
+                  <span className="font-semibold text-green-600">{adminStats?.deliveredShipments || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">In Transit:</span>
+                  <span className="font-semibold text-blue-600">{adminStats?.inTransitShipments || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Undelivered:</span>
+                  <span className="font-semibold text-red-600">{adminStats?.undeliveredShipments || 0}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-gray-600">Cancelled:</span>
+                  <span className="font-semibold text-gray-600">{adminStats?.cancelledShipments || 0}</span>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  };
+
   const renderAnalytics = () => {
     if (isLoading) {
       return (
@@ -2390,69 +2761,9 @@ export default function SuperAdminDashboard() {
 
   const renderSettings = () => (
     <div className="space-y-4 xl:space-y-6" id="parcego-admin-settings-section">
-                  <h2 className="text-xl font-bold">Platform Settings</h2>
+      <h2 className="text-xl font-bold">Platform Settings</h2>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 xl:gap-6">
-        <Card id="parcego-settings-general">
-          <CardHeader>
-            <CardTitle>General Settings</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span>Platform Maintenance Mode</span>
-              <Button variant="outline" size="sm" onClick={() => console.log('Configure maintenance mode')} className="h-9 px-3">Configure</Button>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>API Rate Limiting</span>
-              <Button variant="outline" size="sm" onClick={() => console.log('Manage API rate limiting')} className="h-9 px-3">Manage</Button>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Email Notifications</span>
-              <Button variant="outline" size="sm" onClick={() => console.log('Email notification settings')} className="h-9 px-3">Settings</Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card id="parcego-settings-security">
-          <CardHeader>
-            <CardTitle>Security Settings</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span>Two-Factor Authentication</span>
-              <Badge className="bg-green-100 text-green-800">Enabled</Badge>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>API Security</span>
-              <Button variant="outline" size="sm" onClick={() => console.log('Configure API security')} className="h-9 px-3">Configure</Button>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Access Logs</span>
-              <Button variant="outline" size="sm" onClick={() => console.log('View access logs')} className="h-9 px-3">View</Button>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card id="parcego-settings-billing">
-          <CardHeader>
-            <CardTitle>Billing & Payments</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span>Payment Gateway</span>
-              <Button variant="outline" size="sm" onClick={() => console.log('Stripe settings')} className="h-9 px-3">Stripe Settings</Button>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Commission Rates</span>
-              <Button variant="outline" size="sm" onClick={() => console.log('Configure commission rates')} className="h-9 px-3">Configure</Button>
-            </div>
-            <div className="flex items-center justify-between">
-              <span>Payout Schedule</span>
-              <Button variant="outline" size="sm" onClick={() => console.log('Manage payout schedule')} className="h-9 px-3">Manage</Button>
-            </div>
-          </CardContent>
-        </Card>
-
+      <div className="max-w-2xl">
         <Card id="parcego-settings-support">
           <CardHeader>
             <CardTitle>Support & Help</CardTitle>
@@ -4933,7 +5244,8 @@ export default function SuperAdminDashboard() {
           
           {/* Right Section - Actions and User Menu */}
           <div className="flex items-center space-x-4">
-            <NotificationDropdown />
+            {/* Notification Bell - Hidden */}
+            {/* <NotificationDropdown /> */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -4946,7 +5258,7 @@ export default function SuperAdminDashboard() {
                     <AvatarFallback className="bg-indigo-100 text-indigo-600 text-sm font-medium">SA</AvatarFallback>
                   </Avatar>
                   <div className="hidden sm:block text-left">
-                    <p className="text-sm font-medium text-gray-900">Admin User</p>
+                    <p className="text-sm font-medium text-gray-900">{adminName}</p>
                     <p className="text-xs text-gray-500">Super Admin</p>
                   </div>
                 </Button>
@@ -4954,8 +5266,8 @@ export default function SuperAdminDashboard() {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">Admin User</p>
-                    <p className="text-xs leading-none text-muted-foreground">admin@parcego.com</p>
+                    <p className="text-sm font-medium leading-none">{adminName}</p>
+                    <p className="text-xs leading-none text-muted-foreground">{adminEmail}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
@@ -5077,7 +5389,8 @@ export default function SuperAdminDashboard() {
             {activeSection === "overview" && renderOverview()}
             {activeSection === "merchants" && renderMerchants()}
             {activeSection === "couriers" && renderCouriers()}
-            {activeSection === "analytics" && renderAnalytics()}
+            {activeSection === "assignments" && renderAssignments()}
+            {activeSection === "warehouse" && renderWarehouse()}
             {activeSection === "settings" && renderSettings()}
           </main>
         </div>
