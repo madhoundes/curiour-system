@@ -782,3 +782,141 @@ export interface AdminStatisticsResponse {
   total_shipments: number;
   undelivered_shipments: number;
 }
+
+// Driver Types
+export interface DriverShipment {
+  id: number;
+  tracking_code: string;
+  status: string;
+  sender_name: string;
+  sender_company?: string;
+  sender_address: string;
+  sender_city: string;
+  sender_province: string;
+  sender_postal_code: string;
+  receiver_name: string;
+  receiver_company?: string;
+  receiver_address: string;
+  receiver_city: string;
+  receiver_province: string;
+  receiver_postal_code: string;
+  package_type: string;
+  weight: number;
+  special_instructions?: string;
+  delivery_notes?: string;
+  estimated_delivery_date?: string;
+  created_at: string;
+}
+
+export interface DriverSearchShipmentsParams {
+  q: string;
+}
+
+export interface DriverSearchShipmentsResponse {
+  query: string;
+  shipments: DriverShipment[];
+  total: number;
+}
+
+export interface DriverUpdateShipmentStatusRequest {
+  status: string;
+  notes?: string;
+}
+
+export interface DriverUpdateShipmentStatusResponse {
+  success: boolean;
+  message: string;
+  shipment_id: number;
+  old_status: string;
+  new_status: string;
+  notes?: string;
+  updated_at: string;
+}
+
+export interface DriverAssignment {
+  id: number;
+  shipment_id: number;
+  tracking_code: string;
+  status: string;
+  assignment_status: string;
+  sender_name: string;
+  sender_company?: string;
+  sender_address: string;
+  sender_city: string;
+  sender_province: string;
+  sender_postal_code: string;
+  receiver_name: string;
+  receiver_address: string;
+  receiver_city: string;
+  receiver_province: string;
+  receiver_postal_code: string;
+  package_type: string;
+  weight: number;
+  special_instructions?: string;
+  estimated_delivery_date?: string;
+  assigned_date: string;
+  created_at: string;
+}
+
+export interface DriverAssignmentsResponse {
+  assignments: DriverAssignment[];
+  date: string;
+  total: number;
+}
+
+export interface DriverUploadDeliveryPhotoRequest {
+  photo: File | Blob;
+  notes?: string;
+}
+
+export interface DriverUploadDeliveryPhotoResponse {
+  success: boolean;
+  message: string;
+  shipment_id: number;
+  photo_url: string;
+  notes?: string;
+  uploaded_at: string;
+}
+
+export interface DriverStatisticsParams {
+  date_start?: string;
+  date_end?: string;
+}
+
+export interface DriverStatisticsResponse {
+  date_start: string;
+  date_end: string;
+  total_deliveries: number;
+  items_in_transit: number;
+  items_in_warehouse: number;
+  undelivered_shipments: number;
+}
+
+// Public Tracking Types (no authentication required)
+export interface TrackingStatusHistoryItem {
+  status: string;
+  previous_status: string;
+  timestamp: string;
+  notes?: string;
+}
+
+export interface PublicTrackingResponse {
+  tracking_code: string;
+  current_status: string;
+  status_history: TrackingStatusHistoryItem[];
+  sender_company?: string;
+  receiver_company?: string;
+  receiver_city?: string;
+  receiver_province?: string;
+  estimated_delivery_date?: string;
+  actual_delivery_date?: string;
+  delivery_photos: string[];
+  created_at: string;
+  last_updated: string;
+}
+
+export interface PublicStatusResponse {
+  tracking_code: string;
+  current_status: string;
+  last_updated: string;
+}

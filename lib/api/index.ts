@@ -36,6 +36,12 @@ export { contactService } from './contact';
 // Locations service
 export { locationsService, LocationsService } from './locations';
 
+// Driver service
+export { driverService, DriverService } from './driver';
+
+// Tracking service
+export { trackingService, TrackingService } from './tracking';
+
 // Import for internal use
 import { apiClient } from './client';
 import { authService } from './auth';
@@ -46,6 +52,8 @@ import { shippingService } from './shipping';
 import { claimsService } from './claims';
 import { contactService } from './contact';
 import { locationsService } from './locations';
+import { driverService } from './driver';
+import { trackingService } from './tracking';
 
 // Utility functions for API integration
 export const api = {
@@ -58,6 +66,8 @@ export const api = {
   claims: claimsService,
   contact: contactService,
   locations: locationsService,
+  driver: driverService,
+  tracking: trackingService,
 };
 
 export default api;

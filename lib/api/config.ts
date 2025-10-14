@@ -58,6 +58,8 @@ export const API_ENDPOINTS = {
   TRACKING: {
     TRACK: '/tracking/:trackingNumber',
     EVENTS: '/tracking/:trackingNumber/events',
+    PUBLIC_TRACK: '/track/:tracking_code',
+    PUBLIC_STATUS: '/track/status/:tracking_code',
   },
   NOTIFICATIONS: {
     LIST: '/notifications',
@@ -105,6 +107,15 @@ export const API_ENDPOINTS = {
     ADMIN_USER_STATS: '/stats/admin/user/:user_id',
     ADMIN_STATS: '/stats/admin',
     USER_STATS: '/stats/user',
+  },
+  DRIVER: {
+    SEARCH_SHIPMENTS: '/driver/shipments/search',
+    GET_SHIPMENT_BY_ID: '/driver/shipments/search/:shipment_id',
+    UPDATE_SHIPMENT_STATUS: '/driver/shipments/:shipment_id/status',
+    ASSIGNMENTS_TODAY: '/driver/assignments/today',
+    ASSIGNMENTS_BY_DATE: '/driver/assignments/:assignment_date',
+    UPLOAD_DELIVERY_PHOTO: '/driver/shipments/:shipment_id/delivery-photo',
+    DRIVER_STATISTICS: '/stats/driver',
   },
 } as const;
 
