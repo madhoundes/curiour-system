@@ -920,3 +920,32 @@ export interface PublicStatusResponse {
   current_status: string;
   last_updated: string;
 }
+
+// Notification Subscription Types
+export interface NotificationUnsubscribeRequest {
+  email: string;
+}
+
+export interface NotificationUnsubscribeResponse {
+  success: boolean;
+  message: string;
+  notification_type: string;
+  recipient_email: string;
+}
+
+export interface NotificationResubscribeRequest {
+  email: string;
+}
+
+export interface NotificationResubscribeResponse {
+  success: boolean;
+  message: string;
+  notification_type: string;
+  recipient_email: string;
+}
+
+export interface NotificationStatusResponse {
+  email: string;
+  subscribed: boolean;
+  notification_type: string;
+}

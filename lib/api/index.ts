@@ -42,6 +42,9 @@ export { driverService, DriverService } from './driver';
 // Tracking service
 export { trackingService, TrackingService } from './tracking';
 
+// Notification service
+export { notificationService, NotificationService } from './notifications';
+
 // Import for internal use
 import { apiClient } from './client';
 import { authService } from './auth';
@@ -54,6 +57,7 @@ import { contactService } from './contact';
 import { locationsService } from './locations';
 import { driverService } from './driver';
 import { trackingService } from './tracking';
+import { notificationService } from './notifications';
 
 // Utility functions for API integration
 export const api = {
@@ -68,6 +72,7 @@ export const api = {
   locations: locationsService,
   driver: driverService,
   tracking: trackingService,
+  notifications: notificationService,
 };
 
 export default api;

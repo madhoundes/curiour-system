@@ -65,6 +65,9 @@ export const API_ENDPOINTS = {
     LIST: '/notifications',
     MARK_READ: '/notifications/:id/read',
     MARK_ALL_READ: '/notifications/read-all',
+    UNSUBSCRIBE: '/notifications/unsubscribe',
+    RESUBSCRIBE: '/notifications/resubscribe',
+    STATUS: '/notifications/status',
   },
   ANALYTICS: {
     DASHBOARD: '/analytics/dashboard',
