@@ -31,7 +31,8 @@ import { type Payment, type Invoice, type PaymentMethod, type TaxDocument } from
 
 // Real API imports
 import { shippingService } from "@/lib/api/shipping"
-import type { BillingRecord, BillingRecordsListResponse } from "@/lib/api/types"
+import { profileService } from "@/lib/api/profile"
+import type { BillingRecord, BillingRecordsListResponse, UserProfile } from "@/lib/api/types"
 
 // Mock data (fallback only)
 import { mockPayments, mockInvoices, mockPaymentMethods, mockTaxDocuments } from "./mock-data"
@@ -165,16 +166,22 @@ export function BillingPage() {
   const [invoices, setInvoices] = useState<Invoice[]>([])
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(tempPaymentStorage)
   const [taxDocuments] = useState<TaxDocument[]>(mockTaxDocuments)
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch billing data from API
+  // Fetch user profile and billing data from API
   useEffect(() => {
-    const fetchBillingData = async () => {
+    const fetchData = async () => {
       try {
         setIsLoading(true)
         setError(null)
         
+        // Fetch user profile
+        const profileData = await profileService.getProfile()
+        setUserProfile(profileData)
+        
+        // Fetch billing records
         const billingResponse = await shippingService.getBillingRecords({
           page: 1,
           per_page: 50
@@ -187,8 +194,8 @@ export function BillingPage() {
         setPayments(transformedPayments)
         setInvoices(transformedInvoices)
       } catch (err) {
-        console.error('Failed to fetch billing data:', err)
-        setError('Failed to load billing data')
+        console.error('Failed to fetch data:', err)
+        setError('Failed to load data')
         // Fallback to mock data on error
         setPayments(mockPayments)
         setInvoices(mockInvoices)
@@ -197,7 +204,7 @@ export function BillingPage() {
       }
     }
 
-    fetchBillingData()
+    fetchData()
   }, [])
 
   return (
@@ -333,7 +340,7 @@ export function BillingPage() {
                 </CardContent>
               </Card>
             ) : (
-              <InvoicesTab invoices={invoices} />
+              <InvoicesTab invoices={invoices} userProfile={userProfile} />
             )}
           </TabsContent>
 
@@ -803,7 +810,7 @@ Generated on: ${new Date().toLocaleDateString('en-US', {
   )
 }
 
-function InvoicesTab({ invoices }: { invoices: Invoice[] }) {
+function InvoicesTab({ invoices, userProfile }: { invoices: Invoice[]; userProfile: UserProfile | null }) {
   return (
     <Card id="parcego-billing-table-invoices">
       <CardHeader className="px-4 sm:px-6">
@@ -836,13 +843,13 @@ function InvoicesTab({ invoices }: { invoices: Invoice[] }) {
                   issueDate: new Date().toLocaleDateString(),
                   dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(),
                   billTo: {
-                    name: 'Parcego Business Account',
-                    company: 'Your Business Name',
-                    address: '123 Business Street',
-                    city: 'Toronto',
-                    province: 'ON',
-                    postalCode: 'M5V 3A8',
-                    country: 'Canada'
+                    name: userProfile ? `${userProfile.first_name} ${userProfile.last_name}` : 'Business Account',
+                    company: userProfile?.business_name || 'Your Business',
+                    address: userProfile?.street_address || '',
+                    city: userProfile?.city || '',
+                    province: userProfile?.province || '',
+                    postalCode: userProfile?.postal_code || '',
+                    country: userProfile?.country || 'Canada'
                   },
                   lineItems: allLineItems,
                   subtotal: totalSubtotal,
@@ -889,7 +896,7 @@ function InvoicesTab({ invoices }: { invoices: Invoice[] }) {
               </div>
               
               <div className="flex gap-2">
-                <InvoiceDetailsDialog invoice={invoice} />
+                <InvoiceDetailsDialog invoice={invoice} userProfile={userProfile} />
                 <Button 
                   variant="ghost" 
                   size="sm"
@@ -900,13 +907,13 @@ function InvoicesTab({ invoices }: { invoices: Invoice[] }) {
                             issueDate: new Date(invoice.date).toLocaleDateString(),
                             dueDate: new Date(invoice.dueDate).toLocaleDateString(),
                             billTo: {
-                              name: 'Parcego Business Account',
-                              company: 'Your Business Name',
-                              address: '123 Business Street',
-                              city: 'Toronto',
-                              province: 'ON',
-                              postalCode: 'M5V 3A8',
-                              country: 'Canada'
+                              name: userProfile ? `${userProfile.first_name} ${userProfile.last_name}` : 'Business Account',
+                              company: userProfile?.business_name || 'Your Business',
+                              address: userProfile?.street_address || '',
+                              city: userProfile?.city || '',
+                              province: userProfile?.province || '',
+                              postalCode: userProfile?.postal_code || '',
+                              country: userProfile?.country || 'Canada'
                             },
                             lineItems: invoice.lineItems.map(item => ({
                               description: item.description,
@@ -962,7 +969,7 @@ function InvoicesTab({ invoices }: { invoices: Invoice[] }) {
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-3">
-                          <InvoiceDetailsDialog invoice={invoice} />
+                          <InvoiceDetailsDialog invoice={invoice} userProfile={userProfile} />
                           <Button 
                             variant="ghost" 
                             size="sm"
@@ -973,13 +980,13 @@ function InvoicesTab({ invoices }: { invoices: Invoice[] }) {
                                   issueDate: new Date(invoice.date).toLocaleDateString(),
                                   dueDate: new Date(invoice.dueDate).toLocaleDateString(),
                                   billTo: {
-                                    name: 'Parcego Business Account',
-                                    company: 'Your Business Name',
-                                    address: '123 Business Street',
-                                    city: 'Toronto',
-                                    province: 'ON',
-                                    postalCode: 'M5V 3A8',
-                                    country: 'Canada'
+                                    name: userProfile ? `${userProfile.first_name} ${userProfile.last_name}` : 'Business Account',
+                                    company: userProfile?.business_name || 'Your Business',
+                                    address: userProfile?.street_address || '',
+                                    city: userProfile?.city || '',
+                                    province: userProfile?.province || '',
+                                    postalCode: userProfile?.postal_code || '',
+                                    country: userProfile?.country || 'Canada'
                                   },
                                   lineItems: invoice.lineItems.map(item => ({
                                     description: item.description,
@@ -2198,7 +2205,7 @@ function PaymentMethodIcon({ type }: { type: PaymentMethod["type"] }) {
   }
 }
 
-function InvoiceDetailsDialog({ invoice }: { invoice: Invoice }) {
+function InvoiceDetailsDialog({ invoice, userProfile }: { invoice: Invoice; userProfile: UserProfile | null }) {
   const [isPrinting, setIsPrinting] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [isViewHovered, setIsViewHovered] = useState(false)
@@ -2526,11 +2533,15 @@ function InvoiceDetailsDialog({ invoice }: { invoice: Invoice }) {
             <div className="mb-8 relative z-10">
               <h3 className="text-lg font-semibold text-gray-900 mb-3">Bill To:</h3>
               <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="font-medium">Acme Business Solutions</div>
-                <div className="text-gray-600">John Smith, CEO</div>
-                <div className="text-gray-600">456 Commerce Ave</div>
-                <div className="text-gray-600">Business District, CA 90210</div>
-                <div className="text-gray-600">john.smith@acme.com</div>
+                <div className="font-medium">{userProfile?.business_name || 'Business Account'}</div>
+                <div className="text-gray-600">{userProfile ? `${userProfile.first_name} ${userProfile.last_name}` : 'Account Holder'}</div>
+                {userProfile?.street_address && <div className="text-gray-600">{userProfile.street_address}</div>}
+                {(userProfile?.city || userProfile?.province || userProfile?.postal_code) && (
+                  <div className="text-gray-600">
+                    {[userProfile?.city, userProfile?.province, userProfile?.postal_code].filter(Boolean).join(', ')}
+                  </div>
+                )}
+                {userProfile?.email && <div className="text-gray-600">{userProfile.email}</div>}
               </div>
             </div>
 
