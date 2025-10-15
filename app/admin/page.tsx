@@ -214,8 +214,6 @@ export default function SuperAdminDashboard() {
         return merchant.created_at;
       case 'totalShipments':
         return 0; // TODO: Will come from shipment stats API
-      case 'monthlyRevenue':
-        return 0; // TODO: Will come from billing stats API
       default:
         return '';
     }
@@ -352,8 +350,6 @@ export default function SuperAdminDashboard() {
   const [courierSearchQuery, setCourierSearchQuery] = useState("");
   const [isCourierSearchLoading, setIsCourierSearchLoading] = useState(false);
   const [filteredCouriers, setFilteredCouriers] = useState<User[]>([]);
-  const [selectedCourier, setSelectedCourier] = useState<User | null>(null);
-  const [isCourierProfileOpen, setIsCourierProfileOpen] = useState(false);
   const [expandedCourierCards, setExpandedCourierCards] = useState<Set<string>>(new Set());
 
   // Modal state for courier approval/suspension
@@ -788,6 +784,16 @@ export default function SuperAdminDashboard() {
   const handleReassignAssignment = async (newDriverId: number, notes?: string) => {
     if (!selectedAssignment) return;
     
+    // Debug: Check authentication before making API call
+    const authToken = localStorage.getItem("auth_token");
+    console.log("🔄 Reassign Assignment Debug:", {
+      assignmentId: selectedAssignment.id,
+      newDriverId,
+      notes,
+      hasAuthToken: !!authToken,
+      tokenPreview: authToken ? `${authToken.substring(0, 20)}...` : "No token"
+    });
+    
     try {
       await adminService.reassignAssignment(selectedAssignment.id, {
         new_driver_id: newDriverId,
@@ -814,6 +820,14 @@ export default function SuperAdminDashboard() {
       if (typeof window !== 'undefined') {
         const adminAuth = localStorage.getItem("admin_authenticated");
         const adminCookie = document.cookie.includes("admin_authenticated=true");
+        const authToken = localStorage.getItem("auth_token");
+        
+        console.log("🔐 Admin Auth Debug:", {
+          adminAuth,
+          adminCookie,
+          hasAuthToken: !!authToken,
+          tokenPreview: authToken ? `${authToken.substring(0, 20)}...` : "No token"
+        });
         
         if (adminAuth === "true" || adminCookie) {
           setIsAuthenticated(true);
@@ -824,6 +838,11 @@ export default function SuperAdminDashboard() {
           
           if (name) setAdminName(name);
           if (email) setAdminEmail(email);
+          
+          // Debug: Check if we have a valid auth token
+          if (!authToken) {
+            console.warn("⚠️ Admin authenticated but no auth_token found in localStorage");
+          }
         } else {
           console.log("Admin not authenticated, redirecting to login...");
           router.push("/admin-login");
@@ -1315,10 +1334,6 @@ export default function SuperAdminDashboard() {
             {isExpanded && (
               <div className="border-t border-gray-200 pt-1.5 mt-1.5 space-y-1.5 animate-in slide-in-from-top-2 duration-200">
                 <div>
-                  <p className="text-xs font-medium text-gray-700 uppercase tracking-wider">Monthly Revenue</p>
-                  <p className="text-lg font-bold text-green-600">${getMerchantProperty(merchant, 'monthlyRevenue').toLocaleString()}</p>
-                </div>
-                <div>
                   <p className="text-xs font-medium text-gray-700 uppercase tracking-wider">Join Date</p>
                   <p className="text-sm font-medium text-gray-900">{new Date(merchant.created_at).toLocaleDateString()}</p>
                 </div>
@@ -1326,47 +1341,6 @@ export default function SuperAdminDashboard() {
                 {/* Action Buttons - Only visible when expanded */}
                 <div className="pt-1.5 border-t border-gray-100">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedMerchant(merchant)}
-                        className="h-9 px-3 touch-manipulation text-sm font-medium"
-                        aria-label={`View details for ${getMerchantProperty(merchant, 'businessName')}`}
-                        id={`parcego-merchant-view-mobile-${merchant.id}`}
-                      >
-                        <Icon name="Eye" size={14} className="mr-1.5" />
-                        View
-                      </Button>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {getMerchantProperty(merchant, 'status') === "pending" && (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        className="bg-green-600 hover:bg-green-700 h-9 px-3 touch-manipulation text-sm font-medium"
-                        onClick={() => handleMerchantAction(merchant, 'approve')}
-                        aria-label={`Approve ${getMerchantProperty(merchant, 'businessName')}`}
-                        id={`parcego-merchant-approve-mobile-${merchant.id}`}
-                      >
-                        <Icon name="UserCheck" size={14} className="mr-1.5" />
-                        Approve
-                      </Button>
-                      )}
-                      {getMerchantProperty(merchant, 'status') === "active" && (
-                        <Button
-                          variant="destructive"
-                          size="sm"
-                          className="h-9 px-3 touch-manipulation text-sm font-medium"
-                          onClick={() => handleMerchantAction(merchant, 'suspend')}
-                          aria-label={`Suspend ${getMerchantProperty(merchant, 'businessName')}`}
-                          id={`parcego-merchant-suspend-mobile-${merchant.id}`}
-                        >
-                          <Icon name="Ban" size={14} className="mr-1.5" />
-                          Suspend
-                        </Button>
-                      )}
-                    </div>
                   </div>
                 </div>
               </div>
@@ -1487,7 +1461,6 @@ export default function SuperAdminDashboard() {
                       <th className="text-left p-3 text-sm font-semibold">Business & Contact</th>
                       <th className="text-left p-3 text-sm font-semibold">Status</th>
                       <th className="text-left p-3 text-sm font-semibold">Shipments</th>
-                      <th className="text-left p-3 text-sm font-semibold">Revenue</th>
                       <th className="text-left p-3 text-sm font-semibold">Actions</th>
                     </tr>
                   </thead>
@@ -1531,20 +1504,7 @@ export default function SuperAdminDashboard() {
                             <span className="text-sm font-medium">{getMerchantProperty(merchant, 'totalShipments').toLocaleString()}</span>
                           </td>
                           <td className="p-3">
-                            <span className="text-sm font-medium text-green-600">${getMerchantProperty(merchant, 'monthlyRevenue').toLocaleString()}</span>
-                          </td>
-                          <td className="p-3">
                             <div className="flex items-center gap-1">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                id={`parcego-merchant-view-${merchant.id}`}
-                                onClick={() => setSelectedMerchant(merchant)}
-                                className="h-8 w-8 p-0 touch-manipulation"
-                                aria-label={`View details for ${getMerchantProperty(merchant, 'businessName')}`}
-                              >
-                                <Icon name="Eye" size={14} />
-                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1602,14 +1562,13 @@ export default function SuperAdminDashboard() {
                       <th className="text-left p-4 font-semibold">Contact</th>
                       <th className="text-left p-4 font-semibold">Status</th>
                       <th className="text-left p-4 font-semibold">Shipments</th>
-                      <th className="text-left p-4 font-semibold">Revenue</th>
                       <th className="text-left p-4 font-semibold">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {filteredMerchants.length === 0 && merchantSearchQuery && !isMerchantSearchLoading ? (
                       <tr>
-                        <td colSpan={6} className="text-center py-12">
+                        <td colSpan={5} className="text-center py-12">
                           <div className="flex flex-col items-center gap-2">
                             <Icon name="Search" size={48} className="text-gray-300" />
                             <h3 className="text-lg font-medium text-gray-900">No results found</h3>
@@ -1649,20 +1608,7 @@ export default function SuperAdminDashboard() {
                           </td>
                           <td className="p-4">{getMerchantProperty(merchant, 'totalShipments').toLocaleString()}</td>
                           <td className="p-4">
-                            <span className="font-medium text-green-600">${getMerchantProperty(merchant, 'monthlyRevenue').toLocaleString()}</span>
-                          </td>
-                          <td className="p-4">
                             <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                id={`parcego-merchant-view-${merchant.id}`}
-                                onClick={() => setSelectedMerchant(merchant)}
-                                className="h-8 w-8 p-0"
-                                aria-label={`View details for ${getMerchantProperty(merchant, 'businessName')}`}
-                              >
-                                <Icon name="Eye" size={16} />
-                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -1675,30 +1621,6 @@ export default function SuperAdminDashboard() {
                               >
                                 <Icon name="Edit" size={16} />
                               </Button>
-                              {getMerchantProperty(merchant, 'status') === "pending" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-green-600 h-8 w-8 p-0 touch-manipulation"
-                                id={`parcego-merchant-approve-${merchant.id}`}
-                                onClick={() => handleMerchantAction(merchant, 'approve')}
-                                aria-label={`Approve merchant ${getMerchantProperty(merchant, 'businessName')}`}
-                              >
-                                <Icon name="UserCheck" size={16} />
-                              </Button>
-                              )}
-                              {getMerchantProperty(merchant, 'status') === "active" && (
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                className="text-red-600 h-8 w-8 p-0 touch-manipulation"
-                                id={`parcego-merchant-suspend-${merchant.id}`}
-                                onClick={() => handleMerchantAction(merchant, 'suspend')}
-                                aria-label={`Suspend merchant ${getMerchantProperty(merchant, 'businessName')}`}
-                              >
-                                <Icon name="Ban" size={16} />
-                              </Button>
-                              )}
                             </div>
                           </td>
                         </tr>
@@ -1777,20 +1699,6 @@ export default function SuperAdminDashboard() {
 
             {/* Action Buttons */}
             <div className="flex items-center gap-1">
-              <Button
-                variant="outline"
-                size="sm"
-                id={`parcego-courier-view-mobile-${courier.id}`}
-                onClick={() => {
-                  setSelectedCourier(courier);
-                  setIsCourierProfileOpen(true);
-                }}
-                className="h-9 px-3 touch-manipulation min-w-[44px]"
-                aria-label={`View details for ${getCourierProperty(courier, 'fullName')}`}
-              >
-                <Icon name="Eye" size={16} />
-                <span className="hidden sm:inline ml-1">View</span>
-              </Button>
               <Button
                 variant="outline"
                 size="sm"
@@ -2022,19 +1930,6 @@ export default function SuperAdminDashboard() {
                           </td>
                           <td className="p-4">
                             <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                id={`parcego-courier-view-${courier.id}`}
-                                onClick={() => {
-                                  setSelectedCourier(courier);
-                                  setIsCourierProfileOpen(true);
-                                }}
-                                className="h-8 w-8 p-0 touch-manipulation"
-                                aria-label={`View details for ${getCourierProperty(courier, 'fullName')}`}
-                              >
-                                <Icon name="Eye" size={14} />
-                              </Button>
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -4151,341 +4046,6 @@ export default function SuperAdminDashboard() {
   };
 
   // Merchant Action Modal (Approve/Suspend)
-  // Render courier profile modal
-  const renderCourierProfileModal = () => {
-    if (!selectedCourier) return null;
-
-    const getStatusColor = (status: string) => {
-      switch (status) {
-        case "active":
-          return "text-emerald-600 bg-emerald-50";
-        case "pending":
-          return "text-amber-600 bg-amber-50";
-        case "inactive":
-        case "suspended":
-          return "text-red-600 bg-red-50";
-        default:
-          return "text-gray-600 bg-gray-50";
-      }
-    };
-
-    const formatDate = (dateString: string) => {
-      return new Date(dateString).toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric'
-      });
-    };
-
-    const formatTime = (dateString: string) => {
-      return new Date(dateString).toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    };
-
-    // Mock revenue data for the selected courier
-    const revenueData = {
-      totalRevenue: Number(getCourierProperty(selectedCourier, 'completedDeliveries') || 0) * 25.50, // Mock: $25.50 per delivery
-      recentPayouts: [
-        { date: "2025-01-15", amount: 485.50, deliveries: 19 },
-        { date: "2025-01-08", amount: 612.75, deliveries: 24 },
-        { date: "2025-01-01", amount: 357.25, deliveries: 14 }
-      ],
-      monthlyBreakdown: [
-        { month: "Jan 2025", revenue: 1455.25, deliveries: 57 },
-        { month: "Dec 2024", revenue: 1320.50, deliveries: 52 },
-        { month: "Nov 2024", revenue: 1687.75, deliveries: 66 }
-      ]
-    };
-
-    const formatCurrency = (amount: number) => {
-      return new Intl.NumberFormat('en-CA', {
-        style: 'currency',
-        currency: 'CAD'
-      }).format(amount);
-    };
-
-    return (
-      <Dialog open={isCourierProfileOpen} onOpenChange={setIsCourierProfileOpen}>
-        <DialogContent className="sm:max-w-2xl bg-white max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="space-y-4">
-            <div className="flex items-start gap-4">
-              <Avatar className="h-16 w-16 border-2 border-gray-100">
-                <AvatarFallback className="text-lg bg-indigo-100 text-indigo-600">
-                  {(() => {
-                    const fullName = String(getCourierProperty(selectedCourier, 'fullName'));
-                    return fullName.split(' ').map((n: string) => n.charAt(0)).join('');
-                  })()}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <DialogTitle className="text-xl font-bold text-gray-900 mb-1">
-                  {getCourierProperty(selectedCourier, 'fullName')}
-                </DialogTitle>
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge variant="outline" className="font-normal">
-                    ID: {selectedCourier.id}
-                  </Badge>
-                  <Badge className={cn("font-normal", getStatusColor(String(getCourierProperty(selectedCourier, 'status'))))}>
-                    {(() => {
-                      const status = String(getCourierProperty(selectedCourier, 'status'));
-                      return status.charAt(0).toUpperCase() + status.slice(1);
-                    })()}
-                  </Badge>
-                  {(() => {
-                    const rating = Number(getCourierProperty(selectedCourier, 'rating'));
-                    return rating > 0 ? (
-                    <Badge className="bg-yellow-50 text-yellow-700 border-yellow-200 font-normal">
-                      <Icon name="Star" size={12} className="mr-1" />
-                        {rating.toFixed(1)}
-                    </Badge>
-                    ) : null;
-                  })()}
-                </div>
-              </div>
-            </div>
-          </DialogHeader>
-
-          <div className="mt-6 space-y-6">
-            {/* Revenue Section */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-                Revenue & Earnings
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Card className="p-4">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Icon name="DollarSign" size={20} className="text-green-600" />
-                    <p className="text-xs text-gray-500 uppercase tracking-wider">Total Revenue</p>
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {formatCurrency(revenueData.totalRevenue)}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Icon name="Calendar" size={20} className="text-blue-600" />
-                    <p className="text-xs text-gray-500 uppercase tracking-wider">Avg Monthly</p>
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {formatCurrency(revenueData.totalRevenue / 12)}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Icon name="TrendingUp" size={20} className="text-purple-600" />
-                    <p className="text-xs text-gray-500 uppercase tracking-wider">Per Delivery</p>
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {formatCurrency(25.50)}
-                  </p>
-                </Card>
-              </div>
-
-              {/* Recent Payouts */}
-              <Card className="p-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <Icon name="CreditCard" size={20} className="text-emerald-600" />
-                  <h4 className="text-sm font-semibold text-gray-900">Recent Payouts</h4>
-                </div>
-                <div className="space-y-3">
-                  {revenueData.recentPayouts.map((payout, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="flex items-center gap-3">
-                        <Icon name="Receipt" size={16} className="text-gray-500" />
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">
-                            {formatDate(payout.date)}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {payout.deliveries} deliveries
-                          </p>
-                        </div>
-                      </div>
-                      <p className="text-sm font-semibold text-green-600">
-                        {formatCurrency(payout.amount)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-
-              {/* Monthly Breakdown */}
-              <Card className="p-4">
-                <div className="flex items-center gap-2 mb-4">
-                  <Icon name="BarChart3" size={20} className="text-indigo-600" />
-                  <h4 className="text-sm font-semibold text-gray-900">Monthly Breakdown</h4>
-                </div>
-                <div className="space-y-3">
-                  {revenueData.monthlyBreakdown.map((month, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{month.month}</p>
-                        <p className="text-xs text-gray-500">{month.deliveries} deliveries</p>
-                      </div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        {formatCurrency(month.revenue)}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </Card>
-            </div>
-
-            {/* Contact Information */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-                Contact Information
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg">
-                <div>
-                  <a
-                    href={`mailto:${selectedCourier.email}`}
-                    className="flex items-center gap-3 text-sm text-blue-600 hover:text-blue-700 transition-colors"
-                  >
-                    <Icon name="Mail" size={20} />
-                    {selectedCourier.email}
-                  </a>
-                </div>
-                <div>
-                  <a
-                    href={`tel:${getCourierProperty(selectedCourier, 'phone')}`}
-                    className="flex items-center gap-3 text-sm text-blue-600 hover:text-blue-700 transition-colors"
-                  >
-                    <Icon name="Phone" size={20} />
-                    {getCourierProperty(selectedCourier, 'phone')}
-                  </a>
-                </div>
-                <div className="flex items-center gap-3 text-sm text-gray-600">
-                  <Icon name="MapPin" size={20} />
-                  {getCourierProperty(selectedCourier, 'city')}
-                </div>
-                <div className="flex items-center gap-3 text-sm text-gray-600">
-                  <Icon name="Truck" size={20} />
-                  {getCourierProperty(selectedCourier, 'vehicle')}
-                </div>
-              </div>
-            </div>
-
-            {/* Performance Metrics */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-                Performance Metrics
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Card className="p-4">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Icon name="Package" size={20} className="text-blue-600" />
-                    <p className="text-xs text-gray-500 uppercase tracking-wider">Deliveries</p>
-                  </div>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {Number(getCourierProperty(selectedCourier, 'completedDeliveries')).toLocaleString()}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Icon name="Calendar" size={20} className="text-purple-600" />
-                    <p className="text-xs text-gray-500 uppercase tracking-wider">Join Date</p>
-                  </div>
-                  <p className="text-sm font-medium text-gray-900">
-                    {formatDate(String(getCourierProperty(selectedCourier, 'joinDate')))}
-                  </p>
-                </Card>
-                <Card className="p-4">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Icon name="Clock" size={20} className="text-emerald-600" />
-                    <p className="text-xs text-gray-500 uppercase tracking-wider">Last Active</p>
-                  </div>
-                  <p className="text-sm font-medium text-gray-900">
-                    {formatDate(String(getCourierProperty(selectedCourier, 'lastLogin')))}
-                    <span className="block text-xs text-gray-500">
-                      {formatTime(String(getCourierProperty(selectedCourier, 'lastLogin')))}
-                    </span>
-                  </p>
-                </Card>
-              </div>
-            </div>
-
-            {/* Tags & Notes */}
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wider">
-                Tags & Notes
-              </h3>
-              <div className="space-y-4 bg-gray-50 p-4 rounded-lg">
-                {(() => {
-                  const tags = getCourierProperty(selectedCourier, 'tags');
-                  return Array.isArray(tags) && tags.length > 0 ? (
-                  <div className="flex flex-wrap gap-2">
-                      {tags.map((tag: string, index: number) => (
-                      <Badge
-                        key={index}
-                        variant="outline"
-                        className="bg-white font-normal"
-                      >
-                        {tag}
-                      </Badge>
-                    ))}
-                  </div>
-                  ) : null;
-                })()}
-                {(() => {
-                  const notes = getCourierProperty(selectedCourier, 'notes');
-                  return notes ? (
-                  <div className="text-sm text-gray-600 bg-white p-3 rounded border">
-                      {notes}
-                  </div>
-                  ) : null;
-                })()}
-              </div>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center justify-end gap-2 pt-6 border-t mt-6">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    onClick={() => setIsCourierProfileOpen(false)}
-                    className="h-9 px-4"
-                  >
-                    <Icon name="X" size={18} className="mr-2" />
-                    Close
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Close profile modal</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="default"
-                    className="h-9 px-4 bg-blue-600 hover:bg-blue-700"
-                    onClick={() => {
-                      // Handle edit action
-                      setIsCourierProfileOpen(false);
-                      // You can add edit mode state and logic here
-                    }}
-                  >
-                    <Icon name="Edit" size={18} className="mr-2" />
-                    Edit Profile
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <p>Edit courier profile information</p>
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  };
 
   const renderMerchantActionModal = () => {
     if (!selectedMerchantForAction || !actionType) return null;
@@ -5338,8 +4898,6 @@ export default function SuperAdminDashboard() {
       {/* Courier Action Modal */}
       {renderCourierActionModal()}
 
-      {/* Courier Profile Modal */}
-      {renderCourierProfileModal()}
 
       {/* Courier Edit Modal */}
       {(isCourierEditOpen || !!editingCourier) && <CourierEditModal />}
