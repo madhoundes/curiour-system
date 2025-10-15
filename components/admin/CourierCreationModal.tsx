@@ -27,6 +27,10 @@ const courierCreationSchema = z.object({
     .min(2, "Last name must be at least 2 characters")
     .max(50, "Last name must be less than 50 characters"),
   email: z.string().email("Please enter a valid email address"),
+  phone_number: z
+    .string()
+    .min(10, "Phone number must be at least 10 digits")
+    .regex(/^\+?[\d\s\-\(\)]+$/, "Please enter a valid phone number"),
   password: z.string().min(6, "Password must be at least 6 characters"),
   business_name: z
     .string()
@@ -100,6 +104,7 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
         first_name: data.first_name,
         last_name: data.last_name,
         business_name: data.business_name,
+        phone_number: data.phone_number,
         role: data.role,
         password: data.password
       };
@@ -205,6 +210,20 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
           />
           {errors.business_name && (
             <p className="text-sm text-red-600">{errors.business_name.message}</p>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="phone_number">Phone Number *</Label>
+          <Input
+            id="phone_number"
+            {...register("phone_number")}
+            className={errors.phone_number ? "border-red-500" : ""}
+            placeholder="Enter phone number"
+            autoComplete="off"
+          />
+          {errors.phone_number && (
+            <p className="text-sm text-red-600">{errors.phone_number.message}</p>
           )}
         </div>
 

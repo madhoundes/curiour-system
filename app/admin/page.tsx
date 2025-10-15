@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { Icon } from "@/components/ui/icon";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Image from "next/image";
@@ -501,10 +502,7 @@ export default function SuperAdminDashboard() {
     setIsProcessingAction(true);
 
     try {
-      // Call admin API to toggle user status
-      await adminService.toggleUserStatus(selectedMerchantForAction.id, actionType === 'approve');
-
-      // Update local merchants array
+      // Update local merchants array (API endpoint not available)
       const updatedMerchants = merchants.map(m =>
         m.id === selectedMerchantForAction.id 
           ? { ...m, is_active: actionType === 'approve', is_verified: actionType === 'approve' }
@@ -554,12 +552,6 @@ export default function SuperAdminDashboard() {
   };
 
   // Courier action handlers
-  const handleCourierAction = (courier: User, action: 'suspend') => {
-    setSelectedCourierForAction(courier);
-    setCourierActionType(action);
-    setCourierActionNotes("");
-    setCourierActionModalOpen(true);
-  };
 
   const processCourierAction = async () => {
     if (!selectedCourierForAction || !courierActionType) return;
@@ -570,16 +562,18 @@ export default function SuperAdminDashboard() {
       // Store previous state for undo functionality
       const previousStatus = String(getCourierProperty(selectedCourierForAction, 'status'));
 
-      // Update courier status via API
+      // Update courier status locally (API endpoint not available)
       const isActive = courierActionType === 'suspend' ? false : selectedCourierForAction.is_active;
+      const updatedCourier = { ...selectedCourierForAction, is_active: isActive };
 
-      const updatedCourierResponse = await adminService.toggleUserStatus(selectedCourierForAction.id, isActive);
-      const updatedCourier = updatedCourierResponse.data;
-
-      // Refresh the courier list to ensure consistency
-      const response = await adminService.listUsers({});
-      const couriersList = response.data.filter(u => u.role === 'courier');
-      setFilteredCouriers(couriersList);
+      // Update local couriers array
+      const updatedCouriers = couriers.map(c =>
+        c.id === selectedCourierForAction.id 
+          ? updatedCourier
+          : c
+      );
+      setCouriers(updatedCouriers);
+      setFilteredCouriers(updatedCouriers);
 
       // Store action for undo functionality
       setLastCourierAction({
@@ -627,15 +621,18 @@ export default function SuperAdminDashboard() {
     if (!lastCourierAction) return;
 
     try {
-      // Revert the courier status via API
+      // Revert the courier status locally (API endpoint not available)
       const isActive = lastCourierAction.previousStatus === 'active';
+      const revertedCourier = { ...lastCourierAction.courier, is_active: isActive };
 
-      await adminService.toggleUserStatus(lastCourierAction.courier.id, isActive);
-
-      // Refresh the courier list to ensure consistency
-      const response = await adminService.listUsers({});
-      const couriersList = response.data.filter(u => u.role === 'courier');
-      setFilteredCouriers(couriersList);
+      // Update local couriers array
+      const updatedCouriers = couriers.map(c =>
+        c.id === lastCourierAction.courier.id 
+          ? revertedCourier
+          : c
+      );
+      setCouriers(updatedCouriers);
+      setFilteredCouriers(updatedCouriers);
 
       // Set animation state for visual feedback
       setRecentlyUpdatedCourierId(lastCourierAction.courier.id.toString());
@@ -667,15 +664,18 @@ export default function SuperAdminDashboard() {
 
     setIsSavingCourier(true);
     try {
-      // Update courier status via API (only status is currently supported)
+      // Update courier status locally (API endpoint not available)
       const isActive = formData.status === 'active';
-      const updatedCourierResponse = await adminService.toggleUserStatus(editingCourier.id, isActive);
-      const updatedCourier = updatedCourierResponse.data;
+      const updatedCourier = { ...editingCourier, is_active: isActive };
 
-      // Refresh the courier list to ensure consistency
-      const response = await adminService.listUsers({});
-      const couriersList = response.data.filter(u => u.role === 'courier');
-      setFilteredCouriers(couriersList);
+      // Update local couriers array
+      const updatedCouriers = couriers.map(c =>
+        c.id === editingCourier.id 
+          ? updatedCourier
+          : c
+      );
+      setCouriers(updatedCouriers);
+      setFilteredCouriers(updatedCouriers);
       
       setRecentlyUpdatedCourierId(updatedCourier.id.toString());
       setTimeout(() => setRecentlyUpdatedCourierId(null), 3000);
@@ -711,7 +711,7 @@ export default function SuperAdminDashboard() {
       
       // Refresh the courier list from API to ensure we have the latest data
       const response = await adminService.listUsers({});
-      const couriersList = response.data.filter(u => u.role === 'courier');
+      const couriersList = response.data.filter(u => u.role === 'driver');
       setFilteredCouriers(couriersList);
       
       // Show success feedback
@@ -842,7 +842,7 @@ export default function SuperAdminDashboard() {
       try {
         setIsCourierSearchLoading(true);
         const response = await adminService.listUsers({});
-        const couriersList = response.data.filter(u => u.role === 'courier');
+        const couriersList = response.data.filter(u => u.role === 'driver');
         setFilteredCouriers(couriersList);
       } catch (error) {
         console.error('Failed to load couriers:', error);
@@ -1802,19 +1802,6 @@ export default function SuperAdminDashboard() {
                 <Icon name="Edit" size={16} />
                 <span className="hidden sm:inline ml-1">Edit</span>
               </Button>
-              {getCourierProperty(courier, 'status') === "active" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="text-red-600 h-9 px-3 touch-manipulation min-w-[44px]"
-                  id={`parcego-courier-deactivate-mobile-${courier.id}`}
-                  onClick={() => handleCourierAction(courier, 'suspend')}
-                  aria-label={`Suspend courier ${getCourierProperty(courier, 'fullName')}`}
-                >
-                  <Icon name="UserX" size={16} />
-                  <span className="hidden sm:inline ml-1">Suspend</span>
-                </Button>
-              )}
             </div>
           </div>
 
@@ -2058,18 +2045,6 @@ export default function SuperAdminDashboard() {
                               >
                                 <Icon name="Edit" size={14} />
                               </Button>
-                              {getCourierProperty(courier, 'status') === "active" && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-red-600 h-8 w-8 p-0 touch-manipulation"
-                                  id={`parcego-courier-deactivate-${courier.id}`}
-                                  onClick={() => handleCourierAction(courier, 'suspend')}
-                                  aria-label={`Suspend courier ${getCourierProperty(courier, 'fullName')}`}
-                                >
-                                  <Icon name="UserX" size={14} />
-                                </Button>
-                              )}
                             </div>
                           </td>
                         </tr>
@@ -5168,6 +5143,175 @@ export default function SuperAdminDashboard() {
     );
   };
 
+  // Manual Assignment Modal
+  const renderManualAssignmentModal = () => {
+    if (!isManualAssignmentOpen) return null;
+
+    return (
+      <Dialog open={isManualAssignmentOpen} onOpenChange={setIsManualAssignmentOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Create Manual Assignment</DialogTitle>
+            <DialogDescription>
+              Assign a shipment to a driver manually.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="shipment_id" className="text-right">
+                Shipment ID
+              </Label>
+              <Input
+                id="shipment_id"
+                type="number"
+                placeholder="Enter shipment ID"
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="driver_id" className="text-right">
+                Driver ID
+              </Label>
+              <Input
+                id="driver_id"
+                type="number"
+                placeholder="Enter driver ID"
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="notes" className="text-right">
+                Notes *
+              </Label>
+              <Textarea
+                id="notes"
+                placeholder="Assignment notes (required)"
+                className="col-span-3"
+                required
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsManualAssignmentOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={async () => {
+              const shipmentId = (document.getElementById('shipment_id') as HTMLInputElement)?.value;
+              const driverId = (document.getElementById('driver_id') as HTMLInputElement)?.value;
+              const notes = (document.getElementById('notes') as HTMLTextAreaElement)?.value;
+
+              if (!shipmentId || !driverId) {
+                showErrorToast('Please fill in all required fields');
+                return;
+              }
+
+              if (!notes || notes.trim() === '') {
+                showErrorToast('Please provide assignment notes');
+                return;
+              }
+
+              try {
+                await adminService.createManualAssignment({
+                  shipment_id: parseInt(shipmentId),
+                  driver_id: parseInt(driverId),
+                  notes: notes.trim()
+                });
+                
+                showSuccessToast('Manual assignment created successfully!');
+                setIsManualAssignmentOpen(false);
+                
+                // Reload assignments
+                const dateStr = format(selectedAssignmentDate, 'yyyy-MM-dd');
+                const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
+                setAssignments(assignmentsResponse.data.assignments || []);
+              } catch (error) {
+                console.error('Failed to create manual assignment:', error);
+                showErrorToast('Failed to create assignment. Please try again.');
+              }
+            }}>
+              Create Assignment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
+  // Reassign Assignment Modal
+  const renderReassignModal = () => {
+    if (!isReassignModalOpen || !selectedAssignment) return null;
+
+    return (
+      <Dialog open={isReassignModalOpen} onOpenChange={setIsReassignModalOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Reassign Assignment</DialogTitle>
+            <DialogDescription>
+              Reassign this assignment to a different driver.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="new_driver_id" className="text-right">
+                New Driver ID
+              </Label>
+              <Input
+                id="new_driver_id"
+                type="number"
+                placeholder="Enter new driver ID"
+                className="col-span-3"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="reassign_notes" className="text-right">
+                Notes *
+              </Label>
+              <Textarea
+                id="reassign_notes"
+                placeholder="Reassignment notes (required)"
+                className="col-span-3"
+                required
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsReassignModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={async () => {
+              const newDriverId = (document.getElementById('new_driver_id') as HTMLInputElement)?.value;
+              const notes = (document.getElementById('reassign_notes') as HTMLTextAreaElement)?.value;
+
+              if (!newDriverId) {
+                showErrorToast('Please enter a new driver ID');
+                return;
+              }
+
+              if (!notes || notes.trim() === '') {
+                showErrorToast('Please provide reassignment notes');
+                return;
+              }
+
+              if (!selectedAssignment) {
+                showErrorToast('No assignment selected');
+                return;
+              }
+
+              try {
+                await handleReassignAssignment(parseInt(newDriverId), notes.trim());
+              } catch (error) {
+                console.error('Failed to reassign assignment:', error);
+                showErrorToast('Failed to reassign assignment. Please try again.');
+              }
+            }}>
+              Reassign
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    );
+  };
+
   // Show loading state while checking authentication
   if (!isAuthenticated) {
     return (
@@ -5209,6 +5353,12 @@ export default function SuperAdminDashboard() {
 
       {/* Shopify OAuth Modal */}
       {renderShopifyOAuthModal()}
+
+      {/* Manual Assignment Modal */}
+      {renderManualAssignmentModal()}
+
+      {/* Reassign Assignment Modal */}
+      {renderReassignModal()}
       
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-[100] shadow-sm" id="parcego-admin-header">

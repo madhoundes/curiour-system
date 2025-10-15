@@ -38,7 +38,7 @@ export interface RegisterResponse {
   first_name: string;
   last_name: string;
   business_name: string;
-  role: 'user' | 'admin' | 'courier';
+  role: 'user' | 'admin' | 'courier' | 'driver';
   is_active: boolean;
   is_verified: boolean;
   created_at: string;
@@ -66,7 +66,7 @@ export interface User {
   first_name: string;
   last_name: string;
   business_name: string;
-  role: 'user' | 'admin' | 'courier';
+  role: 'user' | 'admin' | 'courier' | 'driver';
   is_active: boolean;
   is_verified: boolean;
   created_at: string;
@@ -111,6 +111,7 @@ export interface AdminCreateUserRequest {
   first_name: string;
   last_name: string;
   business_name: string;
+  phone_number: string;
   role: 'user' | 'driver' | 'admin';
   password: string;
 }
@@ -177,7 +178,7 @@ export interface UserProfile {
   preferred_date_format?: string;
   enable_email_updates: boolean;
   enable_sms_updates: boolean;
-  role: 'user' | 'admin' | 'courier';
+  role: 'user' | 'admin' | 'courier' | 'driver';
   is_active: boolean;
   is_verified: boolean;
   created_at: string;
