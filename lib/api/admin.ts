@@ -111,23 +111,6 @@ export class AdminService {
     }
   }
 
-  /**
-   * Deactivate/activate user (admin only)
-   */
-  async toggleUserStatus(userId: number, isActive: boolean): Promise<ApiSuccessResponse<User>> {
-    try {
-      const response = await apiClient.patch<User>(
-        `/auth/admin/users/${userId}/status`,
-        { is_active: isActive },
-        { requiresAuth: true }
-      );
-      
-      return response;
-    } catch (error) {
-      console.error('Admin toggle user status failed:', error);
-      throw error;
-    }
-  }
 
   /**
    * Get today's assignments for all drivers (admin only)

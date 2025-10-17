@@ -1,6 +1,5 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import type { jsPDF } from "jspdf"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -8,21 +7,56 @@ export function cn(...inputs: ClassValue[]) {
 
 /**
  * Loads the Parcego logo for PDF generation
- * @returns Base64 encoded logo data
+ * @returns Base64 encoded PNG logo data
  */
 export const loadLogoForPDF = async (): Promise<string> => {
   try {
-    // Use the SVG logo and convert to base64
-    const logoSvg = `<svg width="120" height="40" viewBox="0 0 120 40" xmlns="http://www.w3.org/2000/svg">
-      <rect width="120" height="40" rx="8" fill="#0091F5"/>
-      <circle cx="20" cy="20" r="12" fill="white"/>
-      <circle cx="35" cy="20" r="8" fill="rgba(255,255,255,0.8)"/>
-      <text x="50" y="25" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="white">Parcego</text>
+    // Create SVG content
+    const logoSvg = `<svg width="240" height="80" viewBox="0 0 240 80" xmlns="http://www.w3.org/2000/svg">
+      <rect width="240" height="80" rx="12" fill="#0091F5"/>
+      <circle cx="40" cy="40" r="18" fill="white"/>
+      <circle cx="70" cy="40" r="14" fill="rgba(255,255,255,0.8)"/>
+      <text x="100" y="50" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="white">Parcego</text>
     </svg>`;
     
-    // Convert SVG to base64
-    const base64 = btoa(logoSvg);
-    return `data:image/svg+xml;base64,${base64}`;
+    // Convert SVG to PNG using canvas
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = 240;
+          canvas.height = 80;
+          
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(''); // Return empty string if canvas not available
+            return;
+          }
+          
+          ctx.drawImage(img, 0, 0, 240, 80);
+          const pngDataUrl = canvas.toDataURL('image/png');
+          resolve(pngDataUrl);
+        } catch (error) {
+          console.error('Error converting SVG to PNG:', error);
+          resolve(''); // Return empty string on error
+        }
+      };
+      
+      img.onerror = () => {
+        console.error('Error loading SVG image');
+        resolve(''); // Return empty string on error
+      };
+      
+      // Convert SVG to data URL
+      const svgBlob = new Blob([logoSvg], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(svgBlob);
+      img.src = url;
+      
+      // Clean up object URL after a delay
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    });
   } catch (error) {
     console.error('Failed to load logo:', error);
     return '';
@@ -33,7 +67,7 @@ export const loadLogoForPDF = async (): Promise<string> => {
  * Adds logo to PDF at specified position
  */
 export const addLogoToPDF = (
-  pdf: jsPDF,
+  pdf: any,
   x: number,
   y: number,
   width: number,
@@ -41,8 +75,8 @@ export const addLogoToPDF = (
   logoData: string
 ) => {
   try {
-    if (logoData) {
-      pdf.addImage(logoData, 'SVG', x, y, width, height);
+    if (logoData && logoData.startsWith('data:image/png')) {
+      pdf.addImage(logoData, 'PNG', x, y, width, height);
     }
   } catch (error) {
     console.error('Failed to add logo to PDF:', error);
@@ -85,10 +119,23 @@ export const generateMockInvoice = (shipmentData: {
   return 'Mock invoice generation is no longer supported. Please use the real API endpoints.';
 };
 
-interface jsPDFWithAutoTable extends jsPDF {
+interface jsPDFWithAutoTable {
   autoTable: (options: any) => void;
   lastAutoTable?: {
     finalY: number;
+  };
+  addImage: (imageData: string, format: string, x: number, y: number, width: number, height: number) => void;
+  setFontSize: (size: number) => void;
+  setTextColor: (...args: number[]) => void;
+  setFont: (fontName: string, fontStyle: string) => void;
+  text: (text: string | string[], x: number, y: number) => void;
+  splitTextToSize: (text: string, maxWidth: number) => string[];
+  save: (filename: string) => void;
+  internal: {
+    pageSize: {
+      height: number;
+      width: number;
+    };
   };
 }
 
@@ -100,7 +147,7 @@ export const testPdfAutoTable = async (): Promise<boolean> => {
     const { jsPDF } = await import('jspdf');
     await import('jspdf-autotable');
     
-    const testPdf = new jsPDF() as jsPDFWithAutoTable;
+    const testPdf = new jsPDF() as unknown as jsPDFWithAutoTable;
     
     if (typeof testPdf.autoTable === 'function') {
       console.log('jsPDF autoTable plugin is available');
@@ -233,89 +280,110 @@ export const generatePdfInvoice = async (invoiceData: {
   };
 }): Promise<void> => {
   try {
+    // Import jsPDF and autoTable - they must be imported together
     const { jsPDF } = await import('jspdf');
-    await import('jspdf-autotable');
     
-    const pdf = new jsPDF() as jsPDFWithAutoTable;
+    // Import autoTable which extends jsPDF prototype
+    const autoTableModule = await import('jspdf-autotable');
+    
+    // Create PDF instance after autoTable import
+    const pdf = new jsPDF();
+    
+    // TypeScript type assertion for autoTable method
+    const pdfWithAutoTable = pdf as unknown as jsPDFWithAutoTable;
+    
+    // Check if autoTable is available
+    if (typeof pdfWithAutoTable.autoTable !== 'function') {
+      // Try using the default export as a function
+      const autoTableFn = (autoTableModule as any).default || autoTableModule;
+      if (typeof autoTableFn === 'function') {
+        // Use autotable as a standalone function: autoTable(pdf, options)
+        pdfWithAutoTable.autoTable = (options: any) => autoTableFn(pdf, options);
+      } else {
+        console.error('Cannot initialize autoTable plugin');
+        console.log('autoTable module:', autoTableModule);
+        throw new Error('PDF table generation plugin not loaded correctly');
+      }
+    }
     
     // Load and add logo
     try {
       const logoData = await loadLogoForPDF();
       if (logoData) {
-        addLogoToPDF(pdf, 20, 20, 40, 13, logoData);
+        addLogoToPDF(pdfWithAutoTable, 20, 20, 40, 13, logoData);
       }
     } catch (logoError) {
       console.warn('Could not load logo, continuing without it:', logoError);
     }
     
     // Add company info
-    pdf.setFontSize(20);
-    pdf.setTextColor(0, 145, 245);
-    pdf.text('Parcego', 70, 30);
+    pdfWithAutoTable.setFontSize(20);
+    pdfWithAutoTable.setTextColor(0, 145, 245);
+    pdfWithAutoTable.text('Parcego', 70, 30);
     
-    pdf.setFontSize(10);
-    pdf.setTextColor(100, 100, 100);
-    pdf.text('Professional Shipping Solutions', 70, 37);
+    pdfWithAutoTable.setFontSize(10);
+    pdfWithAutoTable.setTextColor(100, 100, 100);
+    pdfWithAutoTable.text('Professional Shipping Solutions', 70, 37);
     
     // Invoice title and number
-    pdf.setFontSize(24);
-    pdf.setTextColor(0, 0, 0);
-    pdf.text('INVOICE', 20, 60);
+    pdfWithAutoTable.setFontSize(24);
+    pdfWithAutoTable.setTextColor(0, 0, 0);
+    pdfWithAutoTable.text('INVOICE', 20, 60);
     
-    pdf.setFontSize(12);
-    pdf.text(`Invoice #: ${invoiceData.invoiceNumber}`, 20, 70);
-    pdf.text(`Issue Date: ${invoiceData.issueDate}`, 20, 78);
-    pdf.text(`Due Date: ${invoiceData.dueDate}`, 20, 86);
+    pdfWithAutoTable.setFontSize(12);
+    pdfWithAutoTable.text(`Invoice #: ${invoiceData.invoiceNumber}`, 20, 70);
+    pdfWithAutoTable.text(`Issue Date: ${invoiceData.issueDate}`, 20, 78);
+    pdfWithAutoTable.text(`Due Date: ${invoiceData.dueDate}`, 20, 86);
     
     if (invoiceData.status) {
-      pdf.text(`Status: ${invoiceData.status}`, 20, 94);
+      pdfWithAutoTable.text(`Status: ${invoiceData.status}`, 20, 94);
     }
     
     // Bill To section
-    pdf.setFontSize(14);
-    pdf.text('Bill To:', 20, 110);
+    pdfWithAutoTable.setFontSize(14);
+    pdfWithAutoTable.text('Bill To:', 20, 110);
     
-    pdf.setFontSize(11);
+    pdfWithAutoTable.setFontSize(11);
     let yPos = 120;
-    pdf.text(invoiceData.billTo.name, 20, yPos);
+    pdfWithAutoTable.text(invoiceData.billTo.name, 20, yPos);
     yPos += 7;
     
     if (invoiceData.billTo.company) {
-      pdf.text(invoiceData.billTo.company, 20, yPos);
+      pdfWithAutoTable.text(invoiceData.billTo.company, 20, yPos);
       yPos += 7;
     }
     
-    pdf.text(invoiceData.billTo.address, 20, yPos);
+    pdfWithAutoTable.text(invoiceData.billTo.address, 20, yPos);
     yPos += 7;
-    pdf.text(`${invoiceData.billTo.city}, ${invoiceData.billTo.province} ${invoiceData.billTo.postalCode}`, 20, yPos);
+    pdfWithAutoTable.text(`${invoiceData.billTo.city}, ${invoiceData.billTo.province} ${invoiceData.billTo.postalCode}`, 20, yPos);
     yPos += 7;
-    pdf.text(invoiceData.billTo.country, 20, yPos);
+    pdfWithAutoTable.text(invoiceData.billTo.country, 20, yPos);
     
     // Shipment details if provided
     if (invoiceData.shipmentDetails) {
-      pdf.setFontSize(14);
-      pdf.text('Shipment Details:', 120, 110);
+      pdfWithAutoTable.setFontSize(14);
+      pdfWithAutoTable.text('Shipment Details:', 120, 110);
       
-      pdf.setFontSize(11);
+      pdfWithAutoTable.setFontSize(11);
       let shipYPos = 120;
       
       if (invoiceData.shipmentDetails.trackingNumber) {
-        pdf.text(`Tracking: ${invoiceData.shipmentDetails.trackingNumber}`, 120, shipYPos);
+        pdfWithAutoTable.text(`Tracking: ${invoiceData.shipmentDetails.trackingNumber}`, 120, shipYPos);
         shipYPos += 7;
       }
       
       if (invoiceData.shipmentDetails.service) {
-        pdf.text(`Service: ${invoiceData.shipmentDetails.service}`, 120, shipYPos);
+        pdfWithAutoTable.text(`Service: ${invoiceData.shipmentDetails.service}`, 120, shipYPos);
         shipYPos += 7;
       }
       
       if (invoiceData.shipmentDetails.weight) {
-        pdf.text(`Weight: ${invoiceData.shipmentDetails.weight}`, 120, shipYPos);
+        pdfWithAutoTable.text(`Weight: ${invoiceData.shipmentDetails.weight}`, 120, shipYPos);
         shipYPos += 7;
       }
       
       if (invoiceData.shipmentDetails.deliveryDate) {
-        pdf.text(`Delivery: ${invoiceData.shipmentDetails.deliveryDate}`, 120, shipYPos);
+        pdfWithAutoTable.text(`Delivery: ${invoiceData.shipmentDetails.deliveryDate}`, 120, shipYPos);
       }
     }
     
@@ -327,7 +395,7 @@ export const generatePdfInvoice = async (invoiceData: {
       `${invoiceData.currency}${item.amount.toFixed(2)}`
     ]);
     
-    pdf.autoTable({
+    pdfWithAutoTable.autoTable({
       startY: yPos + 20,
       head: [['Description', 'Qty', 'Unit Price', 'Amount']],
       body: tableData,
@@ -350,42 +418,42 @@ export const generatePdfInvoice = async (invoiceData: {
     });
     
     // Totals
-    const finalY = pdf.lastAutoTable?.finalY || yPos + 80;
+    const finalY = pdfWithAutoTable.lastAutoTable?.finalY || yPos + 80;
     const totalsX = 130;
     let totalsY = finalY + 20;
     
-    pdf.setFontSize(11);
-    pdf.text(`Subtotal: ${invoiceData.currency}${invoiceData.subtotal.toFixed(2)}`, totalsX, totalsY);
+    pdfWithAutoTable.setFontSize(11);
+    pdfWithAutoTable.text(`Subtotal: ${invoiceData.currency}${invoiceData.subtotal.toFixed(2)}`, totalsX, totalsY);
     totalsY += 8;
-    pdf.text(`Tax: ${invoiceData.currency}${invoiceData.tax.toFixed(2)}`, totalsX, totalsY);
+    pdfWithAutoTable.text(`Tax: ${invoiceData.currency}${invoiceData.tax.toFixed(2)}`, totalsX, totalsY);
     totalsY += 8;
     
     // Total with emphasis
-    pdf.setFontSize(12);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text(`Total: ${invoiceData.currency}${invoiceData.total.toFixed(2)}`, totalsX, totalsY);
+    pdfWithAutoTable.setFontSize(12);
+    pdfWithAutoTable.setFont('helvetica', 'bold');
+    pdfWithAutoTable.text(`Total: ${invoiceData.currency}${invoiceData.total.toFixed(2)}`, totalsX, totalsY);
     
     // Notes
     if (invoiceData.notes) {
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(10);
-      pdf.text('Notes:', 20, totalsY + 20);
+      pdfWithAutoTable.setFont('helvetica', 'normal');
+      pdfWithAutoTable.setFontSize(10);
+      pdfWithAutoTable.text('Notes:', 20, totalsY + 20);
       
       // Split notes into multiple lines if needed
-      const splitNotes = pdf.splitTextToSize(invoiceData.notes, 170);
-      pdf.text(splitNotes, 20, totalsY + 28);
+      const splitNotes = pdfWithAutoTable.splitTextToSize(invoiceData.notes, 170);
+      pdfWithAutoTable.text(splitNotes, 20, totalsY + 28);
     }
     
     // Footer
-    const pageHeight = pdf.internal.pageSize.height;
-    pdf.setFontSize(8);
-    pdf.setTextColor(100, 100, 100);
-    pdf.text('Thank you for your business!', 20, pageHeight - 20);
-    pdf.text(`Generated on ${new Date().toLocaleDateString()}`, 20, pageHeight - 12);
+    const pageHeight = pdfWithAutoTable.internal.pageSize.height;
+    pdfWithAutoTable.setFontSize(8);
+    pdfWithAutoTable.setTextColor(100, 100, 100);
+    pdfWithAutoTable.text('Thank you for your business!', 20, pageHeight - 20);
+    pdfWithAutoTable.text(`Generated on ${new Date().toLocaleDateString()}`, 20, pageHeight - 12);
     
     // Save the PDF
     const filename = `${invoiceData.invoiceNumber.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
-    pdf.save(filename);
+    pdfWithAutoTable.save(filename);
     
   } catch (error) {
     console.error('Error generating PDF invoice:', error);

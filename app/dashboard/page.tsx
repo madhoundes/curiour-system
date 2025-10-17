@@ -4,7 +4,6 @@ import { StatsCards } from "@/components/dashboard/stats-cards"
 import { PerformanceSummary } from "@/components/dashboard/performance-summary"
 import { ShippingTips } from "@/components/dashboard/shipping-tips"
 import { RecentShipments } from "@/components/dashboard/recent-shipments"
-import { RecentActivity } from "@/components/dashboard/recent-activity"
 
 export default function DashboardPage() {
   return (
@@ -24,11 +23,8 @@ export default function DashboardPage() {
       {/* Shipping Tips */}
       <ShippingTips />
       
-      {/* Recent Shipments and Activity Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <RecentShipments />
-        <RecentActivity />
-      </div>
+      {/* Recent Shipments */}
+      <RecentShipments />
     </div>
   )
 }

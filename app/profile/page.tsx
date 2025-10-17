@@ -5,6 +5,7 @@ import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { profileService } from "@/lib/api/profile";
+import { notificationService } from "@/lib/api/notifications";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,10 +47,6 @@ const AccountSettingsSchema = z.object({
 
 const NotificationPrefsSchema = z.object({
   emailUpdates: z.boolean(),
-  smsUpdates: z.boolean(),
-  pushUpdates: z.boolean(),
-  deliveryAlerts: z.boolean(),
-  weeklySummary: z.boolean(),
 });
 
 const ThirdPartyIntegrationSchema = z.object({
@@ -80,6 +77,8 @@ export default function ProfileAccountPage() {
   // Loading and error states
   const [isLoading, setIsLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<boolean | null>(null);
+  const [isLoadingSubscription, setIsLoadingSubscription] = useState(false);
 
   const defaultBusiness: BusinessInfo = useMemo(
     () => ({
@@ -110,10 +109,6 @@ export default function ProfileAccountPage() {
   const defaultNotifications: NotificationPrefs = useMemo(
     () => ({
       emailUpdates: true,
-      smsUpdates: false,
-      pushUpdates: true,
-      deliveryAlerts: true,
-      weeklySummary: true,
     }),
     []
   );
@@ -176,12 +171,15 @@ export default function ProfileAccountPage() {
         
         businessForm.reset(businessData);
         
+        // Check notification subscription status for the email
+        if (profileData.email) {
+          await checkSubscriptionStatus(profileData.email);
+        }
+        
         // Load other data from localStorage as fallback for now
         const s = localStorage.getItem(STORAGE_KEYS.settings);
-        const n = localStorage.getItem(STORAGE_KEYS.notifications);
         const i = localStorage.getItem(STORAGE_KEYS.integrations);
         if (s) settingsForm.reset(JSON.parse(s));
-        if (n) notificationsForm.reset(JSON.parse(n));
         if (i) integrationsForm.reset(JSON.parse(i));
         
       } catch (error: any) {
@@ -272,6 +270,40 @@ export default function ProfileAccountPage() {
     integrationsForm.setValue("shopify.enabled", true);
     integrationsForm.setValue("shopify.shopDomain", "demo-store.myshopify.com");
     integrationsForm.setValue("shopify.accessToken", "shpat_••••••••••••••••••");
+  };
+
+  const checkSubscriptionStatus = async (email: string) => {
+    if (!email) return;
+    
+    try {
+      setIsLoadingSubscription(true);
+      const status = await notificationService.getSubscriptionStatus(email);
+      setSubscriptionStatus(status.subscribed);
+      notificationsForm.setValue("emailUpdates", status.subscribed);
+    } catch (error) {
+      console.error('Failed to check subscription status:', error);
+      // Default to subscribed if we can't check
+      setSubscriptionStatus(true);
+      notificationsForm.setValue("emailUpdates", true);
+    } finally {
+      setIsLoadingSubscription(false);
+    }
+  };
+
+  const handleNotificationToggle = async (email: string, isSubscribed: boolean) => {
+    try {
+      if (isSubscribed) {
+        await notificationService.unsubscribeEmail({ email });
+        setNotificationsMsg("Successfully unsubscribed from email notifications");
+      } else {
+        await notificationService.resubscribeEmail({ email });
+        setNotificationsMsg("Successfully subscribed to email notifications");
+      }
+      setSubscriptionStatus(isSubscribed);
+    } catch (error: any) {
+      console.error('Failed to update notification subscription:', error);
+      setNotificationsMsg(`Failed to update subscription: ${error.message}`);
+    }
   };
 
 
@@ -635,63 +667,67 @@ export default function ProfileAccountPage() {
                     <form
                       id="parcego-profile-notifications-form"
                       className="grid grid-cols-1 gap-3"
-                      onSubmit={notificationsForm.handleSubmit((data) =>
-                        handleSave(
-                          STORAGE_KEYS.notifications,
-                          data,
-                          setNotificationsMsg,
-                          "Notifications"
-                        )
-                      )}
+                      onSubmit={notificationsForm.handleSubmit((data) => {
+                        const email = businessForm.getValues("email");
+                        if (email) {
+                          handleNotificationToggle(email, data.emailUpdates);
+                        } else {
+                          setNotificationsMsg("Please enter your email address in the Business tab first");
+                        }
+                      })}
                       aria-label="Notification preferences form"
                     >
-                      {[
-                        ["emailUpdates", "Email updates"],
-                        ["smsUpdates", "SMS updates"],
-                        ["pushUpdates", "Push notifications"],
-                        ["deliveryAlerts", "Delivery alerts"],
-                        ["weeklySummary", "Weekly summary"],
-                      ].map(([key, text]) => (
-                        <FormField
-                          key={key}
-                          control={notificationsForm.control}
-                          // @ts-expect-error index access is safe here
-                          name={key}
-                          render={({ field }) => (
-                            <FormItem>
+                      <FormField
+                        control={notificationsForm.control}
+                        name="emailUpdates"
+                        render={({ field }) => (
+                          <FormItem>
+                            <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
                                 <Checkbox
-                                  id={`parcego-profile-notif-${key}`}
+                                  id="parcego-profile-notif-email"
                                   checked={field.value as boolean}
                                   onCheckedChange={(v) => field.onChange(!!v)}
-                                  aria-label={text as string}
+                                  aria-label="Email updates"
+                                  disabled={isLoadingSubscription}
                                 />
-                                <Label htmlFor={`parcego-profile-notif-${key}`}>{text as string}</Label>
+                                <Label htmlFor="parcego-profile-notif-email">Email updates</Label>
                               </div>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      ))}
+                              {isLoadingSubscription && (
+                                <span className="text-sm text-gray-500">Checking status...</span>
+                              )}
+                              {subscriptionStatus !== null && !isLoadingSubscription && (
+                                <span className="text-sm text-gray-500">
+                                  {subscriptionStatus ? "Subscribed" : "Unsubscribed"}
+                                </span>
+                              )}
+                            </div>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
 
                       <div className="mt-4 flex items-center gap-2">
-                        <Button type="submit" aria-label="Save notification preferences">
-                          Save changes
+                        <Button 
+                          type="submit" 
+                          aria-label="Update notification preferences"
+                          disabled={isLoadingSubscription}
+                        >
+                          {isLoadingSubscription ? "Checking..." : "Update Subscription"}
                         </Button>
                         <Button
                           type="button"
                           variant="ghost"
-                          onClick={() =>
-                            handleReset(
-                              notificationsForm.reset,
-                              defaultNotifications,
-                              setNotificationsMsg,
-                              "Notifications"
-                            )
-                          }
-                          aria-label="Reset notification preferences to defaults"
+                          onClick={() => {
+                            const email = businessForm.getValues("email");
+                            if (email) {
+                              checkSubscriptionStatus(email);
+                            }
+                          }}
+                          aria-label="Refresh subscription status"
+                          disabled={isLoadingSubscription}
                         >
-                          Reset
+                          Refresh Status
                         </Button>
                       </div>
                     </form>
