@@ -15,6 +15,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NotificationBanner } from "@/components/ui/notification-banner";
+import { authService, driverService } from "@/lib/api";
+import type { User, DriverAssignment, DriverStatisticsResponse } from "@/lib/api";
 
 // Mock data for courier dashboard
 const mockCourierData = {
@@ -208,15 +210,20 @@ function CourierDashboard() {
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [isScanPackageModalOpen, setIsScanPackageModalOpen] = useState(false);
   
+  // API Data state
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [assignments, setAssignments] = useState<DriverAssignment[]>([]);
+  const [apiStats, setApiStats] = useState<DriverStatisticsResponse | null>(null);
+  
   // Notification banner state
   const [showNotificationBanner, setShowNotificationBanner] = useState(true);
   const [notificationBanner, setNotificationBanner] = useState({
     type: "warning" as "info" | "success" | "warning" | "error",
     title: "Delivery Status Update",
-    message: "You have 3 pending deliveries that need attention (mock)",
+    message: "Loading your assignments...",
   });
   
-  // Deliveries & Stats state (sequential by priority)
+  // Deliveries & Stats state (sequential by priority) - now based on API data
   const [deliveries, setDeliveries] = useState<typeof mockDeliveries>(() => [...mockDeliveries]);
   const [stats, setStats] = useState(() => ({ ...mockCourierData.stats }));
   const priorityOrder = React.useMemo(() => ({ high: 3, medium: 2, low: 1 } as const), []);
@@ -318,80 +325,266 @@ function CourierDashboard() {
     setCameraError("");
   };
 
-  // Check authentication on component mount
+  // Extract data fetching logic to avoid duplication
+  const fetchDashboardData = async (userData: any) => {
+    try {
+      console.log('🔍 [DASHBOARD] Fetching dashboard data...');
+      
+      // Fetch today's assignments
+      const assignmentsResponse = await driverService.getTodaysAssignments();
+      console.log('✅ [DASHBOARD] Assignments fetched:', {
+        totalAssignments: assignmentsResponse.assignments?.length || 0,
+        date: assignmentsResponse.date,
+        firstAssignment: assignmentsResponse.assignments?.[0]?.tracking_code || 'none'
+      });
+      setAssignments(assignmentsResponse.assignments || []);
+
+      // Update deliveries based on assignments
+      let mappedDeliveries: any[] = [];
+      if (assignmentsResponse.assignments && assignmentsResponse.assignments.length > 0) {
+        mappedDeliveries = assignmentsResponse.assignments.map((assignment, index) => {
+          // Map assignment status to delivery status more accurately
+          let deliveryStatus: string;
+          if (assignment.assignment_status === 'completed' || assignment.status === 'delivered') {
+            deliveryStatus = 'delivered';
+          } else if (assignment.status === 'out_for_delivery') {
+            deliveryStatus = 'ready_for_pickup';
+          } else if (assignment.status === 'in_transit') {
+            deliveryStatus = 'in_transit';
+          } else if (assignment.assignment_status === 'in_progress') {
+            deliveryStatus = 'in_transit';
+          } else {
+            deliveryStatus = 'assigned';
+          }
+
+          return {
+            id: `PCG-DEL-${assignment.id}`,
+            trackingNumber: assignment.tracking_code,
+            customerName: assignment.receiver_name,
+            address: `${assignment.receiver_address}, ${assignment.receiver_city}`,
+            timeWindow: "N/A", // Can be calculated based on estimated_delivery_date
+            estimatedTime: assignment.estimated_delivery_date || "TBD",
+            status: deliveryStatus,
+            packageType: assignment.package_type || 'Standard',
+            weight: `${assignment.weight} kg`,
+            specialInstructions: assignment.special_instructions || '',
+            priority: 'medium' as const // Default priority
+          };
+        });
+        setDeliveries(mappedDeliveries);
+        
+        console.log('📦 [DASHBOARD] Mapped deliveries:', mappedDeliveries.map(d => ({
+          id: d.id,
+          trackingNumber: d.trackingNumber,
+          customerName: d.customerName,
+          status: d.status
+        })));
+      } else {
+        console.log('ℹ️ [DASHBOARD] No assignments found for today');
+        setDeliveries([]);
+        mappedDeliveries = [];
+      }
+
+      // Fetch driver statistics
+      console.log('🔍 [DASHBOARD] Fetching driver statistics...');
+      const statsResponse = await driverService.getDriverStatistics();
+      console.log('✅ [DASHBOARD] Statistics fetched:', {
+        totalDeliveries: statsResponse.total_deliveries,
+        itemsInTransit: statsResponse.items_in_transit,
+        itemsInWarehouse: statsResponse.items_in_warehouse,
+        undeliveredShipments: statsResponse.undelivered_shipments
+      });
+      setApiStats(statsResponse);
+
+      // Update stats UI based on mapped deliveries
+      const totalAssignments = assignmentsResponse.assignments?.length || 0;
+      const completedDeliveries = mappedDeliveries?.filter(d => d.status === 'delivered').length || 0;
+      const remainingDeliveries = totalAssignments - completedDeliveries;
+
+      console.log('📊 [DASHBOARD] Delivery status breakdown:', {
+        totalAssignments,
+        completedDeliveries,
+        remainingDeliveries,
+        deliveryStatuses: mappedDeliveries?.map(d => ({
+          id: d.id,
+          trackingNumber: d.trackingNumber,
+          customerName: d.customerName,
+          status: d.status
+        })) || []
+      });
+
+      setStats({
+        deliveriesToday: totalAssignments,
+        completed: completedDeliveries,
+        remaining: remainingDeliveries,
+        earnings: 145.50, // Mock value - not in API yet
+        efficiency: 92, // Mock value - can be calculated
+        onTimeRate: 98 // Mock value - can be calculated
+      });
+
+      // Update notification banner
+      setNotificationBanner({
+        type: remainingDeliveries > 0 ? "warning" : "success",
+        title: remainingDeliveries > 0 ? "Delivery Status Update" : "All Deliveries Complete",
+        message: remainingDeliveries > 0 
+          ? `You have ${remainingDeliveries} pending deliveries that need attention`
+          : "Great job! All deliveries are complete for today."
+      });
+
+      console.log('✅ [DASHBOARD] Dashboard data loaded successfully');
+      
+    } catch (error: any) {
+      console.error('❌ [DASHBOARD] Error fetching dashboard data:', error);
+      throw error; // Re-throw to be handled by caller
+    }
+  };
+
+  // Check authentication and fetch data on component mount
   useEffect(() => {
-    const checkAuthentication = () => {
+    const checkAuthenticationAndFetchData = async () => {
       // Only run on client side to prevent hydration mismatch
       if (typeof window === 'undefined') {
+        console.log('⚠️ [DASHBOARD] Running on server side, skipping auth check');
         setIsLoading(false);
         return;
       }
 
-      // Add debugging for HTTPS context
-      console.log('🔍 Courier Dashboard - Checking authentication...');
-      console.log('🔍 Current protocol:', window.location.protocol);
-      console.log('🔍 Current host:', window.location.host);
-      console.log('🔍 Is secure context:', window.isSecureContext);
+      console.log('🔍 [DASHBOARD] Starting authentication check...');
+      console.log('🔍 [DASHBOARD] Current URL:', window.location.href);
 
       try {
         const authenticated = localStorage.getItem("courier_authenticated");
+        const authToken = localStorage.getItem("auth_token");
         const loginTime = localStorage.getItem("courier_login_time");
+        const courierEmail = localStorage.getItem("courier_email");
+        const courierUser = localStorage.getItem("courier_user");
 
-        console.log('🔍 Authentication status:', authenticated);
-        console.log('🔍 Login time:', loginTime);
+        console.log('🔍 [DASHBOARD] LocalStorage check:', {
+          courier_authenticated: authenticated,
+          auth_token_exists: !!authToken,
+          auth_token_length: authToken?.length || 0,
+          auth_token_preview: authToken?.substring(0, 20) + '...',
+          courier_login_time: loginTime,
+          courier_email: courierEmail,
+          courier_user_exists: !!courierUser,
+          all_keys: Object.keys(localStorage)
+        });
 
-        // Load completed deliveries from localStorage
-        const completedDeliveries = JSON.parse(localStorage.getItem('parcego_completed_deliveries') || '[]');
-        if (completedDeliveries.length > 0) {
-          setDeliveries(prev => prev.map(delivery =>
-            completedDeliveries.includes(delivery.id)
-              ? { ...delivery, status: 'delivered' as const }
-              : delivery
-          ));
+        console.log('🍪 [DASHBOARD] Cookies:', document.cookie);
 
-          // Update stats based on completed deliveries
-          const completedCount = completedDeliveries.length;
-          setStats(prev => ({
-            ...prev,
-            completed: Math.max(prev.completed, completedCount),
-            remaining: Math.max(0, prev.deliveriesToday - completedCount)
-          }));
-        }
-        
         // Check if authentication exists and is not expired (24 hours)
-        if (authenticated === "true" && loginTime) {
+        // Only check localStorage - if it's empty, redirect to login
+        const hasLocalStorageAuth = authenticated === "true" && authToken && loginTime;
+        
+        console.log('🔍 [DASHBOARD] Authentication check:', {
+          hasLocalStorageAuth,
+          localStorageData: { authenticated, authToken: !!authToken, loginTime },
+          cookieData: document.cookie
+        });
+
+        if (!hasLocalStorageAuth) {
+          console.log('❌ [DASHBOARD] No valid authentication found in localStorage');
+          console.log('❌ [DASHBOARD] Missing authentication data:', {
+            courier_authenticated: authenticated,
+            auth_token_exists: !!authToken,
+            courier_login_time: loginTime,
+            required: 'All three must be present'
+          });
+          router.push("/courier-login");
+          return;
+        }
+
+        console.log('✅ [DASHBOARD] Using localStorage authentication');
+
+        // Authentication already validated above, proceed with token expiry check
+        console.log('✅ [DASHBOARD] Basic auth check passed');
+        console.log('🔍 [DASHBOARD] Checking token expiry...');
           const timeSinceLogin = Date.now() - parseInt(loginTime);
-          const twentyFourHours = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-          
-          console.log('🔍 Time since login:', timeSinceLogin, 'ms');
-          
-          if (timeSinceLogin < twentyFourHours) {
-            console.log('✅ Authentication valid, setting authenticated to true');
-            setIsAuthenticated(true);
-          } else {
-            console.log('⏰ Session expired, clearing storage and redirecting');
-            // Session expired, clear storage and redirect
+        const twentyFourHours = 24 * 60 * 60 * 1000;
+        
+        console.log('🔍 [DASHBOARD] Time since login:', {
+          timeSinceLogin,
+          timeSinceLoginMinutes: Math.floor(timeSinceLogin / (1000 * 60)),
+          twentyFourHours,
+          isExpired: timeSinceLogin >= twentyFourHours
+        });
+
+        if (timeSinceLogin >= twentyFourHours) {
+          console.log('⏰ [DASHBOARD] Session expired, clearing storage and redirecting');
             localStorage.removeItem("courier_authenticated");
             localStorage.removeItem("courier_email");
             localStorage.removeItem("courier_login_time");
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("courier_user");
             document.cookie = "courier_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
             router.push("/courier-login");
-          }
-        } else {
-          console.log('❌ No authentication found, redirecting to login');
-          // No authentication found, redirect to login
-          router.push("/courier-login");
+          return;
         }
-      } catch (error) {
-        console.error('❌ Error during authentication check:', error);
-        // If there's an error, redirect to login for safety
+
+        console.log('✅ [DASHBOARD] Token not expired, proceeding with API verification...');
+
+        try {
+          // Verify token and get current user
+          console.log('🔍 [DASHBOARD] Calling authService.getCurrentUser()...');
+          console.log('🔍 [DASHBOARD] Auth token being used:', authToken.substring(0, 20) + '...');
+          
+          const userResponse = await authService.getCurrentUser();
+          
+          console.log('✅ [DASHBOARD] User data fetched successfully:', {
+            userId: userResponse.data.id,
+            email: userResponse.data.email,
+            firstName: userResponse.data.first_name,
+            lastName: userResponse.data.last_name,
+            role: userResponse.data.role,
+            isActive: userResponse.data.is_active,
+            isVerified: userResponse.data.is_verified
+          });
+
+          // Check if user has courier/driver role
+          if (userResponse.data.role !== 'courier' && userResponse.data.role !== 'driver') {
+            console.error('❌ [DASHBOARD] User does not have courier/driver role:', userResponse.data.role);
+            localStorage.removeItem("courier_authenticated");
+            localStorage.removeItem("auth_token");
+          router.push("/courier-login");
+            return;
+          }
+
+          console.log('✅ [DASHBOARD] Role validation passed');
+          setCurrentUser(userResponse.data);
+          setIsAuthenticated(true);
+
+          // Fetch dashboard data using the extracted function
+          await fetchDashboardData(userResponse.data);
+
+        } catch (apiError: any) {
+          console.error('❌ [DASHBOARD] API error during data fetch:', apiError);
+          console.error('❌ [DASHBOARD] API error details:', {
+            message: apiError.message,
+            response: apiError.response,
+            status: apiError.response?.status,
+            data: apiError.response?.data
+          });
+          
+          // Token might be invalid, redirect to login
+          console.log('❌ [DASHBOARD] Token appears invalid, clearing storage and redirecting...');
+          localStorage.removeItem("courier_authenticated");
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("courier_email");
+          localStorage.removeItem("courier_login_time");
+          localStorage.removeItem("courier_user");
+          router.push("/courier-login");
+          return;
+        }
+      } catch (error: any) {
+        console.error('❌ [DASHBOARD] Error during authentication check:', error);
+        console.error('❌ [DASHBOARD] Error stack:', error.stack);
         router.push("/courier-login");
       }
       
       setIsLoading(false);
     };
 
-    checkAuthentication();
+    checkAuthenticationAndFetchData();
   }, [router]);
 
   // Keyboard support for modals
@@ -560,14 +753,24 @@ function CourierDashboard() {
 
 
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     // Only run on client side to prevent hydration mismatch
     if (typeof window === 'undefined') return;
+
+    try {
+      // Call API logout endpoint
+      await authService.logout();
+    } catch (error) {
+      console.error('Logout API error:', error);
+      // Continue with local logout even if API call fails
+    }
 
     // Clear all authentication data
     localStorage.removeItem("courier_authenticated");
     localStorage.removeItem("courier_email");
     localStorage.removeItem("courier_login_time");
+    localStorage.removeItem("auth_token");
+    localStorage.removeItem("courier_user");
     
     // Clear authentication cookie with proper attributes
     document.cookie = "courier_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
@@ -828,23 +1031,45 @@ function CourierDashboard() {
     }
   };
   
-  const handleBarcodeDetected = (detectedCode: string) => {
+  const handleBarcodeDetected = async (detectedCode: string) => {
     console.log("📱 Barcode detected:", detectedCode);
     
     // Stop scanning after successful detection
     setIsScanning(false);
     
-    // Simulate successful scan by calling existing submit logic
+    // Set scan input and validate
     setScanInput(detectedCode);
     const validation = validateScan(detectedCode);
     setIsScanValid(validation.valid);
     setScanValidationMessage(validation.message);
     
     if (validation.valid) {
-      // Automatically process successful scan
-      setTimeout(() => {
-        handleScanSubmit();
-      }, 500);
+      // Automatically process successful scan with API
+      try {
+        console.log('🔍 Auto-searching for shipment:', detectedCode);
+        const searchResponse = await driverService.searchShipments(detectedCode);
+        console.log('✅ Auto-search results:', searchResponse);
+
+        if (searchResponse.shipments && searchResponse.shipments.length > 0) {
+          const shipment = searchResponse.shipments[0];
+          const packageData = {
+            trackingNumber: shipment.tracking_code,
+            customerName: shipment.receiver_name,
+            address: `${shipment.receiver_address}, ${shipment.receiver_city}, ${shipment.receiver_province} ${shipment.receiver_postal_code}`,
+            packageType: shipment.package_type || "Standard",
+            weight: `${shipment.weight} kg`,
+            estimatedDelivery: shipment.estimated_delivery_date || "TBD",
+            currentStatus: shipment.status as any,
+            specialInstructions: shipment.special_instructions || ""
+          };
+          setScannedPackageData(packageData);
+        } else {
+          setScanError("Package not found. Please check the tracking number.");
+        }
+      } catch (error: any) {
+        console.error('❌ Auto-search error:', error);
+        setScanError(error.message || "Failed to search for package.");
+      }
     }
   };
   
@@ -876,27 +1101,53 @@ function CourierDashboard() {
 
   // Scan package functions will be defined after handleCameraStop
 
-  const handleScanSubmit = () => {
+  const handleScanSubmit = async () => {
     if (!scanInput || scanInput.trim().length === 0) {
       setScanError("Please enter or scan a barcode");
       return;
     }
 
-    // Mock package data based on scanned input
-    const mockPackageData = {
-      trackingNumber: scanInput.trim(),
-      customerName: "Sarah Johnson",
-      address: "123 Main Street, Downtown District, NY 10001",
-      packageType: "Express Delivery",
-      weight: "2.5 kg",
-      estimatedDelivery: "Today, 4:00 PM",
-      currentStatus: "ready_for_pickup" as const,
-      specialInstructions: "Call upon arrival"
-    };
+    try {
+      // Set loading state
+      setIsScanning(true);
+      setScanError("");
 
-    setScannedPackageData(mockPackageData);
+      // Search for the shipment using the API
+      console.log('🔍 Searching for shipment:', scanInput.trim());
+      const searchResponse = await driverService.searchShipments(scanInput.trim());
+      console.log('✅ Shipment search results:', searchResponse);
+
+      // Check if any shipments were found
+      if (!searchResponse.shipments || searchResponse.shipments.length === 0) {
+        setScanError("Package not found. Please check the tracking number and try again.");
+        setIsScanning(false);
+        return;
+      }
+
+      // Get the first matching shipment
+      const shipment = searchResponse.shipments[0];
+
+      // Map API data to scanned package data
+      const packageData = {
+        trackingNumber: shipment.tracking_code,
+        customerName: shipment.receiver_name,
+        address: `${shipment.receiver_address}, ${shipment.receiver_city}, ${shipment.receiver_province} ${shipment.receiver_postal_code}`,
+        packageType: shipment.package_type || "Standard",
+        weight: `${shipment.weight} kg`,
+        estimatedDelivery: shipment.estimated_delivery_date || "TBD",
+        currentStatus: shipment.status as any,
+        specialInstructions: shipment.special_instructions || ""
+      };
+
+      setScannedPackageData(packageData);
     setScanError("");
-    console.log(`Package scanned successfully: ${scanInput}`);
+      setIsScanning(false);
+      console.log(`✅ Package scanned successfully: ${scanInput}`);
+    } catch (error: any) {
+      console.error('❌ Error searching for shipment:', error);
+      setScanError(error.message || "Failed to search for package. Please try again.");
+      setIsScanning(false);
+    }
   };
 
   const validateScan = (input: string) => {
@@ -990,7 +1241,9 @@ function CourierDashboard() {
                 >
                   <Avatar className="h-8 w-8">
                     <AvatarFallback className="bg-gray-100 text-gray-700 text-sm font-medium">
-                      {mockCourierData.name.split(' ').map(n => n[0]).join('')}
+                      {currentUser 
+                        ? `${currentUser.first_name[0]}${currentUser.last_name[0]}`.toUpperCase()
+                        : 'U'}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -998,9 +1251,13 @@ function CourierDashboard() {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{mockCourierData.name}</p>
+                    <p className="text-sm font-medium leading-none">
+                      {currentUser 
+                        ? `${currentUser.first_name} ${currentUser.last_name}`
+                        : 'Courier'}
+                    </p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      {mockCourierData.id}
+                      {currentUser?.email || ''}
                     </p>
                   </div>
                 </DropdownMenuLabel>
@@ -1042,7 +1299,7 @@ function CourierDashboard() {
               </div>
               <div className="flex-1 min-w-0">
                 <h3 className="text-lg/7 md:text-xl/8 font-bold text-blue-900 mb-1 tracking-tight antialiased">
-                  Good Morning, {mockCourierData.name.split(' ')[0]}!
+                  Good Morning, {currentUser?.first_name || 'Courier'}!
                 </h3>
                 <p className="text-sm md:text-base text-blue-700">
                   You have {stats.remaining} deliveries remaining today. 

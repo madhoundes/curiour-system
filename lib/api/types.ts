@@ -950,3 +950,12 @@ export interface NotificationStatusResponse {
   subscribed: boolean;
   notification_type: string;
 }
+
+// Route Optimization Types
+export interface RouteOptimizationParams {
+  date?: string; // Optional date parameter
+}
+
+export interface RouteOptimizationResponse {
+  google_maps_url: string;
+}
