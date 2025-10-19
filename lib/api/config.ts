@@ -120,6 +120,9 @@ export const API_ENDPOINTS = {
     UPLOAD_DELIVERY_PHOTO: '/driver/shipments/:shipment_id/delivery-photo',
     DRIVER_STATISTICS: '/stats/driver',
   },
+  ROUTE_OPTIMIZATION: {
+    GOOGLE_MAPS_ROUTE: '/route-optimization/driver/:driver_id/google-maps-route',
+  },
 } as const;
 
 export const HTTP_STATUS = {

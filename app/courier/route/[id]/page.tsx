@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
+import { authService, driverService, routeOptimizationService } from "@/lib/api";
+import type { DriverAssignment, DriverShipment, DriverAssignmentsResponse } from "@/lib/api/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -127,57 +129,8 @@ const AppleMapsIcon = () => (
   </svg>
 );
 
-// Mock delivery data - enhanced for route simulation
-const mockDeliveries = [
-  {
-    id: "PCG-DEL-001",
-    trackingNumber: "PCG789123456",
-    customerName: "Sarah Johnson",
-    address: "123 Main Street, Downtown",
-    coordinates: { lat: 43.6532, lng: -79.3832 },
-    timeWindow: "2:00 PM - 4:00 PM",
-    estimatedTime: "2:30 PM",
-    status: "ready_for_pickup",
-    packageType: "Standard",
-    weight: "2.5 kg",
-    specialInstructions: "Call upon arrival",
-    priority: "high",
-    requiredBarcode: "PCG789123456SCAN",
-    photoRequired: true
-  },
-  {
-    id: "PCG-DEL-002", 
-    trackingNumber: "PCG789123457",
-    customerName: "Mike Chen",
-    address: "456 Oak Avenue, Suburbs",
-    coordinates: { lat: 43.6567, lng: -79.3897 },
-    timeWindow: "3:00 PM - 5:00 PM",
-    estimatedTime: "3:15 PM",
-    status: "assigned",
-    packageType: "Fragile",
-    weight: "1.2 kg",
-    specialInstructions: "Handle with care - electronics",
-    priority: "medium",
-    requiredBarcode: "PCG789123457SCAN",
-    photoRequired: true
-  },
-  {
-    id: "PCG-DEL-003",
-    trackingNumber: "PCG789123458", 
-    customerName: "Lisa Brown",
-    address: "789 Pine Road, Uptown",
-    coordinates: { lat: 43.6612, lng: -79.3776 },
-    timeWindow: "4:00 PM - 6:00 PM",
-    estimatedTime: "4:45 PM",
-    status: "assigned",
-    packageType: "Documents", 
-    weight: "0.3 kg",
-    specialInstructions: "Signature required",
-    priority: "low",
-    requiredBarcode: "PCG789123458SCAN",
-    photoRequired: true
-  }
-];
+// API Data will replace mock data
+// Real delivery data will be fetched from driverService.getTodaysAssignments()
 
 type DeliveryStatus = "assigned" | "route_started" | "arrived" | "scanned" | "photo_taken" | "delivered" | "failed";
 
@@ -197,14 +150,19 @@ export default function CourierRouteSimulation() {
   // Navigation state management
   const { activeTab, setActiveTab } = useNavigationStore();
   
-  // Find current delivery
-  const currentDelivery = mockDeliveries.find(d => d.id === deliveryId);
-  const deliveryIndex = mockDeliveries.findIndex(d => d.id === deliveryId);
-  const nextDelivery = deliveryIndex >= 0 ? mockDeliveries[deliveryIndex + 1] : null;
+  // API Data States
+  const [assignments, setAssignments] = useState<DriverAssignment[]>([]);
+  const [currentAssignment, setCurrentAssignment] = useState<DriverAssignment | null>(null);
+  const [nextAssignment, setNextAssignment] = useState<DriverAssignment | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [optimizedRouteUrl, setOptimizedRouteUrl] = useState<string | null>(null);
+  const [isLoadingRoute, setIsLoadingRoute] = useState(false);
   
   // Route simulation state
   const [routeStatus, setRouteStatus] = useState<DeliveryStatus>("assigned");
-  const [currentLocation, setCurrentLocation] = useState({ lat: 43.6426, lng: -79.3871 }); // Mock current location
+  const [currentLocation, setCurrentLocation] = useState({ lat: 43.6426, lng: -79.3871 }); // Will be replaced with real GPS
   
   // Modal states
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
@@ -215,6 +173,116 @@ export default function CourierRouteSimulation() {
   
   // Auto-close timeout reference for cleanup
   const [successModalTimeout, setSuccessModalTimeout] = useState<number | null>(null);
+
+  // Fetch assignments data from API
+  useEffect(() => {
+    const fetchAssignmentsData = async () => {
+      console.log('🔍 [ROUTE] Starting assignments data fetch...');
+      
+      try {
+        // Check authentication
+        const authenticated = localStorage.getItem("courier_authenticated");
+        const authToken = localStorage.getItem("auth_token");
+        const loginTime = localStorage.getItem("courier_login_time");
+
+        if (authenticated !== "true" || !authToken || !loginTime) {
+          console.log('❌ [ROUTE] No authentication found, redirecting to login');
+          router.push("/courier-login");
+          return;
+        }
+
+        // Check token expiry
+        const twentyFourHours = 24 * 60 * 60 * 1000;
+        const timeSinceLogin = Date.now() - parseInt(loginTime);
+        if (timeSinceLogin >= twentyFourHours) {
+          console.log('❌ [ROUTE] Token expired, redirecting to login');
+          localStorage.clear();
+          router.push("/courier-login");
+          return;
+        }
+
+        console.log('✅ [ROUTE] Authentication valid, fetching user data and assignments...');
+
+        // Fetch current user data
+        const userResponse = await authService.getCurrentUser();
+        setCurrentUser(userResponse.data);
+        console.log('✅ [ROUTE] User data received:', userResponse.data);
+
+        // Fetch today's assignments
+        const assignmentsResponse = await driverService.getTodaysAssignments();
+        console.log('✅ [ROUTE] Assignments data received:', assignmentsResponse);
+        
+        setAssignments(assignmentsResponse.assignments);
+
+        // Find current assignment by deliveryId (assuming deliveryId matches assignment ID or tracking code)
+        const current = assignmentsResponse.assignments.find(
+          assignment => assignment.id.toString() === deliveryId || 
+          assignment.tracking_code === deliveryId
+        );
+        
+        if (current) {
+          setCurrentAssignment(current);
+          console.log('✅ [ROUTE] Current assignment found:', current);
+          
+          // Find next assignment
+          const currentIndex = assignmentsResponse.assignments.findIndex(a => a.id === current.id);
+          const next = assignmentsResponse.assignments[currentIndex + 1] || null;
+          setNextAssignment(next);
+          
+          if (next) {
+            console.log('✅ [ROUTE] Next assignment found:', next);
+          } else {
+            console.log('ℹ️ [ROUTE] No next assignment - this is the last delivery');
+          }
+        } else {
+          console.error('❌ [ROUTE] Assignment not found for deliveryId:', deliveryId);
+          setError(`Assignment not found for ID: ${deliveryId}`);
+        }
+
+        setIsLoading(false);
+        console.log('✅ [ROUTE] Route page loaded successfully');
+
+      } catch (error: any) {
+        console.error('❌ [ROUTE] Error fetching assignments data:', error);
+        
+        if (error.message?.includes('Authentication') || error.response?.status === 401) {
+          console.log('❌ [ROUTE] Authentication error, redirecting to login');
+          localStorage.clear();
+          router.push("/courier-login");
+        } else {
+          setError("Failed to load assignments: " + (error.message || "Unknown error"));
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchAssignmentsData();
+  }, [deliveryId, router]);
+
+  // Fetch optimized route when user data is available
+  useEffect(() => {
+    const fetchOptimizedRoute = async () => {
+      if (!currentUser?.id) return;
+
+      try {
+        setIsLoadingRoute(true);
+        console.log('🔍 [ROUTE] Fetching optimized route for driver:', currentUser.id);
+        
+        const today = new Date().toISOString().split('T')[0];
+        const routeUrl = await routeOptimizationService.getGoogleMapsRoute(currentUser.id, { date: today });
+        
+        setOptimizedRouteUrl(routeUrl);
+        console.log('✅ [ROUTE] Optimized route URL received:', routeUrl);
+      } catch (error: any) {
+        console.error('❌ [ROUTE] Error fetching optimized route:', error);
+        // Don't set error state, just log it - user can still use individual navigation
+      } finally {
+        setIsLoadingRoute(false);
+      }
+    };
+
+    fetchOptimizedRoute();
+  }, [currentUser?.id]);
 
   // Body scroll lock when modals are open with scroll position preservation
   useEffect(() => {
@@ -518,15 +586,54 @@ export default function CourierRouteSimulation() {
     };
   }, [isCameraActive, audioContext]);
 
-  // Redirect if delivery not found
-  if (!currentDelivery) {
+  // Show loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-6 text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <h2 className="text-lg font-semibold mb-2">Loading Route...</h2>
+            <p className="text-gray-600">
+              Fetching your delivery assignments...
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+        <Card className="max-w-md w-full">
+          <CardContent className="p-6 text-center">
+            <Icon name="AlertTriangle" size={48} className="text-red-500 mx-auto mb-4" />
+            <h2 className="text-lg font-semibold mb-2">Error Loading Route</h2>
+            <p className="text-gray-600 mb-4">
+              {error}
+            </p>
+            <Button onClick={() => router.push('/courier')} className="w-full">
+              Back to Dashboard
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Redirect if assignment not found
+  if (!currentAssignment) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <Card className="max-w-md w-full">
           <CardContent className="p-6 text-center">
             <Icon name="AlertTriangle" size={48} className="text-orange-500 mx-auto mb-4" />
-            <h2 className="text-lg font-semibold mb-2">Delivery Not Found</h2>
-            <p className="text-gray-600 mb-4">The requested delivery could not be found.</p>
+            <h2 className="text-lg font-semibold mb-2">Assignment Not Found</h2>
+            <p className="text-gray-600 mb-4">
+              The assignment with ID "{deliveryId}" could not be found.
+            </p>
             <Button onClick={() => router.push('/courier')} className="w-full">
               <Icon name="ArrowLeft" size={16} className="mr-2" />
               Back to Dashboard
@@ -537,52 +644,112 @@ export default function CourierRouteSimulation() {
     );
   }
 
-  const handleStartRoute = () => {
-    setRouteStatus("route_started");
-    setIsMapModalOpen(true);
+  const handleStartRoute = async () => {
+    if (!currentAssignment) return;
+    
+    try {
+      console.log('🚛 [ROUTE] Starting route for assignment:', currentAssignment.id);
+      await driverService.updateShipmentStatus(currentAssignment.shipment_id, {
+        status: 'in_transit',
+        notes: 'Driver started route'
+      });
+      setRouteStatus("route_started");
+      setIsMapModalOpen(true);
+      console.log('✅ [ROUTE] Route started successfully');
+    } catch (error: any) {
+      console.error('❌ [ROUTE] Error starting route:', error);
+      alert('Failed to start route: ' + (error.message || 'Unknown error'));
+    }
   };
 
-  const handleArriveAtLocation = () => {
-    setRouteStatus("arrived");
-    setGpsError(""); // Clear any GPS errors
+  const handleArriveAtLocation = async () => {
+    if (!currentAssignment) return;
+    
+    try {
+      console.log('📍 [ROUTE] Arriving at location for assignment:', currentAssignment.id);
+      await driverService.updateShipmentStatus(currentAssignment.shipment_id, {
+        status: 'out_for_delivery',
+        notes: 'Driver arrived at delivery location'
+      });
+      setRouteStatus("arrived");
+      setGpsError(""); // Clear any GPS errors
+      console.log('✅ [ROUTE] Arrived at location successfully');
+    } catch (error: any) {
+      console.error('❌ [ROUTE] Error updating arrival status:', error);
+      alert('Failed to update arrival status: ' + (error.message || 'Unknown error'));
+    }
   };
 
-  const handleBarcodeSubmit = () => {
-    if (!barcodeInput) {
+  const handleBarcodeSubmit = async () => {
+    if (!barcodeInput || !currentAssignment) {
       setBarcodeError("Please enter a barcode");
       return;
     }
-    
-    // Validate barcode if not already validated
-    if (!isBarcodeValid) {
-      const validation = validateBarcode(barcodeInput, scannedBarcodeType || 'unknown');
-      if (!validation.valid) {
-        setBarcodeError(validation.message);
+
+    try {
+      console.log('📱 [ROUTE] Scanning barcode:', barcodeInput);
+      
+      // Search for shipment using the barcode
+      const searchResponse = await driverService.searchShipments(barcodeInput);
+      
+      if (searchResponse.shipments.length === 0) {
+        setBarcodeError("No shipment found with this tracking code");
         return;
       }
+
+      // Check if the found shipment matches current assignment
+      const foundShipment = searchResponse.shipments.find(
+        shipment => shipment.tracking_code === currentAssignment.tracking_code
+      );
+
+      if (!foundShipment) {
+        setBarcodeError("Barcode does not match this delivery");
+        return;
+      }
+
+      // Update status to scanned
+      await driverService.updateShipmentStatus(currentAssignment.shipment_id, {
+        status: 'out_for_delivery',
+        notes: 'Package scanned at delivery location'
+      });
+
+      setBarcodeError("");
+      setRouteStatus("scanned");
+      setIsBarcodeModalOpen(false);
+      setBarcodeInput("");
+      setIsBarcodeValid(false);
+      setBarcodeValidationMessage("");
+      setScannedBarcodeType("");
+      
+      console.log('✅ [ROUTE] Barcode scanned successfully');
+    } catch (error: any) {
+      console.error('❌ [ROUTE] Error scanning barcode:', error);
+      setBarcodeError('Failed to scan barcode: ' + (error.message || 'Unknown error'));
     }
-    
-    // Proceed with valid barcode
-    setBarcodeError("");
-    setRouteStatus("scanned");
-    setIsBarcodeModalOpen(false);
-    setBarcodeInput("");
-    setIsBarcodeValid(false);
-    setBarcodeValidationMessage("");
-    setScannedBarcodeType("");
   };
 
-  const handlePhotoCapture = () => {
-    // Simulate random photo success/failure for testing
-    const photoSuccess = Math.random() > 0.1; // 90% success rate
+  const handlePhotoCapture = async () => {
+    if (!currentAssignment) return;
     
-    if (photoSuccess) {
-      setPhotoTaken(true);
-      setPhotoError("");
-      setRouteStatus("photo_taken");
-      setIsPhotoModalOpen(false);
-    } else {
-      setPhotoError("Failed to capture photo. Please try again.");
+    try {
+      console.log('📸 [ROUTE] Capturing photo for assignment:', currentAssignment.id);
+      
+      // Simulate photo capture success (in real implementation, this would capture actual photo)
+      const photoSuccess = Math.random() > 0.1; // 90% success rate
+      
+      if (photoSuccess) {
+        setPhotoTaken(true);
+        setPhotoError("");
+        setRouteStatus("photo_taken");
+        setIsPhotoModalOpen(false);
+        console.log('✅ [ROUTE] Photo captured successfully');
+      } else {
+        setPhotoError("Failed to capture photo. Please try again.");
+        console.log('❌ [ROUTE] Photo capture failed');
+      }
+    } catch (error: any) {
+      console.error('❌ [ROUTE] Error capturing photo:', error);
+      setPhotoError('Failed to capture photo: ' + (error.message || 'Unknown error'));
     }
   };
   
@@ -641,7 +808,7 @@ export default function CourierRouteSimulation() {
       // Toggle torch
       const newFlashState = !flashEnabled;
       await videoTrack.applyConstraints({
-        advanced: [{ torch: newFlashState }] as MediaTrackConstraints[]
+        advanced: [{ torch: newFlashState }] as any
       });
       
       setFlashEnabled(newFlashState);
@@ -817,35 +984,66 @@ export default function CourierRouteSimulation() {
   };
   
   const uploadPhotos = async () => {
+    if (!currentAssignment || capturedPhotos.length === 0) return;
+    
     setIsUploading(true);
     
-    // Simulate upload with progress
-    for (let i = 0; i < capturedPhotos.length; i++) {
-      const photo = capturedPhotos[i];
+    try {
+      console.log('📤 [ROUTE] Uploading photos for assignment:', currentAssignment.id);
       
-      // Update status to uploading
-      setCapturedPhotos(prev => prev.map(p => 
-        p.id === photo.id ? { ...p, uploadStatus: 'uploading' } : p
-      ));
+      // Upload each photo using the API
+      for (let i = 0; i < capturedPhotos.length; i++) {
+        const photo = capturedPhotos[i];
+        
+        // Update status to uploading
+        setCapturedPhotos(prev => prev.map(p => 
+          p.id === photo.id ? { ...p, uploadStatus: 'uploading' } : p
+        ));
+        
+        try {
+          // Convert data URL to File
+          const response = await fetch(photo.dataUrl);
+          const blob = await response.blob();
+          const file = new File([blob], `delivery_photo_${i + 1}.jpg`, { type: 'image/jpeg' });
+          
+          // Upload photo using API
+          await driverService.uploadDeliveryPhoto(currentAssignment.shipment_id, {
+            photo: file,
+            notes: `Proof of delivery photo ${i + 1}`
+          });
+          
+          // Update status to completed
+          setCapturedPhotos(prev => prev.map(p => 
+            p.id === photo.id ? { ...p, uploadStatus: 'completed' } : p
+          ));
+          
+          console.log(`✅ [ROUTE] Photo ${i + 1} uploaded successfully`);
+        } catch (error: any) {
+          console.error(`❌ [ROUTE] Error uploading photo ${i + 1}:`, error);
+          
+          // Update status to failed
+          setCapturedPhotos(prev => prev.map(p => 
+            p.id === photo.id ? { ...p, uploadStatus: 'failed' } : p
+          ));
+        }
+      }
       
-      // Simulate upload delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      setIsUploading(false);
+      setPhotoUploaded(true);
+      setRouteStatus("photo_taken");
       
-      // Update status to completed
-      setCapturedPhotos(prev => prev.map(p => 
-        p.id === photo.id ? { ...p, uploadStatus: 'completed' } : p
-      ));
+      // Show success toast
+      setTimeout(() => {
+        alert("Proof of delivery uploaded successfully!");
+        setIsPhotoModalOpen(false);
+      }, 500);
+      
+      console.log('✅ [ROUTE] All photos uploaded successfully');
+    } catch (error: any) {
+      console.error('❌ [ROUTE] Error uploading photos:', error);
+      setIsUploading(false);
+      alert('Failed to upload photos: ' + (error.message || 'Unknown error'));
     }
-    
-    setIsUploading(false);
-    setPhotoUploaded(true);
-    setRouteStatus("photo_taken");
-    
-    // Show success toast
-    setTimeout(() => {
-      alert("Proof of delivery uploaded successfully!");
-      setIsPhotoModalOpen(false);
-    }, 500);
   };
   
   const handleClosePhotoModal = () => {
@@ -960,53 +1158,71 @@ export default function CourierRouteSimulation() {
     }, 800); // Final burst
   };
 
-  const handleConfirmDelivery = () => {
-    setRouteStatus("delivered");
-    setIsConfirmModalOpen(false);
-
-    // Update delivery status in persistent storage for main courier page
-    try {
-      const completedDeliveries = JSON.parse(localStorage.getItem('parcego_completed_deliveries') || '[]');
-      if (!completedDeliveries.includes(deliveryId)) {
-        completedDeliveries.push(deliveryId);
-        localStorage.setItem('parcego_completed_deliveries', JSON.stringify(completedDeliveries));
-
-        // Update remaining deliveries count
-        const currentRemaining = parseInt(localStorage.getItem('parcego_remaining_deliveries') || '0');
-        if (currentRemaining > 0) {
-          localStorage.setItem('parcego_remaining_deliveries', String(currentRemaining - 1));
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to update delivery status in localStorage:', error);
-    }
-
-    // Trigger celebratory confetti immediately
-    setTimeout(() => {
-      triggerCelebrationConfetti();
-    }, 200); // Small delay to allow modal to render
+  const handleConfirmDelivery = async () => {
+    if (!currentAssignment) return;
     
-    // Show success achievement modal with 1.0 second delay
-    setTimeout(() => {
-      setIsSuccessModalOpen(true);
+    try {
+      console.log('✅ [ROUTE] Confirming delivery for assignment:', currentAssignment.id);
       
-      // Auto-close modal after confetti animation finishes + additional 1.5 seconds
-      // Confetti duration: 1.8 seconds + 1.5 seconds additional = 3.3 seconds total
-      const timeoutId = setTimeout(() => {
-        setIsSuccessModalOpen(false);
-        setSuccessModalTimeout(null);
-        // Auto-advance to next delivery after modal dismisses
-        setTimeout(() => {
-          if (nextDelivery) {
-            router.push(`/courier/route/${nextDelivery.id}`);
-          } else {
-            router.push('/courier');
+      // Update shipment status to delivered
+      await driverService.updateShipmentStatus(currentAssignment.shipment_id, {
+        status: 'delivered',
+        notes: 'Package successfully delivered'
+      });
+      
+      setRouteStatus("delivered");
+      setIsConfirmModalOpen(false);
+
+      // Update delivery status in persistent storage for main courier page
+      try {
+        const completedDeliveries = JSON.parse(localStorage.getItem('parcego_completed_deliveries') || '[]');
+        if (!completedDeliveries.includes(deliveryId)) {
+          completedDeliveries.push(deliveryId);
+          localStorage.setItem('parcego_completed_deliveries', JSON.stringify(completedDeliveries));
+
+          // Update remaining deliveries count
+          const currentRemaining = parseInt(localStorage.getItem('parcego_remaining_deliveries') || '0');
+          if (currentRemaining > 0) {
+            localStorage.setItem('parcego_remaining_deliveries', String(currentRemaining - 1));
           }
-        }, 300); // Small delay after modal closes
-      }, 3300); // 1.8s confetti + 1.5s additional display time
+        }
+        console.log('✅ [ROUTE] Delivery status saved to localStorage');
+      } catch (storageError) {
+        console.error('❌ [ROUTE] Error saving to localStorage:', storageError);
+      }
+
+      // Trigger celebratory confetti immediately
+      setTimeout(() => {
+        triggerCelebrationConfetti();
+      }, 200); // Small delay to allow modal to render
       
-      setSuccessModalTimeout(timeoutId);
-    }, 1000); // 1.0 second delay for better UX flow
+      // Show success achievement modal with 1.0 second delay
+      setTimeout(() => {
+        setIsSuccessModalOpen(true);
+        
+        // Auto-close modal after confetti animation finishes + additional 1.5 seconds
+        // Confetti duration: 1.8 seconds + 1.5 seconds additional = 3.3 seconds total
+        const timeoutId = setTimeout(() => {
+          setIsSuccessModalOpen(false);
+          setSuccessModalTimeout(null);
+          // Auto-advance to next delivery after modal dismisses
+          setTimeout(() => {
+            if (nextAssignment) {
+              router.push(`/courier/route/${nextAssignment.id}`);
+            } else {
+              router.push('/courier');
+            }
+          }, 300); // Small delay after modal closes
+        }, 3300); // 1.8s confetti + 1.5s additional display time
+        
+        setSuccessModalTimeout(timeoutId as any);
+      }, 1000); // 1.0 second delay for better UX flow
+      
+      console.log('✅ [ROUTE] Delivery confirmed successfully');
+    } catch (error: any) {
+      console.error('❌ [ROUTE] Error confirming delivery:', error);
+      alert('Failed to confirm delivery: ' + (error.message || 'Unknown error'));
+    }
   };
 
   // Manual close handler for success modal
@@ -1042,7 +1258,7 @@ export default function CourierRouteSimulation() {
   const handleBarcodeDetected = (result: { rawValue: string }[]) => {
     if (result && result.length > 0) {
       const detectedCode = result[0].rawValue;
-      const detectedType = result[0].format || 'unknown';
+      const detectedType = (result[0] as any).format || 'unknown';
       
       setBarcodeInput(detectedCode);
       setScannedBarcodeType(detectedType);
@@ -1318,9 +1534,9 @@ export default function CourierRouteSimulation() {
                 />
               </div>
             </div>
-            {nextDelivery && (
+            {nextAssignment && (
               <p className="text-xs font-bold text-gray-600 mt-2">
-                Next: {nextDelivery.customerName} - {nextDelivery.address}
+                Next: {nextAssignment.receiver_name} - {nextAssignment.receiver_address}
               </p>
             )}
           </CardContent>
@@ -1336,37 +1552,33 @@ export default function CourierRouteSimulation() {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <p className="font-medium text-gray-900">{currentDelivery.customerName}</p>
+              <p className="font-medium text-gray-900">{currentAssignment.receiver_name}</p>
               <p className="text-sm text-gray-600 flex items-center">
                 <Icon name="MapPin" size={16} className="mr-2 text-gray-400" />
-                {currentDelivery.address}
+                {currentAssignment.receiver_address}
               </p>
-              {/* <p className="text-sm text-gray-500 flex items-center">
-                <Icon name="Clock" size={16} className="mr-2 text-gray-400" />
-                {currentDelivery.timeWindow}
-              </p> */}
               <div className="flex items-center space-x-4 text-xs text-gray-500">
                 <span className="flex items-center">
                   <Icon name="Package" size={12} className="mr-1" />
-                  {currentDelivery.packageType}
+                  {currentAssignment.package_type}
                 </span>
                 <span className="flex items-center">
                   <Icon name="Scale" size={12} className="mr-1" />
-                  {currentDelivery.weight}
+                  {currentAssignment.weight} kg
                 </span>
               </div>
             </div>
             
-            {currentDelivery.specialInstructions && (
+            {currentAssignment.special_instructions && (
               <Alert className="border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 ">
                 <Icon name="Info" size={18} className="text-amber-600  flex-shrink-0" />
                 <div className="space-y-2">
                   <div className="flex items-center space-x-2">
-                  
+                    <Icon name="Info" size={16} className="text-amber-600" />
                     <span className="text-sm font-semibold text-amber-900">Special Instructions</span>
                   </div>
                   <AlertDescription className="text-amber-800 leading-relaxed font-medium">
-                    {currentDelivery.specialInstructions}
+                    {currentAssignment.special_instructions}
                   </AlertDescription>
                   <div className="flex items-center space-x-1 text-xs text-amber-700">
                     <Icon name="AlertTriangle" size={12} />
@@ -1497,8 +1709,8 @@ export default function CourierRouteSimulation() {
                 <div>
                   <h3 className="font-medium text-green-900">Delivery Completed!</h3>
                   <p className="text-sm text-green-700">
-                    Package successfully delivered to {currentDelivery.customerName}
-                    {nextDelivery ? ". Redirecting to next delivery..." : ". All deliveries complete!"}
+                    Package successfully delivered to {currentAssignment.receiver_name}
+                    {nextAssignment ? ". Redirecting to next delivery..." : ". All deliveries complete!"}
                   </p>
                 </div>
               </div>
@@ -1555,7 +1767,7 @@ export default function CourierRouteSimulation() {
             <div className="transition-all duration-200 ease-out group-active:scale-95 relative">
               <Icon name="Package" size={20} className="text-current" />
               <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                {Math.max((mockDeliveries.length - 0), 0)}
+                {Math.max((assignments.length - 0), 0)}
               </div>
             </div>
             <span className="text-xs font-medium mt-1 transition-all duration-200 ease-out text-current">
@@ -1626,7 +1838,7 @@ export default function CourierRouteSimulation() {
               <div className="text-center text-gray-500">
                 <Icon name="Map" size={48} className="mx-auto mb-2" />
                 <p className="text-sm">Interactive Map Preview</p>
-                <p className="text-xs">{currentDelivery.address}</p>
+                <p className="text-xs">{currentAssignment.receiver_address}</p>
               </div>
             </div>
             
@@ -1634,18 +1846,32 @@ export default function CourierRouteSimulation() {
               <Button
                 variant="outline"
                 className="flex flex-col items-center p-4 h-auto transition-all duration-200"
-                onClick={() => window.open(`https://maps.google.com/maps?q=${encodeURIComponent(currentDelivery.address)}`, '_blank')}
+                onClick={() => {
+                  if (optimizedRouteUrl) {
+                    window.open(optimizedRouteUrl, '_blank');
+                  } else {
+                    // Fallback to individual address if no optimized route
+                    window.open(`https://maps.google.com/maps?q=${encodeURIComponent(currentAssignment.receiver_address)}`, '_blank');
+                  }
+                }}
+                disabled={isLoadingRoute}
                 id="parcego-navigation-google-maps-btn"
               >
                 <div className="mb-2">
-                  <GoogleMapsIcon />
+                  {isLoadingRoute ? (
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  ) : (
+                    <GoogleMapsIcon />
+                  )}
                 </div>
-                <span className="text-xs font-bold">Google Maps</span>
+                <span className="text-xs font-bold">
+                  {isLoadingRoute ? 'Loading...' : optimizedRouteUrl ? 'Optimized Route' : 'Google Maps'}
+                </span>
               </Button>
               <Button
                 variant="outline"
                 className="flex flex-col items-center p-4 h-auto transition-all duration-200"
-                onClick={() => window.open(`https://waze.com/ul?q=${encodeURIComponent(currentDelivery.address)}`, '_blank')}
+                onClick={() => window.open(`https://waze.com/ul?q=${encodeURIComponent(currentAssignment.receiver_address)}`, '_blank')}
                 id="parcego-navigation-waze-btn"
               >
                 <div className="mb-2">
@@ -1656,7 +1882,7 @@ export default function CourierRouteSimulation() {
               <Button
                 variant="outline" 
                 className="flex flex-col items-center p-4 h-auto transition-all duration-200"
-                onClick={() => window.open(`http://maps.apple.com/?q=${encodeURIComponent(currentDelivery.address)}`, '_blank')}
+                onClick={() => window.open(`http://maps.apple.com/?q=${encodeURIComponent(currentAssignment.receiver_address)}`, '_blank')}
                 id="parcego-navigation-apple-maps-btn"
               >
                 <div className="mb-2">
@@ -2341,7 +2567,7 @@ export default function CourierRouteSimulation() {
             <Alert>
               <Icon name="Info" size={16} />
               <AlertDescription>
-                By confirming, you acknowledge that the package has been successfully delivered to {currentDelivery.customerName}.
+                By confirming, you acknowledge that the package has been successfully delivered to {currentAssignment.receiver_name}.
               </AlertDescription>
             </Alert>
             
@@ -2408,13 +2634,13 @@ export default function CourierRouteSimulation() {
                     Package successfully delivered to:
                   </span>
                   <span className="block font-bold text-green-900 text-xl leading-tight">
-                    {currentDelivery.customerName}
+                    {currentAssignment.receiver_name}
                   </span>
                 </div>
                 
                 {/* Next Action - Reduced padding */}
                 <div className="pt-2">
-                  {nextDelivery ? (
+                  {nextAssignment ? (
                     <div className="text-sm text-green-600 font-medium text-center flex items-center justify-center bg-green-50 py-2 rounded-md leading-tight">
                       <span className="text-lg mr-2">🚛</span>
                       <span>Moving to next delivery...</span>

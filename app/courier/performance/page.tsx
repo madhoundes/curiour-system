@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +11,8 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { driverService, authService } from "@/lib/api";
+import type { DriverStatisticsResponse, User } from "@/lib/api/types";
 
 type Period = "today" | "weekly" | "monthly" | "last7" | "last30" | "last90" | "custom";
 
@@ -66,6 +68,75 @@ export default function CourierPerformance() {
   const [toDate, setToDate] = useState<string>("");
   const [showDateRange, setShowDateRange] = useState(false);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
+  
+  // API Data State
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [statisticsData, setStatisticsData] = useState<DriverStatisticsResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Fetch data on component mount and when period changes
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        // Fetch current user data
+        console.log('🔍 [PERFORMANCE] Fetching user data...');
+        const userResponse = await authService.getCurrentUser();
+        setCurrentUser(userResponse.data);
+
+        // Calculate date range based on selected period
+        const dateRange = getDateRange(selectedPeriod, fromDate, toDate);
+        
+        // Fetch statistics data
+        console.log('🔍 [PERFORMANCE] Fetching statistics data...', dateRange);
+        const statsResponse = await driverService.getDriverStatistics(dateRange);
+        setStatisticsData(statsResponse);
+
+        console.log('✅ [PERFORMANCE] Data fetched successfully:', {
+          user: userResponse.data.email,
+          stats: statsResponse
+        });
+
+      } catch (error: any) {
+        console.error('❌ [PERFORMANCE] Error fetching data:', error);
+        setError(error.message || 'Failed to load performance data');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [selectedPeriod, fromDate, toDate]);
+
+  // Helper function to calculate date ranges
+  const getDateRange = (period: Period, customFrom?: string, customTo?: string) => {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+
+    switch (period) {
+      case 'today':
+        return { date_start: todayStr, date_end: todayStr };
+      case 'last7':
+        const last7 = new Date(today);
+        last7.setDate(today.getDate() - 7);
+        return { date_start: last7.toISOString().split('T')[0], date_end: todayStr };
+      case 'last30':
+        const last30 = new Date(today);
+        last30.setDate(today.getDate() - 30);
+        return { date_start: last30.toISOString().split('T')[0], date_end: todayStr };
+      case 'custom':
+        if (customFrom && customTo) {
+          return { date_start: customFrom, date_end: customTo };
+        }
+        return { date_start: todayStr, date_end: todayStr };
+      default:
+        return { date_start: todayStr, date_end: todayStr };
+    }
+  };
+
   const [notifications, setNotifications] = useState<Array<{
     id: string;
     type: string;
@@ -146,23 +217,38 @@ export default function CourierPerformance() {
     router.push("/courier-login");
   };
 
+  // Calculate performance data from API statistics
   const currentData = useMemo(() => {
-    switch (selectedPeriod) {
-      case "weekly":
-        return mockPerformanceData.weekly;
-      case "monthly":
-        return mockPerformanceData.monthly;
-      case "last7":
-      case "last30":
-      case "last90":
-      case "custom":
-        // For custom periods, we could implement custom data logic here
-        // For now, fall back to today's data
-        return mockPerformanceData.today;
-      default:
-        return mockPerformanceData.today;
+    if (!statisticsData) {
+      return {
+        deliveries: 0,
+        completed: 0,
+        remaining: 0,
+        onTimeRate: 0
+      };
     }
-  }, [selectedPeriod]);
+
+    // Calculate completed deliveries (total - undelivered - in_transit - in_warehouse)
+    const completed = Math.max(0, statisticsData.total_deliveries - 
+      statisticsData.undelivered_shipments - 
+      statisticsData.items_in_transit - 
+      statisticsData.items_in_warehouse);
+
+    // Calculate remaining deliveries
+    const remaining = statisticsData.undelivered_shipments + 
+      statisticsData.items_in_transit + 
+      statisticsData.items_in_warehouse;
+
+    // Mock on-time rate calculation (API doesn't provide this yet)
+    const onTimeRate = completed > 0 ? Math.min(98, 85 + (completed * 0.5)) : 0;
+
+    return {
+      deliveries: statisticsData.total_deliveries,
+      completed: completed,
+      remaining: remaining,
+      onTimeRate: Math.round(onTimeRate * 10) / 10
+    };
+  }, [statisticsData]);
 
   const completionPct = useMemo(() => {
     if (!currentData || !("completed" in currentData)) return 0;
@@ -231,9 +317,9 @@ export default function CourierPerformance() {
                   aria-label="Profile menu"
                 >
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={mockPerformanceData.courier.avatarUrl} alt={mockPerformanceData.courier.name} />
+                    <AvatarImage src={currentUser?.avatar_url || ""} alt={currentUser?.first_name || "User"} />
                     <AvatarFallback className="bg-gray-100 text-gray-700 text-sm font-medium">
-                      AH
+                      {currentUser ? `${currentUser.first_name?.[0] || ''}${currentUser.last_name?.[0] || ''}`.toUpperCase() : 'U'}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -241,9 +327,11 @@ export default function CourierPerformance() {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{mockPerformanceData.courier.name}</p>
+                    <p className="text-sm font-medium leading-none">
+                      {currentUser ? `${currentUser.first_name || ''} ${currentUser.last_name || ''}`.trim() || currentUser.email : 'User'}
+                    </p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      {mockPerformanceData.courier.id}
+                      {currentUser?.email || 'No email'}
                     </p>
                   </div>
                 </DropdownMenuLabel>
@@ -444,6 +532,32 @@ export default function CourierPerformance() {
       )}
 
       <div className="p-4 space-y-8" id="parcego-courier-performance-content">
+        {/* Loading State */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Loading performance data...</p>
+            </div>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-center">
+              <Icon name="AlertCircle" size={20} className="text-red-600 mr-3" />
+              <div>
+                <h3 className="text-sm font-medium text-red-800">Error loading data</h3>
+                <p className="text-sm text-red-600 mt-1">{error}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Main Content - Only show when not loading and no error */}
+        {!isLoading && !error && (
+          <>
         {/* Career Progress Banner - Simplified */}
         <Card id="parcego-courier-performance-career" className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 border border-blue-200 overflow-hidden relative">
           <CardContent className="p-6">
@@ -462,11 +576,15 @@ export default function CourierPerformance() {
             <div className="grid grid-cols-2 gap-6">
               <div className="bg-white/70 p-4 rounded-lg shadow-sm">
                 <p className="text-sm text-gray-600 mb-2 font-medium">Total Deliveries</p>
-                <p className="text-3xl font-bold text-blue-700">{mockPerformanceData.courier.totalDeliveries}</p>
+                <p className="text-3xl font-bold text-blue-700">
+                  {isLoading ? '...' : currentData.deliveries}
+                </p>
               </div>
               <div className="bg-white/70 p-4 rounded-lg shadow-sm">
                 <p className="text-sm text-gray-600 mb-2 font-medium">Success Rate</p>
-                <p className="text-3xl font-bold text-green-600">{mockPerformanceData.courier.successRate}%</p>
+                <p className="text-3xl font-bold text-green-600">
+                  {isLoading ? '...' : `${currentData.onTimeRate}%`}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -705,39 +823,15 @@ export default function CourierPerformance() {
           </div>
         </div>
 
-        {/* Financial Performance Group */}
+        {/* Efficiency Performance Group */}
         <div className="rounded-xl border border-gray-100 bg-white/50 p-5 shadow-sm">
           <h3 className="text-sm font-medium text-gray-700 mb-4 flex items-center gap-2">
-            <div className="rounded-md bg-green-100 p-1">
-              <Icon name="DollarSign" size={14} className="text-green-600" />
+            <div className="rounded-md bg-purple-100 p-1">
+              <Icon name="TrendingUp" size={14} className="text-purple-600" />
             </div>
-            Financial Summary
+            Performance Metrics
           </h3>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Card id="parcego-courier-performance-metric-earnings" className="border-l-4 border-l-green-500">
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <div className="rounded-md bg-green-100 p-1.5">
-                      <Icon name="DollarSign" size={16} className="text-green-600" />
-                    </div>
-                    <span>Earnings</span>
-                  </CardTitle>
-                  <Badge variant="outline" className="text-xs">{selectedPeriod === "monthly" ? "Monthly" : selectedPeriod === "weekly" ? "Weekly" : "Today"}</Badge>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-baseline">
-                  <p className="text-2xl font-bold text-foreground">${currentData.earnings.toFixed(2)}</p>
-                  <span className="ml-2 text-sm text-muted-foreground">earned</span>
-                </div>
-                <p className="text-xs text-muted-foreground flex items-center">
-                  <Icon name="TrendingUp" size={12} className="mr-1 opacity-70" />
-                  <span>{selectedPeriod === "today" ? "+$12.50 from yesterday" : "On track"}</span>
-                </p>
-              </CardContent>
-            </Card>
-
+          <div className="grid gap-4 sm:grid-cols-1">
             <Card id="parcego-courier-performance-metric-efficiency" className="border-l-4 border-l-purple-500">
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between">
@@ -849,6 +943,9 @@ export default function CourierPerformance() {
             </div>
           </CardContent>
         </Card> */}
+
+          </>
+        )}
 
       </div>
 

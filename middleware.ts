@@ -39,9 +39,10 @@ export default async function middleware(req: NextRequest) {
   if (isProtectedRoute && pathname !== '/login' && pathname !== '/courier-login') {
     // For courier routes, check courier authentication
     if (pathname.startsWith('/courier')) {
-      // Allow access for HTTPS testing - set a temporary cookie
+      // Only redirect if there's NO courier authentication at all
+      // Let client-side handle localStorage validation
       if (!hasCourierAuth && !hasValidTempAuth) {
-        console.log('Courier authentication failed, redirecting to login');
+        console.log('No courier authentication found, redirecting to login');
         const response = NextResponse.redirect(new URL('/courier-login', req.url));
         // Set a temporary courier auth cookie for HTTPS testing
         if (req.url.includes('https://')) {
@@ -54,6 +55,8 @@ export default async function middleware(req: NextRequest) {
           console.log('Set temporary courier auth cookie for HTTPS testing');
         }
         return response;
+      } else {
+        console.log('Courier cookie exists, allowing access - client-side will validate localStorage');
       }
     } else {
       // For other protected routes, check regular authentication
@@ -64,10 +67,13 @@ export default async function middleware(req: NextRequest) {
   }
   
   // If someone tries to access login while authenticated, redirect to dashboard
+  // BUT only if they have BOTH cookie AND localStorage (to prevent redirect loops)
   if (isPublicRoute && (pathname === '/login' || pathname === '/courier-login')) {
     if (pathname === '/courier-login' && hasCourierAuth) {
-      console.log('Courier already authenticated, redirecting to /courier');
-      return NextResponse.redirect(new URL('/courier', req.url));
+      // Don't redirect if localStorage might be empty (let client-side handle it)
+      console.log('Courier cookie exists, but letting client-side handle localStorage check');
+      // Remove the automatic redirect to prevent loops
+      // return NextResponse.redirect(new URL('/courier', req.url));
     } else if (pathname === '/login' && hasMockAuth) {
       console.log('User already authenticated, redirecting to /dashboard');
       return NextResponse.redirect(new URL('/dashboard', req.url));

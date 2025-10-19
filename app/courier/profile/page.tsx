@@ -3,6 +3,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import { authService, driverService, profileService } from "@/lib/api";
+import type { User, UserProfile, DriverStatisticsResponse, UpdateProfileRequest, ChangePasswordRequest } from "@/lib/api/types";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -38,23 +40,8 @@ interface GeolocationPositionError {
   message: string;
 }
 
-const MOCK_PROFILE = {
-  fullName: "Alex Morgan",
-  email: "alex.morgan@example.com",
-  phone: "+1 (555) 123-4567",
-  address: "221B Baker Street, London, NW1 6XE",
-  courierId: "PCG-CR-1029",
-  avatarUrl: "",
-  available: true,
-};
-
-const MOCK_VEHICLE = {
-  type: "bike",
-  plate: "NYC-7K21",
-  color: "Black",
-  notes: "Rear basket installed; bring rain cover.",
-  photoUrl: "",
-};
+// User profile state will be populated from API
+// No more mock data
 
 const StatsCard: React.FC<{ label: string; value: string; icon: string; id: string }> = ({ label, value, icon, id }) => {
   return (
@@ -75,6 +62,10 @@ const StatsCard: React.FC<{ label: string; value: string; icon: string; id: stri
 export default function CourierProfilePage() {
   const router = useRouter();
 
+  // API Data States
+  const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
+  const [driverStats, setDriverStats] = useState<DriverStatisticsResponse | null>(null);
+
   const [isLoading, setIsLoading] = useState(true);
   const [selectedTab, setSelectedTab] = useState("profile");
   const [showToast, setShowToast] = useState<string | null>(null);
@@ -88,21 +79,21 @@ export default function CourierProfilePage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   const [profileForm, setProfileForm] = useState({
-    fullName: MOCK_PROFILE.fullName,
-    email: MOCK_PROFILE.email,
-    phone: MOCK_PROFILE.phone,
-    address: MOCK_PROFILE.address,
+    fullName: "",
+    email: "",
+    phone: "",
+    address: "",
   });
 
   // Track original values for change detection
-  const originalProfileForm = useMemo(() => ({
-    fullName: MOCK_PROFILE.fullName,
-    email: MOCK_PROFILE.email,
-    phone: MOCK_PROFILE.phone,
-    address: MOCK_PROFILE.address,
-  }), []);
+  const [originalProfileForm, setOriginalProfileForm] = useState({
+    fullName: "",
+    email: "",
+    phone: "",
+    address: "",
+  });
 
-  const [availability, setAvailability] = useState<boolean>(MOCK_PROFILE.available);
+  const [availability, setAvailability] = useState<boolean>(true);
   const [availabilityMessage, setAvailabilityMessage] = useState<string>("");
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState<number>(0);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
@@ -149,11 +140,11 @@ export default function CourierProfilePage() {
   });
 
   const [vehicleForm, setVehicleForm] = useState({
-    type: MOCK_VEHICLE.type,
-    plate: MOCK_VEHICLE.plate,
-    color: MOCK_VEHICLE.color,
-    notes: MOCK_VEHICLE.notes,
-    photoUrl: MOCK_VEHICLE.photoUrl,
+    type: "",
+    plate: "",
+    color: "",
+    notes: "",
+    photoUrl: "",
   });
 
   // Vehicle photo upload state - support up to 3 photos
@@ -175,10 +166,87 @@ export default function CourierProfilePage() {
   const [locationError, setLocationError] = useState<string>('');
   const [deliveriesCount, setDeliveriesCount] = useState<number>(0);
 
+  // Fetch user profile and statistics from API
   useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 400);
-    return () => clearTimeout(t);
-  }, []);
+    const fetchProfileData = async () => {
+      console.log('🔍 [PROFILE] Starting profile data fetch...');
+      
+      try {
+        // Check authentication
+        const authenticated = localStorage.getItem("courier_authenticated");
+        const authToken = localStorage.getItem("auth_token");
+        const loginTime = localStorage.getItem("courier_login_time");
+
+        if (authenticated !== "true" || !authToken || !loginTime) {
+          console.log('❌ [PROFILE] No authentication found, redirecting to login');
+          router.push("/courier-login");
+          return;
+        }
+
+        // Check token expiry
+        const twentyFourHours = 24 * 60 * 60 * 1000;
+        const timeSinceLogin = Date.now() - parseInt(loginTime);
+        if (timeSinceLogin >= twentyFourHours) {
+          console.log('❌ [PROFILE] Token expired, redirecting to login');
+          localStorage.clear();
+          router.push("/courier-login");
+          return;
+        }
+
+        console.log('✅ [PROFILE] Authentication valid, fetching profile...');
+
+        // Fetch user profile
+        const profileResponse = await profileService.getProfile();
+        console.log('✅ [PROFILE] Profile data received:', profileResponse);
+        setCurrentUser(profileResponse);
+
+        // Build full address from profile
+        const addressParts = [
+          profileResponse.street_address,
+          profileResponse.street_address_2,
+          profileResponse.city,
+          profileResponse.province,
+          profileResponse.postal_code,
+          profileResponse.country
+        ].filter(Boolean);
+        const fullAddress = addressParts.join(', ') || '';
+
+        // Set profile form data
+        const profileData = {
+          fullName: `${profileResponse.first_name} ${profileResponse.last_name}`,
+          email: profileResponse.email,
+          phone: profileResponse.phone_number || '',
+          address: fullAddress,
+        };
+        
+        setProfileForm(profileData);
+        setOriginalProfileForm(profileData);
+
+        // Fetch driver statistics
+        console.log('🔍 [PROFILE] Fetching driver statistics...');
+        const statsResponse = await driverService.getDriverStatistics();
+        console.log('✅ [PROFILE] Statistics data received:', statsResponse);
+        setDriverStats(statsResponse);
+
+        setIsLoading(false);
+        console.log('✅ [PROFILE] Profile page loaded successfully');
+
+      } catch (error: any) {
+        console.error('❌ [PROFILE] Error fetching profile data:', error);
+        
+        if (error.message?.includes('Authentication') || error.response?.status === 401) {
+          console.log('❌ [PROFILE] Authentication error, redirecting to login');
+          localStorage.clear();
+          router.push("/courier-login");
+        } else {
+          setShowToast("Failed to load profile data");
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchProfileData();
+  }, [router]);
 
   const notifUnreadCount = useMemo(() => notifItems.filter(n => n.status === 'unread').length, [notifItems]);
   const handleNotificationClick = () => setIsNotificationModalOpen(true);
@@ -253,43 +321,44 @@ export default function CourierProfilePage() {
     router.push("/courier");
   }, [router]);
 
-  const handleLogout = useCallback(() => {
+  const handleLogout = useCallback(async () => {
     try {
-      console.log("Logout initiated");
+      console.log("🔐 [PROFILE] Logout initiated");
       
-      // Clear all authentication data
+      // Call API logout endpoint to invalidate session on backend
+      try {
+        await authService.logout();
+        console.log("✅ [PROFILE] API logout successful");
+      } catch (logoutError) {
+        console.error("❌ [PROFILE] API logout failed:", logoutError);
+        // Continue with client-side cleanup even if API call fails
+      }
+      
+      // Clear all authentication data from client
       if (typeof window !== 'undefined') {
         localStorage.removeItem("courier_authenticated");
         localStorage.removeItem("courier_email");
         localStorage.removeItem("courier_login_time");
+        localStorage.removeItem("auth_token");
+        localStorage.removeItem("courier_user");
         
         // Clear authentication cookie with proper attributes
         document.cookie = "courier_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
-        console.log("Authentication data cleared");
+        console.log("✅ [PROFILE] Authentication data cleared");
       }
       
-      // Close the dropdown menu first
+      // Close the logout confirm dialog
       setShowLogoutConfirm(false);
       
       // Add a small delay to ensure state is cleared before navigation
       setTimeout(() => {
-        console.log("Navigating to courier login");
-        if (router && typeof router.push === 'function') {
-          router.push("/courier-login");
-        } else {
-          console.error("Router not available, using window.location");
-          window.location.href = "/courier-login";
-        }
+        console.log("🔐 [PROFILE] Navigating to courier login");
+        router.push("/courier-login");
       }, 100);
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error("❌ [PROFILE] Logout error:", error);
       // Fallback: still try to navigate even if clearing state fails
-      if (router && typeof router.push === 'function') {
-        router.push("/courier-login");
-      } else {
-        console.error("Router not available in fallback, using window.location");
-        window.location.href = "/courier-login";
-      }
+      router.push("/courier-login");
     }
   }, [router]);
 
@@ -331,37 +400,75 @@ export default function CourierProfilePage() {
     setProfileForm((prev) => ({ ...prev, [id]: value }));
   }, []);
 
-  const handleSaveProfile = useCallback(() => {
-    // Check if vehicle photos are uploaded
-    const hasVehiclePhotos = vehiclePhotoPreviews.some(preview => preview !== null);
+  const handleSaveProfile = useCallback(async () => {
+    console.log('💾 [PROFILE] Saving profile data...');
+    
+    try {
+      // Parse the full name into first and last name
+      const nameParts = profileForm.fullName.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || nameParts[0] || '';
 
-    if (hasVehiclePhotos) {
-      // Vehicle photos are uploaded - profile is complete
-      setShowNotificationBanner(false);
-      setNotificationBanner(prev => ({
-        ...prev,
-        type: "success" as const,
-        title: "Profile Complete",
-        message: "Your profile has been successfully updated with vehicle photos",
-      }));
-      setShowToast("Profile saved successfully! Vehicle photos uploaded.");
-    } else {
-      setShowToast("Profile saved");
+      // Parse address into components
+      // For now, we'll save the full address in street_address
+      // In a production app, you'd want a more sophisticated address parser
+      const updateData: UpdateProfileRequest = {
+        first_name: firstName,
+        last_name: lastName,
+        phone_number: profileForm.phone || undefined,
+        street_address: profileForm.address || undefined,
+      };
+
+      console.log('💾 [PROFILE] Update data:', updateData);
+
+      // Call API to update profile
+      const updatedProfile = await profileService.updateProfile(updateData);
+      console.log('✅ [PROFILE] Profile updated successfully:', updatedProfile);
+
+      // Update current user state
+      if (currentUser) {
+        setCurrentUser({
+          ...currentUser,
+          first_name: firstName,
+          last_name: lastName,
+          phone_number: profileForm.phone,
+          street_address: profileForm.address,
+        });
+      }
+
+      // Update original form values to reflect saved data
+      setOriginalProfileForm(profileForm);
+
+      // Check if vehicle photos are uploaded
+      const hasVehiclePhotos = vehiclePhotoPreviews.some(preview => preview !== null);
+
+      if (hasVehiclePhotos) {
+        // Vehicle photos are uploaded - profile is complete
+        setShowNotificationBanner(false);
+        setNotificationBanner(prev => ({
+          ...prev,
+          type: "success" as const,
+          title: "Profile Complete",
+          message: "Your profile has been successfully updated with vehicle photos",
+        }));
+        setShowToast("Profile saved successfully! Vehicle photos uploaded.");
+      } else {
+        setShowToast("Profile saved successfully");
+      }
+
+      setIsEditMode(false);
+      setHasUnsavedChanges(false);
+      setShowMobileCameraButton(false);
+
+    } catch (error: any) {
+      console.error('❌ [PROFILE] Error saving profile:', error);
+      setShowToast("Failed to save profile: " + (error.message || "Unknown error"));
     }
-
-    setIsEditMode(false);
-    setHasUnsavedChanges(false);
-    setShowMobileCameraButton(false); // Hide camera button when saving changes
-  }, [vehiclePhotoPreviews]);
+  }, [profileForm, vehiclePhotoPreviews, currentUser]);
 
   const handleCancelProfile = useCallback(() => {
     // Reset form to original values
-    setProfileForm({
-      fullName: MOCK_PROFILE.fullName,
-      email: MOCK_PROFILE.email,
-      phone: MOCK_PROFILE.phone,
-      address: MOCK_PROFILE.address,
-    });
+    setProfileForm(originalProfileForm);
     // Reset location status
     setLocationStatus('idle');
     setLocationError('');
@@ -369,7 +476,7 @@ export default function CourierProfilePage() {
     setIsEditMode(false);
     setHasUnsavedChanges(false);
     setShowMobileCameraButton(false); // Hide camera button when cancelling edit mode
-  }, []);
+  }, [originalProfileForm]);
 
   const handleUseCurrentLocation = useCallback(async () => {
     if (!navigator.geolocation) {
@@ -568,11 +675,60 @@ export default function CourierProfilePage() {
 
   const availabilityLabel = useMemo(() => (availability ? "Available" : "Unavailable"), [availability]);
 
+  // Password change handler
+  const handlePasswordChange = useCallback(async () => {
+    console.log('🔐 [PROFILE] Password change initiated');
+
+    // Validate password fields
+    if (!passwordFields.current || !passwordFields.next || !passwordFields.confirm) {
+      setShowToast("Please fill in all password fields");
+      return;
+    }
+
+    if (passwordFields.next !== passwordFields.confirm) {
+      setShowToast("New passwords do not match");
+      return;
+    }
+
+    if (passwordFields.next.length < 8) {
+      setShowToast("Password must be at least 8 characters");
+      return;
+    }
+
+    try {
+      const changeData: ChangePasswordRequest = {
+        current_password: passwordFields.current,
+        new_password: passwordFields.next,
+      };
+
+      console.log('🔐 [PROFILE] Calling password change API...');
+      await authService.changePassword(changeData);
+      console.log('✅ [PROFILE] Password changed successfully');
+
+      // Clear password fields
+      setPasswordFields({
+        current: "",
+        next: "",
+        confirm: "",
+        showCurrent: false,
+        showNext: false,
+        showConfirm: false,
+      });
+
+      setShowPasswordDialog(false);
+      setShowToast("Password updated successfully");
+
+    } catch (error: any) {
+      console.error('❌ [PROFILE] Password change failed:', error);
+      setShowToast("Failed to update password: " + (error.message || "Unknown error"));
+    }
+  }, [passwordFields]);
+
   // Vehicle Photo Frame Component
   const VehiclePhotoFrame: React.FC<{
     index: number;
     preview: string | null;
-    onDrop: (acceptedFiles: File[], rejectedFiles: { errors: { code: string; message: string }[] }[], slotIndex: number) => void;
+    onDrop: (acceptedFiles: File[], rejectedFiles: any[], slotIndex: number) => void;
     onRemove: (index: number) => void;
     isUploading: boolean;
     disabled?: boolean;
@@ -669,7 +825,7 @@ export default function CourierProfilePage() {
 
   // Vehicle Photo Dropzone Component (for initial upload area)
   const VehiclePhotoDropzone: React.FC<{
-    onDrop: (acceptedFiles: File[], rejectedFiles: { errors: { code: string; message: string }[] }[], slotIndex?: number) => void;
+    onDrop: (acceptedFiles: File[], rejectedFiles: any[], slotIndex?: number) => void;
     error: string | null;
     isUploading: boolean;
     disabled?: boolean;
@@ -840,7 +996,7 @@ export default function CourierProfilePage() {
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={avatarObjectUrl} alt="Courier avatar" />
                     <AvatarFallback className="bg-gray-100 text-gray-700 text-sm font-medium">
-                      {MOCK_PROFILE.fullName.split(' ').map(n => n[0]).join('')}
+                      {currentUser ? `${currentUser.first_name[0]}${currentUser.last_name[0]}` : 'CR'}
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -848,9 +1004,11 @@ export default function CourierProfilePage() {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{MOCK_PROFILE.fullName}</p>
+                    <p className="text-sm font-medium leading-none">
+                      {currentUser ? `${currentUser.first_name} ${currentUser.last_name}` : 'Courier'}
+                    </p>
                     <p className="text-xs leading-none text-muted-foreground">
-                      {MOCK_PROFILE.courierId}
+                      {currentUser ? `PCG-CR-${String(currentUser.id).padStart(4, '0')}` : 'Loading...'}
                     </p>
                   </div>
                 </DropdownMenuLabel>
@@ -1142,10 +1300,10 @@ export default function CourierProfilePage() {
                 <div className="flex-1 min-w-0 pt-1">
                   <div className="space-y-1">
                     <h2 className="font-semibold text-[27px] sm:text-xl md:text-2xl text-gray-900 leading-tight">
-                      {profileForm.fullName}
+                      {profileForm.fullName || 'Loading...'}
                     </h2>
                     <p className="text-[21px] sm:text-base text-gray-600 font-medium">
-                      {MOCK_PROFILE.courierId}
+                      {currentUser ? `PCG-CR-${String(currentUser.id).padStart(4, '0')}` : 'Loading...'}
                     </p>
                   </div>
 
@@ -1185,8 +1343,18 @@ export default function CourierProfilePage() {
               </>
             ) : (
               <>
-                <StatsCard id="parcego-courier-profile-stats-deliveries" label="Deliveries" value="1,248" icon="Package" />
-                <StatsCard id="parcego-courier-profile-stats-hours" label="Hours Online" value="732h" icon="Clock" />
+                <StatsCard 
+                  id="parcego-courier-profile-stats-deliveries" 
+                  label="Deliveries" 
+                  value={driverStats ? driverStats.total_deliveries.toLocaleString() : "0"} 
+                  icon="Package" 
+                />
+                <StatsCard 
+                  id="parcego-courier-profile-stats-hours" 
+                  label="In Transit" 
+                  value={driverStats ? driverStats.items_in_transit.toString() : "0"} 
+                  icon="Truck" 
+                />
               </>
             )}
           </div>
@@ -1665,7 +1833,7 @@ export default function CourierProfilePage() {
                 Cancel
               </Button>
               <Button
-                onClick={() => { setShowPasswordDialog(false); setShowToast("Password updated"); }}
+                onClick={handlePasswordChange}
                 className="flex-1 h-11 font-medium"
               >
                 Update Password

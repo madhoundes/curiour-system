@@ -39,6 +39,9 @@ export { locationsService, LocationsService } from './locations';
 // Driver service
 export { driverService, DriverService } from './driver';
 
+// Route optimization service
+export { routeOptimizationService, RouteOptimizationService } from './route-optimization';
+
 // Tracking service
 export { trackingService, TrackingService } from './tracking';
 
@@ -56,6 +59,7 @@ import { claimsService } from './claims';
 import { contactService } from './contact';
 import { locationsService } from './locations';
 import { driverService } from './driver';
+import { routeOptimizationService } from './route-optimization';
 import { trackingService } from './tracking';
 import { notificationService } from './notifications';
 
@@ -71,6 +75,7 @@ export const api = {
   contact: contactService,
   locations: locationsService,
   driver: driverService,
+  routeOptimization: routeOptimizationService,
   tracking: trackingService,
   notifications: notificationService,
 };
