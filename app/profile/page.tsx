@@ -380,7 +380,7 @@ export default function ProfileAccountPage() {
 
                   {/* Success/Info Messages */}
                   {businessMsg && (
-                    <Alert className="mb-3" role="status" aria-live="polite">
+                    <Alert className="mb-3" variant="success" role="status" aria-live="polite">
                       <AlertTitle>Business</AlertTitle>
                       <AlertDescription>{businessMsg}</AlertDescription>
                     </Alert>
