@@ -134,6 +134,16 @@ export class ShippingService {
     } catch (error: any) {
       if (error.response?.status === 400) {
         const errorData = error.response.data as ShippingErrorResponse;
+        
+        // Handle specific service area errors
+        if (errorData.detail?.error === 'SENDER_SERVICE_AREA_NOT_SUPPORTED') {
+          throw new Error(`Service Area Not Supported: We do not currently service the sender's area (${errorData.detail.postal_code || 'unknown postal code'}). Please contact support for assistance.`);
+        }
+        
+        if (errorData.detail?.error === 'RECEIVER_SERVICE_AREA_NOT_SUPPORTED') {
+          throw new Error(`Service Area Not Supported: We do not currently service the receiver's area (${errorData.detail.postal_code || 'unknown postal code'}). Please contact support for assistance.`);
+        }
+        
         throw new Error(errorData.detail.message || 'Invalid shipment data');
       }
       
@@ -454,7 +464,9 @@ export class ShippingService {
       
       // Provide more specific error messages based on the error type
       if (error instanceof Error) {
-        if (error.message.includes('Authentication')) {
+        if (error.message.includes('Service Area Not Supported')) {
+          throw new Error(error.message); // Pass through service area errors as-is
+        } else if (error.message.includes('Authentication')) {
           throw new Error(`Shipping flow failed: Authentication required - ${error.message}`);
         } else if (error.message.includes('validation')) {
           throw new Error(`Shipping flow failed: Data validation error - ${error.message}`);

@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,6 +43,7 @@ const Login03Page = () => {
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [isForgotPasswordLoading, setIsForgotPasswordLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const loginForm = useForm<z.infer<typeof loginFormSchema>>({
     defaultValues: {
@@ -62,6 +63,20 @@ const Login03Page = () => {
     },
     resolver: zodResolver(signupFormSchema),
   });
+
+  // Handle email verification success
+  useEffect(() => {
+    const verified = searchParams.get('verified');
+    const tab = searchParams.get('tab');
+    
+    if (verified === 'true') {
+      toast.success("Email verified successfully! You can now log in to your account.");
+    }
+    
+    if (tab === 'signup') {
+      setActiveTab('signup');
+    }
+  }, [searchParams]);
 
   // Function to set mock authentication cookie and redirect
   const handleSuccessfulAuth = () => {
@@ -147,7 +162,16 @@ const Login03Page = () => {
       const response = await authService.register(registerData);
       
       // Show success message
-      toast.success("Registration successful! Please check your email to verify your account.");
+      toast.success("Registration successful! Please check your email to verify your account.", {
+        duration: 8000,
+        action: {
+          label: "Resend Email",
+          onClick: () => {
+            // You could implement resend functionality here
+            toast.info("Please check your spam folder or contact support if you don't receive the email.");
+          }
+        }
+      });
       
       console.log("Registration successful:", response.data);
       

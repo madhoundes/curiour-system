@@ -493,7 +493,9 @@ export default function PurchaseLabelPage() {
 
       let errorMessage = 'Payment processing failed. ';
       
-      if (errorObj.message?.includes('Authentication') || errorObj.message?.includes('401')) {
+      if (errorObj.message?.includes('Service Area Not Supported')) {
+        errorMessage = errorObj.message; // Use the specific service area error message
+      } else if (errorObj.message?.includes('Authentication') || errorObj.message?.includes('401')) {
         errorMessage = 'Authentication failed. Please log in and try again.';
       } else if (errorObj.message?.includes('Invalid shipment data') || errorObj.message?.includes('validation')) {
         errorMessage = 'Invalid shipment information. Please go back and check your details.';
@@ -545,7 +547,19 @@ export default function PurchaseLabelPage() {
       
     } catch (error) {
       console.error('Error generating PDF:', error);
-      alert('Failed to generate PDF. Please try again.');
+      
+      const errorObj = error as Error;
+      let errorMessage = 'Failed to generate PDF. Please try again.';
+      
+      if (errorObj.message?.includes('Service Area Not Supported')) {
+        errorMessage = errorObj.message;
+      } else if (errorObj.message?.includes('Payment required')) {
+        errorMessage = 'Payment required - shipment must be paid before generating label';
+      } else if (errorObj.message?.includes('Shipment not found')) {
+        errorMessage = 'Shipment not found. Please try creating a new shipment.';
+      }
+      
+      alert(errorMessage);
     }
   };
   
@@ -594,8 +608,21 @@ export default function PurchaseLabelPage() {
       }
     } catch (error) {
       console.error('Error in handlePreviewAndPrint:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      alert(`Failed to generate label preview. Error: ${errorMessage}`);
+      
+      const errorObj = error as Error;
+      let errorMessage = 'Failed to generate label preview.';
+      
+      if (errorObj.message?.includes('Service Area Not Supported')) {
+        errorMessage = errorObj.message;
+      } else if (errorObj.message?.includes('Payment required')) {
+        errorMessage = 'Payment required - shipment must be paid before generating label';
+      } else if (errorObj.message?.includes('Shipment not found')) {
+        errorMessage = 'Shipment not found. Please try creating a new shipment.';
+      } else {
+        errorMessage = `Failed to generate label preview. Error: ${errorObj.message || 'Unknown error'}`;
+      }
+      
+      alert(errorMessage);
     } finally {
       setIsGeneratingPreview(false);
     }
@@ -707,7 +734,10 @@ export default function PurchaseLabelPage() {
               {/* Stripe Elements Payment Form */}
               {showStripePayment && checkoutSession?.client_secret ? (
                 <StripePaymentForm
+                  key={checkoutSession.session_id} // Add key to prevent re-render issues
                   clientSecret={checkoutSession.client_secret}
+                  amount={parseFloat(checkoutSession.amount || '0') * 100} // Convert to cents
+                  currency={checkoutSession.currency?.toLowerCase() || 'cad'}
                   onSuccess={() => {
                     console.log('Payment successful');
                     setShowStripePayment(false);
@@ -718,8 +748,6 @@ export default function PurchaseLabelPage() {
                     setShipmentError(error || 'Payment failed. Please try again.');
                     setShowStripePayment(false);
                   }}
-                  amount={Math.round(calculateTotalCost() * 100)}
-                  currency="cad"
                 />
               ) : (
                 /* Original Payment Form - Fallback */
