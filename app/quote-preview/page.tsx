@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useWizardBack } from "@/lib/wizard";
 import { useShipment } from "@/lib/shipment-context";
@@ -408,7 +408,7 @@ const ShipmentSummary = ({ formData }: { formData: ShipmentData }) => {
   );
 };
 
-export default function QuotePreviewPage() {
+function QuotePreviewPageContent() {
   const router = useRouter();
   const wizardBack = useWizardBack();
   const [isLoading, setIsLoading] = useState(false);
@@ -767,5 +767,24 @@ export default function QuotePreviewPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// Loading component for Suspense fallback
+const QuotePreviewLoadingFallback = () => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+      <p className="text-gray-600">Loading quote preview...</p>
+    </div>
+  </div>
+);
+
+// Main page component with Suspense boundary
+export default function QuotePreviewPage() {
+  return (
+    <Suspense fallback={<QuotePreviewLoadingFallback />}>
+      <QuotePreviewPageContent />
+    </Suspense>
   );
 }
