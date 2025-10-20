@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import {
@@ -26,7 +26,7 @@ const generateBarsFromTracking = (trackingNumber: string): number[] => {
   });
 };
 
-const LabelPreviewPage: React.FC = () => {
+const LabelPreviewPageContent: React.FC = () => {
   const router = useRouter();
   const params = useSearchParams();
   const trackingParam = params.get("tracking") || DEFAULT_TRACKING;
@@ -305,6 +305,25 @@ const LabelPreviewPage: React.FC = () => {
         </div>
       </div>
     </div>
+  );
+};
+
+// Loading component for Suspense fallback
+const LabelPreviewLoadingFallback = () => (
+  <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+      <p className="text-gray-600">Loading label preview...</p>
+    </div>
+  </div>
+);
+
+// Main page component with Suspense boundary
+const LabelPreviewPage: React.FC = () => {
+  return (
+    <Suspense fallback={<LabelPreviewLoadingFallback />}>
+      <LabelPreviewPageContent />
+    </Suspense>
   );
 };
 

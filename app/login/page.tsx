@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,7 @@ const signupFormSchema = z.object({
   password: z.string().min(8, "Password must be at least 8 characters long"),
 });
 
-const Login03Page = () => {
+const Login03PageContent = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
   const [showForgotPassword, setShowForgotPassword] = useState(false);
@@ -625,6 +625,25 @@ const Login03Page = () => {
         </div>
       )}
     </div>
+  );
+};
+
+// Loading component for Suspense fallback
+const LoginLoadingFallback = () => (
+  <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+      <p className="text-gray-600">Loading...</p>
+    </div>
+  </div>
+);
+
+// Main page component with Suspense boundary
+const Login03Page = () => {
+  return (
+    <Suspense fallback={<LoginLoadingFallback />}>
+      <Login03PageContent />
+    </Suspense>
   );
 };
 
