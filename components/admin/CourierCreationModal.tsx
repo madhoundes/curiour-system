@@ -52,6 +52,11 @@ interface CourierCreationModalProps {
 export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCreationModalProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitProgress, setSubmitProgress] = useState(0);
+  const [errorState, setErrorState] = useState<{
+    message: string;
+    description: string;
+    field?: string;
+  } | null>(null);
   const { showSuccessToast, showErrorToast } = useToast();
 
   const {
@@ -75,12 +80,14 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
     
     reset();
     setSubmitProgress(0);
+    setErrorState(null);
     onClose();
   };
 
   const onSubmit = async (data: CourierCreationFormData) => {
     setIsSubmitting(true);
     setSubmitProgress(0);
+    setErrorState(null); // Clear any previous errors
 
     try {
       // Progress updates for better UX
@@ -111,10 +118,8 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
 
       const response = await adminService.createUser(createUserRequest);
 
-      // Don't show toast here - let the parent component handle it
-      // to avoid duplicate toasts
-      
-      // Pass the created user data to parent
+      // Success - clear any errors and close modal
+      setErrorState(null);
       onSuccess(response.data);
       handleClose();
     } catch (error: any) {
@@ -122,18 +127,46 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
       
       let errorMessage = "Error Creating Account";
       let errorDescription = "Please try again.";
+      let errorField: string | undefined;
 
-      // Handle specific API errors
-      if (error?.response?.status === 422) {
+      // Parse API error response
+      const apiError = error?.response?.data || error?.data || error;
+      
+      if (apiError?.details === "Email already registered" || apiError?.message?.includes("already registered")) {
+        errorMessage = "Email Already Exists";
+        errorDescription = "A user with this email address already exists. Please use a different email address.";
+        errorField = "email";
+      } else if (apiError?.details === "Phone number already registered" || apiError?.message?.includes("phone")) {
+        errorMessage = "Phone Number Already Exists";
+        errorDescription = "A user with this phone number already exists. Please use a different phone number.";
+        errorField = "phone_number";
+      } else if (error?.response?.status === 422) {
         errorMessage = "Validation Error";
         errorDescription = "Please check your input and try again.";
-      } else if (error?.response?.status === 409) {
-        errorMessage = "Email Already Exists";
-        errorDescription = "A user with this email already exists.";
-      } else if (error?.message) {
-        errorDescription = error.message;
+      } else if (error?.response?.status === 400) {
+        errorMessage = "Invalid Request";
+        errorDescription = apiError?.message || apiError?.details || "Please check your information and try again.";
+      } else if (error?.response?.status === 401) {
+        errorMessage = "Authentication Error";
+        errorDescription = "Your session has expired. Please refresh the page and try again.";
+      } else if (error?.response?.status === 403) {
+        errorMessage = "Permission Denied";
+        errorDescription = "You don't have permission to create users.";
+      } else if (error?.response?.status >= 500) {
+        errorMessage = "Server Error";
+        errorDescription = "The server is experiencing issues. Please try again later.";
+      } else if (apiError?.message) {
+        errorDescription = apiError.message;
       }
 
+      // Set error state for UI display
+      setErrorState({
+        message: errorMessage,
+        description: errorDescription,
+        field: errorField
+      });
+
+      // Also show toast for immediate feedback
       showErrorToast(
         `${errorMessage}: ${errorDescription}`,
         { 
@@ -190,12 +223,15 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
             id="email"
             type="email"
             {...register("email")}
-            className={errors.email ? "border-red-500" : ""}
+            className={errors.email || (errorState?.field === "email") ? "border-red-500" : ""}
             placeholder="user@example.com"
             autoComplete="off"
           />
           {errors.email && (
             <p className="text-sm text-red-600">{errors.email.message}</p>
+          )}
+          {errorState?.field === "email" && !errors.email && (
+            <p className="text-sm text-red-600">{errorState.description}</p>
           )}
         </div>
 
@@ -218,12 +254,15 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
           <Input
             id="phone_number"
             {...register("phone_number")}
-            className={errors.phone_number ? "border-red-500" : ""}
+            className={errors.phone_number || (errorState?.field === "phone_number") ? "border-red-500" : ""}
             placeholder="Enter phone number"
             autoComplete="off"
           />
           {errors.phone_number && (
             <p className="text-sm text-red-600">{errors.phone_number.message}</p>
+          )}
+          {errorState?.field === "phone_number" && !errors.phone_number && (
+            <p className="text-sm text-red-600">{errorState.description}</p>
           )}
         </div>
 
@@ -290,6 +329,61 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
             {renderStepContent()}
           </form>
         </div>
+
+        {/* Error Display */}
+        {errorState && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <Icon name="AlertCircle" size={20} className="text-red-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1">
+                <h4 className="text-sm font-semibold text-red-800 mb-1">
+                  {errorState.message}
+                </h4>
+                <p className="text-sm text-red-700">
+                  {errorState.description}
+                </p>
+                {errorState.field && (
+                  <p className="text-xs text-red-600 mt-2">
+                    Please check the <strong>{errorState.field}</strong> field above.
+                  </p>
+                )}
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setErrorState(null)}
+                    className="text-red-600 border-red-300 hover:bg-red-100"
+                  >
+                    Dismiss
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setErrorState(null);
+                      handleSubmit(onSubmit)();
+                    }}
+                    className="text-red-600 border-red-300 hover:bg-red-100"
+                    disabled={isSubmitting}
+                  >
+                    Try Again
+                  </Button>
+                </div>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setErrorState(null)}
+                className="text-red-600 hover:text-red-800 hover:bg-red-100"
+              >
+                <Icon name="X" size={16} />
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Submit Progress */}
         {isSubmitting && (

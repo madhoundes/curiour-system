@@ -214,10 +214,25 @@ export default function CourierRouteSimulation() {
         
         setAssignments(assignmentsResponse.assignments);
 
-        // Find current assignment by deliveryId (assuming deliveryId matches assignment ID or tracking code)
+        // Find current assignment by deliveryId
+        // Handle PCG-DEL-{id} format by extracting the numeric ID
+        const numericId = deliveryId.startsWith('PCG-DEL-') 
+          ? deliveryId.replace('PCG-DEL-', '') 
+          : deliveryId;
+        
+        console.log('🔍 [ROUTE] Searching for assignment:', {
+          deliveryId,
+          numericId,
+          availableAssignments: assignmentsResponse.assignments.map(a => ({
+            id: a.id,
+            tracking_code: a.tracking_code
+          }))
+        });
+        
         const current = assignmentsResponse.assignments.find(
-          assignment => assignment.id.toString() === deliveryId || 
-          assignment.tracking_code === deliveryId
+          assignment => assignment.id.toString() === numericId || 
+          assignment.tracking_code === deliveryId ||
+          assignment.tracking_code === numericId
         );
         
         if (current) {
@@ -1208,7 +1223,7 @@ export default function CourierRouteSimulation() {
           // Auto-advance to next delivery after modal dismisses
           setTimeout(() => {
             if (nextAssignment) {
-              router.push(`/courier/route/${nextAssignment.id}`);
+              router.push(`/courier/route/PCG-DEL-${nextAssignment.id}`);
             } else {
               router.push('/courier');
             }
