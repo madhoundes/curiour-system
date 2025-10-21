@@ -294,7 +294,7 @@ export class ClaimsService {
    * Validate claim reason
    */
   validateClaimReason(reason: string): boolean {
-    const validReasons = ['damaged', 'lost', 'delayed', 'other'];
+    const validReasons = ['damaged', 'lost', 'late_delivery', 'wrong_address', 'missing_items', 'other'];
     return validReasons.includes(reason);
   }
 
@@ -325,7 +325,9 @@ export class ClaimsService {
     const reasonMap: Record<string, string> = {
       'damaged': 'Package Damaged',
       'lost': 'Package Lost',
-      'delayed': 'Delivery Delayed',
+      'late_delivery': 'Late Delivery',
+      'wrong_address': 'Wrong Address',
+      'missing_items': 'Missing Items',
       'other': 'Other Issue'
     };
     return reasonMap[reason] || reason;

@@ -463,7 +463,7 @@ export interface InitializeStatusTrackingResponse {
 // Claims Types
 export interface CreateClaimRequest {
   description: string;
-  reason: 'damaged' | 'lost' | 'delayed' | 'other';
+  reason: 'damaged' | 'lost' | 'late_delivery' | 'wrong_address' | 'missing_items' | 'other';
   shipment_id: number;
 }
 
@@ -473,7 +473,7 @@ export interface Claim {
   created_at: string;
   description: string;
   photos: string[];
-  reason: 'damaged' | 'lost' | 'delayed' | 'other';
+  reason: 'damaged' | 'lost' | 'late_delivery' | 'wrong_address' | 'missing_items' | 'other';
   shipment_id: number;
   shipment_tracking_code: string;
   status: 'pending' | 'approved' | 'rejected' | 'resolved';
@@ -488,7 +488,7 @@ export interface CreateClaimResponse {
   description: string;
   id: number;
   photos: string[];
-  reason: 'damaged' | 'lost' | 'delayed' | 'other';
+  reason: 'damaged' | 'lost' | 'late_delivery' | 'wrong_address' | 'missing_items' | 'other';
   shipment_id: number;
   shipment_tracking_code: string;
   status: 'pending' | 'approved' | 'rejected' | 'resolved';
