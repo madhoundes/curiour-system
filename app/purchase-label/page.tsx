@@ -77,20 +77,6 @@ export default function PurchaseLabelPage() {
   // Billing data from shipping flow
   const [billingData, setBillingData] = useState<any>(null);
 
-  // Payment form validation state
-  const [validationErrors, setValidationErrors] = useState<{
-    cardNumber?: string;
-    expiryDate?: string;
-    cvv?: string;
-    cardholderName?: string;
-    billingAddress?: {
-      address?: string;
-      city?: string;
-      province?: string;
-      postalCode?: string;
-    };
-  }>({});
-
   useEffect(() => {
     if (!trackingNumber) {
       const timestamp = new Date().getTime().toString().slice(-6);
@@ -162,169 +148,6 @@ export default function PurchaseLabelPage() {
     };
     loadSenderData();
   }, []);
-  
-  // Payment form state - Initialize with empty values for user input
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiryDate, setExpiryDate] = useState("");
-  const [cvv, setCvv] = useState("");
-  const [cardholderName, setCardholderName] = useState("");
-  const [billingAddress, setBillingAddress] = useState({
-    address: "",
-    city: "",
-    province: "",
-    postalCode: ""
-  });
-
-  // Validation functions
-  const validateCardNumber = (cardNum: string): string | undefined => {
-    const cleaned = cardNum.replace(/\s/g, '');
-    if (!cleaned) return 'Card number is required';
-    if (cleaned.length < 13 || cleaned.length > 19) return 'Card number must be 13-19 digits';
-    if (!/^\d+$/.test(cleaned)) return 'Card number must contain only digits';
-    
-    // Basic Luhn algorithm check
-    let sum = 0;
-    let isEven = false;
-    for (let i = cleaned.length - 1; i >= 0; i--) {
-      let digit = parseInt(cleaned[i]);
-      if (isEven) {
-        digit *= 2;
-        if (digit > 9) digit -= 9;
-      }
-      sum += digit;
-      isEven = !isEven;
-    }
-    if (sum % 10 !== 0) return 'Invalid card number';
-    
-    return undefined;
-  };
-
-  const validateExpiryDate = (expiry: string): string | undefined => {
-    if (!expiry) return 'Expiry date is required';
-    const match = expiry.match(/^(\d{1,2})\/(\d{2,4})$/);
-    if (!match) return 'Expiry date must be in MM/YY format';
-    
-    const month = parseInt(match[1]);
-    const year = parseInt(match[2]) + (match[2].length === 2 ? 2000 : 0);
-    
-    if (month < 1 || month > 12) return 'Invalid month';
-    
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
-    
-    if (year < currentYear || (year === currentYear && month < currentMonth)) {
-      return 'Card has expired';
-    }
-    
-    return undefined;
-  };
-
-  const validateCVV = (cvvValue: string): string | undefined => {
-    if (!cvvValue) return 'CVV is required';
-    if (!/^\d{3,4}$/.test(cvvValue)) return 'CVV must be 3-4 digits';
-    return undefined;
-  };
-
-  const validateCardholderName = (name: string): string | undefined => {
-    if (!name.trim()) return 'Cardholder name is required';
-    if (name.trim().length < 2) return 'Name must be at least 2 characters';
-    if (!/^[a-zA-Z\s\-\.\']+$/.test(name)) return 'Name contains invalid characters';
-    return undefined;
-  };
-
-  const validateBillingAddress = (address: typeof billingAddress): Record<string, string> | undefined => {
-    const errors: Record<string, string> = {};
-    
-    if (!address.address.trim()) errors.address = 'Address is required';
-    if (!address.city.trim()) errors.city = 'City is required';
-    if (!address.province.trim()) errors.province = 'Province is required';
-    
-    const postalCodeRegex = /^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/;
-    if (!address.postalCode.trim()) {
-      errors.postalCode = 'Postal code is required';
-    } else if (!postalCodeRegex.test(address.postalCode)) {
-      errors.postalCode = 'Invalid Canadian postal code format';
-    }
-    
-    return Object.keys(errors).length > 0 ? errors : undefined;
-  };
-
-  const validateAllFields = () => {
-    const errors: {
-      cardNumber?: string;
-      expiryDate?: string;
-      cvv?: string;
-      cardholderName?: string;
-      billingAddress?: Record<string, string>;
-    } = {};
-    
-    const cardError = validateCardNumber(cardNumber);
-    if (cardError) errors.cardNumber = cardError;
-    
-    const expiryError = validateExpiryDate(expiryDate);
-    if (expiryError) errors.expiryDate = expiryError;
-    
-    const cvvError = validateCVV(cvv);
-    if (cvvError) errors.cvv = cvvError;
-    
-    const nameError = validateCardholderName(cardholderName);
-    if (nameError) errors.cardholderName = nameError;
-    
-    const addressErrors = validateBillingAddress(billingAddress);
-    if (addressErrors) errors.billingAddress = addressErrors;
-    
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
-  };
-
-  // Real-time validation handlers
-  const handleCardNumberChange = (value: string) => {
-    // Format card number with spaces
-    const formatted = value.replace(/\s/g, '').replace(/(.{4})/g, '$1 ').trim();
-    setCardNumber(formatted);
-    
-    const error = validateCardNumber(value);
-    setValidationErrors(prev => ({ ...prev, cardNumber: error }));
-  };
-
-  const handleExpiryDateChange = (value: string) => {
-    // Auto-format expiry date
-    let formatted = value.replace(/\D/g, '');
-    if (formatted.length >= 2) {
-      formatted = formatted.substring(0, 2) + '/' + formatted.substring(2, 4);
-    }
-    setExpiryDate(formatted);
-    
-    const error = validateExpiryDate(formatted);
-    setValidationErrors(prev => ({ ...prev, expiryDate: error }));
-  };
-
-  const handleCVVChange = (value: string) => {
-    const cleaned = value.replace(/\D/g, '').substring(0, 4);
-    setCvv(cleaned);
-    
-    const error = validateCVV(cleaned);
-    setValidationErrors(prev => ({ ...prev, cvv: error }));
-  };
-
-  const handleCardholderNameChange = (value: string) => {
-    setCardholderName(value);
-    
-    const error = validateCardholderName(value);
-    setValidationErrors(prev => ({ ...prev, cardholderName: error }));
-  };
-
-  const handleBillingAddressChange = (field: keyof typeof billingAddress, value: string) => {
-    const newAddress = { ...billingAddress, [field]: value };
-    setBillingAddress(newAddress);
-    
-    const addressErrors = validateBillingAddress(newAddress);
-    setValidationErrors(prev => ({ 
-      ...prev, 
-      billingAddress: addressErrors 
-    }));
-  };
   
 
   
@@ -412,12 +235,6 @@ export default function PurchaseLabelPage() {
   
   // Handle payment submission
   const handlePayment = async () => {
-    // Validate all fields before processing
-    if (!validateAllFields()) {
-      setShipmentError('Please correct the validation errors before proceeding');
-      return;
-    }
-
     setIsProcessing(true);
     setShipmentError(null);
 
@@ -728,9 +545,9 @@ export default function PurchaseLabelPage() {
             </Card>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Left Column - Payment Form */}
-            <div className="lg:col-span-2 space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {/* Stripe Payment Section */}
+            <div className="space-y-6">
               {/* Stripe Elements Payment Form */}
               {showStripePayment && checkoutSession?.client_secret ? (
                 <StripePaymentForm
@@ -750,14 +567,14 @@ export default function PurchaseLabelPage() {
                   }}
                 />
               ) : (
-                /* Original Payment Form - Fallback */
+                /* Payment Summary Card */
                 <Card className="border-0 shadow-lg bg-white/80 backdrop-blur-sm">
                   <CardHeader className="pb-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <CardTitle className="text-xl font-semibold text-gray-900">Payment Information</CardTitle>
+                        <CardTitle className="text-xl font-semibold text-gray-900">Complete Purchase</CardTitle>
                         <CardDescription className="text-gray-600 mt-1">
-                          Complete your payment to generate your shipping label
+                          Proceed to Stripe payment to generate your shipping label
                         </CardDescription>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -769,222 +586,54 @@ export default function PurchaseLabelPage() {
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-6">
-
-                    <form className="space-y-8">
-                      {/* Credit Card Information Section */}
-                      <div className="space-y-4">
-                        <div className="flex items-center space-x-2 mb-4">
-                          <Icon name="CreditCard" size={20} className="text-blue-600" />
-                          <h3 className="text-lg font-medium text-gray-900">Credit Card Details</h3>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="md:col-span-2">
-                            <Label htmlFor="parcego-card-number" className="text-sm font-medium text-gray-700 mb-2 block">
-                              Card Number
-                            </Label>
-                            <div className="relative">
-                              <Input
-                                id="parcego-card-number"
-                                type="text"
-                                value={cardNumber}
-                                onChange={(e) => handleCardNumberChange(e.target.value)}
-                                className={`pl-12 pr-4 h-12 text-lg font-mono tracking-wider border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
-                                  validationErrors.cardNumber ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
-                                }`}
-                                maxLength={19}
-                                placeholder="0000 0000 0000 0000"
-                              />
-                              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <Icon name="CreditCard" size={20} className="text-gray-400" />
-                              </div>
-                            </div>
-                            {validationErrors.cardNumber && (
-                              <p className="mt-1 text-sm text-red-600 flex items-center">
-                                <Icon name="AlertCircle" size={14} className="mr-1" />
-                                {validationErrors.cardNumber}
-                              </p>
-                            )}
-                          </div>
-                        
-                        <div>
-                          <Label htmlFor="parcego-expiry-date" className="text-sm font-medium text-gray-700 mb-2 block">
-                            Expiry Date
-                          </Label>
-                          <Input
-                            id="parcego-expiry-date"
-                            type="text"
-                            value={expiryDate}
-                            onChange={(e) => handleExpiryDateChange(e.target.value)}
-                            className={`h-12 text-lg font-mono tracking-wider border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
-                              validationErrors.expiryDate ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
-                            }`}
-                            maxLength={5}
-                            placeholder="MM/YY"
-                          />
-                          {validationErrors.expiryDate && (
-                            <p className="mt-1 text-sm text-red-600 flex items-center">
-                              <Icon name="AlertCircle" size={14} className="mr-1" />
-                              {validationErrors.expiryDate}
-                            </p>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="parcego-cvv" className="text-sm font-medium text-gray-700 mb-2 block">
-                            CVV
-                          </Label>
-                          <Input
-                            id="parcego-cvv"
-                            type="text"
-                            value={cvv}
-                            onChange={(e) => handleCVVChange(e.target.value)}
-                            className={`h-12 text-lg font-mono tracking-wider border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
-                              validationErrors.cvv ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
-                            }`}
-                            maxLength={4}
-                            placeholder="123"
-                          />
-                          {validationErrors.cvv && (
-                            <p className="mt-1 text-sm text-red-600 flex items-center">
-                              <Icon name="AlertCircle" size={14} className="mr-1" />
-                              {validationErrors.cvv}
-                            </p>
-                          )}
-                        </div>
-                        
-                        <div className="md:col-span-2">
-                          <Label htmlFor="parcego-cardholder-name" className="text-sm font-medium text-gray-700 mb-2 block">
-                            Cardholder Name
-                          </Label>
-                          <Input
-                            id="parcego-cardholder-name"
-                            type="text"
-                            value={cardholderName}
-                            onChange={(e) => handleCardholderNameChange(e.target.value)}
-                            className={`h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
-                              validationErrors.cardholderName ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
-                            }`}
-                            placeholder="John A. Smith"
-                          />
-                          {validationErrors.cardholderName && (
-                            <p className="mt-1 text-sm text-red-600 flex items-center">
-                              <Icon name="AlertCircle" size={14} className="mr-1" />
-                              {validationErrors.cardholderName}
-                            </p>
-                          )}
-                        </div>
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Icon name="CreditCard" size={32} className="text-blue-600" />
                       </div>
-                    </div>
-                    
-                    {/* Billing Address Section */}
-                    <div className="space-y-4">
-                      <div className="flex items-center space-x-2 mb-4">
-                        <Icon name="MapPin" size={20} className="text-green-600" />
-                        <h3 className="text-lg font-medium text-gray-900">Billing Address</h3>
-                      </div>
+                      <h3 className="text-lg font-medium text-gray-900 mb-2">Ready to Pay</h3>
+                      <p className="text-gray-600 mb-6">
+                        Click the button below to proceed with secure payment via Stripe
+                      </p>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div className="md:col-span-2">
-                          <Label htmlFor="parcego-billing-address" className="text-sm font-medium text-gray-700 mb-2 block">
-                            Street Address
-                          </Label>
-                          <Input
-                            id="parcego-billing-address"
-                            type="text"
-                            value={billingAddress.address}
-                            onChange={(e) => handleBillingAddressChange('address', e.target.value)}
-                            className={`h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
-                              validationErrors.billingAddress?.address ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
-                            }`}
-                            placeholder="Enter your billing address"
-                          />
-                          {validationErrors.billingAddress?.address && (
-                            <p className="mt-1 text-sm text-red-600 flex items-center">
-                              <Icon name="AlertCircle" size={14} className="mr-1" />
-                              {validationErrors.billingAddress.address}
-                            </p>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="parcego-billing-city" className="text-sm font-medium text-gray-700 mb-2 block">
-                            City
-                          </Label>
-                          <Input
-                            id="parcego-billing-city"
-                            value={billingAddress.city}
-                            onChange={(e) => handleBillingAddressChange('city', e.target.value)}
-                            className={`h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
-                              validationErrors.billingAddress?.city ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
-                            }`}
-                            placeholder="Enter city"
-                          />
-                          {validationErrors.billingAddress?.city && (
-                            <p className="mt-1 text-sm text-red-600 flex items-center">
-                              <Icon name="AlertCircle" size={14} className="mr-1" />
-                              {validationErrors.billingAddress.city}
-                            </p>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="parcego-billing-province" className="text-sm font-medium text-gray-700 mb-2 block">
-                            Province
-                          </Label>
-                          <Input
-                            id="parcego-billing-province"
-                            value={billingAddress.province}
-                            onChange={(e) => handleBillingAddressChange('province', e.target.value)}
-                            className={`h-12 border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
-                              validationErrors.billingAddress?.province ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
-                            }`}
-                            placeholder="Province/State"
-                          />
-                          {validationErrors.billingAddress?.province && (
-                            <p className="mt-1 text-sm text-red-600 flex items-center">
-                              <Icon name="AlertCircle" size={14} className="mr-1" />
-                              {validationErrors.billingAddress.province}
-                            </p>
-                          )}
-                        </div>
-                        
-                        <div>
-                          <Label htmlFor="parcego-billing-postal" className="text-sm font-medium text-gray-700 mb-2 block">
-                            Postal Code
-                          </Label>
-                          <Input
-                            id="parcego-billing-postal"
-                            value={billingAddress.postalCode}
-                            onChange={(e) => handleBillingAddressChange('postalCode', e.target.value)}
-                            className={`h-12 font-mono tracking-wider border-gray-300 focus:border-blue-500 focus:ring-blue-500 ${
-                              validationErrors.billingAddress?.postalCode ? 'border-red-500 focus:border-red-500 focus:ring-red-500' : ''
-                            }`}
-                            placeholder="Postal Code"
-                          />
-                          {validationErrors.billingAddress?.postalCode && (
-                            <p className="mt-1 text-sm text-red-600 flex items-center">
-                              <Icon name="AlertCircle" size={14} className="mr-1" />
-                              {validationErrors.billingAddress.postalCode}
-                            </p>
-                          )}
-                        </div>
-                      </div>
+                      <Button
+                        id="parcego-payment-cta-btn"
+                        type="button"
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 h-12 text-base font-medium transition-all duration-300 ease-out hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                        disabled={isProcessing || !formData || !senderData}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          handlePayment();
+                        }}
+                        aria-label="Go to Stripe payment"
+                      >
+                        {isProcessing ? (
+                          <div className="flex items-center space-x-2">
+                            <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                            <span>Creating shipment...</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center space-x-2">
+                            <Icon name="CreditCard" size={18} />
+                            <span>Go to Stripe</span>
+                          </div>
+                        )}
+                      </Button>
+                      
+                      <p className="text-xs text-muted-foreground text-center mt-4">
+                        By completing this purchase, you agree to our terms of service.
+                      </p>
                     </div>
-                    
-                  </form>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
               )}
             </div>
 
-            {/* Right Column - Order Summary & Payment */}
+            {/* Order Summary */}
             <div className="space-y-6">
-              {/* Payment Summary & Submit Card (Shadcn-styled) */}
               <Card id="parcego-payment-summary-card">
                 <CardHeader className="pb-4">
-                  <CardTitle className="text-base font-semibold">Complete Purchase</CardTitle>
-                  <CardDescription>Proceed to Stripe payment to generate your shipping label.</CardDescription>
+                  <CardTitle className="text-base font-semibold">Order Summary</CardTitle>
+                  <CardDescription>Review your shipment details and pricing</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {/* Only show cost breakdown after payment processing starts or billing data is available */}
@@ -1051,34 +700,6 @@ export default function PurchaseLabelPage() {
                       </div>
                     </div>
                   )}
-
-                  <Button
-                    id="parcego-payment-cta-btn"
-                    type="button"
-                    className="w-full bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 h-12 text-base font-medium transition-all duration-300 ease-out hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                    disabled={isProcessing || !formData || !senderData}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      handlePayment();
-                    }}
-                    aria-label="Go to Stripe payment"
-                  >
-                    {isProcessing ? (
-                      <div className="flex items-center space-x-2">
-                        <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                        <span>Creating shipment...</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center space-x-2">
-                        <Icon name="CreditCard" size={18} />
-                        <span>Go to Stripe</span>
-                      </div>
-                    )}
-                  </Button>
-
-                  <p className="text-xs text-muted-foreground text-center">
-                    By completing this purchase, you agree to our terms of service.
-                  </p>
                 </CardContent>
               </Card>
             </div>

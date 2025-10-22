@@ -227,16 +227,6 @@ const Login03PageContent = () => {
     }
   };
 
-  const handleGuestLogin = () => {
-    setIsLoading(true);
-    
-    // Simulate API call delay
-    setTimeout(() => {
-      setIsLoading(false);
-      console.log("Guest login successful - redirect to dashboard");
-      handleSuccessfulAuth();
-    }, 2000);
-  };
 
   const handleForgotPassword = async () => {
     if (!forgotPasswordEmail) {
@@ -346,17 +336,6 @@ const Login03PageContent = () => {
                     disabled={isLoading}
                   >
                     {isLoading ? "Signing In..." : "Sign In Securely"}
-                  </Button>
-                  
-                  {/* Guest Login Button */}
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    className="h-11 w-full"
-                    disabled={isLoading}
-                    onClick={handleGuestLogin}
-                  >
-                    {isLoading ? "Logging in as Guest..." : "Guest Login"}
                   </Button>
                 </form>
               </Form>
