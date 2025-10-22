@@ -114,12 +114,26 @@ export class DriverService {
     statusData: DriverUpdateShipmentStatusRequest
   ): Promise<DriverUpdateShipmentStatusResponse> {
     try {
+      console.log('🔧 [DRIVER API] updateShipmentStatus called with:', {
+        shipmentId,
+        statusData,
+        statusDataStatus: statusData.status,
+        statusDataStatusType: typeof statusData.status,
+        statusDataStatusLength: statusData.status?.length
+      });
+
       // Validate input
       if (!shipmentId || shipmentId <= 0) {
         throw new Error('Valid shipment ID is required');
       }
 
       if (!statusData.status || statusData.status.trim() === '') {
+        console.error('❌ [DRIVER API] Status validation failed:', {
+          status: statusData.status,
+          statusType: typeof statusData.status,
+          statusLength: statusData.status?.length,
+          statusTrimmed: statusData.status?.trim()
+        });
         throw new Error('Status is required');
       }
 
@@ -133,15 +147,42 @@ export class DriverService {
         shipmentId.toString()
       );
 
+      console.log('🔧 [DRIVER API] Making API call:', {
+        url,
+        method: 'PUT',
+        shipmentId,
+        statusData
+      });
+
       const response = await apiClient.put<DriverUpdateShipmentStatusResponse>(
         url,
-        statusData
+        statusData,
+        { requiresAuth: true }
       );
+
+      console.log('🔧 [DRIVER API] API response received:', {
+        status: response.status,
+        data: response.data,
+        success: response.data?.success
+      });
 
       return response.data;
     } catch (error: any) {
+      console.error('🔧 [DRIVER API] Error caught in updateShipmentStatus:', {
+        error,
+        errorMessage: error.message,
+        errorStack: error.stack,
+        errorResponse: error.response,
+        errorResponseStatus: error.response?.status,
+        errorResponseData: error.response?.data,
+        errorCode: error.code,
+        errorName: error.name
+      });
+
       if (error.response?.status === 400) {
-        throw new Error('Invalid status transition or shipment not found');
+        const errorData = error.response.data;
+        const errorMessage = errorData?.details || errorData?.message || 'Invalid status transition or shipment not found';
+        throw new Error(errorMessage);
       }
       if (error.response?.status === 401) {
         throw new Error('Authentication required');
@@ -154,7 +195,8 @@ export class DriverService {
       }
       if (error.response?.status === 422) {
         const errorData = error.response.data;
-        throw new Error(errorData.detail?.[0]?.msg || 'Validation error');
+        const validationMessage = errorData.detail?.[0]?.msg || errorData.message || 'Validation error';
+        throw new Error(`Validation error: ${validationMessage}`);
       }
       throw new Error(error.message || 'Failed to update shipment status');
     }

@@ -225,7 +225,9 @@ export default function CourierRouteSimulation() {
           numericId,
           availableAssignments: assignmentsResponse.assignments.map(a => ({
             id: a.id,
-            tracking_code: a.tracking_code
+            shipment_id: a.shipment_id,
+            tracking_code: a.tracking_code,
+            status: a.status
           }))
         });
         
@@ -236,8 +238,20 @@ export default function CourierRouteSimulation() {
         );
         
         if (current) {
+          // Validate that the assignment has a valid shipment_id
+          if (!current.shipment_id || current.shipment_id <= 0) {
+            console.error('❌ [ROUTE] Assignment found but missing shipment_id:', current);
+            setError(`Assignment found but missing shipment ID. Please contact support.`);
+            return;
+          }
+          
           setCurrentAssignment(current);
-          console.log('✅ [ROUTE] Current assignment found:', current);
+          console.log('✅ [ROUTE] Current assignment found:', {
+            id: current.id,
+            shipment_id: current.shipment_id,
+            tracking_code: current.tracking_code,
+            status: current.status
+          });
           
           // Find next assignment
           const currentIndex = assignmentsResponse.assignments.findIndex(a => a.id === current.id);
@@ -660,20 +674,87 @@ export default function CourierRouteSimulation() {
   }
 
   const handleStartRoute = async () => {
-    if (!currentAssignment) return;
+    if (!currentAssignment) {
+      console.error('❌ [ROUTE] No current assignment available');
+      alert('No assignment data available. Please refresh the page.');
+      return;
+    }
+    
+    // Validate shipment_id
+    if (!currentAssignment.shipment_id || currentAssignment.shipment_id <= 0) {
+      console.error('❌ [ROUTE] Invalid shipment_id:', currentAssignment.shipment_id);
+      console.error('❌ [ROUTE] Current assignment data:', currentAssignment);
+      alert('Invalid shipment data. Please refresh the page and try again.');
+      return;
+    }
     
     try {
-      console.log('🚛 [ROUTE] Starting route for assignment:', currentAssignment.id);
-      await driverService.updateShipmentStatus(currentAssignment.shipment_id, {
-        status: 'in_transit',
-        notes: 'Driver started route'
+      console.log('🚛 [ROUTE] Starting route for assignment:', {
+        assignmentId: currentAssignment.id,
+        shipmentId: currentAssignment.shipment_id,
+        trackingCode: currentAssignment.tracking_code,
+        currentStatus: currentAssignment.status,
+        statusData: {
+          status: 'IN_TRANSIT',
+          notes: 'Driver started route'
+        }
       });
+      
+      // Check current status and determine appropriate transition
+      let targetStatus = 'IN_TRANSIT';
+      let notes = 'Driver started route';
+      
+      if (currentAssignment.status === 'IN_WAREHOUSE') {
+        targetStatus = 'IN_TRANSIT';
+        notes = 'Driver started route';
+      } else if (currentAssignment.status === 'IN_TRANSIT') {
+        // Already in transit, no need to change status
+        console.log('ℹ️ [ROUTE] Shipment already in transit, skipping status update');
+        setRouteStatus("route_started");
+        setIsMapModalOpen(true);
+        console.log('✅ [ROUTE] Route started successfully (already in transit)');
+        return;
+      } else if (currentAssignment.status === 'DELIVERED') {
+        // Already delivered, skip status update and proceed to delivery steps
+        console.log('ℹ️ [ROUTE] Shipment already delivered, proceeding to delivery steps');
+        setRouteStatus("delivered");
+        console.log('✅ [ROUTE] Route started successfully (already delivered)');
+        return;
+      } else {
+        console.warn('⚠️ [ROUTE] Unexpected current status:', currentAssignment.status);
+        targetStatus = 'IN_TRANSIT';
+      }
+      
+      await driverService.updateShipmentStatus(currentAssignment.shipment_id, {
+        status: targetStatus,
+        notes: notes
+      });
+      
       setRouteStatus("route_started");
       setIsMapModalOpen(true);
       console.log('✅ [ROUTE] Route started successfully');
     } catch (error: any) {
       console.error('❌ [ROUTE] Error starting route:', error);
-      alert('Failed to start route: ' + (error.message || 'Unknown error'));
+      console.error('❌ [ROUTE] Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
+      
+      let errorMessage = 'Failed to start route: ';
+      if (error.message?.includes('Invalid status transition')) {
+        errorMessage += error.message;
+      } else if (error.message?.includes('Validation error')) {
+        errorMessage += 'Invalid shipment data. Please refresh the page.';
+      } else if (error.message?.includes('Authentication')) {
+        errorMessage += 'Please log in again.';
+      } else if (error.message?.includes('not found')) {
+        errorMessage += 'Shipment not found. Please refresh the page.';
+      } else {
+        errorMessage += error.message || 'Unknown error';
+      }
+      
+      alert(errorMessage);
     }
   };
 
@@ -682,13 +763,10 @@ export default function CourierRouteSimulation() {
     
     try {
       console.log('📍 [ROUTE] Arriving at location for assignment:', currentAssignment.id);
-      await driverService.updateShipmentStatus(currentAssignment.shipment_id, {
-        status: 'out_for_delivery',
-        notes: 'Driver arrived at delivery location'
-      });
+      // No status update to backend here, status remains IN_TRANSIT until Confirm Delivery
       setRouteStatus("arrived");
       setGpsError(""); // Clear any GPS errors
-      console.log('✅ [ROUTE] Arrived at location successfully');
+      console.log('✅ [ROUTE] Arrived at location successfully (status remains IN_TRANSIT)');
     } catch (error: any) {
       console.error('❌ [ROUTE] Error updating arrival status:', error);
       alert('Failed to update arrival status: ' + (error.message || 'Unknown error'));
@@ -722,11 +800,8 @@ export default function CourierRouteSimulation() {
         return;
       }
 
-      // Update status to scanned
-      await driverService.updateShipmentStatus(currentAssignment.shipment_id, {
-        status: 'out_for_delivery',
-        notes: 'Package scanned at delivery location'
-      });
+      // Package scanned successfully - no status update needed as it's already DELIVERED
+      console.log('✅ [ROUTE] Package scanned successfully');
 
       setBarcodeError("");
       setRouteStatus("scanned");
@@ -1181,7 +1256,7 @@ export default function CourierRouteSimulation() {
       
       // Update shipment status to delivered
       await driverService.updateShipmentStatus(currentAssignment.shipment_id, {
-        status: 'delivered',
+        status: 'DELIVERED',
         notes: 'Package successfully delivered'
       });
       
