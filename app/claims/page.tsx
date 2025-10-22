@@ -67,7 +67,9 @@ const insuranceCoverage = {
 const claimTypes = [
   { value: "lost", label: "Lost", description: "Package lost during transit" },
   { value: "damaged", label: "Damaged", description: "Package damaged during shipping" },
-  { value: "delayed", label: "Delayed Delivery", description: "Significant delivery delay" },
+  { value: "late_delivery", label: "Late Delivery", description: "Significant delivery delay" },
+  { value: "wrong_address", label: "Wrong Address", description: "Package delivered to incorrect address" },
+  { value: "missing_items", label: "Missing Items", description: "Some items missing from package" },
   { value: "other", label: "Other", description: "Other shipping issues" }
 ];
 
@@ -118,6 +120,7 @@ export default function ClaimsPage() {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
 
@@ -164,6 +167,11 @@ export default function ClaimsPage() {
   // Handle form data updates
   const handleInputChange = (field: keyof ClaimFormData, value: string | File[]) => {
     setFormData(prev => ({ ...prev, [field]: value }));
+    
+    // Clear submit error when user starts typing
+    if (submitError) {
+      setSubmitError(null);
+    }
   };
 
   // Handle file uploads
@@ -211,6 +219,7 @@ export default function ClaimsPage() {
   // Handle form submission
   const handleSubmit = async () => {
     setIsSubmitting(true);
+    setSubmitError(null); // Clear any previous errors
     
     try {
       // Validate description length
@@ -218,10 +227,20 @@ export default function ClaimsPage() {
         throw new Error('Description must be at least 10 characters long');
       }
 
+      // Validate shipment number
+      if (!formData.shipmentNumber || formData.shipmentNumber.trim().length === 0) {
+        throw new Error('Shipment number is required');
+      }
+
+      // Validate claim type
+      if (!formData.claimType) {
+        throw new Error('Please select a claim type');
+      }
+
       // Map form data to API request format
       const claimRequest: CreateClaimRequest = {
         description: formData.description.trim(),
-        reason: formData.claimType as 'damaged' | 'lost' | 'delayed' | 'other',
+        reason: formData.claimType as 'damaged' | 'lost' | 'late_delivery' | 'wrong_address' | 'missing_items' | 'other',
         shipment_id: parseInt(formData.shipmentNumber) || 1 // For now, using a default shipment ID
       };
 
@@ -232,9 +251,7 @@ export default function ClaimsPage() {
       setSubmitted(true);
     } catch (error: any) {
       console.error('Failed to submit claim:', error);
-      // For now, still show success to avoid blocking the user
-      // In production, you'd want to show an error message
-      setSubmitted(true);
+      setSubmitError(error.message || 'Failed to submit claim. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -285,14 +302,25 @@ export default function ClaimsPage() {
                   placeholder="Enter your shipment tracking number"
                   value={formData.shipmentNumber}
                   onChange={(e) => handleInputChange("shipmentNumber", e.target.value)}
-                  className="mt-2"
+                  className={`mt-2 ${
+                    formData.shipmentNumber.length === 0 && submitError?.includes('Shipment number')
+                      ? 'border-red-300 focus:border-red-500' 
+                      : ''
+                  }`}
                 />
+                {formData.shipmentNumber.length === 0 && submitError?.includes('Shipment number') && (
+                  <p className="text-xs text-red-600 mt-1">Shipment number is required</p>
+                )}
               </div>
               
               <div>
                 <Label htmlFor="parcego-claims-type">Type of Claim *</Label>
                 <Select value={formData.claimType} onValueChange={(value) => handleInputChange("claimType", value)}>
-                  <SelectTrigger className="mt-2">
+                  <SelectTrigger className={`mt-2 ${
+                    !formData.claimType && submitError?.includes('claim type')
+                      ? 'border-red-300 focus:border-red-500' 
+                      : ''
+                  }`}>
                     <SelectValue placeholder="Select claim type">
                       {formData.claimType ? (
                         <span className="py-1">{claimTypes.find(t => t.value === formData.claimType)?.label}</span>
@@ -310,6 +338,9 @@ export default function ClaimsPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {!formData.claimType && submitError?.includes('claim type') && (
+                  <p className="text-xs text-red-600 mt-1">Please select a claim type</p>
+                )}
               </div>
             </div>
 
@@ -375,10 +406,21 @@ export default function ClaimsPage() {
                 placeholder="Please provide a detailed description of what happened, including any relevant circumstances... (minimum 10 characters)"
                 value={formData.description}
                 onChange={(e) => handleInputChange("description", e.target.value)}
-                className="mt-2 min-h-[120px]"
+                className={`mt-2 min-h-[120px] ${
+                  formData.description.length > 0 && formData.description.length < 10 
+                    ? 'border-red-300 focus:border-red-500' 
+                    : ''
+                }`}
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className={`text-xs mt-1 ${
+                formData.description.length > 0 && formData.description.length < 10 
+                  ? 'text-red-600' 
+                  : 'text-gray-500'
+              }`}>
                 {formData.description.length}/10 characters minimum
+                {formData.description.length > 0 && formData.description.length < 10 && (
+                  <span className="ml-2 font-medium">(Minimum 10 characters required)</span>
+                )}
               </p>
             </div>
 
@@ -752,10 +794,24 @@ export default function ClaimsPage() {
                         carefully as changes cannot be made after submission.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
+                    
+                    {/* Error Display */}
+                    {submitError && (
+                      <Alert className="border-red-200 bg-red-50">
+                        <AlertDescription className="text-red-800">
+                          {submitError}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+                    
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction onClick={handleSubmit} className="bg-blue-600 hover:bg-blue-700">
-                        Submit Claim
+                      <AlertDialogAction 
+                        onClick={handleSubmit} 
+                        className="bg-blue-600 hover:bg-blue-700"
+                        disabled={isSubmitting}
+                      >
+                        {isSubmitting ? "Submitting..." : "Submit Claim"}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>

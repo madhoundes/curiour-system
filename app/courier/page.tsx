@@ -18,132 +18,9 @@ import { NotificationBanner } from "@/components/ui/notification-banner";
 import { authService, driverService } from "@/lib/api";
 import type { User, DriverAssignment, DriverStatisticsResponse } from "@/lib/api";
 
-// Mock data for courier dashboard
-const mockCourierData = {
-  name: "Ahmed Hassan",
-  id: "PCG-C001",
-  avatar: "/avatars/ahmed.jpg",
-  stats: {
-    deliveriesToday: 8,
-    completed: 5,
-    remaining: 3,
-    earnings: 145.50,
-    efficiency: 92,
-    onTimeRate: 98
-  }
-};
+// Mock data removed - using real API data only
 
-const mockDeliveries = [
-  {
-    id: "PCG-DEL-001",
-    trackingNumber: "PCG789123456",
-    customerName: "Sarah Johnson",
-    address: "123 Main Street, Downtown",
-    timeWindow: "2:00 PM - 4:00 PM",
-    estimatedTime: "2:30 PM",
-    status: "ready_for_pickup",
-    packageType: "Standard",
-    weight: "2.5 kg",
-    specialInstructions: "Call upon arrival",
-    priority: "high"
-  },
-  {
-    id: "PCG-DEL-002",
-    trackingNumber: "PCG789123457",
-    customerName: "Mike Chen",
-    address: "456 Oak Avenue, Suburbs",
-    timeWindow: "3:00 PM - 5:00 PM",
-    estimatedTime: "3:15 PM",
-    status: "in_transit",
-    packageType: "Fragile",
-    weight: "1.2 kg",
-    specialInstructions: "Handle with care - electronics",
-    priority: "medium"
-  },
-  {
-    id: "PCG-DEL-003",
-    trackingNumber: "PCG789123458",
-    customerName: "Lisa Brown",
-    address: "789 Pine Road, Uptown",
-    timeWindow: "4:00 PM - 6:00 PM",
-    estimatedTime: "4:45 PM",
-    status: "assigned",
-    packageType: "Documents",
-    weight: "0.3 kg",
-    specialInstructions: "Signature required",
-    priority: "low"
-  }
-];
 
-// Mock notification data
-const mockNotifications = [
-  {
-    id: "notif-001",
-    type: "delivery_assignment",
-    priority: "high",
-    status: "unread",
-    title: "New Delivery Assigned",
-    message: "Package PCG789123459 assigned for delivery to Downtown area",
-    timestamp: "2025-01-15T14:30:00Z",
-    icon: "Package",
-    category: "assignment"
-  },
-  {
-    id: "notif-002", 
-    type: "package_status",
-    priority: "normal",
-    status: "unread",
-    title: "Package Scanned Successfully",
-    message: "PCG789123456 scanned at pickup location - ready for transit",
-    timestamp: "2025-01-15T13:45:00Z",
-    icon: "CheckCircle",
-    category: "status"
-  },
-  {
-    id: "notif-003",
-    type: "system_message",
-    priority: "normal", 
-    status: "read",
-    title: "Route Optimization Complete",
-    message: "Your delivery route has been optimized for maximum efficiency",
-    timestamp: "2025-01-15T12:15:00Z",
-    icon: "Route",
-    category: "system"
-  },
-  {
-    id: "notif-004",
-    type: "delivery_assignment",
-    priority: "high",
-    status: "read",
-    title: "Urgent Delivery Added",
-    message: "High-priority package PCG789123460 added to your route",
-    timestamp: "2025-01-15T11:30:00Z", 
-    icon: "AlertTriangle",
-    category: "assignment"
-  },
-  {
-    id: "notif-005",
-    type: "package_status",
-    priority: "low",
-    status: "read",
-    title: "Delivery Confirmation",
-    message: "PCG789123455 successfully delivered with proof of delivery",
-    timestamp: "2025-01-15T10:45:00Z",
-    icon: "CircleCheck",
-    category: "status"
-  },
-  {
-    id: "notif-006",
-    type: "system_message",
-    priority: "normal",
-    status: "read", 
-    title: "Platform Maintenance Scheduled",
-    message: "System maintenance scheduled for tonight 11 PM - 1 AM EST",
-    timestamp: "2025-01-15T09:00:00Z",
-    icon: "Settings",
-    category: "system"
-  }
-];
 
 
 const getStatusColor = (status: string) => {
@@ -224,8 +101,15 @@ function CourierDashboard() {
   });
   
   // Deliveries & Stats state (sequential by priority) - now based on API data
-  const [deliveries, setDeliveries] = useState<typeof mockDeliveries>(() => [...mockDeliveries]);
-  const [stats, setStats] = useState(() => ({ ...mockCourierData.stats }));
+  const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [stats, setStats] = useState({
+    deliveriesToday: 0,
+    completed: 0,
+    remaining: 0,
+    earnings: 0,
+    efficiency: 0,
+    onTimeRate: 0
+  });
   const priorityOrder = React.useMemo(() => ({ high: 3, medium: 2, low: 1 } as const), []);
   const activeDeliveryId = React.useMemo(() => {
     const pending = deliveries.filter(d => d.status !== 'delivered');
@@ -251,7 +135,7 @@ function CourierDashboard() {
   }, [deliveries, activeDeliveryId, priorityOrder]);
   
   // Notification state management
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const [notifications, setNotifications] = useState<any[]>([]);
   
   // Scan package state management
   interface ScannedPackageData {
@@ -342,7 +226,17 @@ function CourierDashboard() {
       // Update deliveries based on assignments
       let mappedDeliveries: any[] = [];
       if (assignmentsResponse.assignments && assignmentsResponse.assignments.length > 0) {
+        console.log('📦 [DASHBOARD] Raw assignments data:', assignmentsResponse.assignments);
+        
         mappedDeliveries = assignmentsResponse.assignments.map((assignment, index) => {
+          console.log(`📦 [DASHBOARD] Processing assignment ${index + 1}:`, {
+            id: assignment.id,
+            tracking_code: assignment.tracking_code,
+            assignment_status: assignment.assignment_status,
+            status: assignment.status,
+            receiver_name: assignment.receiver_name
+          });
+          
           // Map assignment status to delivery status more accurately
           let deliveryStatus: string;
           if (assignment.assignment_status === 'completed' || assignment.status === 'delivered') {
@@ -356,6 +250,8 @@ function CourierDashboard() {
           } else {
             deliveryStatus = 'assigned';
           }
+          
+          console.log(`📦 [DASHBOARD] Mapped status for ${assignment.tracking_code}: ${assignment.status} + ${assignment.assignment_status} → ${deliveryStatus}`);
 
           return {
             id: `PCG-DEL-${assignment.id}`,
@@ -371,6 +267,7 @@ function CourierDashboard() {
             priority: 'medium' as const // Default priority
           };
         });
+        console.log('📦 [DASHBOARD] Mapped deliveries:', mappedDeliveries);
         setDeliveries(mappedDeliveries);
         
         console.log('📦 [DASHBOARD] Mapped deliveries:', mappedDeliveries.map(d => ({
@@ -405,21 +302,20 @@ function CourierDashboard() {
         totalAssignments,
         completedDeliveries,
         remainingDeliveries,
-        deliveryStatuses: mappedDeliveries?.map(d => ({
+        deliveryStatuses: mappedDeliveries.map(d => ({
           id: d.id,
           trackingNumber: d.trackingNumber,
-          customerName: d.customerName,
           status: d.status
-        })) || []
+        }))
       });
 
       setStats({
         deliveriesToday: totalAssignments,
         completed: completedDeliveries,
         remaining: remainingDeliveries,
-        earnings: 145.50, // Mock value - not in API yet
-        efficiency: 92, // Mock value - can be calculated
-        onTimeRate: 98 // Mock value - can be calculated
+        earnings: 0, // TODO: Get from API when available
+        efficiency: completedDeliveries > 0 ? Math.round((completedDeliveries / totalAssignments) * 100) : 0,
+        onTimeRate: 0 // TODO: Calculate based on delivery times when available
       });
 
       // Update notification banner

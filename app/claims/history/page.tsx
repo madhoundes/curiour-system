@@ -62,7 +62,9 @@ const claimStatusConfig = {
 const claimTypeConfig = {
   damaged: { label: "Damage", color: "bg-orange-50 text-orange-700", icon: Package },
   lost: { label: "Loss", color: "bg-red-50 text-red-700", icon: Package },
-  delayed: { label: "Delay", color: "bg-yellow-50 text-yellow-700", icon: Clock },
+  late_delivery: { label: "Late Delivery", color: "bg-yellow-50 text-yellow-700", icon: Clock },
+  wrong_address: { label: "Wrong Address", color: "bg-purple-50 text-purple-700", icon: AlertTriangle },
+  missing_items: { label: "Missing Items", color: "bg-blue-50 text-blue-700", icon: Package },
   other: { label: "Other", color: "bg-gray-50 text-gray-700", icon: AlertTriangle }
 };
 
@@ -335,7 +337,9 @@ export default function ClaimsHistoryPage() {
                   <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="damaged">Damage</SelectItem>
                   <SelectItem value="lost">Loss</SelectItem>
-                  <SelectItem value="delayed">Delay</SelectItem>
+                  <SelectItem value="late_delivery">Late Delivery</SelectItem>
+                  <SelectItem value="wrong_address">Wrong Address</SelectItem>
+                  <SelectItem value="missing_items">Missing Items</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>
