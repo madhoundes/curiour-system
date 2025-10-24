@@ -239,14 +239,17 @@ function CourierDashboard() {
           
           // Map assignment status to delivery status more accurately
           let deliveryStatus: string;
-          if (assignment.assignment_status === 'completed' || assignment.status === 'delivered') {
+          const status = assignment.status?.toUpperCase();
+          const assignmentStatus = assignment.assignment_status?.toLowerCase();
+          
+          if (assignmentStatus === 'completed' || status === 'DELIVERED') {
             deliveryStatus = 'delivered';
-          } else if (assignment.status === 'out_for_delivery') {
+          } else if (status === 'OUT_FOR_DELIVERY') {
             deliveryStatus = 'ready_for_pickup';
-          } else if (assignment.status === 'in_transit') {
+          } else if (status === 'IN_TRANSIT' || assignmentStatus === 'in_progress') {
             deliveryStatus = 'in_transit';
-          } else if (assignment.assignment_status === 'in_progress') {
-            deliveryStatus = 'in_transit';
+          } else if (status === 'IN_WAREHOUSE') {
+            deliveryStatus = 'assigned';
           } else {
             deliveryStatus = 'assigned';
           }

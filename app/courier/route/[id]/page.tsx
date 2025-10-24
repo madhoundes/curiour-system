@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
@@ -160,8 +161,14 @@ export default function CourierRouteSimulation() {
   const [optimizedRouteUrl, setOptimizedRouteUrl] = useState<string | null>(null);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
   
-  // Route simulation state
-  const [routeStatus, setRouteStatus] = useState<DeliveryStatus>("assigned");
+  // Route simulation state - Load from localStorage if available
+  const [routeStatus, setRouteStatus] = useState<DeliveryStatus>(() => {
+    if (typeof window !== 'undefined') {
+      const savedStatus = localStorage.getItem(`parcego_route_status_${deliveryId}`);
+      return (savedStatus as DeliveryStatus) || "assigned";
+    }
+    return "assigned";
+  });
   const [currentLocation, setCurrentLocation] = useState({ lat: 43.6426, lng: -79.3871 }); // Will be replaced with real GPS
   
   // Modal states
@@ -170,6 +177,8 @@ export default function CourierRouteSimulation() {
   const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [isProblemModalOpen, setIsProblemModalOpen] = useState(false);
+  const [problemNote, setProblemNote] = useState("");
   
   // Auto-close timeout reference for cleanup
   const [successModalTimeout, setSuccessModalTimeout] = useState<number | null>(null);
@@ -602,6 +611,14 @@ export default function CourierRouteSimulation() {
       }
     }));
   }, [routeStatus]);
+
+  // Save route status to localStorage whenever it changes
+  useEffect(() => {
+    if (routeStatus && deliveryId) {
+      localStorage.setItem(`parcego_route_status_${deliveryId}`, routeStatus);
+      console.log(`💾 [ROUTE] Saved route status to localStorage: ${routeStatus} for ${deliveryId}`);
+    }
+  }, [routeStatus, deliveryId]);
 
   // Cleanup camera and audio context on component unmount
   useEffect(() => {
@@ -1263,6 +1280,10 @@ export default function CourierRouteSimulation() {
       setRouteStatus("delivered");
       setIsConfirmModalOpen(false);
 
+      // Clear saved route status since delivery is complete
+      localStorage.removeItem(`parcego_route_status_${deliveryId}`);
+      console.log(`🗑️ [ROUTE] Cleared saved route status for ${deliveryId}`);
+
       // Update delivery status in persistent storage for main courier page
       try {
         const completedDeliveries = JSON.parse(localStorage.getItem('parcego_completed_deliveries') || '[]');
@@ -1312,6 +1333,41 @@ export default function CourierRouteSimulation() {
     } catch (error: any) {
       console.error('❌ [ROUTE] Error confirming delivery:', error);
       alert('Failed to confirm delivery: ' + (error.message || 'Unknown error'));
+    }
+  };
+
+  const handleReportProblem = async () => {
+    if (!currentAssignment) return;
+    
+    if (!problemNote.trim()) {
+      alert('Please provide a reason for the delivery problem.');
+      return;
+    }
+    
+    try {
+      console.log('⚠️ [ROUTE] Reporting delivery problem for assignment:', currentAssignment.id);
+      
+      // Update shipment status to undelivered
+      await driverService.updateShipmentStatus(currentAssignment.shipment_id, {
+        status: 'UNDELIVERED',
+        notes: problemNote.trim()
+      });
+      
+      setRouteStatus("failed");
+      setIsProblemModalOpen(false);
+      setProblemNote("");
+
+      console.log('✅ [ROUTE] Problem reported successfully');
+      
+      // Show alert and redirect back to dashboard
+      alert('Delivery problem reported. You will be redirected to the dashboard.');
+      
+      // Redirect to courier dashboard
+      router.push('/courier');
+      
+    } catch (error: any) {
+      console.error('❌ [ROUTE] Error reporting problem:', error);
+      alert('Failed to report problem: ' + (error.message || 'Unknown error'));
     }
   };
 
@@ -1788,6 +1844,36 @@ export default function CourierRouteSimulation() {
           </CardContent>
         </Card>
 
+        {/* Problem Reporting Section */}
+        {routeStatus !== "delivered" && routeStatus !== "failed" && (
+          <Card className="bg-red-50 border-red-200">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-red-100 rounded-full">
+                    <Icon name="AlertTriangle" size={20} className="text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="font-medium text-red-900">Having Issues?</h3>
+                    <p className="text-sm text-red-700">
+                      Report any delivery problems or issues
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={() => setIsProblemModalOpen(true)}
+                  id="parcego-route-report-problem-btn"
+                >
+                  <Icon name="AlertTriangle" size={16} className="mr-2" />
+                  Report Problem
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Success Message */}
         {routeStatus === "delivered" && (
           <Card className="bg-green-50 border-green-200">
@@ -1923,12 +2009,14 @@ export default function CourierRouteSimulation() {
           </DialogHeader>
           <div className="flex-1 overflow-y-auto px-1">
             <div className="space-y-4">
-            {/* Mock Map Preview */}
-            <div className="bg-gray-100 rounded-lg h-48 flex items-center justify-center">
-              <div className="text-center text-gray-500">
-                <Icon name="Map" size={48} className="mx-auto mb-2" />
-                <p className="text-sm">Interactive Map Preview</p>
-                <p className="text-xs">{currentAssignment.receiver_address}</p>
+            {/* Delivery Address Info */}
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <div className="flex items-start space-x-3">
+                <Icon name="MapPin" size={20} className="text-blue-600 mt-0.5" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-900 mb-1">Delivery Address</p>
+                  <p className="text-sm text-gray-700">{currentAssignment.receiver_address}, {currentAssignment.receiver_city}</p>
+                </div>
               </div>
             </div>
             
@@ -1955,13 +2043,28 @@ export default function CourierRouteSimulation() {
                   )}
                 </div>
                 <span className="text-xs font-bold">
-                  {isLoadingRoute ? 'Loading...' : optimizedRouteUrl ? 'Optimized Route' : 'Google Maps'}
+                  {isLoadingRoute ? 'Loading...' : 'Google Maps'}
                 </span>
               </Button>
               <Button
                 variant="outline"
-                className="flex flex-col items-center p-4 h-auto transition-all duration-200"
-                onClick={() => window.open(`https://waze.com/ul?q=${encodeURIComponent(currentAssignment.receiver_address)}`, '_blank')}
+                className="flex flex-col items-center p-4 h-auto transition-all duration-200 hover:bg-blue-50 hover:border-blue-300"
+                onClick={() => {
+                  // Build full address for Waze with start and destination
+                  const startAddress = "3883 Quartz Rd, Mississauga, ON L5B 0M4, Canada";
+                  const fullAddress = `${currentAssignment.receiver_address}, ${currentAssignment.receiver_city}`;
+                  
+                  // Waze URL with start and destination
+                  let wazeUrl = `https://waze.com/ul?navigate=yes&from=${encodeURIComponent(startAddress)}&to=${encodeURIComponent(fullAddress)}`;
+                  
+                  // Add next delivery as waypoint if available
+                  if (nextAssignment) {
+                    const nextFullAddress = `${nextAssignment.receiver_address}, ${nextAssignment.receiver_city}`;
+                    wazeUrl += `&waypoint=1&lat=${encodeURIComponent(nextFullAddress)}`;
+                  }
+                  
+                  window.open(wazeUrl, '_blank');
+                }}
                 id="parcego-navigation-waze-btn"
               >
                 <div className="mb-2">
@@ -1971,8 +2074,17 @@ export default function CourierRouteSimulation() {
               </Button>
               <Button
                 variant="outline" 
-                className="flex flex-col items-center p-4 h-auto transition-all duration-200"
-                onClick={() => window.open(`http://maps.apple.com/?q=${encodeURIComponent(currentAssignment.receiver_address)}`, '_blank')}
+                className="flex flex-col items-center p-4 h-auto transition-all duration-200 hover:bg-green-50 hover:border-green-300"
+                onClick={() => {
+                  // Build full address for Apple Maps with start and destination
+                  const startAddress = "3883 Quartz Rd, Mississauga, ON L5B 0M4, Canada";
+                  const fullAddress = `${currentAssignment.receiver_address}, ${currentAssignment.receiver_city}`;
+                  
+                  // Apple Maps URL with start (saddr) and destination (daddr)
+                  let appleMapsUrl = `http://maps.apple.com/?saddr=${encodeURIComponent(startAddress)}&daddr=${encodeURIComponent(fullAddress)}&dirflg=d`;
+                  
+                  window.open(appleMapsUrl, '_blank');
+                }}
                 id="parcego-navigation-apple-maps-btn"
               >
                 <div className="mb-2">
@@ -2676,6 +2788,64 @@ export default function CourierRouteSimulation() {
                 Confirm Delivery
               </Button>
             </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Problem Reporting Modal */}
+      <Dialog open={isProblemModalOpen} onOpenChange={setIsProblemModalOpen}>
+        <DialogContent className="max-w-md max-h-[90vh] bg-white flex flex-col overflow-hidden">
+          <DialogHeader className="flex-shrink-0 pb-4">
+            <DialogTitle className="flex items-center space-x-2">
+              <Icon name="AlertTriangle" size={20} className="text-red-600" />
+              <span>Report Delivery Problem</span>
+            </DialogTitle>
+            <DialogDescription>
+              Please describe the issue that prevented successful delivery
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto px-1">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="problem-note" className="text-sm font-medium">
+                  Problem Description *
+                </Label>
+                <textarea
+                  id="problem-note"
+                  placeholder="Describe what went wrong (e.g., recipient not available, wrong address, package damaged, etc.)"
+                  value={problemNote}
+                  onChange={(e) => setProblemNote(e.target.value)}
+                  className="w-full min-h-[120px] px-3 py-2 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                  maxLength={500}
+                />
+                <div className="text-xs text-gray-500 text-right">
+                  {problemNote.length}/500 characters
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex-shrink-0 pt-4 border-t border-gray-200">
+            <div className="flex space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsProblemModalOpen(false);
+                  setProblemNote("");
+                }}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleReportProblem}
+                className="flex-1"
+                disabled={!problemNote.trim()}
+              >
+                <Icon name="AlertTriangle" size={16} className="mr-2" />
+                Report Problem
+              </Button>
             </div>
           </div>
         </DialogContent>
