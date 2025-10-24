@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Icon } from "@/components/ui/icon";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -72,6 +72,7 @@ export default function CourierPerformance() {
   // API Data State
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [statisticsData, setStatisticsData] = useState<DriverStatisticsResponse | null>(null);
+  const [assignmentCount, setAssignmentCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -95,9 +96,27 @@ export default function CourierPerformance() {
         const statsResponse = await driverService.getDriverStatistics(dateRange);
         setStatisticsData(statsResponse);
 
+        // Fetch today's assignments for badge count
+        console.log('🔍 [PERFORMANCE] Fetching today\'s assignments...');
+        const assignmentsResponse = await driverService.getTodaysAssignments();
+        const assignmentCount = assignmentsResponse.assignments?.length || 0;
+        setAssignmentCount(assignmentCount);
+        console.log('✅ [PERFORMANCE] Assignments fetched:', assignmentCount);
+
         console.log('✅ [PERFORMANCE] Data fetched successfully:', {
           user: userResponse.data.email,
-          stats: statsResponse
+          stats: statsResponse,
+          assignmentCount: assignmentCount,
+          breakdown: {
+            total: statsResponse.total_deliveries,
+            inTransit: statsResponse.items_in_transit,
+            inWarehouse: statsResponse.items_in_warehouse,
+            undelivered: statsResponse.undelivered_shipments,
+            calculatedCompleted: Math.max(0, statsResponse.total_deliveries - 
+              statsResponse.undelivered_shipments - 
+              statsResponse.items_in_transit - 
+              statsResponse.items_in_warehouse)
+          }
         });
 
       } catch (error: any) {
@@ -317,7 +336,6 @@ export default function CourierPerformance() {
                   aria-label="Profile menu"
                 >
                   <Avatar className="h-8 w-8">
-                    <AvatarImage src={currentUser?.avatar_url || ""} alt={currentUser?.first_name || "User"} />
                     <AvatarFallback className="bg-gray-100 text-gray-700 text-sm font-medium">
                       {currentUser ? `${currentUser.first_name?.[0] || ''}${currentUser.last_name?.[0] || ''}`.toUpperCase() : 'U'}
                     </AvatarFallback>
@@ -982,9 +1000,11 @@ export default function CourierPerformance() {
           >
             <div className="relative transition-all duration-200 ease-out">
               <Icon name="Package" size={20} className="text-current" />
-              <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
-                {currentData.remaining}
-              </div>
+              {assignmentCount > 0 && (
+                <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold rounded-full h-5 w-5 flex items-center justify-center">
+                  {assignmentCount}
+                </div>
+              )}
             </div>
             <span className="text-xs font-medium mt-1 transition-all duration-200 ease-out text-current">
               Deliveries

@@ -154,7 +154,8 @@ export default function SuperAdminDashboard() {
   const [assignments, setAssignments] = useState<any[]>([]);
   const [assignmentStats, setAssignmentStats] = useState<any>(null);
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
-  const [selectedAssignmentDate, setSelectedAssignmentDate] = useState<Date>(new Date());
+  // Memoize initial date to prevent unnecessary re-renders
+  const [selectedAssignmentDate, setSelectedAssignmentDate] = useState<Date>(() => new Date());
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [isManualAssignmentOpen, setIsManualAssignmentOpen] = useState(false);
@@ -305,8 +306,7 @@ export default function SuperAdminDashboard() {
       }
     };
 
-    loadAssignments();
-  }, [isAuthenticated, selectedAssignmentDate]);
+    loadAssignments();  }, [isAuthenticated, format(selectedAssignmentDate, 'yyyy-MM-dd')]);
 
   // Real courier data from API
   const [couriers, setCouriers] = useState<User[]>([]);

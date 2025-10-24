@@ -133,6 +133,26 @@ function CourierDashboard() {
     }
     return list;
   }, [deliveries, activeDeliveryId, priorityOrder]);
+
+  // Calculate delivery progress from route status stored in localStorage
+  const deliveryProgress = React.useMemo(() => {
+    if (!activeDeliveryId || typeof window === 'undefined') return 0;
+    
+    const savedStatus = localStorage.getItem(`parcego_route_status_${activeDeliveryId}`);
+    if (!savedStatus) return 0;
+    
+    // Map route status to progress percentage
+    const statusToProgress: Record<string, number> = {
+      'assigned': 0,
+      'route_started': 20,
+      'arrived_location': 40,
+      'scan_barcode': 60,
+      'photo_taken': 80,
+      'delivered': 100
+    };
+    
+    return statusToProgress[savedStatus] || 0;
+  }, [activeDeliveryId]);
   
   // Notification state management
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -1233,7 +1253,7 @@ function CourierDashboard() {
                       Delivery Progress
                     </h3>
                     <span className="text-2xl font-bold text-gray-900" style={{ fontWeight: 700 }}>
-                      {Math.round((stats.completed / stats.deliveriesToday) * 100)}%
+                      {activeDeliveryId ? deliveryProgress : Math.round((stats.completed / stats.deliveriesToday) * 100)}%
                     </span>
                   </div>
                   
@@ -1242,7 +1262,7 @@ function CourierDashboard() {
                     <div 
                       className="h-full rounded-full transition-all duration-500 ease-out"
                       style={{
-                        width: `${Math.round((stats.completed / stats.deliveriesToday) * 100)}%`,
+                        width: `${activeDeliveryId ? deliveryProgress : Math.round((stats.completed / stats.deliveriesToday) * 100)}%`,
                         background: 'linear-gradient(90deg, #10b981 0%, #059669 50%, #047857 100%)',
                         boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
                       }}
