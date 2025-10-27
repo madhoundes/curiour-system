@@ -163,13 +163,9 @@ export default function SuperAdminDashboard() {
   // Warehouse state
   const [isMovingToWarehouse, setIsMovingToWarehouse] = useState(false);
   const [isRunningAutomation, setIsRunningAutomation] = useState(false);
+  const [isClearingAssignments, setIsClearingAssignments] = useState(false);
 
-  // Modal state for merchant approval/suspension
-  const [actionModalOpen, setActionModalOpen] = useState(false);
-  const [actionType, setActionType] = useState<'approve' | 'suspend' | null>(null);
-  const [selectedMerchantForAction, setSelectedMerchantForAction] = useState<User | null>(null);
-  const [actionNotes, setActionNotes] = useState("");
-  const [isProcessingAction, setIsProcessingAction] = useState(false);
+  // Removed: Modal state for merchant approval/suspension (approval system removed)
 
   // Merchant details modal state
   const [isEditingMerchant, setIsEditingMerchant] = useState(false);
@@ -177,7 +173,7 @@ export default function SuperAdminDashboard() {
     businessName: '',
     contactName: '',
     email: '',
-    status: 'active' as 'active' | 'pending' | 'suspended',
+    status: 'active' as 'active' | 'suspended',
     joinDate: ''
   });
   const [isSavingMerchant, setIsSavingMerchant] = useState(false);
@@ -210,7 +206,7 @@ export default function SuperAdminDashboard() {
       case 'contactName':
         return `${merchant.first_name} ${merchant.last_name}`.trim();
       case 'status':
-        return merchant.is_active ? (merchant.is_verified ? 'active' : 'pending') : 'suspended';
+        return merchant.is_active ? 'active' : 'suspended';
       case 'joinDate':
         return merchant.created_at;
       case 'totalShipments':
@@ -483,69 +479,7 @@ export default function SuperAdminDashboard() {
     });
   };
 
-  // Handle merchant action modal
-  const handleMerchantAction = (merchant: User, action: 'approve' | 'suspend') => {
-    setSelectedMerchantForAction(merchant);
-    setActionType(action);
-    setActionNotes("");
-    setActionModalOpen(true);
-  };
-
-  // Process merchant approval/suspension
-  const processMerchantAction = async () => {
-    if (!selectedMerchantForAction || !actionType) return;
-
-    setIsProcessingAction(true);
-
-    try {
-      // Update local merchants array (API endpoint not available)
-      const updatedMerchants = merchants.map(m =>
-        m.id === selectedMerchantForAction.id 
-          ? { ...m, is_active: actionType === 'approve', is_verified: actionType === 'approve' }
-          : m
-      );
-      setMerchants(updatedMerchants);
-      
-      // Update filtered merchants
-      const updatedFilteredMerchants = filteredMerchants.map(m =>
-        m.id === selectedMerchantForAction.id 
-          ? { ...m, is_active: actionType === 'approve', is_verified: actionType === 'approve' }
-          : m
-      );
-      setFilteredMerchants(updatedFilteredMerchants);
-
-      // Close modal and reset state
-      setActionModalOpen(false);
-      setSelectedMerchantForAction(null);
-      setActionType(null);
-      setActionNotes("");
-
-      // Show success toast
-      const merchantName = `${selectedMerchantForAction.first_name} ${selectedMerchantForAction.last_name}`.trim();
-      showSuccessToast(
-        `${merchantName} has been ${actionType === 'approve' ? 'approved' : 'suspended'} successfully!`
-      );
-
-    } catch (error) {
-      showErrorToast(
-        `Failed to ${actionType} merchant. Please try again.`,
-        {
-          duration: 5000,
-          showCloseButton: true
-        }
-      );
-    } finally {
-      setIsProcessingAction(false);
-    }
-  };
-
-  // Cancel action
-  const cancelMerchantAction = () => {
-    setActionModalOpen(false);
-    setSelectedMerchantForAction(null);
-    setActionType(null);
-    setActionNotes("");
-  };
+  // Removed: Merchant action handlers (approval system removed)
 
   // Courier action handlers
 
@@ -762,6 +696,7 @@ export default function SuperAdminDashboard() {
     try {
       setIsRunningAutomation(true);
       const dateStr = format(selectedAssignmentDate, 'yyyy-MM-dd');
+      
       await adminService.runAutomatedAssignment({ assignment_date: dateStr });
       
       showSuccessToast("Automated assignment completed successfully!");
@@ -772,11 +707,51 @@ export default function SuperAdminDashboard() {
       
       const statsResponse = await adminService.getAssignmentStatistics(dateStr);
       setAssignmentStats(statsResponse.data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to run automated assignment:', error);
-      showErrorToast("Failed to run automated assignment. Please try again.");
+      
+      // Check if the error is about existing assignments
+      const errorMessage = error?.details || error?.message || '';
+      const currentDateStr = format(selectedAssignmentDate, 'yyyy-MM-dd');
+      if (errorMessage.includes('already exist')) {
+        showErrorToast(
+          `Assignments already exist for ${currentDateStr}. Please manually click 'Clear All Assignments' first, wait for the success message, then try 'Run Automation' again.`,
+          { duration: 8000 }
+        );
+      } else {
+        showErrorToast("Failed to run automated assignment. Please try again.");
+      }
     } finally {
       setIsRunningAutomation(false);
+    }
+  };
+
+  // Clear all assignments
+  const handleClearAllAssignments = async () => {
+    try {
+      setIsClearingAssignments(true);
+      
+      // NOTE: Backend endpoint /admin/assignments/clear-all does NOT accept date parameter
+      // It only clears global ASSIGNED/IN_PROGRESS statuses, not date-specific assignments
+      await adminService.clearAllAssignments();
+      
+      showSuccessToast("All assignments cleared successfully!");
+      
+      // Small delay to ensure backend processes the clear
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      // Reload assignments to show updated data
+      const dateStr = format(selectedAssignmentDate, 'yyyy-MM-dd');
+      const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
+      setAssignments(assignmentsResponse.data.assignments || []);
+      
+      const statsResponse = await adminService.getAssignmentStatistics(dateStr);
+      setAssignmentStats(statsResponse.data);
+    } catch (error) {
+      console.error('Failed to clear all assignments:', error);
+      showErrorToast("Failed to clear all assignments. Please try again.");
+    } finally {
+      setIsClearingAssignments(false);
     }
   };
   
@@ -921,14 +896,12 @@ export default function SuperAdminDashboard() {
     const totalMerchants = merchants.length;
     const activeCouriers = couriers.filter(c => c.is_active).length;
     const totalShipments = adminStats?.totalShipments || 0;
-    const pendingApprovals = merchants.filter(m => !m.is_verified).length + 
-                            couriers.filter(c => !c.is_verified).length;
     
     return {
       totalMerchants,
       activeCouriers,
       totalShipments,
-      pendingApprovals,
+      pendingApprovals: 0, // Approval system removed
       // These are not available in the current API, kept for export compatibility
       monthlyRevenue: 0,
       systemHealth: 99.0
@@ -1266,24 +1239,6 @@ export default function SuperAdminDashboard() {
           </CardContent>
         </Card> */}
 
-        <Card id="parcego-admin-stat-approvals" className="relative overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base font-bold">Pending Approvals</CardTitle>
-            <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center shadow-sm">
-              <Icon name="AlertCircle" size={24} className="text-amber-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {statsLoading || merchantsLoading || couriersLoading ? (
-              <Skeleton className="h-9 w-24 mb-2" />
-            ) : (
-              <>
-            <div className="text-2xl xl:text-3xl font-bold">{platformStats.pendingApprovals}</div>
-                <p className="text-xs text-amber-600">{platformStats.pendingApprovals > 0 ? 'Requires attention' : 'All verified'}</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
       </div>
 
     </div>
@@ -1518,30 +1473,6 @@ export default function SuperAdminDashboard() {
                               >
                                 <Icon name="Edit" size={14} />
                               </Button>
-                              {getMerchantProperty(merchant, 'status') === "pending" && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-green-600 h-8 w-8 p-0 touch-manipulation"
-                                  id={`parcego-merchant-approve-${merchant.id}`}
-                                  onClick={() => handleMerchantAction(merchant, 'approve')}
-                                  aria-label={`Approve ${getMerchantProperty(merchant, 'businessName')}`}
-                                >
-                                  <Icon name="UserCheck" size={14} />
-                                </Button>
-                              )}
-                              {getMerchantProperty(merchant, 'status') === "active" && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-red-600 h-8 w-8 p-0 touch-manipulation"
-                                  id={`parcego-merchant-suspend-${merchant.id}`}
-                                  onClick={() => handleMerchantAction(merchant, 'suspend')}
-                                  aria-label={`Suspend ${getMerchantProperty(merchant, 'businessName')}`}
-                                >
-                                  <Icon name="Ban" size={14} />
-                                </Button>
-                              )}
                             </div>
                           </td>
                         </tr>
@@ -2008,6 +1939,25 @@ export default function SuperAdminDashboard() {
                 <>
                   <Icon name="Zap" size={16} className="mr-2" />
                   Run Automation
+                </>
+              )}
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleClearAllAssignments}
+              disabled={isClearingAssignments}
+              className="touch-manipulation"
+            >
+              {isClearingAssignments ? (
+                <>
+                  <Icon name="Loader" size={16} className="mr-2 animate-spin" />
+                  Clearing...
+                </>
+              ) : (
+                <>
+                  <Icon name="X" size={16} className="mr-2" />
+                  Clear All Assignments
                 </>
               )}
             </Button>
@@ -2738,7 +2688,7 @@ export default function SuperAdminDashboard() {
       businessName: selectedMerchant.business_name,
       contactName: `${selectedMerchant.first_name} ${selectedMerchant.last_name}`,
       email: selectedMerchant.email,
-      status: (selectedMerchant.is_active ? (selectedMerchant.is_verified ? 'active' : 'pending') : 'suspended') as 'active' | 'pending' | 'suspended',
+      status: (selectedMerchant.is_active ? 'active' : 'suspended') as 'active' | 'suspended',
       joinDate: selectedMerchant.created_at
     });
     setMerchantFormErrors({});
@@ -3084,7 +3034,7 @@ export default function SuperAdminDashboard() {
         businessName: selectedMerchant.business_name,
         contactName: `${selectedMerchant.first_name} ${selectedMerchant.last_name}`,
         email: selectedMerchant.email,
-        status: (selectedMerchant.is_active ? (selectedMerchant.is_verified ? 'active' : 'pending') : 'suspended') as 'active' | 'pending' | 'suspended',
+        status: (selectedMerchant.is_active ? 'active' : 'suspended') as 'active' | 'suspended',
         joinDate: selectedMerchant.created_at
       });
     }
@@ -3203,7 +3153,6 @@ export default function SuperAdminDashboard() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="suspended">Suspended</SelectItem>
                       </SelectContent>
                     </Select>
@@ -4045,158 +3994,7 @@ export default function SuperAdminDashboard() {
     );
   };
 
-  // Merchant Action Modal (Approve/Suspend)
-
-  const renderMerchantActionModal = () => {
-    if (!selectedMerchantForAction || !actionType) return null;
-
-    const isApprove = actionType === 'approve';
-    const actionTitle = isApprove ? 'Approve Merchant' : 'Suspend Merchant';
-    const actionIcon = isApprove ? 'UserCheck' : 'Ban';
-    const actionColor = isApprove ? 'text-green-600' : 'text-red-600';
-    const actionBgColor = isApprove ? 'bg-green-50' : 'bg-red-50';
-    const actionBorderColor = isApprove ? 'border-green-200' : 'border-red-200';
-
-    return (
-      <Dialog
-        open={actionModalOpen}
-        onOpenChange={(open) => {
-          if (!open) cancelMerchantAction();
-        }}
-      >
-        <DialogContent
-          className={cn(
-            "sm:max-w-lg bg-white",
-            isMobile ? "w-[95vw] max-w-none" : "sm:max-w-lg"
-          )}
-          id="parcego-merchant-action-modal"
-        >
-          <DialogHeader className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className={cn(
-                "flex items-center justify-center w-12 h-12 rounded-full",
-                actionBgColor
-              )}>
-                <Icon name={actionIcon} size={24} className={actionColor} />
-              </div>
-              <div>
-                <DialogTitle className="text-xl font-semibold">
-                  {actionTitle}
-                </DialogTitle>
-                <DialogDescription className="text-gray-600 mt-1">
-                  Confirm action for {getMerchantProperty(selectedMerchantForAction, 'businessName')}
-                </DialogDescription>
-              </div>
-            </div>
-          </DialogHeader>
-
-          <div className="mt-6 space-y-6">
-            {/* Action Information */}
-            <Alert className={cn(actionBorderColor, actionBgColor)}>
-              <Icon name={actionIcon} size={16} className={actionColor} />
-              <AlertDescription className="font-medium">
-                {isApprove ? (
-                  <span>
-                    Approving this merchant will grant them full access to the platform.
-                    They will be able to create shipments, track packages, and access all merchant features.
-                  </span>
-                ) : (
-                  <span>
-                    Suspending this merchant will temporarily disable their account.
-                    They will lose access to all platform features until their account is reactivated.
-                  </span>
-                )}
-              </AlertDescription>
-            </Alert>
-
-            {/* Merchant Details */}
-            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-              <h4 className="font-medium text-gray-900">Merchant Information</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <div>
-                  <span className="text-gray-500">Business:</span>
-                  <p className="font-medium">{getMerchantProperty(selectedMerchantForAction, 'businessName')}</p>
-                </div>
-                <div>
-                  <span className="text-gray-500">Contact:</span>
-                  <p className="font-medium">{getMerchantProperty(selectedMerchantForAction, 'contactName')}</p>
-                </div>
-                <div>
-                  <span className="text-gray-500">ID:</span>
-                  <p className="font-medium">{selectedMerchantForAction.id}</p>
-                </div>
-                <div>
-                  <span className="text-gray-500">Current Status:</span>
-                  {getStatusBadge(String(getMerchantProperty(selectedMerchantForAction, 'status')))}
-                </div>
-              </div>
-            </div>
-
-            {/* Notes Field */}
-            <div className="space-y-2">
-              <label
-                htmlFor="action-notes"
-                className="text-sm font-medium text-gray-700"
-              >
-                {isApprove ? 'Approval Notes' : 'Suspension Reason'} (Optional)
-              </label>
-              <Textarea
-                id="action-notes"
-                placeholder={
-                  isApprove
-                    ? "Add any notes about this approval (e.g., verification method, special conditions)..."
-                    : "Provide reason for suspension and any relevant details..."
-                }
-                value={actionNotes}
-                onChange={(e) => setActionNotes(e.target.value)}
-                className="min-h-[80px] resize-none"
-                disabled={isProcessingAction}
-                aria-describedby="notes-help"
-              />
-              <p id="notes-help" className="text-xs text-gray-500">
-                These notes will be recorded for audit purposes and may be visible to the merchant.
-              </p>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-4 border-t">
-              <Button
-                variant="outline"
-                onClick={cancelMerchantAction}
-                disabled={isProcessingAction}
-                className="w-full sm:w-auto"
-                id="parcego-merchant-action-cancel"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant={isApprove ? "default" : "destructive"}
-                onClick={processMerchantAction}
-                disabled={isProcessingAction}
-                className={cn(
-                  "w-full sm:w-auto",
-                  isApprove && "bg-green-600 hover:bg-green-700"
-                )}
-                id="parcego-merchant-action-confirm"
-              >
-                {isProcessingAction ? (
-                  <>
-                    <Icon name="Loader2" size={16} className="mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Icon name={actionIcon} size={16} className="mr-2" />
-                    {isApprove ? 'Approve Merchant' : 'Suspend Merchant'}
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  };
+  // Removed: Merchant Action Modal (approval system removed)
 
   // Shopify OAuth Modal
   const renderShopifyOAuthModal = () => {
@@ -4891,9 +4689,6 @@ export default function SuperAdminDashboard() {
       
       {/* Merchant Details Modal */}
       {renderMerchantDetailsModal()}
-
-      {/* Merchant Action Modal */}
-      {renderMerchantActionModal()}
 
       {/* Courier Action Modal */}
       {renderCourierActionModal()}

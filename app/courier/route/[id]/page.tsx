@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Scanner } from "@yudiel/react-qr-scanner";
 import { create } from "zustand";
 import confetti from 'canvas-confetti';
@@ -179,6 +180,7 @@ export default function CourierRouteSimulation() {
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [isProblemModalOpen, setIsProblemModalOpen] = useState(false);
   const [problemNote, setProblemNote] = useState("");
+  const [undeliveredReason, setUndeliveredReason] = useState<'customer_not_available' | 'incorrect_address' | 'access_denied' | 'customer_refused' | 'damaged_package' | 'other'>('other');
   
   // Auto-close timeout reference for cleanup
   const [successModalTimeout, setSuccessModalTimeout] = useState<number | null>(null);
@@ -1339,8 +1341,15 @@ export default function CourierRouteSimulation() {
   const handleReportProblem = async () => {
     if (!currentAssignment) return;
     
-    if (!problemNote.trim()) {
-      alert('Please provide a reason for the delivery problem.');
+    // Validate reason selection
+    if (!undeliveredReason) {
+      alert('Please select a reason for the delivery problem.');
+      return;
+    }
+    
+    // Validate additional notes if "other" is selected
+    if (undeliveredReason === 'other' && !problemNote.trim()) {
+      alert('Please provide additional details for "Other" reason.');
       return;
     }
     
@@ -1350,20 +1359,29 @@ export default function CourierRouteSimulation() {
       // Update shipment status to undelivered
       await driverService.updateShipmentStatus(currentAssignment.shipment_id, {
         status: 'UNDELIVERED',
-        notes: problemNote.trim()
+        undelivered_reason: undeliveredReason,
+        notes: problemNote.trim() || undefined
       });
       
       setRouteStatus("failed");
       setIsProblemModalOpen(false);
       setProblemNote("");
+      setUndeliveredReason('other');
+
+      // Clear localStorage for this route
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(`parcego_route_status_${currentAssignment.id}`);
+        localStorage.removeItem(`parcego_assignment_${currentAssignment.id}`);
+      }
 
       console.log('✅ [ROUTE] Problem reported successfully');
       
       // Show alert and redirect back to dashboard
       alert('Delivery problem reported. You will be redirected to the dashboard.');
       
-      // Redirect to courier dashboard
+      // Redirect to courier dashboard with force refresh
       router.push('/courier');
+      router.refresh();
       
     } catch (error: any) {
       console.error('❌ [ROUTE] Error reporting problem:', error);
@@ -2808,21 +2826,42 @@ export default function CourierRouteSimulation() {
           <div className="flex-1 overflow-y-auto px-1">
             <div className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="problem-note" className="text-sm font-medium">
-                  Problem Description *
+                <Label htmlFor="undelivered-reason" className="text-sm font-medium">
+                  Reason for Undelivered *
                 </Label>
-                <textarea
-                  id="problem-note"
-                  placeholder="Describe what went wrong (e.g., recipient not available, wrong address, package damaged, etc.)"
-                  value={problemNote}
-                  onChange={(e) => setProblemNote(e.target.value)}
-                  className="w-full min-h-[120px] px-3 py-2 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
-                  maxLength={500}
-                />
-                <div className="text-xs text-gray-500 text-right">
-                  {problemNote.length}/500 characters
-                </div>
+                <Select value={undeliveredReason} onValueChange={(value: any) => setUndeliveredReason(value)}>
+                  <SelectTrigger id="undelivered-reason" className="w-full">
+                    <SelectValue placeholder="Select a reason" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="customer_not_available">Customer Not Available</SelectItem>
+                    <SelectItem value="incorrect_address">Incorrect Address</SelectItem>
+                    <SelectItem value="access_denied">Access Denied</SelectItem>
+                    <SelectItem value="customer_refused">Customer Refused</SelectItem>
+                    <SelectItem value="damaged_package">Damaged Package</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
+              
+              {(undeliveredReason === 'other' || undeliveredReason === 'damaged_package') && (
+                <div className="space-y-2">
+                  <Label htmlFor="problem-note" className="text-sm font-medium">
+                    Additional Details {undeliveredReason === 'other' ? '*' : ''}
+                  </Label>
+                  <textarea
+                    id="problem-note"
+                    placeholder={undeliveredReason === 'other' ? "Please provide additional details..." : "Describe the damage..."}
+                    value={problemNote}
+                    onChange={(e) => setProblemNote(e.target.value)}
+                    className="w-full min-h-[100px] px-3 py-2 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    maxLength={500}
+                  />
+                  <div className="text-xs text-gray-500 text-right">
+                    {problemNote.length}/500 characters
+                  </div>
+                </div>
+              )}
             </div>
           </div>
           <div className="flex-shrink-0 pt-4 border-t border-gray-200">
@@ -2832,6 +2871,7 @@ export default function CourierRouteSimulation() {
                 onClick={() => {
                   setIsProblemModalOpen(false);
                   setProblemNote("");
+                  setUndeliveredReason('other');
                 }}
                 className="flex-1"
               >
@@ -2841,7 +2881,7 @@ export default function CourierRouteSimulation() {
                 variant="destructive"
                 onClick={handleReportProblem}
                 className="flex-1"
-                disabled={!problemNote.trim()}
+                disabled={!undeliveredReason || (undeliveredReason === 'other' && !problemNote.trim())}
               >
                 <Icon name="AlertTriangle" size={16} className="mr-2" />
                 Report Problem

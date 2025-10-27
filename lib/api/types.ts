@@ -822,6 +822,7 @@ export interface DriverSearchShipmentsResponse {
 export interface DriverUpdateShipmentStatusRequest {
   status: string;
   notes?: string;
+  undelivered_reason?: 'customer_not_available' | 'incorrect_address' | 'access_denied' | 'customer_refused' | 'damaged_package' | 'other';
 }
 
 export interface DriverUpdateShipmentStatusResponse {

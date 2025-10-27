@@ -248,48 +248,56 @@ function CourierDashboard() {
       if (assignmentsResponse.assignments && assignmentsResponse.assignments.length > 0) {
         console.log('📦 [DASHBOARD] Raw assignments data:', assignmentsResponse.assignments);
         
-        mappedDeliveries = assignmentsResponse.assignments.map((assignment, index) => {
-          console.log(`📦 [DASHBOARD] Processing assignment ${index + 1}:`, {
-            id: assignment.id,
-            tracking_code: assignment.tracking_code,
-            assignment_status: assignment.assignment_status,
-            status: assignment.status,
-            receiver_name: assignment.receiver_name
-          });
-          
-          // Map assignment status to delivery status more accurately
-          let deliveryStatus: string;
-          const status = assignment.status?.toUpperCase();
-          const assignmentStatus = assignment.assignment_status?.toLowerCase();
-          
-          if (assignmentStatus === 'completed' || status === 'DELIVERED') {
-            deliveryStatus = 'delivered';
-          } else if (status === 'OUT_FOR_DELIVERY') {
-            deliveryStatus = 'ready_for_pickup';
-          } else if (status === 'IN_TRANSIT' || assignmentStatus === 'in_progress') {
-            deliveryStatus = 'in_transit';
-          } else if (status === 'IN_WAREHOUSE') {
-            deliveryStatus = 'assigned';
-          } else {
-            deliveryStatus = 'assigned';
-          }
-          
-          console.log(`📦 [DASHBOARD] Mapped status for ${assignment.tracking_code}: ${assignment.status} + ${assignment.assignment_status} → ${deliveryStatus}`);
+        mappedDeliveries = assignmentsResponse.assignments
+          .map((assignment, index) => {
+            console.log(`📦 [DASHBOARD] Processing assignment ${index + 1}:`, {
+              id: assignment.id,
+              tracking_code: assignment.tracking_code,
+              assignment_status: assignment.assignment_status,
+              status: assignment.status,
+              receiver_name: assignment.receiver_name
+            });
+            
+            // Map assignment status to delivery status more accurately
+            let deliveryStatus: string;
+            const status = assignment.status?.toUpperCase();
+            const assignmentStatus = assignment.assignment_status?.toLowerCase();
+            
+            // Skip UNDELIVERED assignments - they should not appear on the dashboard
+            if (status === 'UNDELIVERED') {
+              console.log(`❌ [DASHBOARD] Skipping UNDELIVERED assignment: ${assignment.tracking_code}`);
+              return null;
+            }
+            
+            if (assignmentStatus === 'completed' || status === 'DELIVERED') {
+              deliveryStatus = 'delivered';
+            } else if (status === 'OUT_FOR_DELIVERY') {
+              deliveryStatus = 'ready_for_pickup';
+            } else if (status === 'IN_TRANSIT' || assignmentStatus === 'in_progress') {
+              deliveryStatus = 'in_transit';
+            } else if (status === 'IN_WAREHOUSE') {
+              deliveryStatus = 'assigned';
+            } else {
+              deliveryStatus = 'assigned';
+            }
+            
+            console.log(`📦 [DASHBOARD] Mapped status for ${assignment.tracking_code}: ${assignment.status} + ${assignment.assignment_status} → ${deliveryStatus}`);
 
-          return {
-            id: `PCG-DEL-${assignment.id}`,
-            trackingNumber: assignment.tracking_code,
-            customerName: assignment.receiver_name,
-            address: `${assignment.receiver_address}, ${assignment.receiver_city}`,
-            timeWindow: "N/A", // Can be calculated based on estimated_delivery_date
-            estimatedTime: assignment.estimated_delivery_date || "TBD",
-            status: deliveryStatus,
-            packageType: assignment.package_type || 'Standard',
-            weight: `${assignment.weight} kg`,
-            specialInstructions: assignment.special_instructions || '',
-            priority: 'medium' as const // Default priority
-          };
-        });
+            return {
+              id: `PCG-DEL-${assignment.id}`,
+              trackingNumber: assignment.tracking_code,
+              customerName: assignment.receiver_name,
+              address: `${assignment.receiver_address}, ${assignment.receiver_city}`,
+              timeWindow: "N/A", // Can be calculated based on estimated_delivery_date
+              estimatedTime: assignment.estimated_delivery_date || "TBD",
+              status: deliveryStatus,
+              packageType: assignment.package_type || 'Standard',
+              weight: `${assignment.weight} kg`,
+              specialInstructions: assignment.special_instructions || '',
+              priority: 'medium' as const // Default priority
+            };
+          })
+          .filter((delivery) => delivery !== null) as any[];
         console.log('📦 [DASHBOARD] Mapped deliveries:', mappedDeliveries);
         setDeliveries(mappedDeliveries);
         
@@ -316,8 +324,8 @@ function CourierDashboard() {
       });
       setApiStats(statsResponse);
 
-      // Update stats UI based on mapped deliveries
-      const totalAssignments = assignmentsResponse.assignments?.length || 0;
+      // Update stats UI based on mapped deliveries (excluding UNDELIVERED)
+      const totalAssignments = mappedDeliveries.length || 0; // Use filtered deliveries count
       const completedDeliveries = mappedDeliveries?.filter(d => d.status === 'delivered').length || 0;
       const remainingDeliveries = totalAssignments - completedDeliveries;
 
