@@ -57,6 +57,7 @@ import { useToast, ToastContainer } from "@/components/ui/toast";
 import NotificationDropdown from "@/components/admin/NotificationDropdown";
 import CourierCreationModal from "@/components/admin/CourierCreationModal";
 import { adminService } from "@/lib/api/admin";
+import { shippingService } from "@/lib/api/shipping";
 import type { User, UserStatisticsResponse } from "@/lib/api/types";
 
 // Zod schema for courier edit form validation
@@ -159,6 +160,17 @@ export default function SuperAdminDashboard() {
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [isManualAssignmentOpen, setIsManualAssignmentOpen] = useState(false);
+  
+  // Manual assignment form state
+  const [manualAssignmentForm, setManualAssignmentForm] = useState({
+    shipmentId: '',
+    driverId: '',
+    notes: ''
+  });
+  
+  // Available shipments for manual assignment
+  const [availableShipments, setAvailableShipments] = useState<any[]>([]);
+  const [shipmentsLoading, setShipmentsLoading] = useState(false);
   
   // Warehouse state
   const [isMovingToWarehouse, setIsMovingToWarehouse] = useState(false);
@@ -719,7 +731,7 @@ export default function SuperAdminDashboard() {
           { duration: 8000 }
         );
       } else {
-        showErrorToast("Failed to run automated assignment. Please try again.");
+      showErrorToast("Failed to run automated assignment. Please try again.");
       }
     } finally {
       setIsRunningAutomation(false);
@@ -834,9 +846,11 @@ export default function SuperAdminDashboard() {
       if (!isAuthenticated) return;
       
       try {
+        setCouriersLoading(true);
         setIsCourierSearchLoading(true);
         const response = await adminService.listUsers({});
         const couriersList = response.data.filter(u => u.role === 'driver');
+        setCouriers(couriersList);  // Set the main couriers state
         setFilteredCouriers(couriersList);
       } catch (error) {
         console.error('Failed to load couriers:', error);
@@ -844,6 +858,7 @@ export default function SuperAdminDashboard() {
           "Unable to fetch courier data. Please try refreshing the page."
         );
       } finally {
+        setCouriersLoading(false);
         setIsCourierSearchLoading(false);
       }
     };
@@ -4501,12 +4516,44 @@ export default function SuperAdminDashboard() {
     );
   };
 
+  // Load available shipments when modal opens
+  useEffect(() => {
+    const loadAvailableShipments = async () => {
+      if (!isManualAssignmentOpen || !isAuthenticated) return;
+      
+      try {
+        setShipmentsLoading(true);
+        const shipments = await shippingService.getShipments({ limit: 100 });
+        // Filter for shipments that are ready for assignment (e.g., paid, in warehouse, etc.)
+        const readyShipments = shipments.filter(s => 
+          s.status === 'PAID' || s.status === 'LABEL_GENERATED' || s.status === 'IN_WAREHOUSE'
+        );
+        setAvailableShipments(readyShipments);
+      } catch (error) {
+        console.error('Failed to load shipments:', error);
+      } finally {
+        setShipmentsLoading(false);
+      }
+    };
+    
+    loadAvailableShipments();
+  }, [isManualAssignmentOpen, isAuthenticated]);
+
   // Manual Assignment Modal
   const renderManualAssignmentModal = () => {
     if (!isManualAssignmentOpen) return null;
 
+    // Filter available drivers (active couriers)
+    const availableDrivers = couriers.filter(c => c.is_active);
+
     return (
-      <Dialog open={isManualAssignmentOpen} onOpenChange={setIsManualAssignmentOpen}>
+      <Dialog open={isManualAssignmentOpen} onOpenChange={(open) => {
+        setIsManualAssignmentOpen(open);
+        if (!open) {
+          // Reset form when closing
+          setManualAssignmentForm({ shipmentId: '', driverId: '', notes: '' });
+        }
+      }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Create Manual Assignment</DialogTitle>
@@ -4517,25 +4564,58 @@ export default function SuperAdminDashboard() {
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="shipment_id" className="text-right">
-                Shipment ID
+                Shipment
               </Label>
-              <Input
-                id="shipment_id"
-                type="number"
-                placeholder="Enter shipment ID"
-                className="col-span-3"
-              />
+              <Select
+                value={manualAssignmentForm.shipmentId}
+                onValueChange={(value) => setManualAssignmentForm(prev => ({ ...prev, shipmentId: value }))}
+                disabled={shipmentsLoading}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue 
+                    placeholder={shipmentsLoading ? "Loading shipments..." : "Select a shipment"}
+                  >
+                    {manualAssignmentForm.shipmentId ? `Shipment ${manualAssignmentForm.shipmentId}` : null}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {shipmentsLoading ? (
+                    <SelectItem value="loading" disabled>Loading...</SelectItem>
+                  ) : availableShipments.length === 0 ? (
+                    <SelectItem value="none" disabled>No shipments available</SelectItem>
+                  ) : (
+                    availableShipments.map((shipment) => (
+                      <SelectItem key={shipment.id} value={shipment.id.toString()}>
+                        ID: {shipment.id} - {shipment.tracking_code} - {shipment.receiver_address.contact_name} ({shipment.status})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="driver_id" className="text-right">
-                Driver ID
+                Driver
               </Label>
-              <Input
-                id="driver_id"
-                type="number"
-                placeholder="Enter driver ID"
-                className="col-span-3"
-              />
+              <Select
+                value={manualAssignmentForm.driverId}
+                onValueChange={(value) => setManualAssignmentForm(prev => ({ ...prev, driverId: value }))}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select a driver" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableDrivers.length === 0 ? (
+                    <SelectItem value="none" disabled>No active drivers available</SelectItem>
+                  ) : (
+                    availableDrivers.map((driver) => (
+                      <SelectItem key={driver.id} value={driver.id.toString()}>
+                        {driver.first_name} {driver.last_name} (ID: {driver.id})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="notes" className="text-right">
@@ -4544,6 +4624,8 @@ export default function SuperAdminDashboard() {
               <Textarea
                 id="notes"
                 placeholder="Assignment notes (required)"
+                value={manualAssignmentForm.notes}
+                onChange={(e) => setManualAssignmentForm(prev => ({ ...prev, notes: e.target.value }))}
                 className="col-span-3"
                 required
               />
@@ -4554,9 +4636,7 @@ export default function SuperAdminDashboard() {
               Cancel
             </Button>
             <Button onClick={async () => {
-              const shipmentId = (document.getElementById('shipment_id') as HTMLInputElement)?.value;
-              const driverId = (document.getElementById('driver_id') as HTMLInputElement)?.value;
-              const notes = (document.getElementById('notes') as HTMLTextAreaElement)?.value;
+              const { shipmentId, driverId, notes } = manualAssignmentForm;
 
               if (!shipmentId || !driverId) {
                 showErrorToast('Please fill in all required fields');
@@ -4577,6 +4657,7 @@ export default function SuperAdminDashboard() {
                 
                 showSuccessToast('Manual assignment created successfully!');
                 setIsManualAssignmentOpen(false);
+                setManualAssignmentForm({ shipmentId: '', driverId: '', notes: '' });
                 
                 // Reload assignments
                 const dateStr = format(selectedAssignmentDate, 'yyyy-MM-dd');
