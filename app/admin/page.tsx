@@ -68,8 +68,26 @@ import { useToast, ToastContainer } from "@/components/ui/toast";
 import NotificationDropdown from "@/components/admin/NotificationDropdown";
 import CourierCreationModal from "@/components/admin/CourierCreationModal";
 import { adminService } from "@/lib/api/admin";
+import { shopifyService } from "@/lib/api/shopify";
 import { shippingService } from "@/lib/api/shipping";
 import type { User, UserStatisticsResponse } from "@/lib/api/types";
+
+// Extended User type with Shopify integration
+interface ShopifyIntegration {
+  connected: boolean;
+  accountId?: number | null;
+  shopDomain?: string | null;
+  shopName?: string | null;
+  lastSync?: string | null;
+  syncStatus?: 'success' | 'error' | null;
+  productsSynced?: number;
+  ordersSynced?: number;
+  webhooks?: Record<string, any>;
+}
+
+interface MerchantWithShopify extends User {
+  shopifyIntegration?: ShopifyIntegration;
+}
 
 // Zod schema for courier edit form validation
 const courierEditSchema = z.object({
@@ -139,9 +157,9 @@ export default function SuperAdminDashboard() {
   const [customRangeOpen, setCustomRangeOpen] = useState(false);
   const [merchantSearchQuery, setMerchantSearchQuery] = useState("");
   const [isMerchantSearchLoading, setIsMerchantSearchLoading] = useState(false);
-  const [merchants, setMerchants] = useState<User[]>([]);
+  const [merchants, setMerchants] = useState<MerchantWithShopify[]>([]);
   const [merchantsLoading, setMerchantsLoading] = useState(false);
-  const [selectedMerchant, setSelectedMerchant] = useState<User | null>(null);
+  const [selectedMerchant, setSelectedMerchant] = useState<MerchantWithShopify | null>(null);
   const [merchantStats, setMerchantStats] = useState<{
     totalShipments: number;
     delivered: number;
@@ -242,7 +260,7 @@ export default function SuperAdminDashboard() {
   // Removed merchants - now using real data from API
 
   // Merchant search functionality
-  const [filteredMerchants, setFilteredMerchants] = useState<User[]>([]);
+  const [filteredMerchants, setFilteredMerchants] = useState<MerchantWithShopify[]>([]);
 
   // Load merchants from API
   useEffect(() => {
@@ -253,8 +271,48 @@ export default function SuperAdminDashboard() {
         setMerchantsLoading(true);
         const response = await adminService.listUsers({});
         const merchantsList = response.data.filter(u => u.role === 'user');
-        setMerchants(merchantsList);
-        setFilteredMerchants(merchantsList);
+
+        // Load Shopify accounts and merge with merchant data
+        try {
+          const shopifyResponse = await shopifyService.getAdminAccounts();
+          const shopifyAccountsMap = new Map(
+            shopifyResponse.data.accounts?.map(acc => [acc.shop_domain, acc]) || []
+          );
+
+          // Merge Shopify data with merchants
+          const merchantsWithShopify = merchantsList.map(merchant => {
+            // Try to find Shopify account by matching shop domain
+            const businessName = merchant.business_name || merchant.first_name;
+            const expectedShopDomain = `${businessName.toLowerCase().replace(/[^a-z0-9]/g, '-')}.myshopify.com`;
+            const shopifyAccount = shopifyAccountsMap.get(expectedShopDomain);
+
+            if (shopifyAccount) {
+              return {
+                ...merchant,
+                shopifyIntegration: {
+                  connected: true,
+                  accountId: shopifyAccount.id,
+                  shopDomain: shopifyAccount.shop_domain,
+                  shopName: shopifyAccount.shop_name,
+                  lastSync: shopifyAccount.last_sync_at,
+                  syncStatus: (shopifyAccount.status === 'active' ? 'success' : 'error') as 'success' | 'error',
+                  productsSynced: 0, // Not available in basic account info
+                  ordersSynced: 0, // Not available in basic account info
+                  webhooks: {}
+                }
+              };
+            }
+            return merchant;
+          });
+
+          setMerchants(merchantsWithShopify);
+          setFilteredMerchants(merchantsWithShopify);
+        } catch (shopifyError) {
+          console.error('Failed to load Shopify accounts:', shopifyError);
+          // Continue without Shopify data
+          setMerchants(merchantsList);
+          setFilteredMerchants(merchantsList);
+        }
       } catch (error) {
         console.error('Failed to load merchants:', error);
         showErrorToast(
@@ -790,7 +848,7 @@ export default function SuperAdminDashboard() {
       newDriverId,
       notes,
       hasAuthToken: !!authToken,
-      tokenPreview: authToken ? `${authToken.substring(0, 20)}...` : "No token"
+      fullToken: authToken || "No token"
     });
 
     try {
@@ -825,7 +883,7 @@ export default function SuperAdminDashboard() {
           adminAuth,
           adminCookie,
           hasAuthToken: !!authToken,
-          tokenPreview: authToken ? `${authToken.substring(0, 20)}...` : "No token"
+          fullToken: authToken || "No token"
         });
 
         if (adminAuth === "true" || adminCookie) {
@@ -2750,23 +2808,30 @@ export default function SuperAdminDashboard() {
   const [isTestingWebhooks, setIsTestingWebhooks] = useState(false);
 
   // Shopify integration functions
-  const handleShopifyConnect = async (merchant: typeof merchants[0]) => {
-    // Reset form data and open OAuth modal
-    setShopifyFormData({
-      apiKey: 'a1b2c3d4e5f6789012345678901234ab',
-      apiSecret: 'b2c3d4e5f6789012345678901234abcd',
-      webhookSecret: 'c3d4e5f6789012345678901234abcdef',
-      webhookUrl: `${window.location.origin}/api/shopify/webhooks`,
-      apiVersion: '2024-10',
-      scopes: ['read_orders', 'write_orders', 'read_products', 'write_products', 'read_inventory', 'write_inventory'],
-      selectedWebhooks: ['orders/create', 'orders/update', 'products/create', 'products/update', 'inventory/update']
-    });
-    setShopifyFormErrors({});
-    setShopifyOAuthModal({
-      open: true,
-      merchant,
-      step: 'install'
-    });
+  const handleShopifyConnect = async (merchant: MerchantWithShopify) => {
+    try {
+      setIsConnectingShopify(true);
+
+      // Get shop domain from merchant business name
+      const businessName = getMerchantProperty(merchant, 'businessName') as string;
+      const shopDomain = `${businessName.toLowerCase().replace(/[^a-z0-9]/g, '-')}.myshopify.com`;
+
+      // Call Shopify OAuth API
+      const response = await shopifyService.installAuthenticated({ shop: shopDomain });
+
+      // Redirect to Shopify OAuth page
+      if (response.data.auth_url) {
+        showSuccessToast('Redirecting to Shopify...');
+        window.location.href = response.data.auth_url;
+      } else {
+        throw new Error('No auth URL returned');
+      }
+    } catch (error) {
+      console.error('Failed to connect Shopify:', error);
+      showErrorToast('Failed to connect Shopify store. Please try again.');
+    } finally {
+      setIsConnectingShopify(false);
+    }
   };
 
   // Handle form input changes
@@ -2917,14 +2982,21 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const handleShopifyDisconnect = async (merchant: typeof merchants[0]) => {
+  const handleShopifyDisconnect = async (merchant: MerchantWithShopify) => {
     setIsDisconnectingShopify(true);
 
     try {
-      // Mock disconnection process
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Get Shopify account ID from merchant
+      const shopifyAccountId = merchant.shopifyIntegration?.accountId;
 
-      const updatedMerchant = {
+      if (!shopifyAccountId) {
+        throw new Error('No Shopify account ID found');
+      }
+
+      // Call Shopify disconnect API
+      await shopifyService.disconnect(shopifyAccountId);
+
+      const updatedMerchant: MerchantWithShopify = {
         ...merchant,
         shopifyIntegration: {
           connected: false,
@@ -2932,14 +3004,12 @@ export default function SuperAdminDashboard() {
           lastSync: null,
           syncStatus: null,
           productsSynced: 0,
-          ordersSynced: 0
+          ordersSynced: 0,
+          accountId: null
         }
-      } as unknown as typeof merchants[0];
+      };
 
       // Update merchant data
-      const updatedMerchants = merchants.map(m =>
-        m.id === merchant.id ? updatedMerchant : m
-      );
       setFilteredMerchants(prev =>
         prev.map(m => m.id === merchant.id ? updatedMerchant : m)
       );
@@ -2951,6 +3021,7 @@ export default function SuperAdminDashboard() {
       });
 
     } catch (error) {
+      console.error('Failed to disconnect Shopify:', error);
       showErrorToast('Failed to disconnect Shopify integration. Please try again.', {
         duration: 5000,
         showCloseButton: true
@@ -2960,58 +3031,45 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const handleShopifySync = async (merchant: typeof merchants[0]) => {
+  const handleShopifySync = async (merchant: MerchantWithShopify) => {
     setIsSyncingShopify(true);
 
     try {
-      // Mock sync process
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Get Shopify account ID from merchant
+      const shopifyAccountId = merchant.shopifyIntegration?.accountId;
 
-      const updatedMerchant = {
+      if (!shopifyAccountId) {
+        throw new Error('No Shopify account ID found');
+      }
+
+      // Call Shopify sync API
+      const response = await shopifyService.syncAccount(shopifyAccountId);
+
+      const updatedMerchant: MerchantWithShopify = {
         ...merchant,
         shopifyIntegration: {
+          ...merchant.shopifyIntegration,
           connected: true,
-          shopDomain: merchant.shopifyIntegration.shopDomain || 'example.myshopify.com',
-          lastSync: new Date().toISOString(),
-          syncStatus: 'success' as const,
-          productsSynced: merchant.shopifyIntegration.productsSynced + Math.floor(Math.random() * 10),
-          ordersSynced: merchant.shopifyIntegration.ordersSynced + Math.floor(Math.random() * 5),
-          webhooks: {
-            ordersCreate: {
-              registered: true,
-              lastTriggered: new Date().toISOString()
-            },
-            ordersUpdate: {
-              registered: true,
-              lastTriggered: new Date().toISOString()
-            },
-            productsUpdate: {
-              registered: true,
-              lastTriggered: new Date().toISOString()
-            },
-            inventoryUpdate: {
-              registered: true,
-              lastTriggered: new Date().toISOString()
-            }
-          }
+          lastSync: response.data.last_sync_at || new Date().toISOString(),
+          syncStatus: response.data.success ? 'success' as const : 'error' as const,
+          productsSynced: merchant.shopifyIntegration?.productsSynced || 0,
+          ordersSynced: merchant.shopifyIntegration?.ordersSynced || 0,
         }
-      } as unknown as typeof merchants[0];
+      };
 
       // Update merchant data
-      const updatedMerchants = merchants.map(m =>
-        m.id === merchant.id ? updatedMerchant : m
-      );
       setFilteredMerchants(prev =>
         prev.map(m => m.id === merchant.id ? updatedMerchant : m)
       );
 
-      showSuccessToast(`Shopify data synced successfully!`, {
+      showSuccessToast(response.data.message || 'Shopify data synced successfully!', {
         duration: 4000,
         showProgressBar: true,
         showCloseButton: true
       });
 
     } catch (error) {
+      console.error('Failed to sync Shopify:', error);
       showErrorToast('Failed to sync Shopify data. Please try again.', {
         duration: 5000,
         showCloseButton: true
@@ -3311,7 +3369,7 @@ export default function SuperAdminDashboard() {
                   Shopify Integration
                 </h3>
                 <div className="bg-gray-50 rounded-lg p-3 sm:p-4 space-y-3 sm:space-y-4">
-                  {selectedMerchant.shopifyIntegration.connected ? (
+                  {selectedMerchant.shopifyIntegration?.connected ? (
                     <div className="space-y-4">
                       {/* Connected Status - Mobile Optimized */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
@@ -3321,7 +3379,7 @@ export default function SuperAdminDashboard() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="font-medium text-gray-900 truncate">Shopify Connected</p>
-                            <p className="text-sm text-gray-500 truncate">{selectedMerchant.shopifyIntegration.shopDomain}</p>
+                            <p className="text-sm text-gray-500 truncate">{selectedMerchant.shopifyIntegration?.shopDomain}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
@@ -3387,14 +3445,14 @@ export default function SuperAdminDashboard() {
                               <Icon name="Package" size={16} className="text-blue-600" />
                               <p className="text-xs text-gray-500 uppercase tracking-wider">Products</p>
                             </div>
-                            <p className="text-lg sm:text-xl font-bold text-blue-600">{selectedMerchant.shopifyIntegration.productsSynced.toLocaleString()}</p>
+                            <p className="text-lg sm:text-xl font-bold text-blue-600">{selectedMerchant.shopifyIntegration?.productsSynced?.toLocaleString() || 0}</p>
                           </div>
                           <div className="bg-white p-3 sm:p-4 rounded-lg border shadow-sm">
                             <div className="flex items-center gap-2 mb-1">
                               <Icon name="ShoppingCart" size={16} className="text-green-600" />
                               <p className="text-xs text-gray-500 uppercase tracking-wider">Orders</p>
                             </div>
-                            <p className="text-lg sm:text-xl font-bold text-green-600">{selectedMerchant.shopifyIntegration.ordersSynced.toLocaleString()}</p>
+                            <p className="text-lg sm:text-xl font-bold text-green-600">{selectedMerchant.shopifyIntegration?.ordersSynced?.toLocaleString() || 0}</p>
                           </div>
                           <div className="bg-white p-3 sm:p-4 rounded-lg border shadow-sm col-span-2 sm:col-span-1">
                             <div className="flex items-center gap-2 mb-1">
@@ -3402,7 +3460,7 @@ export default function SuperAdminDashboard() {
                               <p className="text-xs text-gray-500 uppercase tracking-wider">Last Sync</p>
                             </div>
                             <p className="text-sm sm:text-base font-medium text-gray-900 leading-tight">
-                              {selectedMerchant.shopifyIntegration.lastSync
+                              {selectedMerchant.shopifyIntegration?.lastSync
                                 ? formatDateUTC(new Date(selectedMerchant.shopifyIntegration.lastSync), 'MMM dd, hh:mm a')
                                 : 'Never'
                               }
@@ -3414,12 +3472,12 @@ export default function SuperAdminDashboard() {
                       {/* Sync Status */}
                       <div className="flex items-center gap-2">
                         <Icon
-                          name={selectedMerchant.shopifyIntegration.syncStatus === 'success' ? 'CheckCircle' : 'AlertCircle'}
+                          name={selectedMerchant.shopifyIntegration?.syncStatus === 'success' ? 'CheckCircle' : 'AlertCircle'}
                           size={16}
-                          className={selectedMerchant.shopifyIntegration.syncStatus === 'success' ? 'text-green-500' : 'text-yellow-500'}
+                          className={selectedMerchant.shopifyIntegration?.syncStatus === 'success' ? 'text-green-500' : 'text-yellow-500'}
                         />
                         <span className="text-sm text-gray-600">
-                          {selectedMerchant.shopifyIntegration.syncStatus === 'success'
+                          {selectedMerchant.shopifyIntegration?.syncStatus === 'success'
                             ? 'All data synced successfully'
                             : 'Sync in progress...'
                           }
@@ -3427,14 +3485,14 @@ export default function SuperAdminDashboard() {
                       </div>
 
                       {/* Webhook Status - Mobile Optimized */}
-                      {selectedMerchant.shopifyIntegration.webhooks && (
+                      {selectedMerchant.shopifyIntegration?.webhooks && (
                         <div className="border-t border-gray-200 pt-3 sm:pt-4">
                           <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
                             <Icon name="Webhook" size={16} className="text-indigo-600" />
                             Webhook Status
                           </h4>
                           <div className="space-y-2">
-                            {Object.entries(selectedMerchant.shopifyIntegration.webhooks).map(([webhookType, webhookData]) => (
+                            {Object.entries(selectedMerchant.shopifyIntegration?.webhooks || {}).map(([webhookType, webhookData]) => (
                               <div key={webhookType} className="bg-white rounded-lg border p-3 sm:p-4 shadow-sm">
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0 flex-1">

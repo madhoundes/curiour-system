@@ -124,6 +124,40 @@ export const API_ENDPOINTS = {
   ROUTE_OPTIMIZATION: {
     GOOGLE_MAPS_ROUTE: '/route-optimization/driver/:driver_id/google-maps-route',
   },
+  SHOPIFY: {
+    // OAuth Endpoints
+    INSTALL: '/shopify/auth/install',
+    INSTALL_AUTHENTICATED: '/shopify/auth/install-authenticated',
+    CALLBACK: '/shopify/auth/callback',
+    DISCONNECT: '/shopify/auth/disconnect/:account_id',
+    // Account Management
+    ACCOUNTS: '/shopify/accounts',
+    ACCOUNT_DETAILS: '/shopify/accounts/:account_id',
+    ACCOUNT_SYNC: '/shopify/accounts/:account_id/sync',
+    // Orders
+    ORDERS: '/shopify/orders',
+    // Stats
+    STATS: '/shopify/stats',
+    // Dashboard
+    DASHBOARD_SUMMARY: '/shopify/dashboard/summary',
+    DASHBOARD_ACTIVITY: '/shopify/dashboard/activity',
+    DASHBOARD_ALERTS: '/shopify/dashboard/alerts',
+    DASHBOARD_QUICK_STATS: '/shopify/dashboard/quick-stats',
+    // Monitoring
+    MONITORING_ERROR_METRICS: '/shopify/monitoring/errors/metrics',
+    MONITORING_STORE_HEALTH: '/shopify/monitoring/health/stores',
+    MONITORING_ERROR_TRENDS: '/shopify/monitoring/errors/trends',
+    MONITORING_CRITICAL_ALERTS: '/shopify/monitoring/alerts/critical',
+    MONITORING_HEALTH_SUMMARY: '/shopify/monitoring/health/summary',
+    // Admin
+    ADMIN_ACCOUNTS: '/shopify/admin/accounts',
+    ADMIN_POLL: '/shopify/admin/poll',
+    ADMIN_RETRY_FAILED: '/shopify/admin/retry-failed',
+    ADMIN_SCHEDULER_STATUS: '/shopify/admin/scheduler/status',
+    // Webhooks
+    WEBHOOKS_ORDERS_CREATE: '/shopify/webhooks/orders/create',
+    WEBHOOKS_TEST: '/shopify/webhooks/test',
+  },
 } as const;
 
 export const HTTP_STATUS = {

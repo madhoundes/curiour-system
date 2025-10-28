@@ -19,7 +19,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { authService } from "@/lib/api";
+import { authService, shopifyService } from "@/lib/api";
 import { toast } from "sonner";
 import type { ApiErrorResponse } from "@/lib/api/types";
 
@@ -64,10 +64,30 @@ const Login03PageContent = () => {
     resolver: zodResolver(signupFormSchema),
   });
 
-  // Handle email verification success
+  // Check for Shopify OAuth params
+  const [shopifyParams, setShopifyParams] = useState<{
+    hmac?: string;
+    host?: string;
+    shop?: string;
+    timestamp?: string;
+  } | null>(null);
+
+  // Handle email verification success and Shopify OAuth params
   useEffect(() => {
     const verified = searchParams.get('verified');
     const tab = searchParams.get('tab');
+    
+    // Check for Shopify OAuth parameters
+    const hmac = searchParams.get('hmac');
+    const host = searchParams.get('host');
+    const shop = searchParams.get('shop');
+    const timestamp = searchParams.get('timestamp');
+    
+    if (hmac && host && shop && timestamp) {
+      // Store Shopify params for use after login
+      setShopifyParams({ hmac, host, shop, timestamp });
+      toast.info("Please log in to connect your Shopify store.");
+    }
     
     if (verified === 'true') {
       toast.success("Email verified successfully! You can now log in to your account.");
@@ -79,11 +99,34 @@ const Login03PageContent = () => {
   }, [searchParams]);
 
   // Function to set mock authentication cookie and redirect
-  const handleSuccessfulAuth = () => {
+  const handleSuccessfulAuth = async () => {
     // Set a mock authentication cookie
     document.cookie = "mock-auth=true; path=/; max-age=86400"; // 24 hours
     
-    // Redirect to dashboard
+    // If Shopify params are present, initiate OAuth flow
+    if (shopifyParams?.shop) {
+      try {
+        toast.info("Connecting to Shopify...");
+        
+        // Call the Shopify OAuth endpoint using the API service
+        const response = await shopifyService.installAuthenticated({ 
+          shop: shopifyParams.shop 
+        });
+        
+        // Follow the redirect URL returned by the API
+        if (response.data.auth_url) {
+          window.location.href = response.data.auth_url;
+          return; // Don't redirect to dashboard
+        } else {
+          toast.error("Failed to connect to Shopify. Redirecting to dashboard...");
+        }
+      } catch (error) {
+        console.error("Shopify OAuth error:", error);
+        toast.error("Failed to connect to Shopify. Redirecting to dashboard...");
+      }
+    }
+    
+    // Redirect to dashboard if no Shopify params or if OAuth failed
     router.push("/dashboard");
   };
 
