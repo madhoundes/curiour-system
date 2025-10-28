@@ -119,7 +119,13 @@ export const createShippingLabelData = async (params: {
       dimensions: params.package.dimensions,
       type: params.package.type
     },
-    shipDate: new Date().toLocaleDateString()
+    shipDate: (() => {
+      const date = new Date();
+      const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+      const day = String(date.getUTCDate()).padStart(2, '0');
+      const year = date.getUTCFullYear();
+      return `${month}/${day}/${year}`;
+    })()
   };
 };
 

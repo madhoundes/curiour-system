@@ -21,7 +21,7 @@ const proofImages = [
     location: "Front door - 123 Main St"
   },
   {
-    id: "proof-02", 
+    id: "proof-02",
     src: "/images/proof-02.png",
     alt: "Package placed by entrance",
     timestamp: "2025-09-12T14:14:30Z",
@@ -29,7 +29,7 @@ const proofImages = [
   },
   {
     id: "proof-03",
-    src: "/images/proof-03.png", 
+    src: "/images/proof-03.png",
     alt: "Delivery confirmation photo",
     timestamp: "2025-09-12T14:13:45Z",
     location: "Porch - 123 Main St"
@@ -76,12 +76,13 @@ const ProofOfDeliveryGallery: React.FC<ProofOfDeliveryGalleryProps> = ({ hasPOD 
                 Delivered Successfully
               </Badge>
               <span className="text-xs text-gray-500">
-                {new Date("2025-09-12T14:15:00Z").toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
+                {(() => {
+                  const date = new Date("2025-09-12T14:15:00Z");
+                  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                  const hours = String(date.getUTCHours()).padStart(2, '0');
+                  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+                  return `${months[date.getUTCMonth()]} ${date.getUTCDate()}, ${hours}:${minutes}`;
+                })()}
               </span>
             </div>
 
@@ -95,9 +96,9 @@ const ProofOfDeliveryGallery: React.FC<ProofOfDeliveryGalleryProps> = ({ hasPOD 
                     onClick={() => handleImageClick(image)}
                   >
                     {/* Image Container with Random Rotation */}
-                    <div 
+                    <div
                       className="relative bg-white border-2 border-white shadow-md rounded-lg overflow-hidden transition-all duration-300 hover:shadow-lg hover:scale-105"
-                      style={{ 
+                      style={{
                         transform: `rotate(${rotation}deg)`,
                         transformOrigin: 'center center'
                       }}
@@ -114,7 +115,7 @@ const ProofOfDeliveryGallery: React.FC<ProofOfDeliveryGalleryProps> = ({ hasPOD 
                             console.warn(`Image not found: ${image.src}`)
                           }}
                         />
-                        
+
                         {/* Overlay on Hover */}
                         <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center">
                           <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-lg">
@@ -164,7 +165,14 @@ const ProofOfDeliveryGallery: React.FC<ProofOfDeliveryGalleryProps> = ({ hasPOD 
                       <div>
                         <span className="font-medium text-gray-600">Timestamp:</span>
                         <p className="text-gray-900">
-                          {new Date(selectedImage.timestamp).toLocaleString()}
+                          {(() => {
+                            const date = new Date(selectedImage.timestamp);
+                            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                            const hours = String(date.getUTCHours()).padStart(2, '0');
+                            const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+                            const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+                            return `${months[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}, ${hours}:${minutes}:${seconds}`;
+                          })()}
                         </p>
                       </div>
                       <div>

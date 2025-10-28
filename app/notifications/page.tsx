@@ -143,13 +143,17 @@ export default function NotificationsCenter() {
     return matchesCategory && matchesPriority && matchesStatus;
   });
 
-  // Group notifications by date
+  // Group notifications by date (UTC)
   const groupedNotifications = notifications.reduce((groups: Record<string, Notification[]>, notification) => {
     const notificationDate = new Date(notification.timestamp);
-    const notificationDay = new Date(notificationDate.getFullYear(), notificationDate.getMonth(), notificationDate.getDate());
+    const notificationDay = new Date(Date.UTC(
+      notificationDate.getUTCFullYear(),
+      notificationDate.getUTCMonth(),
+      notificationDate.getUTCDate()
+    ));
 
     const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
     const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
     const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
 
@@ -530,7 +534,13 @@ export default function NotificationsCenter() {
                         {notification.title}
                       </p>
                       <p className="text-gray-500 text-xs">
-                        {new Date(notification.timestamp).toLocaleDateString()}
+                        {(() => {
+                          const date = new Date(notification.timestamp);
+                          const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+                          const day = String(date.getUTCDate()).padStart(2, '0');
+                          const year = date.getUTCFullYear();
+                          return `${month}/${day}/${year}`;
+                        })()}
                       </p>
                     </div>
                   ))}

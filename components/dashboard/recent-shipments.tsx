@@ -24,11 +24,11 @@ const transformShipmentData = (shipment: DetailedShipment): RecentShipment => {
     id: shipment.tracking_code,
     recipient: shipment.receiver_address.contact_name,
     location: `${shipment.receiver_address.city}, ${shipment.receiver_address.province}`,
-    date: new Date(shipment.created_at).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    }),
+    date: (() => {
+      const date = new Date(shipment.created_at);
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return `${months[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
+    })(),
     cost: shipment.billing ? `$${shipment.billing.amount}` : 'N/A',
     status: shipment.status.toUpperCase()
   }
@@ -138,9 +138,11 @@ Location: ${shipment.location}
 Date: ${shipment.date}
 Cost: ${shipment.cost}
 
-Generated on: ${new Date().toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
+Generated on: ${(() => {
+        const date = new Date();
+        const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+        return `${months[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
+      })()} (UTC) 
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit'

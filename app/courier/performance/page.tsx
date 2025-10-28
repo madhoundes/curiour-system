@@ -139,12 +139,10 @@ export default function CourierPerformance() {
       case 'today':
         return { date_start: todayStr, date_end: todayStr };
       case 'last7':
-        const last7 = new Date(today);
-        last7.setDate(today.getDate() - 7);
+        const last7 = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - 7));
         return { date_start: last7.toISOString().split('T')[0], date_end: todayStr };
       case 'last30':
-        const last30 = new Date(today);
-        last30.setDate(today.getDate() - 30);
+        const last30 = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - 30));
         return { date_start: last30.toISOString().split('T')[0], date_end: todayStr };
       case 'custom':
         if (customFrom && customTo) {

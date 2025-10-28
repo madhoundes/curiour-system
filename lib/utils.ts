@@ -449,7 +449,9 @@ export const generatePdfInvoice = async (invoiceData: {
     pdfWithAutoTable.setFontSize(8);
     pdfWithAutoTable.setTextColor(100, 100, 100);
     pdfWithAutoTable.text('Thank you for your business!', 20, pageHeight - 20);
-    pdfWithAutoTable.text(`Generated on ${new Date().toLocaleDateString()}`, 20, pageHeight - 12);
+    const date = new Date();
+    const formattedDate = `${String(date.getUTCMonth() + 1).padStart(2, '0')}/${String(date.getUTCDate()).padStart(2, '0')}/${date.getUTCFullYear()}`;
+    pdfWithAutoTable.text(`Generated on ${formattedDate}`, 20, pageHeight - 12);
     
     // Save the PDF
     const filename = `${invoiceData.invoiceNumber.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;

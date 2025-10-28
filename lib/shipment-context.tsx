@@ -170,11 +170,8 @@ export const ShipmentProvider: React.FC<{ children: ReactNode }> = ({ children }
   const getShippingLabelData = useCallback(async () => {
     const { getSenderFromProfile } = await import('@/lib/shipping-label-service');
     const trackingNumber = generateTrackingNumber();
-    const currentDate = new Date().toLocaleDateString('en-US', {
-      month: 'numeric',
-      day: 'numeric',
-      year: 'numeric'
-    });
+    const date = new Date();
+    const currentDate = `${date.getUTCMonth() + 1}/${date.getUTCDate()}/${date.getUTCFullYear()}`;
 
     // Get sender information from profile
     const senderInfo = await getSenderFromProfile();
