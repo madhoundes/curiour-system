@@ -77,16 +77,27 @@ const Login03PageContent = () => {
     const verified = searchParams.get('verified');
     const tab = searchParams.get('tab');
     
-    // Check for Shopify OAuth parameters
+    // Check for Shopify OAuth parameters (hmac, host, shop, timestamp)
     const hmac = searchParams.get('hmac');
     const host = searchParams.get('host');
     const shop = searchParams.get('shop');
     const timestamp = searchParams.get('timestamp');
     
-    if (hmac && host && shop && timestamp) {
-      // Store Shopify params for use after login
-      setShopifyParams({ hmac, host, shop, timestamp });
-      toast.info("Please log in to connect your Shopify store.");
+    // Store Shopify params if present (shop is the only required param for OAuth initiation)
+    if (shop) {
+      setShopifyParams({ 
+        hmac: hmac || undefined, 
+        host: host || undefined, 
+        shop, 
+        timestamp: timestamp || undefined 
+      });
+      
+      // Only show toast if all required params are present
+      if (hmac && host && timestamp) {
+        toast.info("Please log in to connect your Shopify store.");
+      } else {
+        console.log("Shopify OAuth params detected (partial):", { shop, hmac, host, timestamp });
+      }
     }
     
     if (verified === 'true') {
@@ -98,36 +109,41 @@ const Login03PageContent = () => {
     }
   }, [searchParams]);
 
-  // Function to set mock authentication cookie and redirect
+  // Function to handle successful authentication and Shopify OAuth flow
   const handleSuccessfulAuth = async () => {
-    // Set a mock authentication cookie
-    document.cookie = "mock-auth=true; path=/; max-age=86400"; // 24 hours
-    
     // If Shopify params are present, initiate OAuth flow
     if (shopifyParams?.shop) {
       try {
         toast.info("Connecting to Shopify...");
         
-        // Call the Shopify OAuth endpoint using the API service
+        // Call the Shopify OAuth authenticated endpoint with the shop parameter
         const response = await shopifyService.installAuthenticated({ 
           shop: shopifyParams.shop 
         });
         
         // Follow the redirect URL returned by the API
-        if (response.data.auth_url) {
-          window.location.href = response.data.auth_url;
-          return; // Don't redirect to dashboard
+        // The API can return either auth_url or redirect_url
+        const redirectUrl = response.data?.auth_url || response.data?.redirect_url;
+        
+        if (redirectUrl) {
+          // Redirect to Shopify authorization page
+          window.location.href = redirectUrl;
+          return; // Don't redirect to dashboard - let Shopify handle the redirect
         } else {
-          toast.error("Failed to connect to Shopify. Redirecting to dashboard...");
+          console.error("No redirect URL in response:", response);
+          toast.error("Failed to get Shopify authorization URL. Redirecting to dashboard...");
+          router.push("/dashboard");
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Shopify OAuth error:", error);
-        toast.error("Failed to connect to Shopify. Redirecting to dashboard...");
+        const errorMsg = error.message || "Failed to connect to Shopify";
+        toast.error(`${errorMsg}. Redirecting to dashboard...`);
+        router.push("/dashboard");
       }
+    } else {
+      // No Shopify params - normal login flow
+      router.push("/dashboard");
     }
-    
-    // Redirect to dashboard if no Shopify params or if OAuth failed
-    router.push("/dashboard");
   };
 
   const onLoginSubmit = async (data: z.infer<typeof loginFormSchema>) => {

@@ -11,9 +11,9 @@ export default function ShopifyConnectedPage() {
     const router = useRouter();
 
     useEffect(() => {
-        // Auto-redirect to dashboard after 5 seconds
+        // Auto-redirect to profile page (Shopify Integration tab) after 5 seconds
         const timer = setTimeout(() => {
-            router.push("/dashboard");
+            router.push("/profile?tab=api&connected=true");
         }, 5000);
 
         return () => clearTimeout(timer);
@@ -84,7 +84,15 @@ export default function ShopifyConnectedPage() {
                         {/* Action Buttons */}
                         <div className="space-y-3">
                             <Button
+                                onClick={() => router.push("/profile?tab=api")}
+                                className="w-full"
+                                size="lg"
+                            >
+                                View Integration Settings
+                            </Button>
+                            <Button
                                 onClick={() => router.push("/dashboard")}
+                                variant="outline"
                                 className="w-full"
                                 size="lg"
                             >

@@ -6,6 +6,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { profileService } from "@/lib/api/profile";
 import { notificationService } from "@/lib/api/notifications";
+import { shopifyService } from "@/lib/api/shopify";
+import type { ShopifyAccount } from "@/lib/api/types";
+import { toast } from "sonner";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -51,10 +54,14 @@ const NotificationPrefsSchema = z.object({
 
 const ThirdPartyIntegrationSchema = z.object({
   shopify: z.object({
-    enabled: z.boolean(),
-    shopDomain: z.string().optional(),
-    accessToken: z.string().optional(),
-    webhookSecret: z.string().optional(),
+    shopDomain: z.string().min(1, "Shop domain is required").refine(
+      (val) => {
+        // Allow formats like: mystore, mystore.myshopify.com, https://mystore.myshopify.com
+        const cleanDomain = val.replace(/^https?:\/\//, '').replace(/\/$/, '');
+        return cleanDomain.includes('.') || cleanDomain.length > 0;
+      },
+      { message: "Please enter a valid shop domain (e.g., mystore.myshopify.com)" }
+    ),
   }),
 });
 
@@ -73,12 +80,21 @@ const STORAGE_KEYS = {
 export default function ProfileAccountPage() {
   const prefersReducedMotion =
     typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-
+  
   // Loading and error states
   const [isLoading, setIsLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState<boolean | null>(null);
   const [isLoadingSubscription, setIsLoadingSubscription] = useState(false);
+  
+  // Shopify integration states
+  const [shopifyAccounts, setShopifyAccounts] = useState<ShopifyAccount[]>([]);
+  const [isLoadingShopify, setIsLoadingShopify] = useState(false);
+  const [isConnectingShopify, setIsConnectingShopify] = useState(false);
+  const [isDisconnectingShopify, setIsDisconnectingShopify] = useState<number | null>(null);
+  
+  // Store email in state to avoid calling getValues() in render (hydration issue)
+  const [userEmail, setUserEmail] = useState<string>("");
 
   const defaultBusiness: BusinessInfo = useMemo(
     () => ({
@@ -116,10 +132,7 @@ export default function ProfileAccountPage() {
   const defaultIntegrations: ThirdPartyIntegration = useMemo(
     () => ({
       shopify: {
-        enabled: false,
         shopDomain: "",
-        accessToken: "",
-        webhookSecret: "",
       },
     }),
     []
@@ -147,6 +160,29 @@ export default function ProfileAccountPage() {
     mode: "onBlur",
   });
 
+  // Handle search params separately in a useEffect to avoid hydration issues
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get('connected');
+    
+    if (connected === 'true') {
+      toast.success("Shopify store connected successfully!");
+      loadShopifyAccounts();
+    }
+  }, []);
+
+  // Watch form changes to update email state
+  useEffect(() => {
+    const subscription = businessForm.watch((value) => {
+      if (value.email) {
+        setUserEmail(value.email);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [businessForm]);
+
   useEffect(() => {
     const loadProfile = async () => {
       try {
@@ -171,10 +207,16 @@ export default function ProfileAccountPage() {
         
         businessForm.reset(businessData);
         
+        // Update email state
+        setUserEmail(profileData.email || "");
+        
         // Check notification subscription status for the email
         if (profileData.email) {
           await checkSubscriptionStatus(profileData.email);
         }
+        
+        // Load Shopify accounts
+        await loadShopifyAccounts();
         
         // Load other data from localStorage as fallback for now
         const s = localStorage.getItem(STORAGE_KEYS.settings);
@@ -205,6 +247,25 @@ export default function ProfileAccountPage() {
     loadProfile();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const loadShopifyAccounts = async () => {
+    try {
+      setIsLoadingShopify(true);
+      const response = await shopifyService.getAccounts();
+      if (response.data && response.data.accounts) {
+        setShopifyAccounts(response.data.accounts);
+      }
+    } catch (error: any) {
+      console.error('Failed to load Shopify accounts:', error);
+      // Don't show error to user if no accounts exist yet (401 or 404 is expected for new users)
+      if (error.status !== 401 && error.status !== 404) {
+        toast.error('Failed to load Shopify stores');
+      }
+      setShopifyAccounts([]);
+    } finally {
+      setIsLoadingShopify(false);
+    }
+  };
 
   const [businessMsg, setBusinessMsg] = useState<string | null>(null);
   const [settingsMsg, setSettingsMsg] = useState<string | null>(null);
@@ -264,45 +325,158 @@ export default function ProfileAccountPage() {
     onOk(`${label} reset`);
   };
 
-  const handleShopifyConnect = () => {
-    // Mock Shopify OAuth flow - in real implementation, this would redirect to Shopify
-    setIntegrationsMsg("Shopify integration initiated (UI-only demo)");
-    integrationsForm.setValue("shopify.enabled", true);
-    integrationsForm.setValue("shopify.shopDomain", "demo-store.myshopify.com");
-    integrationsForm.setValue("shopify.accessToken", "shpat_••••••••••••••••••");
+  const handleShopifyConnect = async () => {
+    const shopDomain = integrationsForm.getValues("shopify.shopDomain");
+    
+    if (!shopDomain || shopDomain.trim() === "") {
+      setIntegrationsMsg("Please enter a shop domain (e.g., mystore.myshopify.com)");
+      return;
+    }
+
+    // Normalize shop domain
+    let normalizedShop = shopDomain.trim();
+    // Remove protocol if present
+    normalizedShop = normalizedShop.replace(/^https?:\/\//, '');
+    // Remove trailing slash
+    normalizedShop = normalizedShop.replace(/\/$/, '');
+    // If no .myshopify.com suffix, add it
+    if (!normalizedShop.includes('.')) {
+      normalizedShop = `${normalizedShop}.myshopify.com`;
+    }
+
+    try {
+      setIsConnectingShopify(true);
+      setIntegrationsMsg("Initiating Shopify connection...");
+
+      // Call the authenticated install endpoint
+      const response = await shopifyService.installAuthenticated({
+        shop: normalizedShop,
+      });
+
+      // If we get a redirect URL, navigate to it
+      if (response.data?.auth_url || response.data?.redirect_url) {
+        const authUrl = response.data.auth_url || response.data.redirect_url;
+        if (authUrl) {
+          window.location.href = authUrl;
+        } else {
+          setIntegrationsMsg("Failed to get authorization URL. Please try again.");
+        }
+      } else {
+        setIntegrationsMsg("Failed to get authorization URL. Please try again.");
+      }
+    } catch (error: any) {
+      console.error("Shopify OAuth initiation failed:", error);
+      setIntegrationsMsg(
+        error.message || "Failed to connect to Shopify. Please check your shop domain and try again."
+      );
+      setIsConnectingShopify(false);
+    }
   };
 
-  const checkSubscriptionStatus = async (email: string) => {
+  const handleShopifyDisconnect = async (accountId: number) => {
+    if (!confirm("Are you sure you want to disconnect this Shopify store? This will stop automatic order syncing.")) {
+      return;
+    }
+
+    try {
+      setIsDisconnectingShopify(accountId);
+      const response = await shopifyService.disconnect(accountId);
+
+      if (response.data?.success) {
+        setIntegrationsMsg("Shopify store disconnected successfully");
+        toast.success("Shopify store disconnected successfully");
+        // Reload accounts list
+        await loadShopifyAccounts();
+      } else {
+        const errorMsg = "Failed to disconnect Shopify store";
+        setIntegrationsMsg(errorMsg);
+        toast.error(errorMsg);
+      }
+    } catch (error: any) {
+      console.error("Shopify disconnect failed:", error);
+      setIntegrationsMsg(error.message || "Failed to disconnect Shopify store");
+    } finally {
+      setIsDisconnectingShopify(null);
+    }
+  };
+
+  const handleShopifySync = async (accountId: number) => {
+    try {
+      setIsLoadingShopify(true);
+      const response = await shopifyService.syncAccount(accountId);
+
+      if (response.data?.success) {
+        setIntegrationsMsg("Shopify store synced successfully");
+        toast.success("Shopify store synced successfully");
+        // Reload accounts list
+        await loadShopifyAccounts();
+      } else {
+        const errorMsg = "Failed to sync Shopify store";
+        setIntegrationsMsg(errorMsg);
+        toast.error(errorMsg);
+      }
+    } catch (error: any) {
+      console.error("Shopify sync failed:", error);
+      setIntegrationsMsg(error.message || "Failed to sync Shopify store");
+    } finally {
+      setIsLoadingShopify(false);
+    }
+  };
+
+  const checkSubscriptionStatus = async (email: string, showError = true) => {
     if (!email) return;
     
     try {
       setIsLoadingSubscription(true);
+      if (showError) {
+        setNotificationsMsg(null);
+      }
       const status = await notificationService.getSubscriptionStatus(email);
       setSubscriptionStatus(status.subscribed);
       notificationsForm.setValue("emailUpdates", status.subscribed);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to check subscription status:', error);
-      // Default to subscribed if we can't check
-      setSubscriptionStatus(true);
-      notificationsForm.setValue("emailUpdates", true);
+      if (showError) {
+        const errorMsg = error.response?.data?.message || error.message || "Unable to verify subscription status";
+        setNotificationsMsg(errorMsg);
+        toast.error(errorMsg);
+      }
     } finally {
       setIsLoadingSubscription(false);
     }
   };
 
-  const handleNotificationToggle = async (email: string, isSubscribed: boolean) => {
+  const handleNotificationToggle = async (email: string, wantSubscribed: boolean) => {
     try {
-      if (isSubscribed) {
-        await notificationService.unsubscribeEmail({ email });
-        setNotificationsMsg("Successfully unsubscribed from email notifications");
-      } else {
+      setIsLoadingSubscription(true);
+      setNotificationsMsg(null);
+      
+      if (wantSubscribed) {
         await notificationService.resubscribeEmail({ email });
         setNotificationsMsg("Successfully subscribed to email notifications");
+        toast.success("You will now receive email notifications");
+        // Refresh status from server to ensure UI matches server state (silently, no error messages)
+        await checkSubscriptionStatus(email, false);
+      } else {
+        await notificationService.unsubscribeEmail({ email });
+        setNotificationsMsg("Successfully unsubscribed from email notifications");
+        toast.success("You have been unsubscribed from email notifications");
+        // Refresh status from server to ensure UI matches server state (silently, no error messages)
+        await checkSubscriptionStatus(email, false);
       }
-      setSubscriptionStatus(isSubscribed);
     } catch (error: any) {
       console.error('Failed to update notification subscription:', error);
-      setNotificationsMsg(`Failed to update subscription: ${error.message}`);
+      const errorMsg = error.message || "Failed to update subscription";
+      setNotificationsMsg(errorMsg);
+      toast.error(errorMsg);
+      // If the operation failed, refresh status to show actual server state
+      try {
+        await checkSubscriptionStatus(email, false);
+      } catch (refreshError) {
+        console.error('Failed to refresh status after error:', refreshError);
+      }
+    } finally {
+      setIsLoadingSubscription(false);
     }
   };
 
@@ -323,7 +497,11 @@ export default function ProfileAccountPage() {
             prefersReducedMotion ? "" : "animate-in fade-in slide-in-from-bottom-1 duration-300"
           }`}
         >
-          <Tabs defaultValue="business" id="parcego-profile-tabs" className="w-full mb-8">
+          <Tabs 
+            defaultValue="business"
+            id="parcego-profile-tabs" 
+            className="w-full mb-8"
+          >
             <TabsList 
               className="flex w-full h-9 sm:h-10 p-1 bg-gray-100 rounded-lg overflow-hidden justify-between"
               style={{ padding: '1.68rem .75rem' }}
@@ -653,85 +831,149 @@ export default function ProfileAccountPage() {
               <Card id="parcego-profile-notifications-card">
                 <CardHeader>
                   <CardTitle>Notification Preferences</CardTitle>
-                  <CardDescription>Choose when and how we keep you informed.</CardDescription>
+                  <CardDescription>Manage how you receive updates and notifications from Parcego.</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-6">
                   {notificationsMsg && (
-                    <Alert className="mb-3" role="status" aria-live="polite">
+                    <Alert className="mb-4" role="status" aria-live="polite">
                       <AlertTitle>Notifications</AlertTitle>
                       <AlertDescription>{notificationsMsg}</AlertDescription>
                     </Alert>
                   )}
 
-                  <Form {...notificationsForm}>
-                    <form
-                      id="parcego-profile-notifications-form"
-                      className="grid grid-cols-1 gap-3"
-                      onSubmit={notificationsForm.handleSubmit((data) => {
-                        const email = businessForm.getValues("email");
-                        if (email) {
-                          handleNotificationToggle(email, data.emailUpdates);
-                        } else {
-                          setNotificationsMsg("Please enter your email address in the Business tab first");
-                        }
-                      })}
-                      aria-label="Notification preferences form"
-                    >
-                      <FormField
-                        control={notificationsForm.control}
-                        name="emailUpdates"
-                        render={({ field }) => (
-                          <FormItem>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Checkbox
-                                  id="parcego-profile-notif-email"
-                                  checked={field.value as boolean}
-                                  onCheckedChange={(v) => field.onChange(!!v)}
-                                  aria-label="Email updates"
-                                  disabled={isLoadingSubscription}
-                                />
-                                <Label htmlFor="parcego-profile-notif-email">Email updates</Label>
-                              </div>
-                              {isLoadingSubscription && (
-                                <span className="text-sm text-gray-500">Checking status...</span>
-                              )}
-                              {subscriptionStatus !== null && !isLoadingSubscription && (
-                                <span className="text-sm text-gray-500">
-                                  {subscriptionStatus ? "Subscribed" : "Unsubscribed"}
-                                </span>
-                              )}
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
+                  {/* Email Address Check */}
+                  {!userEmail && (
+                    <Alert className="mb-4 border-yellow-200 bg-yellow-50" role="alert">
+                      <AlertTitle className="text-yellow-800">Email Required</AlertTitle>
+                      <AlertDescription className="text-yellow-700">
+                        Please enter your email address in the <strong>Business</strong> tab to manage email notifications.
+                      </AlertDescription>
+                    </Alert>
+                  )}
 
-                      <div className="mt-4 flex items-center gap-2">
-                        <Button 
-                          type="submit" 
-                          aria-label="Update notification preferences"
-                          disabled={isLoadingSubscription}
-                        >
-                          {isLoadingSubscription ? "Checking..." : "Update Subscription"}
-                        </Button>
+                  {/* Email Notifications Section */}
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="font-semibold text-gray-900">Email Notifications</h3>
+                          {isLoadingSubscription && (
+                            <span className="text-sm text-gray-500 flex items-center gap-1">
+                              <span className="animate-spin h-4 w-4 border-2 border-gray-400 border-t-transparent rounded-full"></span>
+                              Checking status...
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-600 mb-2">
+                          Receive email updates about shipment status, delivery confirmations, and important account notifications.
+                        </p>
+                        {userEmail && (
+                          <p className="text-xs text-gray-500">
+                            Email address: <span className="font-medium">{userEmail}</span>
+                          </p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-2 ml-4 min-w-[140px]">
+                        {subscriptionStatus !== null && !isLoadingSubscription ? (
+                          <>
+                            <div className={`px-3 py-1 rounded-full text-xs font-medium ${
+                              subscriptionStatus 
+                                ? 'bg-green-100 text-green-800 border border-green-200' 
+                                : 'bg-red-100 text-red-800 border border-red-200'
+                            }`}>
+                              {subscriptionStatus ? "Subscribed" : "Unsubscribed"}
+                            </div>
+                            <Button
+                              type="button"
+                              variant={subscriptionStatus ? "destructive" : "default"}
+                              size="sm"
+                              onClick={() => {
+                                if (userEmail) {
+                                  handleNotificationToggle(userEmail, !subscriptionStatus);
+                                } else {
+                                  setNotificationsMsg("Please enter your email address in the Business tab first");
+                                  toast.error("Email address required");
+                                }
+                              }}
+                              disabled={isLoadingSubscription}
+                              aria-label={subscriptionStatus ? "Unsubscribe from email notifications" : "Subscribe to email notifications"}
+                            >
+                              {subscriptionStatus ? "Unsubscribe" : "Subscribe"}
+                            </Button>
+                          </>
+                        ) : isLoadingSubscription ? (
+                          <div className="flex flex-col items-end gap-2">
+                            <div className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                              Checking...
+                            </div>
+                            <div className="text-xs text-gray-500">Please wait</div>
+                          </div>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              if (userEmail) {
+                                checkSubscriptionStatus(userEmail);
+                              } else {
+                                setNotificationsMsg("Please enter your email address in the Business tab first");
+                                toast.error("Email address required");
+                              }
+                            }}
+                            disabled={isLoadingSubscription}
+                            aria-label="Check subscription status"
+                          >
+                            Check Status
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Additional Notification Types - Placeholder for future */}
+                    <div className="space-y-3">
+                      <h4 className="font-medium text-gray-900 text-sm">What you'll receive:</h4>
+                      <ul className="space-y-2 text-sm text-gray-600">
+                        <li className="flex items-start gap-2">
+                          <span className="text-green-600 mt-0.5">✓</span>
+                          <span>Shipment status updates and tracking information</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-green-600 mt-0.5">✓</span>
+                          <span>Delivery confirmations and proof of delivery</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-green-600 mt-0.5">✓</span>
+                          <span>Account alerts and important notifications</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <span className="text-green-600 mt-0.5">✓</span>
+                          <span>Billing and payment reminders</span>
+                        </li>
+                      </ul>
+                    </div>
+
+                    {/* Action Buttons */}
+                    {userEmail && subscriptionStatus !== null && (
+                      <div className="flex items-center gap-2 pt-2 border-t">
                         <Button
                           type="button"
-                          variant="ghost"
-                          onClick={() => {
-                            const email = businessForm.getValues("email");
-                            if (email) {
-                              checkSubscriptionStatus(email);
+                          variant="outline"
+                          size="sm"
+                          onClick={async () => {
+                            if (userEmail) {
+                              await checkSubscriptionStatus(userEmail, true);
+                              toast.success("Subscription status refreshed");
                             }
                           }}
-                          aria-label="Refresh subscription status"
                           disabled={isLoadingSubscription}
+                          aria-label="Refresh subscription status"
                         >
-                          Refresh Status
+                          {isLoadingSubscription ? "Refreshing..." : "Refresh Status"}
                         </Button>
                       </div>
-                    </form>
-                  </Form>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </TabsContent>
@@ -751,87 +993,140 @@ export default function ProfileAccountPage() {
                     </Alert>
                   )}
 
+                  {/* Connected Shopify Stores */}
+                  {shopifyAccounts.length > 0 && (
+                    <div className="mb-6 space-y-4">
+                      <h3 className="text-lg font-medium">Connected Stores</h3>
+                      {shopifyAccounts.map((account) => (
+                        <Card key={account.id} className="border-l-4 border-l-green-500">
+                          <CardContent className="pt-4">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <h4 className="font-semibold text-gray-900">{account.shop_name || account.shop_domain}</h4>
+                                  <span className={`px-2 py-1 text-xs rounded-full ${
+                                    account.status === 'active' 
+                                      ? 'bg-green-100 text-green-800' 
+                                      : account.status === 'error'
+                                      ? 'bg-red-100 text-red-800'
+                                      : 'bg-gray-100 text-gray-800'
+                                  }`}>
+                                    {account.status}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-600 mb-2">{account.shop_domain}</p>
+                                {account.last_sync_at && (
+                                  <p className="text-xs text-gray-500">
+                                    Last synced: {new Date(account.last_sync_at).toLocaleString()}
+                                  </p>
+                                )}
+                                {account.error_message && (
+                                  <Alert className="mt-2 border-red-200 bg-red-50">
+                                    <AlertDescription className="text-red-700 text-sm">
+                                      {account.error_message}
+                                    </AlertDescription>
+                                  </Alert>
+                                )}
+                              </div>
+                              <div className="flex gap-2 ml-4">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleShopifySync(account.id)}
+                                  disabled={isLoadingShopify}
+                                  aria-label={`Sync ${account.shop_domain}`}
+                                >
+                                  Sync
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => handleShopifyDisconnect(account.id)}
+                                  disabled={isDisconnectingShopify === account.id}
+                                  aria-label={`Disconnect ${account.shop_domain}`}
+                                >
+                                  {isDisconnectingShopify === account.id ? "Disconnecting..." : "Disconnect"}
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Loading Shopify Accounts */}
+                  {isLoadingShopify && shopifyAccounts.length === 0 && (
+                    <Alert className="mb-4" role="status" aria-live="polite">
+                      <AlertDescription>Loading Shopify stores...</AlertDescription>
+                    </Alert>
+                  )}
+
                   <Form {...integrationsForm}>
                     <form
                       id="parcego-profile-integrations-form"
                       className="space-y-6"
-                      onSubmit={integrationsForm.handleSubmit((data) =>
-                        handleSave(STORAGE_KEYS.integrations, data, setIntegrationsMsg, "Shopify integration")
-                      )}
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        handleShopifyConnect();
+                      }}
                       aria-label="Shopify integration form"
                     >
                       {/* Shopify Integration */}
                       <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="text-lg font-medium">Shopify Store Connection</h3>
-                            <p className="text-sm text-gray-600">Connect your Shopify store for seamless order management and fulfillment</p>
-                          </div>
-                          <Button
-                            type="button"
-                            variant={integrationsForm.watch("shopify.enabled") ? "outline" : "default"}
-                            onClick={handleShopifyConnect}
-                            aria-label="Connect Shopify integration"
-                          >
-                            {integrationsForm.watch("shopify.enabled") ? "Connected" : "Connect"}
-                          </Button>
+                        <div>
+                          <h3 className="text-lg font-medium mb-2">Connect New Shopify Store</h3>
+                          <p className="text-sm text-gray-600 mb-4">
+                            Connect your Shopify store for seamless order management and fulfillment automation.
+                          </p>
                         </div>
                         
-                        {integrationsForm.watch("shopify.enabled") && (
-                          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <FormField
-                              control={integrationsForm.control}
-                              name="shopify.shopDomain"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Shop Domain</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="your-store.myshopify.com" {...field} />
-                                  </FormControl>
-                                  <FormDescription>Your Shopify store&apos;s domain (e.g., mystore.myshopify.com)</FormDescription>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={integrationsForm.control}
-                              name="shopify.accessToken"
-                              render={({ field }) => (
-                                <FormItem>
-                                  <FormLabel>Access Token</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="shpat_••••••••••••••••••" {...field} />
-                                  </FormControl>
-                                  <FormDescription>Your Shopify private app access token</FormDescription>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                            <FormField
-                              control={integrationsForm.control}
-                              name="shopify.webhookSecret"
-                              render={({ field }) => (
-                                <FormItem className="md:col-span-2">
-                                  <FormLabel>Webhook Secret</FormLabel>
-                                  <FormControl>
-                                    <Input placeholder="whsec_••••••••••••••••••" {...field} />
-                                  </FormControl>
-                                  <FormDescription>Secret key for verifying webhook authenticity from Shopify</FormDescription>
-                                  <FormMessage />
-                                </FormItem>
-                              )}
-                            />
-                          </div>
-                        )}
-                      </div>
-
-                      {integrationsForm.watch("shopify.enabled") && (
-                        <div className="pt-4 border-t">
-                          <Button type="submit" aria-label="Save Shopify integration settings">
-                            Save Shopify Settings
-                          </Button>
+                        <div className="grid grid-cols-1 gap-4">
+                          <FormField
+                            control={integrationsForm.control}
+                            name="shopify.shopDomain"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Shop Domain</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    placeholder="your-store.myshopify.com or just your-store" 
+                                    {...field}
+                                    disabled={isConnectingShopify}
+                                  />
+                                </FormControl>
+                                <FormDescription>
+                                  Enter your Shopify store domain. You can use &quot;mystore&quot; or &quot;mystore.myshopify.com&quot;
+                                </FormDescription>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
                         </div>
-                      )}
+
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="submit"
+                            disabled={isConnectingShopify}
+                            aria-label="Connect Shopify store"
+                          >
+                            {isConnectingShopify ? "Connecting..." : "Connect Store"}
+                          </Button>
+                          {shopifyAccounts.length > 0 && (
+                            <Button
+                              type="button"
+                              variant="outline"
+                              onClick={loadShopifyAccounts}
+                              disabled={isLoadingShopify}
+                              aria-label="Refresh Shopify stores"
+                            >
+                              Refresh
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                     </form>
                   </Form>
                 </CardContent>
