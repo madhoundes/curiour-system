@@ -188,7 +188,6 @@ const iconAliases: Record<string, IconName> = {
   "minus": "Minus",
   "Minus": "Minus",
   "check": "Check",
-  "Check": "Check",
   // Filter icon aliases
   "Filter": "Funnel",
   "filter": "Funnel",

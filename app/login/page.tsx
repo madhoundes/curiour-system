@@ -117,35 +117,68 @@ const Login03PageContent = () => {
       if (shopifyParams?.shop) {
         toast.info("Connecting to Shopify...");
         
-        // Instead of using fetch, navigate directly to the API endpoint
-        // This allows the backend to return a 302 redirect which the browser will follow automatically
-        // This avoids CORS issues with fetch requests
+        // Use fetch to call the API endpoint with proper Authorization header
+        // Then redirect to the returned URL
         const shopParam = encodeURIComponent(shopifyParams.shop);
         const authToken = authService.getAuthToken();
         
-        // Set auth token as cookie so backend can read it during direct navigation
-        // This is needed because we can't set Authorization header with window.location.href
-        if (authToken && typeof window !== 'undefined') {
-          const isSecure = window.location.protocol === 'https:';
-          const cookieOptions = [
-            `auth_token=${authToken}`,
-            'path=/',
-            'max-age=86400',
-            'SameSite=Lax'
-          ];
-          if (isSecure) {
-            cookieOptions.push('Secure');
-          }
-          document.cookie = cookieOptions.join('; ');
+        if (!authToken) {
+          toast.error("Authentication token missing. Please log in again.");
+          router.push("/dashboard");
+          return;
         }
         
-        // Construct the API endpoint URL
-        const redirectUrl = `${API_CONFIG.BASE_URL}/shopify/auth/install-authenticated?shop=${shopParam}`;
-        
-        // Navigate directly to the API endpoint - backend will handle redirect to Shopify
-        // The browser will automatically follow any 302 redirects returned by the backend
-        window.location.href = redirectUrl;
-        return; // Don't continue - redirect is happening
+        try {
+          // Call the API endpoint with Authorization header
+          const response = await fetch(
+            `${API_CONFIG.BASE_URL}/shopify/auth/install-authenticated?shop=${shopParam}`,
+            {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'Content-Type': 'application/json',
+              },
+              credentials: 'include', // Include cookies if needed
+            }
+          );
+          
+          if (!response.ok) {
+            // Try to get error message from response
+            let errorMessage = "Failed to connect to Shopify";
+            try {
+              const errorData = await response.json();
+              errorMessage = errorData.message || errorData.error || errorMessage;
+            } catch {
+              // If response is not JSON, use status text
+              errorMessage = response.statusText || errorMessage;
+            }
+            throw new Error(errorMessage);
+          }
+          
+          // Get the redirect URL from the response
+          const responseData = await response.json();
+          const redirectUrl = responseData.auth_url || responseData.redirect_url || responseData.data?.auth_url || responseData.data?.redirect_url;
+          
+          if (redirectUrl) {
+            // Redirect to Shopify authorization page
+            window.location.href = redirectUrl;
+            return; // Don't continue - redirect is happening
+          } else {
+            console.error("No redirect URL in response:", responseData);
+            toast.error("Failed to get Shopify authorization URL. Redirecting to dashboard...");
+            router.push("/dashboard");
+          }
+        } catch (fetchError: any) {
+          console.error("Fetch error:", fetchError);
+          // If CORS error, try fallback with token in URL
+          if (fetchError.message?.includes('CORS') || fetchError.message?.includes('Failed to fetch')) {
+            console.log("CORS error detected, trying fallback with token in URL");
+            const fallbackUrl = `${API_CONFIG.BASE_URL}/shopify/auth/install-authenticated?shop=${shopParam}&token=${encodeURIComponent(authToken)}`;
+            window.location.href = fallbackUrl;
+            return;
+          }
+          throw fetchError;
+        }
       } else {
         // No Shopify params - normal login flow
         console.log("No Shopify params detected, redirecting to dashboard...");
