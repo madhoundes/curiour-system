@@ -20,6 +20,7 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { authService, shopifyService } from "@/lib/api";
+import { API_CONFIG } from "@/lib/api/config";
 import { toast } from "sonner";
 import type { ApiErrorResponse } from "@/lib/api/types";
 
@@ -111,37 +112,55 @@ const Login03PageContent = () => {
 
   // Function to handle successful authentication and Shopify OAuth flow
   const handleSuccessfulAuth = async () => {
-    // If Shopify params are present, initiate OAuth flow
-    if (shopifyParams?.shop) {
-      try {
+    try {
+      // If Shopify params are present, initiate OAuth flow
+      if (shopifyParams?.shop) {
         toast.info("Connecting to Shopify...");
         
-        // Call the Shopify OAuth authenticated endpoint with the shop parameter
-        const response = await shopifyService.installAuthenticated({ 
-          shop: shopifyParams.shop 
-        });
+        // Instead of using fetch, navigate directly to the API endpoint
+        // This allows the backend to return a 302 redirect which the browser will follow automatically
+        // This avoids CORS issues with fetch requests
+        const shopParam = encodeURIComponent(shopifyParams.shop);
+        const authToken = authService.getAuthToken();
         
-        // Follow the redirect URL returned by the API
-        // The API can return either auth_url or redirect_url
-        const redirectUrl = response.data?.auth_url || response.data?.redirect_url;
-        
-        if (redirectUrl) {
-          // Redirect to Shopify authorization page
-          window.location.href = redirectUrl;
-          return; // Don't redirect to dashboard - let Shopify handle the redirect
-        } else {
-          console.error("No redirect URL in response:", response);
-          toast.error("Failed to get Shopify authorization URL. Redirecting to dashboard...");
-          router.push("/dashboard");
+        // Set auth token as cookie so backend can read it during direct navigation
+        // This is needed because we can't set Authorization header with window.location.href
+        if (authToken && typeof window !== 'undefined') {
+          const isSecure = window.location.protocol === 'https:';
+          const cookieOptions = [
+            `auth_token=${authToken}`,
+            'path=/',
+            'max-age=86400',
+            'SameSite=Lax'
+          ];
+          if (isSecure) {
+            cookieOptions.push('Secure');
+          }
+          document.cookie = cookieOptions.join('; ');
         }
-      } catch (error: any) {
-        console.error("Shopify OAuth error:", error);
-        const errorMsg = error.message || "Failed to connect to Shopify";
-        toast.error(`${errorMsg}. Redirecting to dashboard...`);
+        
+        // Construct the API endpoint URL
+        const redirectUrl = `${API_CONFIG.BASE_URL}/shopify/auth/install-authenticated?shop=${shopParam}`;
+        
+        // Navigate directly to the API endpoint - backend will handle redirect to Shopify
+        // The browser will automatically follow any 302 redirects returned by the backend
+        window.location.href = redirectUrl;
+        return; // Don't continue - redirect is happening
+      } else {
+        // No Shopify params - normal login flow
+        console.log("No Shopify params detected, redirecting to dashboard...");
         router.push("/dashboard");
       }
-    } else {
-      // No Shopify params - normal login flow
+    } catch (error: any) {
+      console.error("Shopify OAuth error:", error);
+      const errorMsg = error.message || "Failed to connect to Shopify";
+      
+      // If it's a Shopify OAuth error, show message, otherwise just redirect
+      if (shopifyParams?.shop) {
+        toast.error(`${errorMsg}. Redirecting to dashboard...`);
+      }
+      
+      // Always redirect to dashboard on error
       router.push("/dashboard");
     }
   };
@@ -160,12 +179,24 @@ const Login03PageContent = () => {
 
       const response = await authService.login(loginData);
       
+      // Set authentication cookie for middleware to recognize authenticated user
+      // This allows access to protected routes
+      if (typeof window !== 'undefined') {
+        document.cookie = 'mock-auth=true; path=/; max-age=86400; SameSite=Lax';
+      }
+      
       // Show success message
       toast.success("Login successful! Welcome back.");
       
-      // Redirect to dashboard
-      console.log("Login successful - redirect to dashboard");
-      handleSuccessfulAuth();
+      // Redirect to dashboard or handle Shopify OAuth
+      console.log("Login successful - redirecting...");
+      try {
+        await handleSuccessfulAuth();
+      } catch (redirectError) {
+        console.error("Redirect error:", redirectError);
+        // Fallback: always redirect to dashboard even if there's an error
+        router.push("/dashboard");
+      }
     } catch (error) {
       console.error("Login failed:", error);
       
