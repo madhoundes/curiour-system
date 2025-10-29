@@ -3,6 +3,14 @@ import { pdf, Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer
 import { AnalyticsData } from './export-utils';
 
 /**
+ * Format date in UTC for display
+ */
+const formatUTCDate = (date: Date): string => {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
+};
+
+/**
  * Downloads a PDF file with proper filename and MIME type
  * Improved version to prevent page reloads and UI flicker
  */
@@ -132,7 +140,7 @@ const createAnalyticsPDF = (data: AnalyticsData) => {
         {/* Date Range */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>
-            Report Period: {data.dateRange.from.toLocaleDateString()} - {data.dateRange.to.toLocaleDateString()}
+            Report Period: {formatUTCDate(data.dateRange.from)} - {formatUTCDate(data.dateRange.to)}
           </Text>
         </View>
 

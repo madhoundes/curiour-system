@@ -4,6 +4,15 @@ import React from 'react';
 import { Logo } from '@/components/ui/logo';
 import type { Claim } from '@/lib/api/types';
 
+// Format date in UTC
+const formatUTCDate = (date: Date): string => {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const year = date.getUTCFullYear();
+  return `${month}/${day}/${year}`;
+};
+
 // Status configuration for claims
 const claimStatusConfig = {
   approved: { 
@@ -87,7 +96,7 @@ export const ClaimReportPDF = ({ claim, isPreview = false }: ClaimReportPDFProps
           <div><strong>Claim ID:</strong> {claim.id}</div>
           <div><strong>Phone Number:</strong> 1-800-PARCEGO</div>
           <div><strong>Shipment ID:</strong> {claim.shipment_tracking_code}</div>
-          <div><strong>Date Generated:</strong> {new Date().toLocaleDateString()}</div>
+          <div><strong>Date Generated:</strong> {formatUTCDate(new Date())}</div>
         </div>
       </div>
 
@@ -117,13 +126,13 @@ export const ClaimReportPDF = ({ claim, isPreview = false }: ClaimReportPDFProps
           </div>
           <div className="flex">
             <span className="w-32 bg-gray-50 px-2 py-1 font-semibold text-gray-700">Submitted Date</span>
-            <span className="px-2 py-1 text-black">{new Date(claim.created_at).toLocaleDateString()}</span>
+            <span className="px-2 py-1 text-black">{formatUTCDate(new Date(claim.created_at))}</span>
           </div>
           {claim.updated_at && (
             <>
               <div className="flex">
                 <span className="w-32 bg-gray-50 px-2 py-1 font-semibold text-gray-700">Resolved Date</span>
-                <span className="px-2 py-1 text-black">{new Date(claim.updated_at).toLocaleDateString()}</span>
+                <span className="px-2 py-1 text-black">{formatUTCDate(new Date(claim.updated_at))}</span>
               </div>
               <div></div>
             </>
@@ -137,7 +146,7 @@ export const ClaimReportPDF = ({ claim, isPreview = false }: ClaimReportPDFProps
         <div className="space-y-2 text-xs">
           <div className="flex">
             <span className="w-32 bg-gray-50 px-2 py-1 font-semibold text-gray-700">Incident Date</span>
-            <span className="px-2 py-1 text-black">{new Date(claim.created_at).toLocaleDateString()}</span>
+            <span className="px-2 py-1 text-black">{formatUTCDate(new Date(claim.created_at))}</span>
           </div>
           <div className="flex">
             <span className="w-32 bg-gray-50 px-2 py-1 font-semibold text-gray-700">Incident Location</span>
@@ -214,7 +223,7 @@ export const ClaimReportPDF = ({ claim, isPreview = false }: ClaimReportPDFProps
         <div>Keep this document for your records.</div>
         
         <div className="text-center mt-4 text-gray-500">
-          Generated on {new Date().toLocaleDateString()} | Parcego Claims Report
+          Generated on {formatUTCDate(new Date())} | Parcego Claims Report
         </div>
       </div>
     </div>
@@ -399,5 +408,5 @@ const getDocumentDate = (claimSubmittedDate: string, index: number): string => {
   // Documents are typically uploaded 0-3 days before claim submission
   const daysBeforeSubmission = Math.min(index, 3);
   const documentDate = new Date(submittedDate.getTime() - (daysBeforeSubmission * 24 * 60 * 60 * 1000));
-  return documentDate.toLocaleDateString();
+  return formatUTCDate(documentDate);
 };

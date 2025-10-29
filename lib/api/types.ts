@@ -822,6 +822,7 @@ export interface DriverSearchShipmentsResponse {
 export interface DriverUpdateShipmentStatusRequest {
   status: string;
   notes?: string;
+  undelivered_reason?: 'customer_not_available' | 'incorrect_address' | 'access_denied' | 'customer_refused' | 'damaged_package' | 'other';
 }
 
 export interface DriverUpdateShipmentStatusResponse {
@@ -958,4 +959,301 @@ export interface RouteOptimizationParams {
 
 export interface RouteOptimizationResponse {
   google_maps_url: string;
+}
+
+// Shopify OAuth Types
+export interface ShopifyInstallParams {
+  shop: string; // Shop domain (e.g., 'mystore' or 'mystore.myshopify.com')
+}
+
+export interface ShopifyInstallResponse {
+  redirect_url?: string;
+  auth_url?: string;
+  message?: string;
+}
+
+export interface ShopifyCallbackParams {
+  code?: string; // Authorization code from Shopify
+  state?: string; // CSRF protection state
+  shop?: string; // Shop domain
+  error?: string; // Error from Shopify
+}
+
+export interface ShopifyCallbackResponse {
+  success: boolean;
+  message: string;
+  shop?: string;
+  account_id?: number;
+}
+
+export interface ShopifyDisconnectResponse {
+  success: boolean;
+  message: string;
+}
+
+// Shopify Store Types
+export interface ShopifyAccount {
+  id: number;
+  shop_domain: string;
+  shop_name: string;
+  status: string;
+  last_sync_at: string;
+  error_message?: string;
+  created_at: string;
+}
+
+export interface ShopifyAccountsResponse {
+  accounts: ShopifyAccount[];
+  total: number;
+}
+
+export interface ShopifyAccountDetails extends ShopifyAccount {}
+
+export interface ShopifySyncResponse {
+  success: boolean;
+  message: string;
+  last_sync_at: string;
+}
+
+// Shopify Order Types
+export interface ShopifyOrder {
+  id: number;
+  shopify_order_id: number;
+  order_number: string;
+  shipment_id: number | null;
+  processing_status: string;
+  processing_attempts: number;
+  error_message?: string;
+  shopify_created_at: string;
+  processed_at?: string;
+  created_at: string;
+}
+
+export interface ShopifyOrdersParams {
+  account_id?: number;
+  status?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ShopifyOrdersResponse {
+  orders: ShopifyOrder[];
+  total: number;
+}
+
+// Shopify Stats Types
+export interface ShopifyStatsResponse {
+  active_stores: number;
+  connected_stores: number;
+  last_24h_orders: number;
+  orders_failed: number;
+  orders_pending: number;
+  total_orders_processed: number;
+}
+
+// Admin Types
+export interface ShopifyAdminAccountsParams {
+  status?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ShopifyAdminPollResponse {
+  success: boolean;
+  message: string;
+  stores_polled: number;
+  orders_fetched: number;
+}
+
+export interface ShopifyAdminRetryResponse {
+  success: boolean;
+  message: string;
+  orders_retried: number;
+}
+
+export interface ShopifyAdminSchedulerStatusResponse {
+  is_running: boolean;
+  last_run?: string;
+  next_run?: string;
+  interval_seconds: number;
+  last_poll_stats?: {
+    stores_polled: number;
+    orders_fetched: number;
+    orders_processed: number;
+    errors: number;
+  };
+}
+
+// Dashboard Types
+export interface ShopifyDashboardSummaryResponse {
+  active_stores: number;
+  alert_count: number;
+  connected_stores: number;
+  has_alerts: boolean;
+  last_sync_at: string;
+  next_sync_in_minutes: number;
+  orders_failed: number;
+  orders_pending: number;
+  orders_this_week: number;
+  orders_today: number;
+  stores: ShopifyAccount[];
+  stores_with_errors: number;
+  total_orders_processed: number;
+}
+
+export interface ShopifyActivityEvent {
+  id: number;
+  event_type: string;
+  title: string;
+  description: string;
+  timestamp: string;
+  store_domain: string;
+  shopify_order_id: number;
+  shipment_id: number;
+  tracking_code: string;
+  customer_name: string;
+  customer_city: string;
+  order_amount: number;
+  status_color: string;
+  icon: string;
+}
+
+export interface ShopifyActivityParams {
+  limit?: number;
+  offset?: number;
+}
+
+export interface ShopifyActivityResponse {
+  events: ShopifyActivityEvent[];
+  has_more: boolean;
+  total_events: number;
+}
+
+export interface ShopifyAlert {
+  id: string;
+  type: string;
+  title: string;
+  description: string;
+  action_text?: string;
+  action_url?: string;
+  created_at: string;
+}
+
+export interface ShopifyAlertsResponse {
+  alerts: ShopifyAlert[];
+  total_alerts: number;
+}
+
+export interface ShopifyQuickStatsResponse {
+  stores_connected: number;
+  orders_today: number;
+  orders_pending: number;
+  orders_failed: number;
+  last_sync_minutes_ago: number;
+}
+
+// Monitoring Types
+export interface ShopifyErrorMetricsParams {
+  hours_back?: number; // Default 24, max 168, min 1
+}
+
+export interface ShopifyErrorMetricsResponse {
+  total_errors: number;
+  errors_by_type: Record<string, number>;
+  errors_by_store: Array<{
+    store_domain: string;
+    error_count: number;
+  }>;
+  recent_errors: Array<{
+    timestamp: string;
+    error_type: string;
+    store_domain: string;
+    message: string;
+  }>;
+  period_start: string;
+  period_end: string;
+}
+
+export interface ShopifyStoreHealthResponse {
+  stores: Array<{
+    store_domain: string;
+    status: string;
+    last_sync: string;
+    health_score: number;
+    issues_count: number;
+    last_error?: string;
+  }>;
+  overall_health: {
+    healthy_stores: number;
+    warning_stores: number;
+    error_stores: number;
+  };
+}
+
+export interface ShopifyErrorTrendsParams {
+  days_back?: number; // Default 7, max 30, min 1
+}
+
+export interface ShopifyErrorTrendsResponse {
+  trends: Array<{
+    date: string;
+    error_count: number;
+    error_types: Record<string, number>;
+  }>;
+  summary: {
+    total_errors: number;
+    average_per_day: number;
+    peak_day: string;
+    peak_day_errors: number;
+  };
+}
+
+export interface ShopifyCriticalAlert {
+  id: string;
+  severity: 'critical' | 'high' | 'medium';
+  title: string;
+  description: string;
+  store_domain?: string;
+  affected_stores: number;
+  first_seen: string;
+  last_updated: string;
+  action_required: boolean;
+  action_url?: string;
+}
+
+export interface ShopifyCriticalAlertsResponse {
+  alerts: ShopifyCriticalAlert[];
+  total_critical: number;
+  total_high: number;
+  requires_immediate_action: boolean;
+}
+
+export interface ShopifyHealthSummaryResponse {
+  overall_status: 'healthy' | 'warning' | 'critical';
+  health_score: number;
+  stores_total: number;
+  stores_healthy: number;
+  stores_with_issues: number;
+  last_24h_errors: number;
+  system_status: {
+    polling_active: boolean;
+    websocket_connected: boolean;
+    api_rate_limits_ok: boolean;
+  };
+  recommendations: string[];
+}
+
+// Webhook Types
+export interface ShopifyWebhookOrderCreateResponse {
+  success: boolean;
+  message: string;
+  order_id?: number;
+  shipment_id?: number;
+  processed_at?: string;
+}
+
+export interface ShopifyWebhookTestResponse {
+  success: boolean;
+  message: string;
+  timestamp: string;
 }

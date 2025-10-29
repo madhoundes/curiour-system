@@ -77,12 +77,13 @@ export const TrackingTimeline: React.FC<TrackingTimelineProps> = ({ id = "parceg
             <div aria-label="Estimated delivery" className="text-right">
               <div className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">ETA</div>
               <div className="text-sm font-semibold text-gray-900">
-                {new Date(estimatedDelivery).toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                })}
+                {(() => {
+                  const date = new Date(estimatedDelivery);
+                  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                  const hours = String(date.getUTCHours()).padStart(2, '0');
+                  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+                  return `${months[date.getUTCMonth()]} ${date.getUTCDate()}, ${hours}:${minutes}`;
+                })()}
               </div>
             </div>
           )}
@@ -133,12 +134,13 @@ export const TrackingTimeline: React.FC<TrackingTimelineProps> = ({ id = "parceg
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-sm text-gray-600">
                     <span className="font-medium">
-                      {new Date(evt.timestamp).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
+                      {(() => {
+                        const date = new Date(evt.timestamp);
+                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                        const hours = String(date.getUTCHours()).padStart(2, '0');
+                        const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+                        return `${months[date.getUTCMonth()]} ${date.getUTCDate()}, ${hours}:${minutes}`;
+                      })()}
                     </span>
                     {evt.location && (
                       <>

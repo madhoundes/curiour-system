@@ -77,13 +77,11 @@ const formatCurrency = (amount: string | number) => {
   }).format(numAmount);
 };
 
-// Format date
+// Format date in UTC
 const formatDate = (dateString: string) => {
-  return new Date(dateString).toLocaleDateString('en-CA', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric'
-  });
+  const date = new Date(dateString);
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${months[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
 };
 
 export default function ClaimsHistoryPage() {

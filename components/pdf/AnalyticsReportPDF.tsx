@@ -234,11 +234,8 @@ const AnalyticsReportPDF: React.FC<AnalyticsReportPDFProps> = ({ data }) => {
   };
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return `${months[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
   };
 
   return (

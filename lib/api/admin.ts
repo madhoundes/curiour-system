@@ -213,28 +213,50 @@ export class AdminService {
      }
    }
 
-   /**
-    * Run automated assignment process (admin only)
-    */
-   async runAutomatedAssignment(
-     params?: AutomatedAssignmentParams
-   ): Promise<ApiSuccessResponse<string>> {
-     try {
-       const response = await apiClient.post<string>(
-         API_ENDPOINTS.AUTH.ADMIN_RUN_AUTOMATED_ASSIGNMENT,
-         {},
-         { 
-           requiresAuth: true,
-           params: params
-         }
-       );
-       
-       return response;
-     } catch (error) {
-       console.error('Admin run automated assignment failed:', error);
-       throw error;
-     }
-   }
+  /**
+   * Run automated assignment process (admin only)
+   */
+  async runAutomatedAssignment(
+    params?: AutomatedAssignmentParams
+  ): Promise<ApiSuccessResponse<string>> {
+    try {
+      const response = await apiClient.post<string>(
+        API_ENDPOINTS.AUTH.ADMIN_RUN_AUTOMATED_ASSIGNMENT,
+        {},
+        { 
+          requiresAuth: true,
+          params: params
+        }
+      );
+      
+      return response;
+    } catch (error) {
+      console.error('Admin run automated assignment failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Clear all current driver assignments (admin only)
+   * Removes all currently assigned packages (ASSIGNED and IN_PROGRESS status)
+   * 
+   * NOTE: Backend endpoint does NOT support date parameter yet.
+   * It clears ALL assignments globally, not date-specific.
+   */
+  async clearAllAssignments(): Promise<ApiSuccessResponse<string>> {
+    try {
+      const response = await apiClient.post<string>(
+        API_ENDPOINTS.AUTH.ADMIN_CLEAR_ALL_ASSIGNMENTS,
+        {},
+        { requiresAuth: true }
+      );
+      
+      return response;
+    } catch (error) {
+      console.error('Admin clear all assignments failed:', error);
+      throw error;
+    }
+  }
 
    /**
     * Move paid shipments to warehouse (admin only)

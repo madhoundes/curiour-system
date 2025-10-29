@@ -119,31 +119,31 @@ export const exportAnalyticsToCSV = (data: AnalyticsData) => {
       'Metric': 'Total Revenue',
       'Value': formatCurrencyForCSV(data.kpis.totalRevenue),
       'Period': data.timeframe,
-      'Date Range': `${data.dateRange.from.toLocaleDateString()} - ${data.dateRange.to.toLocaleDateString()}`
+      'Date Range': `${formatDateForCSV(data.dateRange.from)} - ${formatDateForCSV(data.dateRange.to)}`
     },
     {
       'Metric': 'Total Shipments',
       'Value': formatNumberForCSV(data.kpis.totalShipments),
       'Period': data.timeframe,
-      'Date Range': `${data.dateRange.from.toLocaleDateString()} - ${data.dateRange.to.toLocaleDateString()}`
+      'Date Range': `${formatDateForCSV(data.dateRange.from)} - ${formatDateForCSV(data.dateRange.to)}`
     },
     {
       'Metric': 'Average Delivery Rate',
       'Value': formatPercentageForCSV(data.kpis.avgDeliveryRate),
       'Period': data.timeframe,
-      'Date Range': `${data.dateRange.from.toLocaleDateString()} - ${data.dateRange.to.toLocaleDateString()}`
+      'Date Range': `${formatDateForCSV(data.dateRange.from)} - ${formatDateForCSV(data.dateRange.to)}`
     },
     {
       'Metric': 'Active Couriers',
       'Value': formatNumberForCSV(data.kpis.activeCouriers),
       'Period': data.timeframe,
-      'Date Range': `${data.dateRange.from.toLocaleDateString()} - ${data.dateRange.to.toLocaleDateString()}`
+      'Date Range': `${formatDateForCSV(data.dateRange.from)} - ${formatDateForCSV(data.dateRange.to)}`
     },
     {
       'Metric': 'Revenue Trend',
       'Value': formatPercentageForCSV(data.kpis.revenueTrend),
       'Period': data.timeframe,
-      'Date Range': `${data.dateRange.from.toLocaleDateString()} - ${data.dateRange.to.toLocaleDateString()}`
+      'Date Range': `${formatDateForCSV(data.dateRange.from)} - ${formatDateForCSV(data.dateRange.to)}`
     }
   ];
 
@@ -270,26 +270,24 @@ export const exportDataSectionToCSV = (
 };
 
 /**
- * Formats date for CSV export
+ * Formats date for CSV export in UTC
  */
 export const formatDateForCSV = (date: Date): string => {
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  });
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  return `${month}/${day}/${year}`;
 };
 
 /**
- * Formats timestamp for CSV export
+ * Formats timestamp for CSV export in UTC
  */
 export const formatTimestampForCSV = (date: Date): string => {
-  return date.toLocaleString('en-US', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit'
-  });
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const hours = String(date.getUTCHours()).padStart(2, '0');
+  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
+  const seconds = String(date.getUTCSeconds()).padStart(2, '0');
+  return `${month}/${day}/${year}, ${hours}:${minutes}:${seconds}`;
 };

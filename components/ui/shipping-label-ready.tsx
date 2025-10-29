@@ -116,11 +116,11 @@ export function ShippingLabelReady({
               <div className="text-right">
                 <p className="text-sm text-gray-600">Date</p>
                 <p className="text-sm font-medium text-gray-900">
-                  {new Date().toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })}
+                  {(() => {
+                    const date = new Date();
+                    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                    return `${months[date.getUTCMonth()]} ${date.getUTCDate()}, ${date.getUTCFullYear()}`;
+                  })()}
                 </p>
               </div>
             </div>

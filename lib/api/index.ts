@@ -48,6 +48,9 @@ export { trackingService, TrackingService } from './tracking';
 // Notification service
 export { notificationService, NotificationService } from './notifications';
 
+// Shopify service
+export { shopifyService, ShopifyService } from './shopify';
+
 // Import for internal use
 import { apiClient } from './client';
 import { authService } from './auth';
@@ -62,6 +65,7 @@ import { driverService } from './driver';
 import { routeOptimizationService } from './route-optimization';
 import { trackingService } from './tracking';
 import { notificationService } from './notifications';
+import { shopifyService } from './shopify';
 
 // Utility functions for API integration
 export const api = {
@@ -78,6 +82,7 @@ export const api = {
   routeOptimization: routeOptimizationService,
   tracking: trackingService,
   notifications: notificationService,
+  shopify: shopifyService,
 };
 
 export default api;

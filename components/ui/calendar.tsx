@@ -36,8 +36,10 @@ function Calendar({
       )}
       captionLayout={captionLayout}
       formatters={{
-        formatMonthDropdown: (date) =>
-          date.toLocaleString("default", { month: "short" }),
+        formatMonthDropdown: (date) => {
+          const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+          return months[date.getUTCMonth()]
+        },
         ...formatters,
       }}
       classNames={{

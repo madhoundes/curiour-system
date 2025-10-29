@@ -133,6 +133,26 @@ function CourierDashboard() {
     }
     return list;
   }, [deliveries, activeDeliveryId, priorityOrder]);
+
+  // Calculate delivery progress from route status stored in localStorage
+  const deliveryProgress = React.useMemo(() => {
+    if (!activeDeliveryId || typeof window === 'undefined') return 0;
+    
+    const savedStatus = localStorage.getItem(`parcego_route_status_${activeDeliveryId}`);
+    if (!savedStatus) return 0;
+    
+    // Map route status to progress percentage
+    const statusToProgress: Record<string, number> = {
+      'assigned': 0,
+      'route_started': 20,
+      'arrived_location': 40,
+      'scan_barcode': 60,
+      'photo_taken': 80,
+      'delivered': 100
+    };
+    
+    return statusToProgress[savedStatus] || 0;
+  }, [activeDeliveryId]);
   
   // Notification state management
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -228,45 +248,56 @@ function CourierDashboard() {
       if (assignmentsResponse.assignments && assignmentsResponse.assignments.length > 0) {
         console.log('📦 [DASHBOARD] Raw assignments data:', assignmentsResponse.assignments);
         
-        mappedDeliveries = assignmentsResponse.assignments.map((assignment, index) => {
-          console.log(`📦 [DASHBOARD] Processing assignment ${index + 1}:`, {
-            id: assignment.id,
-            tracking_code: assignment.tracking_code,
-            assignment_status: assignment.assignment_status,
-            status: assignment.status,
-            receiver_name: assignment.receiver_name
-          });
-          
-          // Map assignment status to delivery status more accurately
-          let deliveryStatus: string;
-          if (assignment.assignment_status === 'completed' || assignment.status === 'delivered') {
-            deliveryStatus = 'delivered';
-          } else if (assignment.status === 'out_for_delivery') {
-            deliveryStatus = 'ready_for_pickup';
-          } else if (assignment.status === 'in_transit') {
-            deliveryStatus = 'in_transit';
-          } else if (assignment.assignment_status === 'in_progress') {
-            deliveryStatus = 'in_transit';
-          } else {
-            deliveryStatus = 'assigned';
-          }
-          
-          console.log(`📦 [DASHBOARD] Mapped status for ${assignment.tracking_code}: ${assignment.status} + ${assignment.assignment_status} → ${deliveryStatus}`);
+        mappedDeliveries = assignmentsResponse.assignments
+          .map((assignment, index) => {
+            console.log(`📦 [DASHBOARD] Processing assignment ${index + 1}:`, {
+              id: assignment.id,
+              tracking_code: assignment.tracking_code,
+              assignment_status: assignment.assignment_status,
+              status: assignment.status,
+              receiver_name: assignment.receiver_name
+            });
+            
+            // Map assignment status to delivery status more accurately
+            let deliveryStatus: string;
+            const status = assignment.status?.toUpperCase();
+            const assignmentStatus = assignment.assignment_status?.toLowerCase();
+            
+            // Skip UNDELIVERED assignments - they should not appear on the dashboard
+            if (status === 'UNDELIVERED') {
+              console.log(`❌ [DASHBOARD] Skipping UNDELIVERED assignment: ${assignment.tracking_code}`);
+              return null;
+            }
+            
+            if (assignmentStatus === 'completed' || status === 'DELIVERED') {
+              deliveryStatus = 'delivered';
+            } else if (status === 'OUT_FOR_DELIVERY') {
+              deliveryStatus = 'ready_for_pickup';
+            } else if (status === 'IN_TRANSIT' || assignmentStatus === 'in_progress') {
+              deliveryStatus = 'in_transit';
+            } else if (status === 'IN_WAREHOUSE') {
+              deliveryStatus = 'assigned';
+            } else {
+              deliveryStatus = 'assigned';
+            }
+            
+            console.log(`📦 [DASHBOARD] Mapped status for ${assignment.tracking_code}: ${assignment.status} + ${assignment.assignment_status} → ${deliveryStatus}`);
 
-          return {
-            id: `PCG-DEL-${assignment.id}`,
-            trackingNumber: assignment.tracking_code,
-            customerName: assignment.receiver_name,
-            address: `${assignment.receiver_address}, ${assignment.receiver_city}`,
-            timeWindow: "N/A", // Can be calculated based on estimated_delivery_date
-            estimatedTime: assignment.estimated_delivery_date || "TBD",
-            status: deliveryStatus,
-            packageType: assignment.package_type || 'Standard',
-            weight: `${assignment.weight} kg`,
-            specialInstructions: assignment.special_instructions || '',
-            priority: 'medium' as const // Default priority
-          };
-        });
+            return {
+              id: `PCG-DEL-${assignment.id}`,
+              trackingNumber: assignment.tracking_code,
+              customerName: assignment.receiver_name,
+              address: `${assignment.receiver_address}, ${assignment.receiver_city}`,
+              timeWindow: "N/A", // Can be calculated based on estimated_delivery_date
+              estimatedTime: assignment.estimated_delivery_date || "TBD",
+              status: deliveryStatus,
+              packageType: assignment.package_type || 'Standard',
+              weight: `${assignment.weight} kg`,
+              specialInstructions: assignment.special_instructions || '',
+              priority: 'medium' as const // Default priority
+            };
+          })
+          .filter((delivery) => delivery !== null) as any[];
         console.log('📦 [DASHBOARD] Mapped deliveries:', mappedDeliveries);
         setDeliveries(mappedDeliveries);
         
@@ -293,8 +324,8 @@ function CourierDashboard() {
       });
       setApiStats(statsResponse);
 
-      // Update stats UI based on mapped deliveries
-      const totalAssignments = assignmentsResponse.assignments?.length || 0;
+      // Update stats UI based on mapped deliveries (excluding UNDELIVERED)
+      const totalAssignments = mappedDeliveries.length || 0; // Use filtered deliveries count
       const completedDeliveries = mappedDeliveries?.filter(d => d.status === 'delivered').length || 0;
       const remainingDeliveries = totalAssignments - completedDeliveries;
 
@@ -1230,7 +1261,7 @@ function CourierDashboard() {
                       Delivery Progress
                     </h3>
                     <span className="text-2xl font-bold text-gray-900" style={{ fontWeight: 700 }}>
-                      {Math.round((stats.completed / stats.deliveriesToday) * 100)}%
+                      {activeDeliveryId ? deliveryProgress : Math.round((stats.completed / stats.deliveriesToday) * 100)}%
                     </span>
                   </div>
                   
@@ -1239,7 +1270,7 @@ function CourierDashboard() {
                     <div 
                       className="h-full rounded-full transition-all duration-500 ease-out"
                       style={{
-                        width: `${Math.round((stats.completed / stats.deliveriesToday) * 100)}%`,
+                        width: `${activeDeliveryId ? deliveryProgress : Math.round((stats.completed / stats.deliveriesToday) * 100)}%`,
                         background: 'linear-gradient(90deg, #10b981 0%, #059669 50%, #047857 100%)',
                         boxShadow: '0 2px 4px rgba(16, 185, 129, 0.3)'
                       }}

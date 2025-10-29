@@ -47,8 +47,19 @@ import {
   Legend
 } from "recharts";
 import { format, subDays, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import type { DateRange } from "react-day-picker";
 import { exportAnalyticsToCSV, AnalyticsData } from "@/lib/export-utils";
+
+// Helper functions for UTC date handling
+const formatDateUTC = (date: Date, formatStr: string) => {
+  return formatInTimeZone(date, 'UTC', formatStr);
+};
+
+const getUTCDate = () => {
+  return new Date(new Date().toISOString());
+};
+
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -57,7 +68,26 @@ import { useToast, ToastContainer } from "@/components/ui/toast";
 import NotificationDropdown from "@/components/admin/NotificationDropdown";
 import CourierCreationModal from "@/components/admin/CourierCreationModal";
 import { adminService } from "@/lib/api/admin";
+import { shopifyService } from "@/lib/api/shopify";
+import { shippingService } from "@/lib/api/shipping";
 import type { User, UserStatisticsResponse } from "@/lib/api/types";
+
+// Extended User type with Shopify integration
+interface ShopifyIntegration {
+  connected: boolean;
+  accountId?: number | null;
+  shopDomain?: string | null;
+  shopName?: string | null;
+  lastSync?: string | null;
+  syncStatus?: 'success' | 'error' | null;
+  productsSynced?: number;
+  ordersSynced?: number;
+  webhooks?: Record<string, any>;
+}
+
+interface MerchantWithShopify extends User {
+  shopifyIntegration?: ShopifyIntegration;
+}
 
 // Zod schema for courier edit form validation
 const courierEditSchema = z.object({
@@ -118,8 +148,8 @@ export default function SuperAdminDashboard() {
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 30),
-    to: new Date()
+    from: subDays(getUTCDate(), 30),
+    to: getUTCDate()
   });
   const [selectedTimeframe, setSelectedTimeframe] = useState("30d");
   const [selectedRegion, setSelectedRegion] = useState("all");
@@ -127,16 +157,16 @@ export default function SuperAdminDashboard() {
   const [customRangeOpen, setCustomRangeOpen] = useState(false);
   const [merchantSearchQuery, setMerchantSearchQuery] = useState("");
   const [isMerchantSearchLoading, setIsMerchantSearchLoading] = useState(false);
-  const [merchants, setMerchants] = useState<User[]>([]);
+  const [merchants, setMerchants] = useState<MerchantWithShopify[]>([]);
   const [merchantsLoading, setMerchantsLoading] = useState(false);
-  const [selectedMerchant, setSelectedMerchant] = useState<User | null>(null);
+  const [selectedMerchant, setSelectedMerchant] = useState<MerchantWithShopify | null>(null);
   const [merchantStats, setMerchantStats] = useState<{
     totalShipments: number;
     delivered: number;
     inTransit: number;
     inWarehouse: number;
   } | null>(null);
-  
+
   // Admin statistics from API
   const [adminStats, setAdminStats] = useState<{
     totalShipments: number;
@@ -149,26 +179,34 @@ export default function SuperAdminDashboard() {
     paidShipments: number;
   } | null>(null);
   const [statsLoading, setStatsLoading] = useState(false);
-  
+
   // Assignments state
   const [assignments, setAssignments] = useState<any[]>([]);
   const [assignmentStats, setAssignmentStats] = useState<any>(null);
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
-  const [selectedAssignmentDate, setSelectedAssignmentDate] = useState<Date>(new Date());
+  // Memoize initial date to prevent unnecessary re-renders (using UTC)
+  const [selectedAssignmentDate, setSelectedAssignmentDate] = useState<Date>(() => getUTCDate());
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [isManualAssignmentOpen, setIsManualAssignmentOpen] = useState(false);
-  
+
+  // Manual assignment form state
+  const [manualAssignmentForm, setManualAssignmentForm] = useState({
+    shipmentId: '',
+    driverId: '',
+    notes: ''
+  });
+
+  // Available shipments for manual assignment
+  const [availableShipments, setAvailableShipments] = useState<any[]>([]);
+  const [shipmentsLoading, setShipmentsLoading] = useState(false);
+
   // Warehouse state
   const [isMovingToWarehouse, setIsMovingToWarehouse] = useState(false);
   const [isRunningAutomation, setIsRunningAutomation] = useState(false);
+  const [isClearingAssignments, setIsClearingAssignments] = useState(false);
 
-  // Modal state for merchant approval/suspension
-  const [actionModalOpen, setActionModalOpen] = useState(false);
-  const [actionType, setActionType] = useState<'approve' | 'suspend' | null>(null);
-  const [selectedMerchantForAction, setSelectedMerchantForAction] = useState<User | null>(null);
-  const [actionNotes, setActionNotes] = useState("");
-  const [isProcessingAction, setIsProcessingAction] = useState(false);
+  // Removed: Modal state for merchant approval/suspension (approval system removed)
 
   // Merchant details modal state
   const [isEditingMerchant, setIsEditingMerchant] = useState(false);
@@ -176,7 +214,7 @@ export default function SuperAdminDashboard() {
     businessName: '',
     contactName: '',
     email: '',
-    status: 'active' as 'active' | 'pending' | 'suspended',
+    status: 'active' as 'active' | 'suspended',
     joinDate: ''
   });
   const [isSavingMerchant, setIsSavingMerchant] = useState(false);
@@ -192,10 +230,10 @@ export default function SuperAdminDashboard() {
 
   // Responsive hook
   const { isMobile, isTablet, isDesktop } = useResponsive();
-  
+
   // Toast management
   const { toasts, showSuccessToast, showErrorToast, dismissToast } = useToast();
-  
+
   // Admin user information from localStorage
   const [adminName, setAdminName] = useState<string>("Admin User");
   const [adminEmail, setAdminEmail] = useState<string>("admin@parcego.com");
@@ -209,7 +247,7 @@ export default function SuperAdminDashboard() {
       case 'contactName':
         return `${merchant.first_name} ${merchant.last_name}`.trim();
       case 'status':
-        return merchant.is_active ? (merchant.is_verified ? 'active' : 'pending') : 'suspended';
+        return merchant.is_active ? 'active' : 'suspended';
       case 'joinDate':
         return merchant.created_at;
       case 'totalShipments':
@@ -218,23 +256,63 @@ export default function SuperAdminDashboard() {
         return '';
     }
   };
-  
+
   // Removed merchants - now using real data from API
-  
+
   // Merchant search functionality
-  const [filteredMerchants, setFilteredMerchants] = useState<User[]>([]);
-  
+  const [filteredMerchants, setFilteredMerchants] = useState<MerchantWithShopify[]>([]);
+
   // Load merchants from API
   useEffect(() => {
     const loadMerchants = async () => {
       if (!isAuthenticated) return;
-      
+
       try {
         setMerchantsLoading(true);
         const response = await adminService.listUsers({});
         const merchantsList = response.data.filter(u => u.role === 'user');
-        setMerchants(merchantsList);
-        setFilteredMerchants(merchantsList);
+
+        // Load Shopify accounts and merge with merchant data
+        try {
+          const shopifyResponse = await shopifyService.getAdminAccounts();
+          const shopifyAccountsMap = new Map(
+            shopifyResponse.data.accounts?.map(acc => [acc.shop_domain, acc]) || []
+          );
+
+          // Merge Shopify data with merchants
+          const merchantsWithShopify = merchantsList.map(merchant => {
+            // Try to find Shopify account by matching shop domain
+            const businessName = merchant.business_name || merchant.first_name;
+            const expectedShopDomain = `${businessName.toLowerCase().replace(/[^a-z0-9]/g, '-')}.myshopify.com`;
+            const shopifyAccount = shopifyAccountsMap.get(expectedShopDomain);
+
+            if (shopifyAccount) {
+              return {
+                ...merchant,
+                shopifyIntegration: {
+                  connected: true,
+                  accountId: shopifyAccount.id,
+                  shopDomain: shopifyAccount.shop_domain,
+                  shopName: shopifyAccount.shop_name,
+                  lastSync: shopifyAccount.last_sync_at,
+                  syncStatus: (shopifyAccount.status === 'active' ? 'success' : 'error') as 'success' | 'error',
+                  productsSynced: 0, // Not available in basic account info
+                  ordersSynced: 0, // Not available in basic account info
+                  webhooks: {}
+                }
+              };
+            }
+            return merchant;
+          });
+
+          setMerchants(merchantsWithShopify);
+          setFilteredMerchants(merchantsWithShopify);
+        } catch (shopifyError) {
+          console.error('Failed to load Shopify accounts:', shopifyError);
+          // Continue without Shopify data
+          setMerchants(merchantsList);
+          setFilteredMerchants(merchantsList);
+        }
       } catch (error) {
         console.error('Failed to load merchants:', error);
         showErrorToast(
@@ -247,17 +325,17 @@ export default function SuperAdminDashboard() {
 
     loadMerchants();
   }, [isAuthenticated]);
-  
+
   // Load admin statistics from API
   useEffect(() => {
     const loadAdminStats = async () => {
       if (!isAuthenticated) return;
-      
+
       try {
         setStatsLoading(true);
         const response = await adminService.getAdminStatistics();
         const stats = response.data;
-        
+
         setAdminStats({
           totalShipments: stats.total_shipments,
           deliveredShipments: stats.delivered_shipments,
@@ -280,20 +358,20 @@ export default function SuperAdminDashboard() {
 
     loadAdminStats();
   }, [isAuthenticated]);
-  
+
   // Load assignments when date changes
   useEffect(() => {
     const loadAssignments = async () => {
       if (!isAuthenticated) return;
-      
+
       try {
         setAssignmentsLoading(true);
-        const dateStr = format(selectedAssignmentDate, 'yyyy-MM-dd');
-        
+        const dateStr = formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd');
+
         // Fetch assignments for the selected date
         const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
         setAssignments(assignmentsResponse.data.assignments || []);
-        
+
         // Fetch statistics for the selected date
         const statsResponse = await adminService.getAssignmentStatistics(dateStr);
         setAssignmentStats(statsResponse.data);
@@ -306,7 +384,7 @@ export default function SuperAdminDashboard() {
     };
 
     loadAssignments();
-  }, [isAuthenticated, selectedAssignmentDate]);
+  }, [isAuthenticated, formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd')]);
 
   // Real courier data from API
   const [couriers, setCouriers] = useState<User[]>([]);
@@ -343,7 +421,7 @@ export default function SuperAdminDashboard() {
         return value !== undefined && value !== null ? String(value) : '';
     }
   };
-  
+
   // Merchant search functionality
 
   // Courier state management
@@ -395,7 +473,7 @@ export default function SuperAdminDashboard() {
             const contactName = String(getMerchantProperty(merchant, 'contactName')).toLowerCase();
             const email = merchant.email.toLowerCase();
             const status = String(getMerchantProperty(merchant, 'status')).toLowerCase();
-            
+
             return (
               businessName.includes(searchTerm) ||
               contactName.includes(searchTerm) ||
@@ -426,7 +504,7 @@ export default function SuperAdminDashboard() {
             const phone = getCourierProperty(courier, 'phone');
             const city = getCourierProperty(courier, 'city');
             const status = courier.is_active ? 'active' : 'inactive';
-            
+
             return (
               (typeof fullName === 'string' && fullName.toLowerCase().includes(searchTerm)) ||
               courier.email.toLowerCase().includes(searchTerm) ||
@@ -483,69 +561,7 @@ export default function SuperAdminDashboard() {
     });
   };
 
-  // Handle merchant action modal
-  const handleMerchantAction = (merchant: User, action: 'approve' | 'suspend') => {
-    setSelectedMerchantForAction(merchant);
-    setActionType(action);
-    setActionNotes("");
-    setActionModalOpen(true);
-  };
-
-  // Process merchant approval/suspension
-  const processMerchantAction = async () => {
-    if (!selectedMerchantForAction || !actionType) return;
-
-    setIsProcessingAction(true);
-
-    try {
-      // Update local merchants array (API endpoint not available)
-      const updatedMerchants = merchants.map(m =>
-        m.id === selectedMerchantForAction.id 
-          ? { ...m, is_active: actionType === 'approve', is_verified: actionType === 'approve' }
-          : m
-      );
-      setMerchants(updatedMerchants);
-      
-      // Update filtered merchants
-      const updatedFilteredMerchants = filteredMerchants.map(m =>
-        m.id === selectedMerchantForAction.id 
-          ? { ...m, is_active: actionType === 'approve', is_verified: actionType === 'approve' }
-          : m
-      );
-      setFilteredMerchants(updatedFilteredMerchants);
-
-      // Close modal and reset state
-      setActionModalOpen(false);
-      setSelectedMerchantForAction(null);
-      setActionType(null);
-      setActionNotes("");
-
-      // Show success toast
-      const merchantName = `${selectedMerchantForAction.first_name} ${selectedMerchantForAction.last_name}`.trim();
-      showSuccessToast(
-        `${merchantName} has been ${actionType === 'approve' ? 'approved' : 'suspended'} successfully!`
-      );
-
-    } catch (error) {
-      showErrorToast(
-        `Failed to ${actionType} merchant. Please try again.`,
-        {
-          duration: 5000,
-          showCloseButton: true
-        }
-      );
-    } finally {
-      setIsProcessingAction(false);
-    }
-  };
-
-  // Cancel action
-  const cancelMerchantAction = () => {
-    setActionModalOpen(false);
-    setSelectedMerchantForAction(null);
-    setActionType(null);
-    setActionNotes("");
-  };
+  // Removed: Merchant action handlers (approval system removed)
 
   // Courier action handlers
 
@@ -564,7 +580,7 @@ export default function SuperAdminDashboard() {
 
       // Update local couriers array
       const updatedCouriers = couriers.map(c =>
-        c.id === selectedCourierForAction.id 
+        c.id === selectedCourierForAction.id
           ? updatedCourier
           : c
       );
@@ -623,7 +639,7 @@ export default function SuperAdminDashboard() {
 
       // Update local couriers array
       const updatedCouriers = couriers.map(c =>
-        c.id === lastCourierAction.courier.id 
+        c.id === lastCourierAction.courier.id
           ? revertedCourier
           : c
       );
@@ -666,13 +682,13 @@ export default function SuperAdminDashboard() {
 
       // Update local couriers array
       const updatedCouriers = couriers.map(c =>
-        c.id === editingCourier.id 
+        c.id === editingCourier.id
           ? updatedCourier
           : c
       );
       setCouriers(updatedCouriers);
       setFilteredCouriers(updatedCouriers);
-      
+
       setRecentlyUpdatedCourierId(updatedCourier.id.toString());
       setTimeout(() => setRecentlyUpdatedCourierId(null), 3000);
 
@@ -704,39 +720,39 @@ export default function SuperAdminDashboard() {
       const firstName = newCourier.first_name || '';
       const lastName = newCourier.last_name || '';
       const fullName = `${firstName} ${lastName}`.trim() || 'New User';
-      
+
       // Refresh the courier list from API to ensure we have the latest data
       const response = await adminService.listUsers({});
       const couriersList = response.data.filter(u => u.role === 'driver');
       setFilteredCouriers(couriersList);
-      
+
       // Show success feedback
       showSuccessToast(
         `${fullName} has been added to the system and is pending verification.`
       );
     } catch (error) {
       console.error('Failed to refresh courier list after creation:', error);
-      
+
       // Build the full name from the response
       const firstName = newCourier.first_name || '';
       const lastName = newCourier.last_name || '';
       const fullName = `${firstName} ${lastName}`.trim() || 'New User';
-      
+
       // Show success feedback even if refresh failed
       showSuccessToast(
         `${fullName} has been added to the system and is pending verification.`
       );
     }
   };
-  
+
   // Warehouse operations
   const handleMoveToWarehouse = async () => {
     try {
       setIsMovingToWarehouse(true);
       await adminService.moveShipmentsToWarehouse();
-      
+
       showSuccessToast("Paid shipments successfully moved to warehouse!");
-      
+
       // Reload admin stats to reflect changes
       const response = await adminService.getAdminStatistics();
       setAdminStats({
@@ -756,34 +772,75 @@ export default function SuperAdminDashboard() {
       setIsMovingToWarehouse(false);
     }
   };
-  
+
   // Run automated assignment
   const handleRunAutomation = async () => {
     try {
       setIsRunningAutomation(true);
-      const dateStr = format(selectedAssignmentDate, 'yyyy-MM-dd');
+      const dateStr = formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd');
+
       await adminService.runAutomatedAssignment({ assignment_date: dateStr });
-      
+
       showSuccessToast("Automated assignment completed successfully!");
-      
+
       // Reload assignments to show updated data
       const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
       setAssignments(assignmentsResponse.data.assignments || []);
-      
+
       const statsResponse = await adminService.getAssignmentStatistics(dateStr);
       setAssignmentStats(statsResponse.data);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to run automated assignment:', error);
-      showErrorToast("Failed to run automated assignment. Please try again.");
+
+      // Check if the error is about existing assignments
+      const errorMessage = error?.details || error?.message || '';
+      const currentDateStr = formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd');
+      if (errorMessage.includes('already exist')) {
+        showErrorToast(
+          `Assignments already exist for ${currentDateStr}. Please manually click 'Clear All Assignments' first, wait for the success message, then try 'Run Automation' again.`,
+          { duration: 8000 }
+        );
+      } else {
+        showErrorToast("Failed to run automated assignment. Please try again.");
+      }
     } finally {
       setIsRunningAutomation(false);
     }
   };
-  
+
+  // Clear all assignments
+  const handleClearAllAssignments = async () => {
+    try {
+      setIsClearingAssignments(true);
+
+      // NOTE: Backend endpoint /admin/assignments/clear-all does NOT accept date parameter
+      // It only clears global ASSIGNED/IN_PROGRESS statuses, not date-specific assignments
+      await adminService.clearAllAssignments();
+
+      showSuccessToast("All assignments cleared successfully!");
+
+      // Small delay to ensure backend processes the clear
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Reload assignments to show updated data
+      const dateStr = formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd');
+      const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
+      setAssignments(assignmentsResponse.data.assignments || []);
+
+      const statsResponse = await adminService.getAssignmentStatistics(dateStr);
+      setAssignmentStats(statsResponse.data);
+    } catch (error) {
+      console.error('Failed to clear all assignments:', error);
+      showErrorToast("Failed to clear all assignments. Please try again.");
+    } finally {
+      setIsClearingAssignments(false);
+    }
+  };
+
   // Reassign assignment
   const handleReassignAssignment = async (newDriverId: number, notes?: string) => {
     if (!selectedAssignment) return;
-    
+
     // Debug: Check authentication before making API call
     const authToken = localStorage.getItem("auth_token");
     console.log("🔄 Reassign Assignment Debug:", {
@@ -791,21 +848,21 @@ export default function SuperAdminDashboard() {
       newDriverId,
       notes,
       hasAuthToken: !!authToken,
-      tokenPreview: authToken ? `${authToken.substring(0, 20)}...` : "No token"
+      fullToken: authToken || "No token"
     });
-    
+
     try {
       await adminService.reassignAssignment(selectedAssignment.id, {
         new_driver_id: newDriverId,
         notes: notes || ''
       });
-      
+
       showSuccessToast("Assignment successfully reassigned!");
       setIsReassignModalOpen(false);
       setSelectedAssignment(null);
-      
+
       // Reload assignments
-      const dateStr = format(selectedAssignmentDate, 'yyyy-MM-dd');
+      const dateStr = formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd');
       const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
       setAssignments(assignmentsResponse.data.assignments || []);
     } catch (error) {
@@ -821,24 +878,24 @@ export default function SuperAdminDashboard() {
         const adminAuth = localStorage.getItem("admin_authenticated");
         const adminCookie = document.cookie.includes("admin_authenticated=true");
         const authToken = localStorage.getItem("auth_token");
-        
+
         console.log("🔐 Admin Auth Debug:", {
           adminAuth,
           adminCookie,
           hasAuthToken: !!authToken,
-          tokenPreview: authToken ? `${authToken.substring(0, 20)}...` : "No token"
+          fullToken: authToken || "No token"
         });
-        
+
         if (adminAuth === "true" || adminCookie) {
           setIsAuthenticated(true);
-          
+
           // Load admin user information from localStorage
           const name = localStorage.getItem("admin_name");
           const email = localStorage.getItem("admin_email");
-          
+
           if (name) setAdminName(name);
           if (email) setAdminEmail(email);
-          
+
           // Debug: Check if we have a valid auth token
           if (!authToken) {
             console.warn("⚠️ Admin authenticated but no auth_token found in localStorage");
@@ -857,11 +914,13 @@ export default function SuperAdminDashboard() {
   useEffect(() => {
     const loadCouriers = async () => {
       if (!isAuthenticated) return;
-      
+
       try {
+        setCouriersLoading(true);
         setIsCourierSearchLoading(true);
         const response = await adminService.listUsers({});
         const couriersList = response.data.filter(u => u.role === 'driver');
+        setCouriers(couriersList);  // Set the main couriers state
         setFilteredCouriers(couriersList);
       } catch (error) {
         console.error('Failed to load couriers:', error);
@@ -869,6 +928,7 @@ export default function SuperAdminDashboard() {
           "Unable to fetch courier data. Please try refreshing the page."
         );
       } finally {
+        setCouriersLoading(false);
         setIsCourierSearchLoading(false);
       }
     };
@@ -879,17 +939,17 @@ export default function SuperAdminDashboard() {
   // Handle timeframe selection
   const handleTimeframeChange = (timeframe: string) => {
     setSelectedTimeframe(timeframe);
-    
+
     if (timeframe === "custom") {
       setCustomRangeOpen(true);
       return;
     }
-    
+
     setCustomRangeOpen(false);
-    
+
     const now = new Date();
     let from: Date;
-    
+
     switch (timeframe) {
       case "7d":
         from = subDays(now, 7);
@@ -903,7 +963,7 @@ export default function SuperAdminDashboard() {
       default:
         from = subDays(now, 30);
     }
-    
+
     setDateRange({ from, to: now });
   };
 
@@ -921,14 +981,12 @@ export default function SuperAdminDashboard() {
     const totalMerchants = merchants.length;
     const activeCouriers = couriers.filter(c => c.is_active).length;
     const totalShipments = adminStats?.totalShipments || 0;
-    const pendingApprovals = merchants.filter(m => !m.is_verified).length + 
-                            couriers.filter(c => !c.is_verified).length;
-    
+
     return {
       totalMerchants,
       activeCouriers,
       totalShipments,
-      pendingApprovals,
+      pendingApprovals: 0, // Approval system removed
       // These are not available in the current API, kept for export compatibility
       monthlyRevenue: 0,
       systemHealth: 99.0
@@ -948,7 +1006,7 @@ export default function SuperAdminDashboard() {
       const seasonal = Math.sin((i / 30) * 2 * Math.PI) * 1500;
 
       data.push({
-        date: format(date, 'MMM dd'),
+        date: formatDateUTC(date, 'MMM dd'),
         fullDate: date,
         revenue: Math.max(0, baseRevenue + trend + seasonal),
         target: 20000,
@@ -968,7 +1026,7 @@ export default function SuperAdminDashboard() {
       const trend = Math.sin(i * 0.15) * 30;
 
       data.push({
-        date: format(date, 'MMM dd'),
+        date: formatDateUTC(date, 'MMM dd'),
         fullDate: date,
         totalShipments: Math.max(0, Math.round(baseShipments + trend)),
         delivered: Math.round((baseShipments + trend) * 0.85),
@@ -1029,7 +1087,7 @@ export default function SuperAdminDashboard() {
   const handleExport = async (format: 'csv' | 'pdf' | 'image') => {
     try {
       setIsLoading(true);
-      
+
       // Prepare analytics data for export
       const analyticsData: AnalyticsData = {
         revenueData,
@@ -1071,11 +1129,11 @@ export default function SuperAdminDashboard() {
           });
         } else {
           console.log('PDF exported successfully:', result.filename);
-        showSuccessToast('PDF report downloaded successfully!', {
-          duration: 3000,
-          showProgressBar: true,
-          showCloseButton: true
-        });
+          showSuccessToast('PDF report downloaded successfully!', {
+            duration: 3000,
+            showProgressBar: true,
+            showCloseButton: true
+          });
         }
       } else if (format === 'image') {
         // For future implementation - could export charts as images
@@ -1129,13 +1187,13 @@ export default function SuperAdminDashboard() {
         { id: "merchants", label: "Merchants", icon: "Users", description: "Manage merchant accounts" },
         { id: "couriers", label: "Drivers", icon: "Truck", description: "Manage driver accounts" },
       ]
-      },
-      {
-        id: "operations",
-        title: "Operations",
-        items: [
-          { id: "assignments", label: "Assignments", icon: "ClipboardList", description: "Manage driver assignments" },
-          { id: "warehouse", label: "Warehouse", icon: "Warehouse", description: "Warehouse operations" },
+    },
+    {
+      id: "operations",
+      title: "Operations",
+      items: [
+        { id: "assignments", label: "Assignments", icon: "ClipboardList", description: "Manage driver assignments" },
+        { id: "warehouse", label: "Warehouse", icon: "Warehouse", description: "Warehouse operations" },
       ]
     },
     {
@@ -1194,7 +1252,7 @@ export default function SuperAdminDashboard() {
               <Skeleton className="h-9 w-24 mb-2" />
             ) : (
               <>
-            <div className="text-2xl xl:text-3xl font-bold">{platformStats.totalMerchants.toLocaleString()}</div>
+                <div className="text-2xl xl:text-3xl font-bold">{platformStats.totalMerchants.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">All registered merchants</p>
               </>
             )}
@@ -1213,7 +1271,7 @@ export default function SuperAdminDashboard() {
               <Skeleton className="h-9 w-24 mb-2" />
             ) : (
               <>
-            <div className="text-2xl xl:text-3xl font-bold">{platformStats.activeCouriers.toLocaleString()}</div>
+                <div className="text-2xl xl:text-3xl font-bold">{platformStats.activeCouriers.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">Currently active drivers</p>
               </>
             )}
@@ -1232,7 +1290,7 @@ export default function SuperAdminDashboard() {
               <Skeleton className="h-9 w-24 mb-2" />
             ) : (
               <>
-            <div className="text-2xl xl:text-3xl font-bold">{platformStats.totalShipments.toLocaleString()}</div>
+                <div className="text-2xl xl:text-3xl font-bold">{platformStats.totalShipments.toLocaleString()}</div>
                 <p className="text-xs text-muted-foreground">All time shipments</p>
               </>
             )}
@@ -1266,24 +1324,6 @@ export default function SuperAdminDashboard() {
           </CardContent>
         </Card> */}
 
-        <Card id="parcego-admin-stat-approvals" className="relative overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base font-bold">Pending Approvals</CardTitle>
-            <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center shadow-sm">
-              <Icon name="AlertCircle" size={24} className="text-amber-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {statsLoading || merchantsLoading || couriersLoading ? (
-              <Skeleton className="h-9 w-24 mb-2" />
-            ) : (
-              <>
-            <div className="text-2xl xl:text-3xl font-bold">{platformStats.pendingApprovals}</div>
-                <p className="text-xs text-amber-600">{platformStats.pendingApprovals > 0 ? 'Requires attention' : 'All verified'}</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
       </div>
 
     </div>
@@ -1335,7 +1375,7 @@ export default function SuperAdminDashboard() {
               <div className="border-t border-gray-200 pt-1.5 mt-1.5 space-y-1.5 animate-in slide-in-from-top-2 duration-200">
                 <div>
                   <p className="text-xs font-medium text-gray-700 uppercase tracking-wider">Join Date</p>
-                  <p className="text-sm font-medium text-gray-900">{new Date(merchant.created_at).toLocaleDateString()}</p>
+                  <p className="text-sm font-medium text-gray-900">{formatDateUTC(new Date(merchant.created_at), 'MMM dd, yyyy')}</p>
                 </div>
 
                 {/* Action Buttons - Only visible when expanded */}
@@ -1518,30 +1558,6 @@ export default function SuperAdminDashboard() {
                               >
                                 <Icon name="Edit" size={14} />
                               </Button>
-                              {getMerchantProperty(merchant, 'status') === "pending" && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-green-600 h-8 w-8 p-0 touch-manipulation"
-                                  id={`parcego-merchant-approve-${merchant.id}`}
-                                  onClick={() => handleMerchantAction(merchant, 'approve')}
-                                  aria-label={`Approve ${getMerchantProperty(merchant, 'businessName')}`}
-                                >
-                                  <Icon name="UserCheck" size={14} />
-                                </Button>
-                              )}
-                              {getMerchantProperty(merchant, 'status') === "active" && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="text-red-600 h-8 w-8 p-0 touch-manipulation"
-                                  id={`parcego-merchant-suspend-${merchant.id}`}
-                                  onClick={() => handleMerchantAction(merchant, 'suspend')}
-                                  aria-label={`Suspend ${getMerchantProperty(merchant, 'businessName')}`}
-                                >
-                                  <Icon name="Ban" size={14} />
-                                </Button>
-                              )}
                             </div>
                           </td>
                         </tr>
@@ -1733,7 +1749,7 @@ export default function SuperAdminDashboard() {
                 <p className="text-sm text-gray-900 mt-1">
                   {(() => {
                     const lastLogin = getCourierProperty(courier, 'lastLogin');
-                    return lastLogin && typeof lastLogin === 'string' ? new Date(lastLogin).toLocaleDateString() : 'Never';
+                    return lastLogin && typeof lastLogin === 'string' ? formatDateUTC(new Date(lastLogin), 'MMM dd, yyyy') : 'Never';
                   })()}
                 </p>
               </div>
@@ -1890,59 +1906,59 @@ export default function SuperAdminDashboard() {
                         </tr>
                       ) : (
                         filteredCouriers.map((courier) => (
-                        <tr
-                          key={courier.id}
-                          className={cn(
-                            "border-b hover:bg-gray-50 transition-all duration-200",
-                            recentlyUpdatedCourierId === courier.id.toString() && "bg-green-50 animate-pulse border-green-200"
-                          )}
-                          id={`parcego-courier-row-${courier.id}`}
-                        >
-                          <td className="p-4">
-                            <div className="flex items-center space-x-3">
-                              <Avatar className="h-10 w-10">
-                                <AvatarFallback className="text-sm font-medium">
-                                  {(() => {
-                                    const fullName = String(getCourierProperty(courier, 'fullName'));
-                                    return fullName.split(' ').map(n => n.charAt(0)).join('');
-                                  })()}
-                                </AvatarFallback>
-                              </Avatar>
-                              <div>
-                                <p className="font-medium text-gray-900">{getCourierProperty(courier, 'fullName')}</p>
-                                <p className="text-sm text-gray-500">ID: {courier.id}</p>
+                          <tr
+                            key={courier.id}
+                            className={cn(
+                              "border-b hover:bg-gray-50 transition-all duration-200",
+                              recentlyUpdatedCourierId === courier.id.toString() && "bg-green-50 animate-pulse border-green-200"
+                            )}
+                            id={`parcego-courier-row-${courier.id}`}
+                          >
+                            <td className="p-4">
+                              <div className="flex items-center space-x-3">
+                                <Avatar className="h-10 w-10">
+                                  <AvatarFallback className="text-sm font-medium">
+                                    {(() => {
+                                      const fullName = String(getCourierProperty(courier, 'fullName'));
+                                      return fullName.split(' ').map(n => n.charAt(0)).join('');
+                                    })()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div>
+                                  <p className="font-medium text-gray-900">{getCourierProperty(courier, 'fullName')}</p>
+                                  <p className="text-sm text-gray-500">ID: {courier.id}</p>
+                                </div>
                               </div>
-                            </div>
-                          </td>
-                          <td className="p-4">
-                            <div>
-                              <p className="text-sm text-gray-900">{courier.email}</p>
-                              <p className="text-sm text-gray-500">{getCourierProperty(courier, 'phone')}</p>
-                            </div>
-                          </td>
-                          <td className="p-4">
-                            {getStatusBadge(String(getCourierProperty(courier, 'status')))}
-                          </td>
-                          <td className="p-4">
-                            <span className="font-medium text-gray-900">
-                              {Number(getCourierProperty(courier, 'completedDeliveries')).toLocaleString()}
-                            </span>
-                          </td>
-                          <td className="p-4">
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                id={`parcego-courier-edit-${courier.id}`}
-                                onClick={() => handleCourierEdit(courier)}
-                                className="h-8 w-8 p-0 touch-manipulation"
-                                aria-label={`Edit courier ${getCourierProperty(courier, 'fullName')}`}
-                              >
-                                <Icon name="Edit" size={14} />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
+                            </td>
+                            <td className="p-4">
+                              <div>
+                                <p className="text-sm text-gray-900">{courier.email}</p>
+                                <p className="text-sm text-gray-500">{getCourierProperty(courier, 'phone')}</p>
+                              </div>
+                            </td>
+                            <td className="p-4">
+                              {getStatusBadge(String(getCourierProperty(courier, 'status')))}
+                            </td>
+                            <td className="p-4">
+                              <span className="font-medium text-gray-900">
+                                {Number(getCourierProperty(courier, 'completedDeliveries')).toLocaleString()}
+                              </span>
+                            </td>
+                            <td className="p-4">
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  id={`parcego-courier-edit-${courier.id}`}
+                                  onClick={() => handleCourierEdit(courier)}
+                                  className="h-8 w-8 p-0 touch-manipulation"
+                                  aria-label={`Edit courier ${getCourierProperty(courier, 'fullName')}`}
+                                >
+                                  <Icon name="Edit" size={14} />
+                                </Button>
+                              </div>
+                            </td>
+                          </tr>
                         ))
                       )}
                     </tbody>
@@ -1981,7 +1997,7 @@ export default function SuperAdminDashboard() {
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="touch-manipulation">
                   <Icon name="Calendar" size={16} className="mr-2" />
-                  {format(selectedAssignmentDate, 'MMM dd, yyyy')}
+                  {formatDateUTC(selectedAssignmentDate, 'MMM dd, yyyy')}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="end">
@@ -2012,6 +2028,25 @@ export default function SuperAdminDashboard() {
               )}
             </Button>
             <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleClearAllAssignments}
+              disabled={isClearingAssignments}
+              className="touch-manipulation"
+            >
+              {isClearingAssignments ? (
+                <>
+                  <Icon name="Loader" size={16} className="mr-2 animate-spin" />
+                  Clearing...
+                </>
+              ) : (
+                <>
+                  <Icon name="X" size={16} className="mr-2" />
+                  Clear All Assignments
+                </>
+              )}
+            </Button>
+            <Button
               size="sm"
               onClick={() => setIsManualAssignmentOpen(true)}
               className="touch-manipulation"
@@ -2023,47 +2058,48 @@ export default function SuperAdminDashboard() {
         </div>
 
         {/* Statistics Cards */}
-        {assignmentStats && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Total Assignments</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold">{assignmentStats.total_assignments || 0}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Assigned</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">{assignmentStats.assigned || 0}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">In Progress</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-orange-600">{assignmentStats.in_progress || 0}</div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-medium text-gray-600">Completed</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-green-600">{assignmentStats.completed || 0}</div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+        {assignments.length > 0 && (() => {
+          const inProgress = assignments.filter((a: any) =>
+            a.shipment_status === 'IN_TRANSIT' || a.status === 'in_progress'
+          ).length;
+          const completed = assignments.filter((a: any) =>
+            a.shipment_status === 'DELIVERED' || a.status === 'completed'
+          ).length;
+
+          return (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">Total Assignments</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{assignments.length}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">In Progress</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-orange-600">{inProgress}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium text-gray-600">Completed</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-green-600">{completed}</div>
+                </CardContent>
+              </Card>
+            </div>
+          );
+        })()}
 
         {/* Assignments List */}
         <Card>
           <CardHeader>
-            <CardTitle>Assignments for {format(selectedAssignmentDate, 'MMMM dd, yyyy')}</CardTitle>
+            <CardTitle>Assignments for {formatDateUTC(selectedAssignmentDate, 'MMMM dd, yyyy')}</CardTitle>
           </CardHeader>
           <CardContent>
             {assignmentsLoading ? (
@@ -2111,8 +2147,8 @@ export default function SuperAdminDashboard() {
                         <td className="p-4">
                           <Badge variant={
                             assignment.status === 'completed' ? 'default' :
-                            assignment.status === 'in_progress' ? 'secondary' :
-                            'outline'
+                              assignment.status === 'in_progress' ? 'secondary' :
+                                'outline'
                           }>
                             {assignment.status}
                           </Badge>
@@ -2208,7 +2244,7 @@ export default function SuperAdminDashboard() {
                 This action will move all paid shipments to the warehouse, making them available for driver assignment.
               </AlertDescription>
             </Alert>
-            
+
             <Button
               size="lg"
               onClick={handleMoveToWarehouse}
@@ -2454,177 +2490,177 @@ export default function SuperAdminDashboard() {
         </div>
 
 
-          {/* Analytics Overview */}
-          <div className="space-y-4 xl:space-y-6">
-            <div className="text-left">
-              <h2 className="text-2xl font-semibold text-gray-800">Overview</h2>
-              <p className="text-gray-600 mt-1">Key performance indicators and analytics</p>
-            </div>
-
-            {/* Charts Grid - Fully Responsive Layout */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 xl:gap-6">
-              {/* Revenue Trend Chart */}
-              <Card id="parcego-analytics-revenue-chart" className="sm:col-span-2 lg:col-span-2 xl:col-span-3">
-                <CardHeader className="pb-2 sm:pb-3">
-                  <CardTitle className="flex items-center text-base sm:text-lg">
-                    <Icon name="TrendingUp" size={18} className="mr-2 text-green-600 sm:w-5 sm:h-5" />
-                    <span className="truncate">Revenue Trends</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0 px-3 sm:px-6">
-                  <div className="w-full overflow-hidden">
-                    <ChartContainer config={chartConfig} className="h-64 sm:h-72 lg:h-80 w-full">
-                      <AreaChart data={revenueData} margin={{ top: 10, right: 20, left: 20, bottom: 10 }}>
-                        <defs>
-                          <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3}/>
-                            <stop offset="95%" stopColor="#22c55e" stopOpacity={0.05}/>
-                          </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                        <XAxis
-                          dataKey="date"
-                          fontSize={11}
-                          fontWeight={500}
-                          tickLine={false}
-                          axisLine={false}
-                          interval="preserveStartEnd"
-                        />
-                        <YAxis
-                          fontSize={11}
-                          fontWeight={500}
-                          tickLine={false}
-                          axisLine={false}
-                          tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                          width={50}
-                        />
-                        <ChartTooltip
-                          content={<ChartTooltipContent
-                            formatter={(value) => [formatCurrency(Number(value)), "Revenue"]}
-                            labelFormatter={(label) => `Date: ${label}`}
-                          />}
-                        />
-                        <Area
-                          type="monotone"
-                          dataKey="revenue"
-                          stroke="#22c55e"
-                          strokeWidth={2}
-                          fill="url(#revenueGradient)"
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="target"
-                          stroke="#94a3b8"
-                          strokeDasharray="5 5"
-                          strokeWidth={1}
-                          dot={false}
-                        />
-                      </AreaChart>
-                    </ChartContainer>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Shipment Status Pie Chart */}
-              <Card id="parcego-analytics-shipment-status" className="sm:col-span-2 lg:col-span-1 xl:col-span-1">
-                <CardHeader className="pb-2 sm:pb-3">
-                  <CardTitle className="flex items-center text-base sm:text-lg">
-                    <Icon name="PieChart" size={18} className="mr-2 text-blue-600 sm:w-5 sm:h-5" />
-                    <span className="truncate">Shipping Status</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0 px-3 sm:px-6">
-                  <div className="w-full overflow-hidden">
-                    <ChartContainer config={chartConfig} className="h-64 sm:h-72 xl:h-80 w-full">
-                      <PieChart>
-                        <Pie
-                          data={[
-                            { name: 'Delivered', value: shipmentData.reduce((sum, item) => sum + item.delivered, 0), fill: '#22c55e' },
-                            { name: 'Pending', value: shipmentData.reduce((sum, item) => sum + item.pending, 0), fill: '#f59e0b' },
-                            { name: 'Failed', value: shipmentData.reduce((sum, item) => sum + item.failed, 0), fill: '#ef4444' }
-                          ]}
-                          cx="50%"
-                          cy="50%"
-                          innerRadius={50}
-                          outerRadius={80}
-                          paddingAngle={2}
-                          dataKey="value"
-                        >
-                          {[
-                            { name: 'Delivered', value: shipmentData.reduce((sum, item) => sum + item.delivered, 0), fill: '#22c55e' },
-                            { name: 'Pending', value: shipmentData.reduce((sum, item) => sum + item.pending, 0), fill: '#f59e0b' },
-                            { name: 'Failed', value: shipmentData.reduce((sum, item) => sum + item.failed, 0), fill: '#ef4444' }
-                          ].map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                          ))}
-                        </Pie>
-                        <ChartTooltip
-                          content={<ChartTooltipContent
-                            formatter={(value) => [formatNumber(Number(value)), "Shipments"]}
-                          />}
-                        />
-                        <Legend 
-                          wrapperStyle={{ fontSize: '13px', fontWeight: '500' }}
-                          iconType="circle"
-                        />
-                      </PieChart>
-                    </ChartContainer>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Distribution Chart */}
-              <Card id="parcego-analytics-distribution" className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
-                <CardHeader className="pb-2 sm:pb-3">
-                  <CardTitle className="flex items-center text-base sm:text-lg">
-                    <Icon name="BarChart3" size={18} className="mr-2 text-purple-600 sm:w-5 sm:h-5" />
-                    <span className="truncate">Distribution</span>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="pt-0 px-3 sm:px-6">
-                  <div className="w-full overflow-hidden">
-                    <ChartContainer config={chartConfig} className="h-64 sm:h-72 xl:h-80 w-full">
-                      <BarChart 
-                        data={shipmentData} 
-                        margin={{ top: 10, right: 20, left: 20, bottom: 10 }}
-                        barCategoryGap="10%"
-                      >
-                        <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                        <XAxis
-                          dataKey="date"
-                          fontSize={11}
-                          fontWeight={500}
-                          tickLine={false}
-                          axisLine={false}
-                          interval="preserveStartEnd"
-                        />
-                        <YAxis
-                          fontSize={11}
-                          fontWeight={500}
-                          tickLine={false}
-                          axisLine={false}
-                          tickFormatter={(value) => formatNumber(value)}
-                          width={50}
-                        />
-                        <ChartTooltip
-                          content={<ChartTooltipContent
-                            formatter={(value, name) => [formatNumber(Number(value)), name]}
-                          />}
-                        />
-                        <Legend 
-                          wrapperStyle={{ fontSize: '13px', fontWeight: '500' }}
-                          iconType="rect"
-                        />
-                        <Bar dataKey="delivered" stackId="a" fill="#22c55e" radius={[0, 0, 4, 4]} />
-                        <Bar dataKey="pending" stackId="a" fill="#f59e0b" radius={[0, 0, 0, 0]} />
-                        <Bar dataKey="failed" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ChartContainer>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+        {/* Analytics Overview */}
+        <div className="space-y-4 xl:space-y-6">
+          <div className="text-left">
+            <h2 className="text-2xl font-semibold text-gray-800">Overview</h2>
+            <p className="text-gray-600 mt-1">Key performance indicators and analytics</p>
           </div>
+
+          {/* Charts Grid - Fully Responsive Layout */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 xl:gap-6">
+            {/* Revenue Trend Chart */}
+            <Card id="parcego-analytics-revenue-chart" className="sm:col-span-2 lg:col-span-2 xl:col-span-3">
+              <CardHeader className="pb-2 sm:pb-3">
+                <CardTitle className="flex items-center text-base sm:text-lg">
+                  <Icon name="TrendingUp" size={18} className="mr-2 text-green-600 sm:w-5 sm:h-5" />
+                  <span className="truncate">Revenue Trends</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 px-3 sm:px-6">
+                <div className="w-full overflow-hidden">
+                  <ChartContainer config={chartConfig} className="h-64 sm:h-72 lg:h-80 w-full">
+                    <AreaChart data={revenueData} margin={{ top: 10, right: 20, left: 20, bottom: 10 }}>
+                      <defs>
+                        <linearGradient id="revenueGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#22c55e" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#22c55e" stopOpacity={0.05} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis
+                        dataKey="date"
+                        fontSize={11}
+                        fontWeight={500}
+                        tickLine={false}
+                        axisLine={false}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        fontSize={11}
+                        fontWeight={500}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                        width={50}
+                      />
+                      <ChartTooltip
+                        content={<ChartTooltipContent
+                          formatter={(value) => [formatCurrency(Number(value)), "Revenue"]}
+                          labelFormatter={(label) => `Date: ${label}`}
+                        />}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="revenue"
+                        stroke="#22c55e"
+                        strokeWidth={2}
+                        fill="url(#revenueGradient)"
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="target"
+                        stroke="#94a3b8"
+                        strokeDasharray="5 5"
+                        strokeWidth={1}
+                        dot={false}
+                      />
+                    </AreaChart>
+                  </ChartContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Shipment Status Pie Chart */}
+            <Card id="parcego-analytics-shipment-status" className="sm:col-span-2 lg:col-span-1 xl:col-span-1">
+              <CardHeader className="pb-2 sm:pb-3">
+                <CardTitle className="flex items-center text-base sm:text-lg">
+                  <Icon name="PieChart" size={18} className="mr-2 text-blue-600 sm:w-5 sm:h-5" />
+                  <span className="truncate">Shipping Status</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 px-3 sm:px-6">
+                <div className="w-full overflow-hidden">
+                  <ChartContainer config={chartConfig} className="h-64 sm:h-72 xl:h-80 w-full">
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'Delivered', value: shipmentData.reduce((sum, item) => sum + item.delivered, 0), fill: '#22c55e' },
+                          { name: 'Pending', value: shipmentData.reduce((sum, item) => sum + item.pending, 0), fill: '#f59e0b' },
+                          { name: 'Failed', value: shipmentData.reduce((sum, item) => sum + item.failed, 0), fill: '#ef4444' }
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={80}
+                        paddingAngle={2}
+                        dataKey="value"
+                      >
+                        {[
+                          { name: 'Delivered', value: shipmentData.reduce((sum, item) => sum + item.delivered, 0), fill: '#22c55e' },
+                          { name: 'Pending', value: shipmentData.reduce((sum, item) => sum + item.pending, 0), fill: '#f59e0b' },
+                          { name: 'Failed', value: shipmentData.reduce((sum, item) => sum + item.failed, 0), fill: '#ef4444' }
+                        ].map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Pie>
+                      <ChartTooltip
+                        content={<ChartTooltipContent
+                          formatter={(value) => [formatNumber(Number(value)), "Shipments"]}
+                        />}
+                      />
+                      <Legend
+                        wrapperStyle={{ fontSize: '13px', fontWeight: '500' }}
+                        iconType="circle"
+                      />
+                    </PieChart>
+                  </ChartContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Distribution Chart */}
+            <Card id="parcego-analytics-distribution" className="sm:col-span-2 lg:col-span-3 xl:col-span-4">
+              <CardHeader className="pb-2 sm:pb-3">
+                <CardTitle className="flex items-center text-base sm:text-lg">
+                  <Icon name="BarChart3" size={18} className="mr-2 text-purple-600 sm:w-5 sm:h-5" />
+                  <span className="truncate">Distribution</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 px-3 sm:px-6">
+                <div className="w-full overflow-hidden">
+                  <ChartContainer config={chartConfig} className="h-64 sm:h-72 xl:h-80 w-full">
+                    <BarChart
+                      data={shipmentData}
+                      margin={{ top: 10, right: 20, left: 20, bottom: 10 }}
+                      barCategoryGap="10%"
+                    >
+                      <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                      <XAxis
+                        dataKey="date"
+                        fontSize={11}
+                        fontWeight={500}
+                        tickLine={false}
+                        axisLine={false}
+                        interval="preserveStartEnd"
+                      />
+                      <YAxis
+                        fontSize={11}
+                        fontWeight={500}
+                        tickLine={false}
+                        axisLine={false}
+                        tickFormatter={(value) => formatNumber(value)}
+                        width={50}
+                      />
+                      <ChartTooltip
+                        content={<ChartTooltipContent
+                          formatter={(value, name) => [formatNumber(Number(value)), name]}
+                        />}
+                      />
+                      <Legend
+                        wrapperStyle={{ fontSize: '13px', fontWeight: '500' }}
+                        iconType="rect"
+                      />
+                      <Bar dataKey="delivered" stackId="a" fill="#22c55e" radius={[0, 0, 4, 4]} />
+                      <Bar dataKey="pending" stackId="a" fill="#f59e0b" radius={[0, 0, 0, 0]} />
+                      <Bar dataKey="failed" stackId="a" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                    </BarChart>
+                  </ChartContainer>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     );
   };
@@ -2632,7 +2668,7 @@ export default function SuperAdminDashboard() {
   const renderSettings = () => (
     <div className="space-y-4 xl:space-y-6" id="parcego-admin-settings-section">
       <h2 className="text-xl font-bold">Platform Settings</h2>
-      
+
       <div className="max-w-2xl">
         <Card id="parcego-settings-support">
           <CardHeader>
@@ -2738,7 +2774,7 @@ export default function SuperAdminDashboard() {
       businessName: selectedMerchant.business_name,
       contactName: `${selectedMerchant.first_name} ${selectedMerchant.last_name}`,
       email: selectedMerchant.email,
-      status: (selectedMerchant.is_active ? (selectedMerchant.is_verified ? 'active' : 'pending') : 'suspended') as 'active' | 'pending' | 'suspended',
+      status: (selectedMerchant.is_active ? 'active' : 'suspended') as 'active' | 'suspended',
       joinDate: selectedMerchant.created_at
     });
     setMerchantFormErrors({});
@@ -2772,23 +2808,30 @@ export default function SuperAdminDashboard() {
   const [isTestingWebhooks, setIsTestingWebhooks] = useState(false);
 
   // Shopify integration functions
-  const handleShopifyConnect = async (merchant: typeof merchants[0]) => {
-    // Reset form data and open OAuth modal
-    setShopifyFormData({
-      apiKey: 'a1b2c3d4e5f6789012345678901234ab',
-      apiSecret: 'b2c3d4e5f6789012345678901234abcd',
-      webhookSecret: 'c3d4e5f6789012345678901234abcdef',
-      webhookUrl: `${window.location.origin}/api/shopify/webhooks`,
-      apiVersion: '2024-10',
-      scopes: ['read_orders', 'write_orders', 'read_products', 'write_products', 'read_inventory', 'write_inventory'],
-      selectedWebhooks: ['orders/create', 'orders/update', 'products/create', 'products/update', 'inventory/update']
-    });
-    setShopifyFormErrors({});
-    setShopifyOAuthModal({
-      open: true,
-      merchant,
-      step: 'install'
-    });
+  const handleShopifyConnect = async (merchant: MerchantWithShopify) => {
+    try {
+      setIsConnectingShopify(true);
+
+      // Get shop domain from merchant business name
+      const businessName = getMerchantProperty(merchant, 'businessName') as string;
+      const shopDomain = `${businessName.toLowerCase().replace(/[^a-z0-9]/g, '-')}.myshopify.com`;
+
+      // Call Shopify OAuth API
+      const response = await shopifyService.installAuthenticated({ shop: shopDomain });
+
+      // Redirect to Shopify OAuth page
+      if (response.data.auth_url) {
+        showSuccessToast('Redirecting to Shopify...');
+        window.location.href = response.data.auth_url;
+      } else {
+        throw new Error('No auth URL returned');
+      }
+    } catch (error) {
+      console.error('Failed to connect Shopify:', error);
+      showErrorToast('Failed to connect Shopify store. Please try again.');
+    } finally {
+      setIsConnectingShopify(false);
+    }
   };
 
   // Handle form input changes
@@ -2838,7 +2881,7 @@ export default function SuperAdminDashboard() {
     try {
       // Simulate webhook test
       await new Promise(resolve => setTimeout(resolve, 2000));
-      
+
       showSuccessToast('Webhook configuration test successful!', {
         duration: 3000,
         showProgressBar: true,
@@ -2939,14 +2982,21 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const handleShopifyDisconnect = async (merchant: typeof merchants[0]) => {
+  const handleShopifyDisconnect = async (merchant: MerchantWithShopify) => {
     setIsDisconnectingShopify(true);
 
     try {
-      // Mock disconnection process
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      // Get Shopify account ID from merchant
+      const shopifyAccountId = merchant.shopifyIntegration?.accountId;
 
-      const updatedMerchant = {
+      if (!shopifyAccountId) {
+        throw new Error('No Shopify account ID found');
+      }
+
+      // Call Shopify disconnect API
+      await shopifyService.disconnect(shopifyAccountId);
+
+      const updatedMerchant: MerchantWithShopify = {
         ...merchant,
         shopifyIntegration: {
           connected: false,
@@ -2954,14 +3004,12 @@ export default function SuperAdminDashboard() {
           lastSync: null,
           syncStatus: null,
           productsSynced: 0,
-          ordersSynced: 0
+          ordersSynced: 0,
+          accountId: null
         }
-      } as unknown as typeof merchants[0];
+      };
 
       // Update merchant data
-      const updatedMerchants = merchants.map(m =>
-        m.id === merchant.id ? updatedMerchant : m
-      );
       setFilteredMerchants(prev =>
         prev.map(m => m.id === merchant.id ? updatedMerchant : m)
       );
@@ -2973,6 +3021,7 @@ export default function SuperAdminDashboard() {
       });
 
     } catch (error) {
+      console.error('Failed to disconnect Shopify:', error);
       showErrorToast('Failed to disconnect Shopify integration. Please try again.', {
         duration: 5000,
         showCloseButton: true
@@ -2982,58 +3031,45 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const handleShopifySync = async (merchant: typeof merchants[0]) => {
+  const handleShopifySync = async (merchant: MerchantWithShopify) => {
     setIsSyncingShopify(true);
 
     try {
-      // Mock sync process
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Get Shopify account ID from merchant
+      const shopifyAccountId = merchant.shopifyIntegration?.accountId;
 
-        const updatedMerchant = {
-          ...merchant,
-          shopifyIntegration: {
-            connected: true,
-            shopDomain: merchant.shopifyIntegration.shopDomain || 'example.myshopify.com',
-            lastSync: new Date().toISOString(),
-            syncStatus: 'success' as const,
-            productsSynced: merchant.shopifyIntegration.productsSynced + Math.floor(Math.random() * 10),
-            ordersSynced: merchant.shopifyIntegration.ordersSynced + Math.floor(Math.random() * 5),
-            webhooks: {
-              ordersCreate: {
-                registered: true,
-                lastTriggered: new Date().toISOString()
-              },
-              ordersUpdate: {
-                registered: true,
-                lastTriggered: new Date().toISOString()
-              },
-              productsUpdate: {
-                registered: true,
-                lastTriggered: new Date().toISOString()
-              },
-              inventoryUpdate: {
-                registered: true,
-                lastTriggered: new Date().toISOString()
-              }
-            }
-          }
-        } as unknown as typeof merchants[0];
+      if (!shopifyAccountId) {
+        throw new Error('No Shopify account ID found');
+      }
+
+      // Call Shopify sync API
+      const response = await shopifyService.syncAccount(shopifyAccountId);
+
+      const updatedMerchant: MerchantWithShopify = {
+        ...merchant,
+        shopifyIntegration: {
+          ...merchant.shopifyIntegration,
+          connected: true,
+          lastSync: response.data.last_sync_at || new Date().toISOString(),
+          syncStatus: response.data.success ? 'success' as const : 'error' as const,
+          productsSynced: merchant.shopifyIntegration?.productsSynced || 0,
+          ordersSynced: merchant.shopifyIntegration?.ordersSynced || 0,
+        }
+      };
 
       // Update merchant data
-      const updatedMerchants = merchants.map(m =>
-        m.id === merchant.id ? updatedMerchant : m
-      );
       setFilteredMerchants(prev =>
         prev.map(m => m.id === merchant.id ? updatedMerchant : m)
       );
 
-      showSuccessToast(`Shopify data synced successfully!`, {
+      showSuccessToast(response.data.message || 'Shopify data synced successfully!', {
         duration: 4000,
         showProgressBar: true,
         showCloseButton: true
       });
 
     } catch (error) {
+      console.error('Failed to sync Shopify:', error);
       showErrorToast('Failed to sync Shopify data. Please try again.', {
         duration: 5000,
         showCloseButton: true
@@ -3050,15 +3086,15 @@ export default function SuperAdminDashboard() {
         setMerchantStats(null);
         return;
       }
-      
+
       try {
         const response = await adminService.getUserStatistics(selectedMerchant.id);
         const stats = response.data;
-        
+
         setMerchantStats({
-          totalShipments: stats.delivered_shipments + stats.in_transit_shipments + 
-                         stats.in_warehouse_shipments + stats.undelivered_shipments + 
-                         stats.unfulfilled_shipments,
+          totalShipments: stats.delivered_shipments + stats.in_transit_shipments +
+            stats.in_warehouse_shipments + stats.undelivered_shipments +
+            stats.unfulfilled_shipments,
           delivered: stats.delivered_shipments,
           inTransit: stats.in_transit_shipments,
           inWarehouse: stats.in_warehouse_shipments
@@ -3084,7 +3120,7 @@ export default function SuperAdminDashboard() {
         businessName: selectedMerchant.business_name,
         contactName: `${selectedMerchant.first_name} ${selectedMerchant.last_name}`,
         email: selectedMerchant.email,
-        status: (selectedMerchant.is_active ? (selectedMerchant.is_verified ? 'active' : 'pending') : 'suspended') as 'active' | 'pending' | 'suspended',
+        status: (selectedMerchant.is_active ? 'active' : 'suspended') as 'active' | 'suspended',
         joinDate: selectedMerchant.created_at
       });
     }
@@ -3103,11 +3139,7 @@ export default function SuperAdminDashboard() {
       },
       {
         label: "Member Since",
-        value: new Date(selectedMerchant.created_at).toLocaleDateString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        }),
+        value: formatDateUTC(new Date(selectedMerchant.created_at), 'MMMM yyyy'),
         icon: "Calendar",
         color: "text-purple-600 bg-purple-100"
       }
@@ -3203,7 +3235,6 @@ export default function SuperAdminDashboard() {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="active">Active</SelectItem>
-                        <SelectItem value="pending">Pending</SelectItem>
                         <SelectItem value="suspended">Suspended</SelectItem>
                       </SelectContent>
                     </Select>
@@ -3234,11 +3265,7 @@ export default function SuperAdminDashboard() {
                     />
                   ) : (
                     <p className="font-medium py-2">
-                      {new Date(selectedMerchant.created_at).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
+                      {formatDateUTC(new Date(selectedMerchant.created_at), 'MMMM yyyy')}
                     </p>
                   )}
                   {isEditingMerchant && merchantFormErrors.joinDate && (
@@ -3342,7 +3369,7 @@ export default function SuperAdminDashboard() {
                   Shopify Integration
                 </h3>
                 <div className="bg-gray-50 rounded-lg p-3 sm:p-4 space-y-3 sm:space-y-4">
-                  {selectedMerchant.shopifyIntegration.connected ? (
+                  {selectedMerchant.shopifyIntegration?.connected ? (
                     <div className="space-y-4">
                       {/* Connected Status - Mobile Optimized */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
@@ -3352,7 +3379,7 @@ export default function SuperAdminDashboard() {
                           </div>
                           <div className="min-w-0 flex-1">
                             <p className="font-medium text-gray-900 truncate">Shopify Connected</p>
-                            <p className="text-sm text-gray-500 truncate">{selectedMerchant.shopifyIntegration.shopDomain}</p>
+                            <p className="text-sm text-gray-500 truncate">{selectedMerchant.shopifyIntegration?.shopDomain}</p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
@@ -3418,14 +3445,14 @@ export default function SuperAdminDashboard() {
                               <Icon name="Package" size={16} className="text-blue-600" />
                               <p className="text-xs text-gray-500 uppercase tracking-wider">Products</p>
                             </div>
-                            <p className="text-lg sm:text-xl font-bold text-blue-600">{selectedMerchant.shopifyIntegration.productsSynced.toLocaleString()}</p>
+                            <p className="text-lg sm:text-xl font-bold text-blue-600">{selectedMerchant.shopifyIntegration?.productsSynced?.toLocaleString() || 0}</p>
                           </div>
                           <div className="bg-white p-3 sm:p-4 rounded-lg border shadow-sm">
                             <div className="flex items-center gap-2 mb-1">
                               <Icon name="ShoppingCart" size={16} className="text-green-600" />
                               <p className="text-xs text-gray-500 uppercase tracking-wider">Orders</p>
                             </div>
-                            <p className="text-lg sm:text-xl font-bold text-green-600">{selectedMerchant.shopifyIntegration.ordersSynced.toLocaleString()}</p>
+                            <p className="text-lg sm:text-xl font-bold text-green-600">{selectedMerchant.shopifyIntegration?.ordersSynced?.toLocaleString() || 0}</p>
                           </div>
                           <div className="bg-white p-3 sm:p-4 rounded-lg border shadow-sm col-span-2 sm:col-span-1">
                             <div className="flex items-center gap-2 mb-1">
@@ -3433,13 +3460,8 @@ export default function SuperAdminDashboard() {
                               <p className="text-xs text-gray-500 uppercase tracking-wider">Last Sync</p>
                             </div>
                             <p className="text-sm sm:text-base font-medium text-gray-900 leading-tight">
-                              {selectedMerchant.shopifyIntegration.lastSync
-                                ? new Date(selectedMerchant.shopifyIntegration.lastSync).toLocaleDateString('en-US', {
-                                    month: 'short',
-                                    day: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit'
-                                  })
+                              {selectedMerchant.shopifyIntegration?.lastSync
+                                ? formatDateUTC(new Date(selectedMerchant.shopifyIntegration.lastSync), 'MMM dd, hh:mm a')
                                 : 'Never'
                               }
                             </p>
@@ -3450,12 +3472,12 @@ export default function SuperAdminDashboard() {
                       {/* Sync Status */}
                       <div className="flex items-center gap-2">
                         <Icon
-                          name={selectedMerchant.shopifyIntegration.syncStatus === 'success' ? 'CheckCircle' : 'AlertCircle'}
+                          name={selectedMerchant.shopifyIntegration?.syncStatus === 'success' ? 'CheckCircle' : 'AlertCircle'}
                           size={16}
-                          className={selectedMerchant.shopifyIntegration.syncStatus === 'success' ? 'text-green-500' : 'text-yellow-500'}
+                          className={selectedMerchant.shopifyIntegration?.syncStatus === 'success' ? 'text-green-500' : 'text-yellow-500'}
                         />
                         <span className="text-sm text-gray-600">
-                          {selectedMerchant.shopifyIntegration.syncStatus === 'success'
+                          {selectedMerchant.shopifyIntegration?.syncStatus === 'success'
                             ? 'All data synced successfully'
                             : 'Sync in progress...'
                           }
@@ -3463,14 +3485,14 @@ export default function SuperAdminDashboard() {
                       </div>
 
                       {/* Webhook Status - Mobile Optimized */}
-                      {selectedMerchant.shopifyIntegration.webhooks && (
+                      {selectedMerchant.shopifyIntegration?.webhooks && (
                         <div className="border-t border-gray-200 pt-3 sm:pt-4">
                           <h4 className="text-sm font-medium text-gray-900 mb-3 flex items-center gap-2">
                             <Icon name="Webhook" size={16} className="text-indigo-600" />
                             Webhook Status
                           </h4>
                           <div className="space-y-2">
-                            {Object.entries(selectedMerchant.shopifyIntegration.webhooks).map(([webhookType, webhookData]) => (
+                            {Object.entries(selectedMerchant.shopifyIntegration?.webhooks || {}).map(([webhookType, webhookData]) => (
                               <div key={webhookType} className="bg-white rounded-lg border p-3 sm:p-4 shadow-sm">
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -3486,19 +3508,13 @@ export default function SuperAdminDashboard() {
                                   <div className="text-right flex-shrink-0">
                                     <div className="text-xs text-gray-500 leading-tight">
                                       {webhookData.lastTriggered
-                                        ? new Date(webhookData.lastTriggered).toLocaleDateString('en-US', {
-                                            month: 'short',
-                                            day: 'numeric'
-                                          })
+                                        ? formatDateUTC(new Date(webhookData.lastTriggered), 'MMM dd')
                                         : 'Never'
                                       }
                                     </div>
                                     {webhookData.lastTriggered && (
                                       <div className="text-xs text-gray-400">
-                                        {new Date(webhookData.lastTriggered).toLocaleTimeString('en-US', {
-                                          hour: '2-digit',
-                                          minute: '2-digit'
-                                        })}
+                                        {formatDateUTC(new Date(webhookData.lastTriggered), 'hh:mm a')}
                                       </div>
                                     )}
                                   </div>
@@ -3625,11 +3641,11 @@ export default function SuperAdminDashboard() {
                 <Button
                   variant="outline"
                   onClick={() => {
-                  if (isEditingMerchant) {
-                    handleMerchantCancelEdit();
-                  } else {
-                    setSelectedMerchant(null);
-                  }
+                    if (isEditingMerchant) {
+                      handleMerchantCancelEdit();
+                    } else {
+                      setSelectedMerchant(null);
+                    }
                   }}
                   disabled={isSavingMerchant}
                   className={cn(
@@ -4045,158 +4061,7 @@ export default function SuperAdminDashboard() {
     );
   };
 
-  // Merchant Action Modal (Approve/Suspend)
-
-  const renderMerchantActionModal = () => {
-    if (!selectedMerchantForAction || !actionType) return null;
-
-    const isApprove = actionType === 'approve';
-    const actionTitle = isApprove ? 'Approve Merchant' : 'Suspend Merchant';
-    const actionIcon = isApprove ? 'UserCheck' : 'Ban';
-    const actionColor = isApprove ? 'text-green-600' : 'text-red-600';
-    const actionBgColor = isApprove ? 'bg-green-50' : 'bg-red-50';
-    const actionBorderColor = isApprove ? 'border-green-200' : 'border-red-200';
-
-    return (
-      <Dialog
-        open={actionModalOpen}
-        onOpenChange={(open) => {
-          if (!open) cancelMerchantAction();
-        }}
-      >
-        <DialogContent
-          className={cn(
-            "sm:max-w-lg bg-white",
-            isMobile ? "w-[95vw] max-w-none" : "sm:max-w-lg"
-          )}
-          id="parcego-merchant-action-modal"
-        >
-          <DialogHeader className="space-y-3">
-            <div className="flex items-center gap-3">
-              <div className={cn(
-                "flex items-center justify-center w-12 h-12 rounded-full",
-                actionBgColor
-              )}>
-                <Icon name={actionIcon} size={24} className={actionColor} />
-              </div>
-              <div>
-                <DialogTitle className="text-xl font-semibold">
-                  {actionTitle}
-                </DialogTitle>
-                <DialogDescription className="text-gray-600 mt-1">
-                  Confirm action for {getMerchantProperty(selectedMerchantForAction, 'businessName')}
-                </DialogDescription>
-              </div>
-            </div>
-          </DialogHeader>
-
-          <div className="mt-6 space-y-6">
-            {/* Action Information */}
-            <Alert className={cn(actionBorderColor, actionBgColor)}>
-              <Icon name={actionIcon} size={16} className={actionColor} />
-              <AlertDescription className="font-medium">
-                {isApprove ? (
-                  <span>
-                    Approving this merchant will grant them full access to the platform.
-                    They will be able to create shipments, track packages, and access all merchant features.
-                  </span>
-                ) : (
-                  <span>
-                    Suspending this merchant will temporarily disable their account.
-                    They will lose access to all platform features until their account is reactivated.
-                  </span>
-                )}
-              </AlertDescription>
-            </Alert>
-
-            {/* Merchant Details */}
-            <div className="bg-gray-50 rounded-lg p-4 space-y-3">
-              <h4 className="font-medium text-gray-900">Merchant Information</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-                <div>
-                  <span className="text-gray-500">Business:</span>
-                  <p className="font-medium">{getMerchantProperty(selectedMerchantForAction, 'businessName')}</p>
-                </div>
-                <div>
-                  <span className="text-gray-500">Contact:</span>
-                  <p className="font-medium">{getMerchantProperty(selectedMerchantForAction, 'contactName')}</p>
-                </div>
-                <div>
-                  <span className="text-gray-500">ID:</span>
-                  <p className="font-medium">{selectedMerchantForAction.id}</p>
-                </div>
-                <div>
-                  <span className="text-gray-500">Current Status:</span>
-                  {getStatusBadge(String(getMerchantProperty(selectedMerchantForAction, 'status')))}
-                </div>
-              </div>
-            </div>
-
-            {/* Notes Field */}
-            <div className="space-y-2">
-              <label
-                htmlFor="action-notes"
-                className="text-sm font-medium text-gray-700"
-              >
-                {isApprove ? 'Approval Notes' : 'Suspension Reason'} (Optional)
-              </label>
-              <Textarea
-                id="action-notes"
-                placeholder={
-                  isApprove
-                    ? "Add any notes about this approval (e.g., verification method, special conditions)..."
-                    : "Provide reason for suspension and any relevant details..."
-                }
-                value={actionNotes}
-                onChange={(e) => setActionNotes(e.target.value)}
-                className="min-h-[80px] resize-none"
-                disabled={isProcessingAction}
-                aria-describedby="notes-help"
-              />
-              <p id="notes-help" className="text-xs text-gray-500">
-                These notes will be recorded for audit purposes and may be visible to the merchant.
-              </p>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-3 pt-4 border-t">
-              <Button
-                variant="outline"
-                onClick={cancelMerchantAction}
-                disabled={isProcessingAction}
-                className="w-full sm:w-auto"
-                id="parcego-merchant-action-cancel"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant={isApprove ? "default" : "destructive"}
-                onClick={processMerchantAction}
-                disabled={isProcessingAction}
-                className={cn(
-                  "w-full sm:w-auto",
-                  isApprove && "bg-green-600 hover:bg-green-700"
-                )}
-                id="parcego-merchant-action-confirm"
-              >
-                {isProcessingAction ? (
-                  <>
-                    <Icon name="Loader2" size={16} className="mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    <Icon name={actionIcon} size={16} className="mr-2" />
-                    {isApprove ? 'Approve Merchant' : 'Suspend Merchant'}
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  };
+  // Removed: Merchant Action Modal (approval system removed)
 
   // Shopify OAuth Modal
   const renderShopifyOAuthModal = () => {
@@ -4434,7 +4299,7 @@ export default function SuperAdminDashboard() {
                         Test your webhook endpoint to ensure it&apos;s working correctly
                       </p>
                     </div>
-                    
+
                     {/* Continue Button for Webhooks Step */}
                     <div className="flex items-center justify-between">
                       <div className="text-sm text-gray-600">
@@ -4608,39 +4473,36 @@ export default function SuperAdminDashboard() {
               <div className="flex items-center justify-between relative">
                 {/* Progress Line Background */}
                 <div className="absolute top-4 left-4 right-4 h-0.5 bg-gray-200 rounded-full" />
-                
+
                 {/* Progress Line Active */}
-                <div 
+                <div
                   className="absolute top-4 left-4 h-0.5 bg-emerald-600 rounded-full transition-all duration-500 ease-out"
-                  style={{ 
-                    width: `${((currentStep - 1) / 4) * 100}%` 
+                  style={{
+                    width: `${((currentStep - 1) / 4) * 100}%`
                   }}
                 />
-                
+
                 {/* Step Indicators */}
                 {[1, 2, 3, 4, 5].map((stepNum) => (
                   <div key={stepNum} className="relative z-10 flex flex-col items-center">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all duration-300 ${
-                      stepNum < currentStep ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' :
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-semibold transition-all duration-300 ${stepNum < currentStep ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' :
                       stepNum === currentStep ? 'bg-blue-600 text-white shadow-lg shadow-blue-200 ring-4 ring-blue-100' :
-                      'bg-gray-200 text-gray-400'
-                    }`}>
+                        'bg-gray-200 text-gray-400'
+                      }`}>
                       {stepNum < currentStep ? <Icon name="Check" size={14} /> : stepNum}
                     </div>
                     <div className="mt-2 text-center">
-                      <div className={`text-xs font-medium transition-colors duration-300 ${
-                        stepNum <= currentStep ? 'text-gray-900' : 'text-gray-400'
-                      }`}>
+                      <div className={`text-xs font-medium transition-colors duration-300 ${stepNum <= currentStep ? 'text-gray-900' : 'text-gray-400'
+                        }`}>
                         {['Install', 'Credentials', 'Webhooks', 'Authorize', 'Complete'][stepNum - 1]}
                       </div>
-                      <div className={`text-xs mt-0.5 transition-colors duration-300 ${
-                        stepNum < currentStep ? 'text-emerald-600' :
+                      <div className={`text-xs mt-0.5 transition-colors duration-300 ${stepNum < currentStep ? 'text-emerald-600' :
                         stepNum === currentStep ? 'text-blue-600' :
-                        'text-gray-400'
-                      }`}>
+                          'text-gray-400'
+                        }`}>
                         {stepNum < currentStep ? 'Completed' :
-                         stepNum === currentStep ? 'In Progress' :
-                         'Pending'}
+                          stepNum === currentStep ? 'In Progress' :
+                            'Pending'}
                       </div>
                     </div>
                   </div>
@@ -4675,17 +4537,17 @@ export default function SuperAdminDashboard() {
               <Icon name="ArrowLeft" size={16} className="mr-2" />
               {step === 'install' ? 'Cancel' : 'Back'}
             </Button>
-            
+
             <div className="flex items-center gap-3">
               {/* Step Progress Indicator */}
               <div className="text-sm text-gray-500">
                 Step {currentStep} of 5
               </div>
-              
+
               <Button
                 onClick={handleShopifyOAuthFlow}
                 className={cn(
-                  stepContent.buttonColor, 
+                  stepContent.buttonColor,
                   "h-10 px-6 transition-all duration-200 font-medium",
                   "hover:shadow-lg hover:scale-105 active:scale-95"
                 )}
@@ -4703,12 +4565,44 @@ export default function SuperAdminDashboard() {
     );
   };
 
+  // Load available shipments when modal opens
+  useEffect(() => {
+    const loadAvailableShipments = async () => {
+      if (!isManualAssignmentOpen || !isAuthenticated) return;
+
+      try {
+        setShipmentsLoading(true);
+        const shipments = await shippingService.getShipments({ limit: 100 });
+        // Filter for shipments that are ready for assignment (e.g., paid, in warehouse, etc.)
+        const readyShipments = shipments.filter(s =>
+          s.status === 'PAID' || s.status === 'LABEL_GENERATED' || s.status === 'IN_WAREHOUSE'
+        );
+        setAvailableShipments(readyShipments);
+      } catch (error) {
+        console.error('Failed to load shipments:', error);
+      } finally {
+        setShipmentsLoading(false);
+      }
+    };
+
+    loadAvailableShipments();
+  }, [isManualAssignmentOpen, isAuthenticated]);
+
   // Manual Assignment Modal
   const renderManualAssignmentModal = () => {
     if (!isManualAssignmentOpen) return null;
 
+    // Filter available drivers (active couriers)
+    const availableDrivers = couriers.filter(c => c.is_active);
+
     return (
-      <Dialog open={isManualAssignmentOpen} onOpenChange={setIsManualAssignmentOpen}>
+      <Dialog open={isManualAssignmentOpen} onOpenChange={(open) => {
+        setIsManualAssignmentOpen(open);
+        if (!open) {
+          // Reset form when closing
+          setManualAssignmentForm({ shipmentId: '', driverId: '', notes: '' });
+        }
+      }}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Create Manual Assignment</DialogTitle>
@@ -4719,25 +4613,58 @@ export default function SuperAdminDashboard() {
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="shipment_id" className="text-right">
-                Shipment ID
+                Shipment
               </Label>
-              <Input
-                id="shipment_id"
-                type="number"
-                placeholder="Enter shipment ID"
-                className="col-span-3"
-              />
+              <Select
+                value={manualAssignmentForm.shipmentId}
+                onValueChange={(value) => setManualAssignmentForm(prev => ({ ...prev, shipmentId: value }))}
+                disabled={shipmentsLoading}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue
+                    placeholder={shipmentsLoading ? "Loading shipments..." : "Select a shipment"}
+                  >
+                    {manualAssignmentForm.shipmentId ? `Shipment ${manualAssignmentForm.shipmentId}` : null}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {shipmentsLoading ? (
+                    <SelectItem value="loading" disabled>Loading...</SelectItem>
+                  ) : availableShipments.length === 0 ? (
+                    <SelectItem value="none" disabled>No shipments available</SelectItem>
+                  ) : (
+                    availableShipments.map((shipment) => (
+                      <SelectItem key={shipment.id} value={shipment.id.toString()}>
+                        ID: {shipment.id} - {shipment.tracking_code} - {shipment.receiver_address.contact_name} ({shipment.status})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="driver_id" className="text-right">
-                Driver ID
+                Driver
               </Label>
-              <Input
-                id="driver_id"
-                type="number"
-                placeholder="Enter driver ID"
-                className="col-span-3"
-              />
+              <Select
+                value={manualAssignmentForm.driverId}
+                onValueChange={(value) => setManualAssignmentForm(prev => ({ ...prev, driverId: value }))}
+              >
+                <SelectTrigger className="col-span-3">
+                  <SelectValue placeholder="Select a driver" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableDrivers.length === 0 ? (
+                    <SelectItem value="none" disabled>No active drivers available</SelectItem>
+                  ) : (
+                    availableDrivers.map((driver) => (
+                      <SelectItem key={driver.id} value={driver.id.toString()}>
+                        {driver.first_name} {driver.last_name} (ID: {driver.id})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="notes" className="text-right">
@@ -4746,6 +4673,8 @@ export default function SuperAdminDashboard() {
               <Textarea
                 id="notes"
                 placeholder="Assignment notes (required)"
+                value={manualAssignmentForm.notes}
+                onChange={(e) => setManualAssignmentForm(prev => ({ ...prev, notes: e.target.value }))}
                 className="col-span-3"
                 required
               />
@@ -4756,9 +4685,7 @@ export default function SuperAdminDashboard() {
               Cancel
             </Button>
             <Button onClick={async () => {
-              const shipmentId = (document.getElementById('shipment_id') as HTMLInputElement)?.value;
-              const driverId = (document.getElementById('driver_id') as HTMLInputElement)?.value;
-              const notes = (document.getElementById('notes') as HTMLTextAreaElement)?.value;
+              const { shipmentId, driverId, notes } = manualAssignmentForm;
 
               if (!shipmentId || !driverId) {
                 showErrorToast('Please fill in all required fields');
@@ -4771,17 +4698,21 @@ export default function SuperAdminDashboard() {
               }
 
               try {
+                const shipmentIdNum = parseInt(shipmentId);
+                const driverIdNum = parseInt(driverId);
+
                 await adminService.createManualAssignment({
-                  shipment_id: parseInt(shipmentId),
-                  driver_id: parseInt(driverId),
+                  shipment_id: shipmentIdNum,
+                  driver_id: driverIdNum,
                   notes: notes.trim()
                 });
-                
+
                 showSuccessToast('Manual assignment created successfully!');
                 setIsManualAssignmentOpen(false);
-                
+                setManualAssignmentForm({ shipmentId: '', driverId: '', notes: '' });
+
                 // Reload assignments
-                const dateStr = format(selectedAssignmentDate, 'yyyy-MM-dd');
+                const dateStr = formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd');
                 const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
                 setAssignments(assignmentsResponse.data.assignments || []);
               } catch (error) {
@@ -4888,12 +4819,9 @@ export default function SuperAdminDashboard() {
     <div className="min-h-screen bg-gray-50" id="parcego-admin-dashboard-container">
       {/* Toast Container */}
       <ToastContainer toasts={toasts} onDismiss={dismissToast} />
-      
+
       {/* Merchant Details Modal */}
       {renderMerchantDetailsModal()}
-
-      {/* Merchant Action Modal */}
-      {renderMerchantActionModal()}
 
       {/* Courier Action Modal */}
       {renderCourierActionModal()}
@@ -4917,7 +4845,7 @@ export default function SuperAdminDashboard() {
 
       {/* Reassign Assignment Modal */}
       {renderReassignModal()}
-      
+
       {/* Header */}
       <header className="fixed top-0 left-0 right-0 h-16 bg-white border-b border-gray-200 z-[100] shadow-sm" id="parcego-admin-header">
         <div className="flex items-center justify-between h-full px-4 lg:px-6">
@@ -4949,7 +4877,7 @@ export default function SuperAdminDashboard() {
               <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200">Admin</Badge>
             </div>
           </div>
-          
+
           {/* Right Section - Actions and User Menu */}
           <div className="flex items-center space-x-4">
             {/* Notification Bell - Hidden */}
@@ -4988,7 +4916,7 @@ export default function SuperAdminDashboard() {
                   <span>Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   className="cursor-pointer text-red-600 focus:text-red-600"
                   onClick={() => {
                     // Clear admin authentication
@@ -4996,7 +4924,7 @@ export default function SuperAdminDashboard() {
                     localStorage.removeItem("admin_email");
                     localStorage.removeItem("admin_login_time");
                     document.cookie = "admin_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-                    
+
                     // Redirect to admin login
                     router.push("/admin-login");
                   }}
@@ -5012,7 +4940,7 @@ export default function SuperAdminDashboard() {
 
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-x-0 top-16 bottom-0 bg-black bg-opacity-75 z-[90] lg:hidden transition-opacity duration-300 ease-out motion-reduce:transition-none"
           onClick={() => setSidebarOpen(false)}
           onTouchStart={() => setSidebarOpen(false)}
@@ -5027,7 +4955,7 @@ export default function SuperAdminDashboard() {
 
       <div className="flex pt-16">
         {/* Sidebar */}
-        <div 
+        <div
           className={cn(
             "fixed left-0 top-16 bottom-0 w-64 bg-white border-r border-gray-200 transform transition-transform duration-300 ease-out z-[95] motion-reduce:transition-none shadow-lg",
             "lg:translate-x-0 lg:fixed lg:inset-0 lg:shadow-none lg:z-[95]",
@@ -5037,8 +4965,8 @@ export default function SuperAdminDashboard() {
         >
           <nav className="pt-12 px-4 pb-4 space-y-6" aria-label="Admin navigation">
             {navigationSections.map((section, index) => (
-              <div 
-                key={section.id} 
+              <div
+                key={section.id}
                 id={`parcego-admin-nav-section-${section.id}`}
                 className={`space-y-2 ${index === 0 ? 'pt-2' : ''}`}
               >
@@ -5065,13 +4993,13 @@ export default function SuperAdminDashboard() {
                         aria-current={isActive ? "page" : undefined}
                         tabIndex={0}
                       >
-                        <Icon 
-                          name={item.icon} 
-                          size={18} 
+                        <Icon
+                          name={item.icon}
+                          size={18}
                           className={cn(
                             "mr-3 transition-colors duration-200",
                             isActive ? "text-indigo-600" : "text-gray-400 group-hover:text-gray-500"
-                          )} 
+                          )}
                         />
                         <div className="flex-1 text-left">
                           <div className={cn(isActive ? "font-bold" : "font-medium")}>{item.label}</div>
@@ -5086,7 +5014,7 @@ export default function SuperAdminDashboard() {
         </div>
 
         {/* Main Content */}
-        <div 
+        <div
           className={cn(
             "flex-1 transition-all duration-300 ease-out motion-reduce:transition-none relative z-10",
             "lg:ml-64" // Add left margin on large screens to account for fixed sidebar
