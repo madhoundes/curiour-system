@@ -225,6 +225,15 @@ export default function SuperAdminDashboard() {
   const [isDisconnectingShopify, setIsDisconnectingShopify] = useState(false);
   const [isSyncingShopify, setIsSyncingShopify] = useState(false);
 
+  // Shopify admin state
+  const [shopifyAccounts, setShopifyAccounts] = useState<any[]>([]);
+  const [shopifyAccountsLoading, setShopifyAccountsLoading] = useState(false);
+  const [schedulerStatus, setSchedulerStatus] = useState<any>(null);
+  const [schedulerStatusLoading, setSchedulerStatusLoading] = useState(false);
+  const [isTriggeringPoll, setIsTriggeringPoll] = useState(false);
+  const [isRetryingFailed, setIsRetryingFailed] = useState(false);
+  const [shopifyFilterStatus, setShopifyFilterStatus] = useState<string>("all");
+
 
   const router = useRouter();
 
@@ -1194,6 +1203,13 @@ export default function SuperAdminDashboard() {
       items: [
         { id: "assignments", label: "Assignments", icon: "ClipboardList", description: "Manage driver assignments" },
         { id: "warehouse", label: "Warehouse", icon: "Warehouse", description: "Warehouse operations" },
+      ]
+    },
+    {
+      id: "integrations",
+      title: "Integrations",
+      items: [
+        { id: "shopify", label: "Shopify", icon: "Store", description: "Manage Shopify integrations" },
       ]
     },
     {
@@ -2661,6 +2677,394 @@ export default function SuperAdminDashboard() {
             </Card>
           </div>
         </div>
+      </div>
+    );
+  };
+
+  // Load Shopify admin data when section is active
+  useEffect(() => {
+    const loadShopifyData = async () => {
+      if (!isAuthenticated || activeSection !== "shopify") return;
+
+      try {
+        // Load Shopify accounts
+        setShopifyAccountsLoading(true);
+        const accountsResponse = await shopifyService.getAdminAccounts({
+          status: shopifyFilterStatus === "all" ? undefined : shopifyFilterStatus,
+        });
+        setShopifyAccounts(accountsResponse.data.accounts || []);
+
+        // Load scheduler status
+        setSchedulerStatusLoading(true);
+        const schedulerResponse = await shopifyService.getSchedulerStatus();
+        setSchedulerStatus(schedulerResponse.data);
+      } catch (error) {
+        console.error('Failed to load Shopify admin data:', error);
+        showErrorToast('Failed to load Shopify data. Please try again.');
+      } finally {
+        setShopifyAccountsLoading(false);
+        setSchedulerStatusLoading(false);
+      }
+    };
+
+    loadShopifyData();
+  }, [isAuthenticated, activeSection, shopifyFilterStatus]);
+
+  // Handle trigger manual polling
+  const handleTriggerPoll = async () => {
+    setIsTriggeringPoll(true);
+    try {
+      const response = await shopifyService.triggerPolling();
+      showSuccessToast(
+        `Polling completed: ${response.data.stores_polled} stores polled, ${response.data.orders_fetched} orders fetched`,
+        { duration: 5000 }
+      );
+      // Reload data
+      const accountsResponse = await shopifyService.getAdminAccounts({
+        status: shopifyFilterStatus === "all" ? undefined : shopifyFilterStatus,
+      });
+      setShopifyAccounts(accountsResponse.data.accounts || []);
+    } catch (error) {
+      console.error('Failed to trigger polling:', error);
+      showErrorToast('Failed to trigger polling. Please try again.');
+    } finally {
+      setIsTriggeringPoll(false);
+    }
+  };
+
+  // Handle retry failed orders
+  const handleRetryFailed = async () => {
+    setIsRetryingFailed(true);
+    try {
+      const response = await shopifyService.retryFailedOrders();
+      showSuccessToast(
+        `Retry completed: ${response.data.orders_retried} orders retried`,
+        { duration: 5000 }
+      );
+      // Reload data
+      const accountsResponse = await shopifyService.getAdminAccounts({
+        status: shopifyFilterStatus === "all" ? undefined : shopifyFilterStatus,
+      });
+      setShopifyAccounts(accountsResponse.data.accounts || []);
+    } catch (error) {
+      console.error('Failed to retry failed orders:', error);
+      showErrorToast('Failed to retry failed orders. Please try again.');
+    } finally {
+      setIsRetryingFailed(false);
+    }
+  };
+
+  const renderShopify = () => {
+    const filteredAccounts = shopifyAccounts.filter(account => {
+      if (shopifyFilterStatus === "all") return true;
+      return account.status === shopifyFilterStatus;
+    });
+
+    return (
+      <div className="space-y-4 xl:space-y-6" id="parcego-admin-shopify-section">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold">Shopify Integration Management</h2>
+            <p className="text-sm text-muted-foreground mt-1">
+              Manage Shopify store connections, monitor syncing, and handle order processing
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={handleTriggerPoll}
+              disabled={isTriggeringPoll}
+              className="h-10 px-4"
+              id="parcego-shopify-trigger-poll-btn"
+            >
+              {isTriggeringPoll ? (
+                <>
+                  <Icon name="Loader2" size={16} className="mr-2 animate-spin" />
+                  Polling...
+                </>
+              ) : (
+                <>
+                  <Icon name="RefreshCw" size={16} className="mr-2" />
+                  Trigger Poll
+                </>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleRetryFailed}
+              disabled={isRetryingFailed}
+              className="h-10 px-4"
+              id="parcego-shopify-retry-failed-btn"
+            >
+              {isRetryingFailed ? (
+                <>
+                  <Icon name="Loader2" size={16} className="mr-2 animate-spin" />
+                  Retrying...
+                </>
+              ) : (
+                <>
+                  <Icon name="RotateCw" size={16} className="mr-2" />
+                  Retry Failed
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card id="parcego-shopify-stat-connected">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Connected Stores</CardTitle>
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Icon name="Store" size={20} className="text-blue-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {shopifyAccountsLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">{shopifyAccounts.length}</div>
+                  <p className="text-xs text-muted-foreground">Total connected stores</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card id="parcego-shopify-stat-active">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Stores</CardTitle>
+              <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <Icon name="CheckCircle" size={20} className="text-emerald-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {shopifyAccountsLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">
+                    {shopifyAccounts.filter(a => a.status === 'active').length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Stores syncing normally</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card id="parcego-shopify-stat-errors">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Stores with Errors</CardTitle>
+              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                <Icon name="AlertCircle" size={20} className="text-red-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {shopifyAccountsLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">
+                    {shopifyAccounts.filter(a => a.status === 'error' || a.error_message).length}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Stores needing attention</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card id="parcego-shopify-stat-scheduler">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Scheduler Status</CardTitle>
+              <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Icon name="Clock" size={20} className="text-purple-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {schedulerStatusLoading ? (
+                <Skeleton className="h-8 w-16" />
+              ) : schedulerStatus ? (
+                <>
+                  <div className="text-2xl font-bold">
+                    {schedulerStatus.is_running ? 'Running' : 'Stopped'}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {schedulerStatus.is_running ? 'Polling active' : 'Polling paused'}
+                  </p>
+                </>
+              ) : (
+                <div className="text-sm text-muted-foreground">Not available</div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Scheduler Status Card */}
+        {schedulerStatus && (
+          <Card id="parcego-shopify-scheduler-status">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Icon name="Clock" size={20} />
+                Scheduler Status
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Status</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge
+                      className={
+                        schedulerStatus.is_running
+                          ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                          : "bg-gray-50 text-gray-800 border-gray-200"
+                      }
+                    >
+                      {schedulerStatus.is_running ? "Running" : "Stopped"}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Last Run</p>
+                  <p className="text-sm font-medium mt-1">
+                    {schedulerStatus.last_run
+                      ? formatDateUTC(new Date(schedulerStatus.last_run), "MMM dd, yyyy HH:mm")
+                      : "Never"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Next Run</p>
+                  <p className="text-sm font-medium mt-1">
+                    {schedulerStatus.next_run
+                      ? formatDateUTC(new Date(schedulerStatus.next_run), "MMM dd, yyyy HH:mm")
+                      : "Not scheduled"}
+                  </p>
+                </div>
+              </div>
+
+              {schedulerStatus.last_poll_stats && (
+                <div className="border-t pt-4">
+                  <p className="text-sm font-medium mb-3">Last Poll Statistics</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <p className="text-xs text-muted-foreground">Stores Polled</p>
+                      <p className="text-lg font-bold">{schedulerStatus.last_poll_stats.stores_polled}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Orders Fetched</p>
+                      <p className="text-lg font-bold">{schedulerStatus.last_poll_stats.orders_fetched}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Orders Processed</p>
+                      <p className="text-lg font-bold">{schedulerStatus.last_poll_stats.orders_processed}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-muted-foreground">Errors</p>
+                      <p className="text-lg font-bold text-red-600">
+                        {schedulerStatus.last_poll_stats.errors}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Accounts List */}
+        <Card id="parcego-shopify-accounts-list">
+          <CardHeader>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <CardTitle>Connected Shopify Stores</CardTitle>
+              <div className="flex gap-2">
+                <Select value={shopifyFilterStatus} onValueChange={setShopifyFilterStatus}>
+                  <SelectTrigger className="w-[140px]" id="parcego-shopify-filter-status">
+                    <SelectValue placeholder="Filter by status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="error">Error</SelectItem>
+                    <SelectItem value="inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {shopifyAccountsLoading ? (
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-20 w-full" />
+                ))}
+              </div>
+            ) : filteredAccounts.length === 0 ? (
+              <div className="text-center py-12" id="parcego-shopify-empty-state">
+                <Icon name="Store" size={48} className="mx-auto text-gray-300 mb-4" />
+                <p className="text-lg font-medium text-gray-900 mb-2">No Shopify stores found</p>
+                <p className="text-sm text-gray-500">
+                  {shopifyFilterStatus !== "all"
+                    ? `No stores with status "${shopifyFilterStatus}"`
+                    : "No stores are currently connected"}
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {filteredAccounts.map((account) => (
+                  <Card
+                    key={account.id}
+                    className="border-gray-200 hover:border-gray-300 transition-colors"
+                    id={`parcego-shopify-account-${account.id}`}
+                  >
+                    <CardContent className="p-4">
+                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start gap-3">
+                            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                              <Icon name="Store" size={24} className="text-blue-600" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h3 className="font-semibold text-base truncate">{account.shop_name || account.shop_domain}</h3>
+                              <p className="text-sm text-muted-foreground truncate">{account.shop_domain}</p>
+                              <div className="flex items-center gap-2 mt-2">
+                                <Badge
+                                  className={
+                                    account.status === "active"
+                                      ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                      : account.status === "error"
+                                      ? "bg-red-50 text-red-800 border-red-200"
+                                      : "bg-gray-50 text-gray-800 border-gray-200"
+                                  }
+                                >
+                                  {account.status}
+                                </Badge>
+                                {account.last_sync_at && (
+                                  <span className="text-xs text-muted-foreground">
+                                    Last sync: {formatDateUTC(new Date(account.last_sync_at), "MMM dd, yyyy HH:mm")}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        {account.error_message && (
+                          <Alert className="md:max-w-md">
+                            <AlertDescription className="text-sm text-red-800">
+                              <Icon name="AlertCircle" size={16} className="inline mr-1" />
+                              {account.error_message}
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     );
   };
@@ -5027,6 +5431,7 @@ export default function SuperAdminDashboard() {
             {activeSection === "couriers" && renderCouriers()}
             {activeSection === "assignments" && renderAssignments()}
             {activeSection === "warehouse" && renderWarehouse()}
+            {activeSection === "shopify" && renderShopify()}
             {activeSection === "settings" && renderSettings()}
           </main>
         </div>

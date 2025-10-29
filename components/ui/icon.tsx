@@ -191,7 +191,13 @@ const iconAliases: Record<string, IconName> = {
   "Check": "Check",
   // Filter icon aliases
   "Filter": "Funnel",
-  "filter": "Funnel"
+  "filter": "Funnel",
+  // Store and shopping icons
+  "Store": "ShoppingBag",
+  "store": "ShoppingBag",
+  "ShoppingBag": "ShoppingBag",
+  "RotateCw": "RotateCw",
+  "rotate-cw": "RotateCw"
 };
 
 // Centralized Lucide icon renderer to avoid scattered imports and runtime errors
