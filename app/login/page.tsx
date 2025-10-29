@@ -75,14 +75,28 @@ const Login03PageContent = () => {
 
   // Handle email verification success and Shopify OAuth params
   useEffect(() => {
+    // Read from searchParams first (Next.js way)
     const verified = searchParams.get('verified');
     const tab = searchParams.get('tab');
     
     // Check for Shopify OAuth parameters (hmac, host, shop, timestamp)
-    const hmac = searchParams.get('hmac');
-    const host = searchParams.get('host');
-    const shop = searchParams.get('shop');
-    const timestamp = searchParams.get('timestamp');
+    let hmac = searchParams.get('hmac');
+    let host = searchParams.get('host');
+    let shop = searchParams.get('shop');
+    let timestamp = searchParams.get('timestamp');
+    
+    // Fallback: Also check window.location if searchParams didn't work (for cached pages)
+    if (!shop && typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      shop = shop || urlParams.get('shop');
+      hmac = hmac || urlParams.get('hmac');
+      host = host || urlParams.get('host');
+      timestamp = timestamp || urlParams.get('timestamp');
+      
+      if (shop) {
+        console.log("Shopify params detected via window.location fallback:", { shop, hmac, host, timestamp });
+      }
+    }
     
     // Store Shopify params if present (shop is the only required param for OAuth initiation)
     if (shop) {
@@ -100,6 +114,8 @@ const Login03PageContent = () => {
       } else {
         console.log("Shopify OAuth params detected (partial):", { shop, hmac, host, timestamp });
       }
+    } else {
+      console.log("No Shopify params found in URL");
     }
     
     if (verified === 'true') {
@@ -118,8 +134,6 @@ const Login03PageContent = () => {
       if (shopifyParams?.shop) {
         toast.info("Connecting to Shopify...");
         
-        // Use the shopifyService which handles API calls with proper CORS configuration
-        // This wraps the API client which should have CORS headers configured
         const shopParam = encodeURIComponent(shopifyParams.shop);
         const authToken = authService.getAuthToken();
         
@@ -131,16 +145,17 @@ const Login03PageContent = () => {
         
         try {
           // Use shopifyService which handles the API call properly
-          // The API client should have CORS configured for our frontend domain
+          // Backend will return the redirect URL in the response body
           const response = await shopifyService.installAuthenticated({ 
             shop: shopifyParams.shop 
           });
           
-          // Get the redirect URL from the response
+          // Get the redirect URL from the response body
+          // Backend returns: { auth_url: "...", redirect_url: "..." } in response.data
           const redirectUrl = response.data?.auth_url || response.data?.redirect_url;
           
           if (redirectUrl) {
-            // Redirect to Shopify authorization page using window.location.href
+            // Navigate to Shopify authorization page using window.location.href
             // This doesn't have CORS issues since we're navigating to Shopify's domain
             window.location.href = redirectUrl;
             return; // Don't continue - redirect is happening
@@ -149,49 +164,12 @@ const Login03PageContent = () => {
             toast.error("Failed to get Shopify authorization URL. Redirecting to dashboard...");
             router.push("/dashboard");
           }
-        } catch (fetchError: any) {
-          console.error("Shopify OAuth error:", fetchError);
-          
-          // If CORS error or network error, try using a Next.js API route as proxy
-          if (fetchError.message?.includes('CORS') || 
-              fetchError.message?.includes('Failed to fetch') ||
-              fetchError.message?.includes('Network')) {
-            console.log("CORS/Network error detected, trying Next.js API route proxy");
-            
-            try {
-              // Call our Next.js API route which will proxy the request
-              // This avoids CORS since it's same-origin
-              const proxyResponse = await fetch(
-                `/api/shopify/install-authenticated?shop=${shopParam}`,
-                {
-                  method: 'GET',
-                  headers: {
-                    'Authorization': `Bearer ${authToken}`,
-                  },
-                  credentials: 'include',
-                }
-              );
-              
-              if (proxyResponse.ok) {
-                const proxyData = await proxyResponse.json();
-                const redirectUrl = proxyData.auth_url || proxyData.redirect_url;
-                if (redirectUrl) {
-                  window.location.href = redirectUrl;
-                  return;
-                }
-              }
-            } catch (proxyError) {
-              console.error("Proxy API route also failed:", proxyError);
-            }
-            
-            // Last resort: include token in URL query param (less secure but works)
-            console.log("All methods failed, trying token in URL as last resort");
-            const fallbackUrl = `${API_CONFIG.BASE_URL}/shopify/auth/install-authenticated?shop=${shopParam}&token=${encodeURIComponent(authToken)}`;
-            window.location.href = fallbackUrl;
-            return;
-          }
-          
-          throw fetchError;
+        } catch (error: any) {
+          console.error("Shopify OAuth error:", error);
+          const errorMsg = error.message || "Failed to connect to Shopify";
+          toast.error(`${errorMsg}. Redirecting to dashboard...`);
+          router.push("/dashboard");
+          return;
         }
       } else {
         // No Shopify params - normal login flow
