@@ -86,6 +86,7 @@ const Login03PageContent = () => {
     
     // Store Shopify params if present (shop is the only required param for OAuth initiation)
     if (shop) {
+      console.log("Shopify OAuth params detected:", { shop, hmac, host, timestamp });
       setShopifyParams({ 
         hmac: hmac || undefined, 
         host: host || undefined, 
@@ -117,8 +118,8 @@ const Login03PageContent = () => {
       if (shopifyParams?.shop) {
         toast.info("Connecting to Shopify...");
         
-        // Use fetch to call the API endpoint with proper Authorization header
-        // Then redirect to the returned URL
+        // Use the shopifyService which handles API calls with proper CORS configuration
+        // This wraps the API client which should have CORS headers configured
         const shopParam = encodeURIComponent(shopifyParams.shop);
         const authToken = authService.getAuthToken();
         
@@ -129,54 +130,67 @@ const Login03PageContent = () => {
         }
         
         try {
-          // Call the API endpoint with Authorization header
-          const response = await fetch(
-            `${API_CONFIG.BASE_URL}/shopify/auth/install-authenticated?shop=${shopParam}`,
-            {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${authToken}`,
-                'Content-Type': 'application/json',
-              },
-              credentials: 'include', // Include cookies if needed
-            }
-          );
-          
-          if (!response.ok) {
-            // Try to get error message from response
-            let errorMessage = "Failed to connect to Shopify";
-            try {
-              const errorData = await response.json();
-              errorMessage = errorData.message || errorData.error || errorMessage;
-            } catch {
-              // If response is not JSON, use status text
-              errorMessage = response.statusText || errorMessage;
-            }
-            throw new Error(errorMessage);
-          }
+          // Use shopifyService which handles the API call properly
+          // The API client should have CORS configured for our frontend domain
+          const response = await shopifyService.installAuthenticated({ 
+            shop: shopifyParams.shop 
+          });
           
           // Get the redirect URL from the response
-          const responseData = await response.json();
-          const redirectUrl = responseData.auth_url || responseData.redirect_url || responseData.data?.auth_url || responseData.data?.redirect_url;
+          const redirectUrl = response.data?.auth_url || response.data?.redirect_url;
           
           if (redirectUrl) {
-            // Redirect to Shopify authorization page
+            // Redirect to Shopify authorization page using window.location.href
+            // This doesn't have CORS issues since we're navigating to Shopify's domain
             window.location.href = redirectUrl;
             return; // Don't continue - redirect is happening
           } else {
-            console.error("No redirect URL in response:", responseData);
+            console.error("No redirect URL in response:", response);
             toast.error("Failed to get Shopify authorization URL. Redirecting to dashboard...");
             router.push("/dashboard");
           }
         } catch (fetchError: any) {
-          console.error("Fetch error:", fetchError);
-          // If CORS error, try fallback with token in URL
-          if (fetchError.message?.includes('CORS') || fetchError.message?.includes('Failed to fetch')) {
-            console.log("CORS error detected, trying fallback with token in URL");
+          console.error("Shopify OAuth error:", fetchError);
+          
+          // If CORS error or network error, try using a Next.js API route as proxy
+          if (fetchError.message?.includes('CORS') || 
+              fetchError.message?.includes('Failed to fetch') ||
+              fetchError.message?.includes('Network')) {
+            console.log("CORS/Network error detected, trying Next.js API route proxy");
+            
+            try {
+              // Call our Next.js API route which will proxy the request
+              // This avoids CORS since it's same-origin
+              const proxyResponse = await fetch(
+                `/api/shopify/install-authenticated?shop=${shopParam}`,
+                {
+                  method: 'GET',
+                  headers: {
+                    'Authorization': `Bearer ${authToken}`,
+                  },
+                  credentials: 'include',
+                }
+              );
+              
+              if (proxyResponse.ok) {
+                const proxyData = await proxyResponse.json();
+                const redirectUrl = proxyData.auth_url || proxyData.redirect_url;
+                if (redirectUrl) {
+                  window.location.href = redirectUrl;
+                  return;
+                }
+              }
+            } catch (proxyError) {
+              console.error("Proxy API route also failed:", proxyError);
+            }
+            
+            // Last resort: include token in URL query param (less secure but works)
+            console.log("All methods failed, trying token in URL as last resort");
             const fallbackUrl = `${API_CONFIG.BASE_URL}/shopify/auth/install-authenticated?shop=${shopParam}&token=${encodeURIComponent(authToken)}`;
             window.location.href = fallbackUrl;
             return;
           }
+          
           throw fetchError;
         }
       } else {
