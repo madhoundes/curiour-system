@@ -33,6 +33,7 @@ import { type Payment, type Invoice, type PaymentMethod, type TaxDocument } from
 import { shippingService } from "@/lib/api/shipping"
 import { profileService } from "@/lib/api/profile"
 import type { BillingRecord, BillingRecordsListResponse, UserProfile } from "@/lib/api/types"
+import { toast } from "sonner"
 
 // Mock data (fallback only)
 import { mockPayments, mockInvoices, mockPaymentMethods, mockTaxDocuments } from "./mock-data"
@@ -1614,7 +1615,6 @@ type BillingAddressFormData = {
 }
 
 function PreferencesTab() {
-  const [isEditingEmail, setIsEditingEmail] = useState(false)
   const [isEditingAddress, setIsEditingAddress] = useState(false)
   const [billingEmail, setBillingEmail] = useState('billing@example.com')
   const [billingAddress, setBillingAddress] = useState<BillingAddressFormData>({
@@ -1625,26 +1625,37 @@ function PreferencesTab() {
     city: 'Toronto',
     postalCode: 'M5V 3A8'
   })
-  const [notifications, setNotifications] = useState({
-    paymentReminders: true,
-    invoiceNotifications: true,
-    paymentConfirmations: true
-  })
+  const [isLoading, setIsLoading] = useState(true)
 
-  const toggleNotification = (key: keyof typeof notifications) => {
-    setNotifications(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }))
-  }
-
-  // Email edit form
-  const emailForm = useForm<BillingContactFormData>({
-    mode: 'onChange',
-    defaultValues: {
-      email: billingEmail
+  // Load profile data on mount
+  useEffect(() => {
+    const loadProfile = async () => {
+      try {
+        setIsLoading(true)
+        const profile = await profileService.getProfile()
+        
+        // Set billing email (use profile email as billing email)
+        setBillingEmail(profile.email || '')
+        
+        // Set billing address from profile
+        setBillingAddress({
+          line1: profile.street_address || '',
+          line2: profile.street_address_2 || '',
+          country: profile.country || 'Canada',
+          province: profile.province || '',
+          city: profile.city || '',
+          postalCode: profile.postal_code || ''
+        })
+      } catch (error) {
+        console.error('Failed to load profile:', error)
+        toast.error('Failed to load billing information')
+      } finally {
+        setIsLoading(false)
+      }
     }
-  })
+    
+    loadProfile()
+  }, [])
 
   // Address edit form
   const addressForm = useForm<BillingAddressFormData>({
@@ -1652,27 +1663,10 @@ function PreferencesTab() {
     defaultValues: billingAddress
   })
 
-  const handleEmailEdit = () => {
-    emailForm.reset({ email: billingEmail })
-    setIsEditingEmail(true)
-  }
-
-  const handleEmailSave = async (data: BillingContactFormData) => {
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      setBillingEmail(data.email)
-      setIsEditingEmail(false)
-      console.log('Email updated:', data.email)
-    } catch (error) {
-      console.error('Failed to update email:', error)
-    }
-  }
-
-  const handleEmailCancel = () => {
-    emailForm.reset({ email: billingEmail })
-    setIsEditingEmail(false)
-  }
+  // Update form when billing address changes
+  useEffect(() => {
+    addressForm.reset(billingAddress)
+  }, [billingAddress, addressForm])
 
   const handleAddressEdit = () => {
     addressForm.reset(billingAddress)
@@ -1681,13 +1675,21 @@ function PreferencesTab() {
 
   const handleAddressSave = async (data: BillingAddressFormData) => {
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000))
+      // Update profile address via API
+      await profileService.updateProfile({
+        street_address: data.line1,
+        street_address_2: data.line2 || undefined,
+        city: data.city,
+        province: data.province,
+        postal_code: data.postalCode,
+        country: data.country
+      })
       setBillingAddress(data)
       setIsEditingAddress(false)
-      console.log('Address updated:', data)
-    } catch (error) {
+      toast.success('Billing address updated successfully')
+    } catch (error: any) {
       console.error('Failed to update address:', error)
+      toast.error(error.message || 'Failed to update billing address')
     }
   }
 
@@ -1700,9 +1702,16 @@ function PreferencesTab() {
     <Card id="parcego-billing-preferences">
       <CardHeader className="px-4 sm:px-6">
         <CardTitle className="text-lg sm:text-xl">Billing Preferences</CardTitle>
-        <CardDescription className="text-sm">Manage your billing settings and notifications</CardDescription>
+        <CardDescription className="text-sm">Manage your billing contact and address information</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6 px-4 sm:px-6">
+        {isLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <Icon name="Loader2" size={24} className="animate-spin text-gray-400" />
+            <span className="ml-2 text-sm text-gray-600">Loading billing information...</span>
+          </div>
+        ) : (
+          <>
         <div>
           <h3 className="text-lg font-medium mb-4">Billing Contact</h3>
           <div className="space-y-2">
@@ -1710,86 +1719,9 @@ function PreferencesTab() {
             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
               <div className="flex-1">
                 <div className="font-medium mb-2">Email</div>
-                {isEditingEmail ? (
-                  <form onSubmit={emailForm.handleSubmit(handleEmailSave)} className="space-y-3">
-                    <div className="max-w-sm w-full">
-                      <Controller
-                        name="email"
-                        control={emailForm.control}
-                        rules={{
-                          required: 'Email is required',
-                          pattern: {
-                            value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                            message: 'Invalid email address'
-                          }
-                        }}
-                        render={({ field, fieldState }) => (
-                          <div>
-                            <Input
-                              {...field}
-                              id="parcego-billing-email-edit"
-                              type="email"
-                              placeholder="Enter billing email"
-                              className={`h-9 ${fieldState.error ? 'border-red-500 focus-visible:ring-red-200' : ''}`}
-                              aria-invalid={!!fieldState.error}
-                            />
-                            {fieldState.error && (
-                              <p className="text-sm text-red-600 mt-1">{fieldState.error.message}</p>
-                            )}
-                          </div>
-                        )}
-                      />
-                    </div>
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <Button 
-                        type="submit" 
-                        size="sm"
-                        disabled={emailForm.formState.isSubmitting || !emailForm.formState.isValid}
-                        id="parcego-billing-email-save-btn"
-                        className="h-8 px-3 transition-all duration-200 w-full sm:w-auto"
-                      >
-                        {emailForm.formState.isSubmitting ? (
-                          <>
-                            <Icon name="Loader2" size={14} className="mr-1 animate-spin" />
-                            Saving...
-                          </>
-                        ) : (
-                          <>
-                            <Icon name="Check" size={14} className="mr-1" />
-                            Save
-                          </>
-                        )}
-                      </Button>
-                      <Button 
-                        type="button" 
-                        variant="outline" 
-                        size="sm"
-                        onClick={handleEmailCancel}
-                        disabled={emailForm.formState.isSubmitting}
-                        id="parcego-billing-email-cancel-btn"
-                        className="h-8 px-3 transition-all duration-200 w-full sm:w-auto"
-                      >
-                        <Icon name="X" size={14} className="mr-1" />
-                        Cancel
-                      </Button>
-                    </div>
-                  </form>
-                ) : (
-                  <div className="text-sm text-muted-foreground">{billingEmail}</div>
-                )}
+                <div className="text-sm text-muted-foreground">{billingEmail || 'Not set'}</div>
+                <p className="text-xs text-gray-500 mt-1">Billing email matches your account email. To change it, please update your email in Account Profile settings.</p>
               </div>
-              {!isEditingEmail && (
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={handleEmailEdit}
-                  id="parcego-billing-email-edit-btn"
-                  className="flex-shrink-0 transition-all duration-200 hover:bg-gray-50 w-full sm:w-auto"
-                >
-                  <Icon name="Edit" size={16} className="mr-2" />
-                  Edit
-                </Button>
-              )}
             </div>
             
             <Separator className="my-4" />
@@ -2021,93 +1953,8 @@ function PreferencesTab() {
             </div>
           </div>
         </div>
-
-        <div>
-          <h3 className="text-lg font-medium mb-4">Notification Preferences</h3>
-          <div className="space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex-1">
-                <div className="font-medium">Payment Reminders</div>
-                <div className="text-sm text-muted-foreground">Receive reminders before payment due dates</div>
-              </div>
-              <Button 
-                variant={notifications.paymentReminders ? "default" : "outline"}
-                size="sm"
-                onClick={() => toggleNotification('paymentReminders')}
-                className={`transition-all duration-300 min-w-[80px] w-full sm:w-auto ${
-                  notifications.paymentReminders 
-                    ? 'bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-200/50' 
-                    : 'hover:bg-red-50 hover:border-red-300 hover:text-red-700 hover:shadow-md hover:shadow-red-100/50'
-                } focus:ring-2 focus:ring-offset-2 ${
-                  notifications.paymentReminders ? 'focus:ring-green-200' : 'focus:ring-red-200'
-                }`}
-                aria-label={`${notifications.paymentReminders ? 'Disable' : 'Enable'} payment reminders`}
-                title={`Click to ${notifications.paymentReminders ? 'disable' : 'enable'} payment reminders`}
-              >
-                <Icon 
-                  name={notifications.paymentReminders ? "Check" : "X"} 
-                  size={14} 
-                  className="mr-1" 
-                />
-                {notifications.paymentReminders ? 'Enabled' : 'Disabled'}
-              </Button>
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex-1">
-                <div className="font-medium">Invoice Notifications</div>
-                <div className="text-sm text-muted-foreground">Get notified when new invoices are available</div>
-              </div>
-              <Button 
-                variant={notifications.invoiceNotifications ? "default" : "outline"}
-                size="sm"
-                onClick={() => toggleNotification('invoiceNotifications')}
-                className={`transition-all duration-300 min-w-[80px] w-full sm:w-auto ${
-                  notifications.invoiceNotifications 
-                    ? 'bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-200/50' 
-                    : 'hover:bg-red-50 hover:border-red-300 hover:text-red-700 hover:shadow-md hover:shadow-red-100/50'
-                } focus:ring-2 focus:ring-offset-2 ${
-                  notifications.invoiceNotifications ? 'focus:ring-green-200' : 'focus:ring-red-200'
-                }`}
-                aria-label={`${notifications.invoiceNotifications ? 'Disable' : 'Enable'} invoice notifications`}
-                title={`Click to ${notifications.invoiceNotifications ? 'disable' : 'enable'} invoice notifications`}
-              >
-                <Icon 
-                  name={notifications.invoiceNotifications ? "Check" : "X"} 
-                  size={14} 
-                  className="mr-1" 
-                />
-                {notifications.invoiceNotifications ? 'Enabled' : 'Disabled'}
-              </Button>
-            </div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex-1">
-                <div className="font-medium">Payment Confirmations</div>
-                <div className="text-sm text-muted-foreground">Receive confirmation for successful payments</div>
-              </div>
-              <Button 
-                variant={notifications.paymentConfirmations ? "default" : "outline"}
-                size="sm"
-                onClick={() => toggleNotification('paymentConfirmations')}
-                className={`transition-all duration-300 min-w-[80px] w-full sm:w-auto ${
-                  notifications.paymentConfirmations 
-                    ? 'bg-green-600 hover:bg-green-700 text-white shadow-md shadow-green-200/50' 
-                    : 'hover:bg-red-50 hover:border-red-300 hover:text-red-700 hover:shadow-md hover:shadow-red-100/50'
-                } focus:ring-2 focus:ring-offset-2 ${
-                  notifications.paymentConfirmations ? 'focus:ring-green-200' : 'focus:ring-red-200'
-                }`}
-                aria-label={`${notifications.paymentConfirmations ? 'Disable' : 'Enable'} payment confirmations`}
-                title={`Click to ${notifications.paymentConfirmations ? 'disable' : 'enable'} payment confirmations`}
-              >
-                <Icon 
-                  name={notifications.paymentConfirmations ? "Check" : "X"} 
-                  size={14} 
-                  className="mr-1" 
-                />
-                {notifications.paymentConfirmations ? 'Enabled' : 'Disabled'}
-              </Button>
-            </div>
-          </div>
-        </div>
+        </>
+        )}
       </CardContent>
     </Card>
   )
