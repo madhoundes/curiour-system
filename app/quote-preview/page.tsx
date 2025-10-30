@@ -48,7 +48,7 @@ interface QuoteOption {
 }
 
 // Enhanced Shipment Summary Component with Reorder Info and Shipping Label Preview
-const ShipmentSummary = ({ formData }: { formData: ShipmentData }) => {
+const ShipmentSummary = ({ formData, fieldErrors }: { formData: ShipmentData; fieldErrors: Record<string, string> }) => {
   const { generateTrackingNumber, updateMultipleFields, getShippingLabelData, isFormValid } = useShipment();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -351,6 +351,11 @@ const ShipmentSummary = ({ formData }: { formData: ShipmentData }) => {
             <div>
               <span className="text-gray-600">Weight:</span>{" "}
               <span className="font-medium">{formData.weight} {formData.weightUnit}</span>
+              {fieldErrors.weight && (
+                <p className="text-xs text-red-600 mt-1" role="alert" aria-live="polite">
+                  {fieldErrors.weight}
+                </p>
+              )}
             </div>
             <div>
               <span className="text-gray-600">Service:</span>{" "}
@@ -416,6 +421,7 @@ function QuotePreviewPageContent() {
   const [formData, setFormData] = useState<ShipmentData | null>(null);
   const [quoteOptions, setQuoteOptions] = useState<QuoteOption[]>([]);
   const [quoteError, setQuoteError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // Map form data to API request format
   const mapFormDataToQuoteRequest = (data: ShipmentData): QuoteEstimateRequest => {
@@ -457,6 +463,7 @@ function QuotePreviewPageContent() {
   const fetchQuoteEstimate = async (data: ShipmentData) => {
     try {
       setQuoteError(null);
+      setFieldErrors({});
       const request = mapFormDataToQuoteRequest(data);
       console.log('Sending quote request:', request);
       
@@ -477,7 +484,22 @@ function QuotePreviewPageContent() {
       }
     } catch (error: any) {
       console.error('Failed to fetch quote:', error);
-      setQuoteError(error.message || 'Failed to get shipping quote');
+      // Handle API validation errors (422)
+      if (error && typeof error === 'object' && (error.status === 422 || error?.error === 'Validation Error')) {
+        const message = error.message || 'Please check your input and try again.';
+        setQuoteError(`Quote estimation failed: ${message}`);
+        if (Array.isArray(error.details)) {
+          const errorsMap: Record<string, string> = {};
+          error.details.forEach((d: any) => {
+            if (d?.field && d?.message) {
+              errorsMap[d.field] = d.message;
+            }
+          });
+          setFieldErrors(errorsMap);
+        }
+      } else {
+        setQuoteError(error?.message || 'Failed to get shipping quote');
+      }
       
       // Fallback to basic quote structure on error
       const fallbackQuote: QuoteOption[] = [
@@ -585,7 +607,7 @@ function QuotePreviewPageContent() {
         <div className="space-y-8">
 
           {/* Enhanced Shipment Summary with Shipping Label Preview */}
-          <ShipmentSummary formData={formData} />
+          <ShipmentSummary formData={formData} fieldErrors={fieldErrors} />
 
           {/* Quote Options */}
           <Card className="parcego-card parcego-card--quote-options">
@@ -609,6 +631,13 @@ function QuotePreviewPageContent() {
                       <p className="text-red-700 text-sm mb-2">
                         {quoteError}
                       </p>
+                      {Object.keys(fieldErrors).length > 0 && (
+                        <ul className="list-disc list-inside text-xs text-red-700 mb-3">
+                          {Object.entries(fieldErrors).map(([field, msg]) => (
+                            <li key={field}><span className="font-medium capitalize">{field}:</span> {msg}</li>
+                          ))}
+                        </ul>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
