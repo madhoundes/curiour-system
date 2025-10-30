@@ -69,15 +69,28 @@ export default async function middleware(req: NextRequest) {
   // If someone tries to access login while authenticated, redirect to dashboard
   // BUT only if they have BOTH cookie AND localStorage (to prevent redirect loops)
   if (isPublicRoute && (pathname === '/login' || pathname === '/courier-login')) {
+    // Always disable caching on the login page to ensure query params (Shopify OAuth) are visible to the client
+    const next = NextResponse.next();
+    if (pathname === '/login') {
+      next.headers.set('Cache-Control', 'no-store, max-age=0');
+    }
+
     if (pathname === '/courier-login' && hasCourierAuth) {
       // Don't redirect if localStorage might be empty (let client-side handle it)
       console.log('Courier cookie exists, but letting client-side handle localStorage check');
-      // Remove the automatic redirect to prevent loops
-      // return NextResponse.redirect(new URL('/courier', req.url));
+      return next;
     } else if (pathname === '/login' && hasMockAuth) {
+      // If Shopify OAuth params exist, DO NOT redirect away; let client-side handle OAuth initiation
+      const hasShopifyParams = !!(url.searchParams.get('shop') || url.searchParams.get('hmac') || url.searchParams.get('host') || url.searchParams.get('timestamp'));
+      if (hasShopifyParams) {
+        console.log('Shopify params detected on /login; bypassing redirect to allow OAuth flow');
+        return next;
+      }
       console.log('User already authenticated, redirecting to /dashboard');
       return NextResponse.redirect(new URL('/dashboard', req.url));
     }
+
+    return next;
   }
   
   return NextResponse.next();
