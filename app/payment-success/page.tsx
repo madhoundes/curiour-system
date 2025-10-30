@@ -22,6 +22,16 @@ function PaymentSuccessContent() {
   // Get session_id from URL parameters
   const sessionId = searchParams.get('session_id');
 
+  // Immediately redirect to purchase-label page with paid flag
+  useEffect(() => {
+    if (sessionId) {
+      router.replace(`/purchase-label?paid=1&session_id=${sessionId}`);
+    } else {
+      setError('No payment session found.');
+      setIsLoading(false);
+    }
+  }, [sessionId, router]);
+
   useEffect(() => {
     const handlePaymentSuccess = async () => {
       if (!sessionId) {

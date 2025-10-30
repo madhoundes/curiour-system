@@ -52,29 +52,11 @@ export function StripePaymentForm({
   }, [onError]);
 
   const handlePaymentComplete = async () => {
-    console.log('Payment completed successfully');
+    console.log('Payment completed, redirecting to return handler');
     setIsProcessingSuccess(true);
-    
     try {
-      // Extract session ID from client secret
       const sessionId = clientSecret.split('_secret_')[0];
-      console.log('Extracted session ID:', sessionId);
-      
-      // Check session status using the API
-      const sessionStatus = await shippingService.getSessionStatus(sessionId);
-      console.log('Session status:', sessionStatus);
-      
-      if (sessionStatus) {
-        // Redirect to payment success page with session ID
-        router.push(`/payment-success?session_id=${sessionId}`);
-      } else {
-        // Fallback to original onSuccess callback
-        onSuccess();
-      }
-    } catch (error) {
-      console.error('Error checking session status:', error);
-      // Fallback to original onSuccess callback
-      onSuccess();
+      router.replace(`/checkout/return?session_id=${sessionId}`);
     } finally {
       setIsProcessingSuccess(false);
     }
@@ -89,7 +71,7 @@ export function StripePaymentForm({
     <Card className="w-full max-w-2xl mx-auto">
       <CardHeader>
         <CardTitle className="flex items-center">
-          <Icon name="shield" className="mr-2 h-5 w-5 text-green-600" />
+          <Icon name="Shield" className="mr-2 h-5 w-5 text-green-600" />
           Secure Payment
         </CardTitle>
       </CardHeader>
