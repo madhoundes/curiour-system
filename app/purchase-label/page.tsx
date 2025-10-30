@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useShipment } from "@/lib/shipment-context";
 import { shippingService } from "@/lib/api/shipping";
 import { profileService } from "@/lib/api/profile";
@@ -52,6 +52,7 @@ interface OrderData {
 export default function PurchaseLabelPage() {
   console.log('PurchaseLabelPage: Component rendering');
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { formData } = useShipment();
   
   // Enhanced state management
@@ -101,6 +102,22 @@ export default function PurchaseLabelPage() {
       setShipmentError('No order data found. Please go back to quote preview and try again.');
     }
   }, []);
+
+  // Handle redirect back from Stripe return page after successful payment
+  useEffect(() => {
+    const paid = searchParams?.get('paid');
+    const sessionId = searchParams?.get('session_id');
+    if (paid === '1') {
+      // Show success confirmation immediately
+      setShowConfirmation(true);
+      // Optionally, we could clear the paid flag from URL
+      const params = new URLSearchParams(window.location.search);
+      params.delete('paid');
+      const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
+      window.history.replaceState({}, '', newUrl);
+      console.log('Returned from Stripe with paid status. session_id:', sessionId);
+    }
+  }, [searchParams]);
 
   // Calculate total cost including additional services
   const calculateTotalCost = (): number => {
