@@ -11,17 +11,22 @@ import { Progress } from "@/components/ui/progress";
 import { useReactToPrint } from "react-to-print";
 import { formatCurrency } from "@/lib/mock/shipments";
 import { ShippingService } from "@/lib/api/shipping";
-import type { DetailedShipment } from "@/lib/api/types";
+import type { DetailedShipment, ShipmentStatusChange, BillingRecord } from "@/lib/api/types";
 import { generatePdfInvoice } from "@/lib/utils";
 
-// Timeline data with status and completion
-const timelineSteps = [
-  { id: 'label_created', label: 'Label Created', icon: 'FileText', completed: true, active: false },
-  { id: 'scanned', label: 'Scanned at Origin Facility', icon: 'Scan', completed: true, active: false },
-  { id: 'in_transit', label: 'In Transit', icon: 'Truck', completed: true, active: false },
-  { id: 'out_for_delivery', label: 'Out for Delivery', icon: 'Package', completed: true, active: false },
-  { id: 'delivered', label: 'Delivered', icon: 'CheckCircle', completed: true, active: true }
-];
+// Map backend status values to labels and icons for display
+const statusMeta: Record<string, { label: string; icon: string }> = {
+  LABEL_CREATED: { label: 'Label Created', icon: 'FileText' },
+  DROP_OFF_CONFIRMED: { label: 'Drop-off Confirmed', icon: 'MapPin' },
+  RECEIVED_AT_FACILITY: { label: 'Scanned at Origin Facility', icon: 'ScanBarcode' },
+  IN_TRANSIT: { label: 'In Transit', icon: 'Truck' },
+  OUT_FOR_DELIVERY: { label: 'Out for Delivery', icon: 'Package' },
+  DELIVERY_ATTEMPTED: { label: 'Delivery Attempted', icon: 'Clock' },
+  DELIVERED: { label: 'Delivered', icon: 'CheckCircle' },
+  FAILED_DELIVERY: { label: 'Failed Delivery', icon: 'CircleX' },
+  RETURNED_TO_SENDER: { label: 'Returned to Sender', icon: 'RotateCcw' },
+  CANCELLED: { label: 'Cancelled', icon: 'Slash' }
+};
 
 export default function ShipmentDetailPage() {
   const router = useRouter();
@@ -34,6 +39,8 @@ export default function ShipmentDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [statusHistory, setStatusHistory] = useState<ShipmentStatusChange[]>([]);
+  const [billingRecord, setBillingRecord] = useState<BillingRecord | null>(null);
 
   const shippingService = new ShippingService();
 
@@ -54,6 +61,28 @@ export default function ShipmentDetailPage() {
         
         const shipmentData = await shippingService.getShipment(shipmentId);
         setShipment(shipmentData);
+        // Prefer billing from shipment payload
+        if (shipmentData?.billing) {
+          setBillingRecord(shipmentData.billing as unknown as BillingRecord);
+        } else {
+          // Fallback: fetch user billing records and find by shipment_id
+          try {
+            const list = await shippingService.getBillingRecords({ page: 1, per_page: 50 });
+            const match = list.items?.find((b) => b.shipment_id === shipmentId) || null;
+            setBillingRecord(match);
+          } catch (billingErr) {
+            console.error('Failed to load billing record:', billingErr);
+            setBillingRecord(null);
+          }
+        }
+        // Fetch real status history
+        try {
+          const history = await shippingService.getShipmentStatusHistory(shipmentId);
+          setStatusHistory(history);
+        } catch (historyErr) {
+          console.error('Failed to load status history:', historyErr);
+          setStatusHistory([]);
+        }
       } catch (err) {
         console.error('Failed to load shipment:', err);
         setError(err instanceof Error ? err.message : 'Failed to load shipment data');
@@ -384,79 +413,66 @@ export default function ShipmentDetailPage() {
                 <CardDescription>Key shipment milestones and current progress</CardDescription>
               </CardHeader>
               <CardContent>
-                {/* Enhanced Progress Bar */}
+                {/* Progress Bar based on status history */}
                 <div className="mb-6">
                   <div className="flex justify-between text-sm text-gray-600 mb-2">
                     <span className="flex items-center gap-1">
                       <Icon name="TrendingUp" size={14} className="text-green-600" />
                       Progress
                     </span>
-                    <span className="font-medium text-green-600">100% Complete</span>
+                    {(() => {
+                      const total = Math.max(statusHistory.length, 1);
+                      const last = statusHistory[statusHistory.length - 1]?.status;
+                      const pct = last === 'DELIVERED' ? 100 : Math.min(90, Math.round((statusHistory.length / 6) * 100));
+                      return <span className="font-medium text-green-600">{pct}% Complete</span>;
+                    })()}
                   </div>
                   <div className="relative">
-                    <Progress value={100} className="h-3 transition-all duration-1000 ease-out" />
+                    {(() => {
+                      const last = statusHistory[statusHistory.length - 1]?.status;
+                      const pct = last === 'DELIVERED' ? 100 : Math.min(90, Math.round((statusHistory.length / 6) * 100));
+                      return <Progress value={pct} className="h-3 transition-all duration-1000 ease-out" />;
+                    })()}
                     <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-green-600 opacity-20 rounded-full animate-pulse"></div>
                   </div>
                   <div className="mt-2 text-xs text-gray-500 text-center">
-                    All milestones completed successfully
+                    {statusHistory.length > 0 ? 'Live status from shipment history' : 'No history available'}
                   </div>
                 </div>
 
-                {/* Enhanced Timeline Steps */}
+                {/* Real Timeline from API */}
                 <div className="space-y-4">
-                  {timelineSteps.map((step, index) => (
-                    <div key={step.id} className="flex items-start gap-4 group hover:bg-gray-50 p-3 rounded-lg transition-all duration-200">
-                      {/* Timeline Connector */}
-                      <div className="flex flex-col items-center">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 group-hover:scale-110 ${
-                          step.completed 
-                            ? 'bg-green-100 border-green-500 text-green-600 shadow-sm' 
-                            : 'bg-gray-100 border-gray-300 text-gray-400'
-                        }`}>
-                          <Icon 
-                            name={step.icon as string} 
-                            size={18} 
-                            className={step.active ? 'text-green-600' : ''}
-                          />
-                        </div>
-                        {index < timelineSteps.length - 1 && (
-                          <div className={`w-0.5 h-8 mt-2 transition-all duration-300 ${
-                            step.completed ? 'bg-green-300' : 'bg-gray-200'
-                          }`} />
-                        )}
-                      </div>
-
-                      {/* Timeline Content */}
-                      <div className="flex-1 pt-1">
-                        <div className={`font-medium transition-colors duration-300 ${
-                          step.completed ? 'text-gray-900' : 'text-gray-500'
-                        }`}>
-                          {step.label}
-                        </div>
-                        {step.active && (
-                          <div className="mt-1">
-                            <Badge variant="default" className="bg-green-100 text-green-800 border-green-200 animate-pulse">
-                              <Icon name="CheckCircle" size={14} className="mr-1" />
-                              Completed
-                            </Badge>
+                  {statusHistory.map((evt, index) => {
+                    const meta = statusMeta[evt.status] || { label: evt.status.replace(/_/g, ' '), icon: 'Info' };
+                    const isDelivered = evt.status === 'DELIVERED';
+                    return (
+                      <div key={evt.id} className="flex items-start gap-4 group hover:bg-gray-50 p-3 rounded-lg transition-all duration-200">
+                        <div className="flex flex-col items-center">
+                          <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all duration-300 group-hover:scale-110 ${
+                            isDelivered ? 'bg-green-100 border-green-500 text-green-600 shadow-sm' : 'bg-gray-100 border-gray-300 text-gray-600'
+                          }`}>
+                            <Icon name={meta.icon} size={18} />
                           </div>
-                        )}
-                        {step.id === 'delivered' && (
-                          <div className="mt-2 text-sm text-gray-600 bg-green-50 p-2 rounded border border-green-200">
-                            <div className="flex items-center gap-2">
-                              <Icon name="Calendar" size={14} className="text-green-600" />
-                              <span>Delivered on {new Date(shipment.created_at).toLocaleDateString()} at 9:56 PM</span>
-                            </div>
+                          {index < statusHistory.length - 1 && (
+                            <div className={`w-0.5 h-8 mt-2 transition-all duration-300 ${
+                              isDelivered ? 'bg-green-300' : 'bg-gray-200'
+                            }`} />
+                          )}
+                        </div>
+                        <div className="flex-1 pt-1">
+                          <div className="font-medium text-gray-900">
+                            {meta.label}
                           </div>
-                        )}
-                        {step.completed && step.id !== 'delivered' && (
                           <div className="mt-1 text-xs text-gray-500">
-                            ✓ Completed successfully
+                            {new Date(evt.created_at).toLocaleString()}
                           </div>
-                        )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
+                  {statusHistory.length === 0 && (
+                    <div className="text-sm text-gray-500">No tracking events recorded yet.</div>
+                  )}
                 </div>
 
                 {/* Enhanced Timeline Summary */}
@@ -592,20 +608,33 @@ export default function ShipmentDetailPage() {
                 <CardTitle>Payment Summary</CardTitle>
               </CardHeader>
               <CardContent>
-                {shipment.billing ? (
+                {billingRecord ? (
                   <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span>Subtotal:</span>
-                      <span>${shipment.billing.subtotal}</span>
+                    <div className="flex justify-between text-sm">
+                      <span>Status:</span>
+                      <span className="font-medium">{billingRecord.payment_status?.toUpperCase()}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span>Tax:</span>
-                      <span>${shipment.billing.tax_amount}</span>
+                      <span>Subtotal:</span>
+                      <span>${parseFloat(billingRecord.subtotal).toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Tax ({(parseFloat(billingRecord.tax_rate) * 100).toFixed(1)}%):</span>
+                      <span>${parseFloat(billingRecord.tax_amount).toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between font-semibold">
                       <span>Total:</span>
-                      <span>{formatCurrency(parseFloat(shipment.billing.amount))}</span>
+                      <span>{formatCurrency(parseFloat(billingRecord.amount))}</span>
                     </div>
+                    {billingRecord.paid_at && (
+                      <div className="flex justify-between text-sm">
+                        <span>Paid at:</span>
+                        <span>{new Date(billingRecord.paid_at).toLocaleString()}</span>
+                      </div>
+                    )}
+                    {billingRecord.stripe_checkout_session_id && (
+                      <div className="text-xs text-gray-500 break-all">Session: {billingRecord.stripe_checkout_session_id}</div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-gray-500">No billing information available</p>
