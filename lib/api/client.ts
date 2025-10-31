@@ -202,6 +202,24 @@ class ApiClient {
         };
       }
 
+      // Handle 401 Unauthorized - try to refresh token if not already a refresh attempt
+      if (response.status === 401 && !config.url.includes('refresh') && attempt === 1) {
+        try {
+          const { authService } = await import('./auth');
+          await authService.refreshToken();
+          
+          // Retry the original request with the new token
+          return this.makeRequest<T>(config, attempt + 1);
+        } catch (refreshError) {
+          // If refresh fails, remove invalid token and throw original error
+          this.removeAuthToken();
+          if (typeof window !== 'undefined') {
+            window.location.href = '/login';
+          }
+          throw this.handleError(responseData, response.status);
+        }
+      }
+
       // Handle error responses
       const errorResponse = this.handleError(responseData, response.status);
       
