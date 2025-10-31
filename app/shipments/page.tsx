@@ -181,11 +181,31 @@ export default function ShipmentsPage() {
         let shipments: DetailedShipment[];
         
         if (query.trim()) {
-          // Use search API when there's a search query
-          shipments = await shippingService.searchShipments(query, {
-            skip: pageIndex * pageSize,
-            limit: pageSize
-          });
+          const raw = query.trim();
+          const isId = /^\d+$/.test(raw);
+          const isTracking = /^[A-Za-z0-9-]{1,50}$/.test(raw);
+          if (!isId && !isTracking) {
+            const listParams: any = { skip: pageIndex * pageSize, limit: pageSize };
+            if (selectedStatus !== 'ALL') listParams.status = selectedStatus;
+            const listResp = await shippingService.getShipments(listParams);
+            const q = raw.toLowerCase();
+            shipments = listResp.filter(s => s.tracking_code?.toLowerCase().includes(q) || String(s.id).includes(q));
+          } else {
+            // Use search API when there's a search query, with graceful fallback
+            try {
+              shipments = await shippingService.searchShipments(raw, {
+                skip: pageIndex * pageSize,
+                limit: pageSize
+              });
+            } catch (searchErr: any) {
+              console.warn('Search API failed, falling back to list+client filter:', searchErr);
+              const listParams: any = { skip: pageIndex * pageSize, limit: pageSize };
+              if (selectedStatus !== 'ALL') listParams.status = selectedStatus;
+              const listResp = await shippingService.getShipments(listParams);
+              const q = raw.toLowerCase();
+              shipments = listResp.filter(s => s.tracking_code?.toLowerCase().includes(q) || String(s.id).includes(q));
+            }
+          }
         } else {
           // Use list API for normal loading
           const params: any = {
@@ -388,14 +408,21 @@ export default function ShipmentsPage() {
   };
 
   const filtered = useMemo(() => {
-    // Since we're now handling filtering server-side via API calls,
-    // we just return the allShipments data directly
     if (!isDataLoaded || !Array.isArray(allShipments) || allShipments.length === 0) return [];
     
-    // Sort: most recent first (in case API doesn't sort)
-    const list = allShipments.slice().sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+    let list = allShipments.slice();
+    // Client-side filter fallback to ensure UX even if backend ignores params
+    if (selectedStatus !== 'ALL') {
+      list = list.filter(s => (s.status?.toUpperCase?.() || s.status) === selectedStatus);
+    }
+    if (query.trim()) {
+      const q = query.trim().toLowerCase();
+      list = list.filter(s => s.tracking_code?.toLowerCase().includes(q) || String(s.id).includes(q));
+    }
+    // Sort: most recent first
+    list.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
     return list;
-  }, [allShipments, isDataLoaded]);
+  }, [allShipments, isDataLoaded, selectedStatus, query]);
 
   // Log selection changes for debugging (removed empty effect to prevent warnings)
   React.useEffect(() => {
@@ -504,7 +531,7 @@ export default function ShipmentsPage() {
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1 relative">
               <Input
-                placeholder="Search shipments by tracking number, recipient, or address..."
+                placeholder="Search by tracking code or shipment ID..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="w-full"
@@ -561,9 +588,9 @@ export default function ShipmentsPage() {
                 <Button
                   variant="destructive"
                   onClick={() => setShowDeleteDialog(true)}
-                  aria-label="Delete selected shipments"
+                  aria-label="Cancel selected shipments"
                 >
-                  <Icon name="Trash2" size={16} className="mr-2" /> Delete
+                  <Icon name="XCircle" size={16} className="mr-2" /> Cancel
                 </Button>
               </div>
             </CardContent>
@@ -794,27 +821,53 @@ export default function ShipmentsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Bulk Cancel Confirmation Dialog */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent id="parcego-delete-shipments-dialog">
+        <AlertDialogContent id="parcego-cancel-shipments-dialog">
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Selected Shipments</AlertDialogTitle>
+            <AlertDialogTitle>Cancel Selected Shipments</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete {selectedIds.size} selected shipment{selectedIds.size === 1 ? '' : 's'}. This action cannot be undone.
+              This will change the status of {selectedIds.size} selected shipment{selectedIds.size === 1 ? '' : 's'} to <strong>Cancelled</strong>.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel id="parcego-delete-shipments-cancel-btn">Cancel</AlertDialogCancel>
+            <AlertDialogCancel id="parcego-cancel-shipments-cancel-btn">Close</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={() => {
-                setSelectedIds(new Set());
-                setShowDeleteDialog(false);
+              onClick={async () => {
+                try {
+                  setIsLoading(true);
+                  const ids = Array.from(selectedIds);
+                  // Backend does not support DELETE; mark as CANCELLED instead
+                  for (const id of ids) {
+                    try {
+                      await shippingService.updateShipmentStatus(id, {
+                        status: 'CANCELLED',
+                        change_reason: 'Deleted by user from list'
+                      });
+                    } catch (innerErr) {
+                      console.warn('Failed to cancel shipment', id, innerErr);
+                    }
+                  }
+                  setSelectedIds(new Set());
+                  setShowDeleteDialog(false);
+                  // reload current page
+                  const params: any = { skip: pageIndex * pageSize, limit: pageSize };
+                  if (selectedStatus !== 'ALL') params.status = selectedStatus;
+                  const list = query.trim()
+                    ? await shippingService.searchShipments(query, { skip: pageIndex * pageSize, limit: pageSize })
+                    : await shippingService.getShipments(params);
+                  setAllShipments(list);
+                } catch (e: any) {
+                  alert(e?.message || 'Failed to update shipment status');
+                } finally {
+                  setIsLoading(false);
+                }
               }}
-              id="parcego-delete-shipments-confirm-btn"
+              id="parcego-cancel-shipments-confirm-btn"
               className="bg-red-600 hover:bg-red-700 focus:ring-red-500"
             >
-              <Icon name="Trash2" size={16} className="mr-2" />
-              Delete Shipments
+              <Icon name="XCircle" size={16} className="mr-2" />
+              Cancel Shipments
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

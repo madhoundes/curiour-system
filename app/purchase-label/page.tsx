@@ -748,7 +748,7 @@ function PurchaseLabelContent() {
             <div className="bg-white rounded-lg p-6 border border-gray-200">
               <h3 className="text-lg font-semibold text-gray-900 text-center mb-4">Order Details</h3>
               
-              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="space-y-1">
                   <span className="font-medium text-gray-800">Tracking Number:</span>
                   <p className="text-gray-900 font-mono text-base">{trackingNumber}</p>
@@ -767,11 +767,17 @@ function PurchaseLabelContent() {
                 </div>
                 <div className="space-y-1">
                   <span className="font-medium text-gray-800">Delivery Time:</span>
-                  <p className="text-gray-900">{formData?.selectedQuote?.deliveryTime || 'N/A'}</p>
+                  <p className="text-gray-900">{orderData?.selectedQuote?.deliveryTime || 'N/A'}</p>
                 </div>
                 <div className="space-y-1">
                   <span className="font-medium text-gray-800">Total Paid:</span>
-                  <p className="text-gray-900 font-semibold text-base">${formData?.selectedQuote?.price || 'N/A'}</p>
+                  <p className="text-gray-900 font-semibold text-base">
+                    {billingData?.amount 
+                      ? `$${parseFloat(billingData.amount).toFixed(2)}` 
+                      : (orderData?.selectedQuote?.price !== undefined 
+                          ? `$${Number(orderData.selectedQuote.price).toFixed(2)}` 
+                          : '$N/A')}
+                  </p>
                 </div>
               </div>
             </div>
