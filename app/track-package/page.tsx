@@ -3,30 +3,102 @@
 import React, { Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import { TrackingTimeline } from "@/components/tracking/tracking-timeline"
-import { formatTrackingNumber, isValidTrackingNumber, getTrackingData } from "@/lib/mock/tracking"
+import { formatTrackingNumber, isValidTrackingNumber } from "@/lib/mock/tracking"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import Icon from "@/components/ui/icon"
 import ProofOfDeliveryGallery from "@/components/tracking/proof-of-delivery-gallery"
-import TrackingDemoExamples from "@/components/tracking/tracking-demo-examples"
+import { trackingService } from "@/lib/api/tracking"
+import type { PublicTrackingResponse, TrackingStatusHistoryItem, ShipmentStatus } from "@/lib/api/types"
+import type { TrackingEvent, ShipmentStatus as MockShipmentStatus } from "@/lib/mock/tracking"
 
-const DEFAULT_TRACKING = "ASH-20250910-ABC123"
+// Helper function to transform API status to mock status format
+const transformStatus = (apiStatus: ShipmentStatus): MockShipmentStatus => {
+  const statusMap: Record<string, MockShipmentStatus> = {
+    'DRAFT': 'LabelCreated',
+    'PENDING_PAYMENT': 'LabelCreated',
+    'PAID': 'LabelCreated',
+    'LABEL_GENERATED': 'LabelCreated',
+    'PICKED_UP': 'DropoffConfirmed',
+    'IN_WAREHOUSE': 'ReceivedAtFacility',
+    'IN_TRANSIT': 'InTransit',
+    'OUT_FOR_DELIVERY': 'OutForDelivery',
+    'DELIVERY_ATTEMPTED': 'DeliveryAttempted',
+    'DELIVERED': 'Delivered',
+    'UNDELIVERED': 'FailedDelivery',
+    'CANCELLED': 'Cancelled',
+  }
+  return statusMap[apiStatus] || 'LabelCreated'
+}
+
+// Helper function to get event type from status change
+const getEventType = (status: ShipmentStatus, previousStatus: ShipmentStatus): string => {
+  const eventTypeMap: Record<string, string> = {
+    'LABEL_GENERATED': 'LABEL_CREATED',
+    'PICKED_UP': 'DROP_OFF_CONFIRMED',
+    'IN_WAREHOUSE': 'SCANNED_AT_FACILITY',
+    'IN_TRANSIT': 'IN_TRANSIT_DEPARTED',
+    'OUT_FOR_DELIVERY': 'OUT_FOR_DELIVERY',
+    'DELIVERY_ATTEMPTED': 'DELIVERY_ATTEMPTED',
+    'DELIVERED': 'DELIVERED',
+    'UNDELIVERED': 'DELIVERY_FAILED',
+    'CANCELLED': 'CANCELLED',
+  }
+  return eventTypeMap[status] || 'NOTE_ADDED'
+}
+
+// Transform API status history to tracking events
+const transformStatusHistoryToEvents = (statusHistory: TrackingStatusHistoryItem[]): TrackingEvent[] => {
+  return statusHistory.map((item, index) => {
+    const eventType = getEventType(item.status as ShipmentStatus, item.previous_status as ShipmentStatus)
+    const statusAfter = transformStatus(item.status as ShipmentStatus)
+    
+    return {
+      id: `evt-${String(statusHistory.length - index).padStart(3, '0')}`,
+      timestamp: item.timestamp,
+      type: eventType,
+      statusAfter,
+      location: '', // Location not available in public tracking response
+      actor: 'system',
+      details: item.notes || undefined,
+    } as TrackingEvent
+  }).reverse() // Reverse to show oldest first
+}
+
+// Transform API public tracking response to tracking summary
+const transformTrackingResponseToSummary = (trackingResponse: PublicTrackingResponse): {
+  status: string;
+  eta: string;
+  origin: string;
+  destination: string;
+  carrier: string;
+  lastUpdate: string;
+  hasPOD: boolean;
+} => {
+  const currentStatus = transformStatus(trackingResponse.current_status as ShipmentStatus)
+  
+  return {
+    status: currentStatus,
+    eta: trackingResponse.estimated_delivery_date || '',
+    origin: trackingResponse.sender_company || 'Origin',
+    destination: trackingResponse.receiver_city && trackingResponse.receiver_province 
+      ? `${trackingResponse.receiver_city}, ${trackingResponse.receiver_province}`
+      : trackingResponse.receiver_company || 'Destination',
+    carrier: 'Parcego',
+    lastUpdate: trackingResponse.last_updated || trackingResponse.created_at,
+    hasPOD: trackingResponse.current_status === 'DELIVERED' && trackingResponse.delivery_photos.length > 0,
+  }
+}
 
 function TrackPackageContent() {
   const router = useRouter()
   const search = useSearchParams()
-  const initial = formatTrackingNumber(search.get("tracking") || DEFAULT_TRACKING)
+  const initial = formatTrackingNumber(search.get("tracking") || "")
   const [tracking, setTracking] = React.useState<string>(initial)
   const [heroTracking, setHeroTracking] = React.useState<string>("")
-  const [showTimeline, setShowTimeline] = React.useState<boolean>(true)
-  interface TrackingEvent {
-    id: string;
-    type: string;
-    status: string;
-    location: string;
-    timestamp: string;
-    description: string;
-  }
+  const [showTimeline, setShowTimeline] = React.useState<boolean>(false)
+  const [loading, setLoading] = React.useState<boolean>(false)
+  const [error, setError] = React.useState<string | null>(null)
 
   interface TrackingSummary {
     status: string;
@@ -40,34 +112,77 @@ function TrackPackageContent() {
 
   const [trackingData, setTrackingData] = React.useState<{ events: TrackingEvent[]; summary: TrackingSummary } | null>(null)
 
-  React.useEffect(() => {
-    const isValid = isValidTrackingNumber(initial)
-    setShowTimeline(isValid)
-    
-    if (isValid) {
-      const data = getTrackingData(initial)
-      setTrackingData(data)
-    } else {
+  const fetchTrackingData = React.useCallback(async (trackingNumber: string) => {
+    if (!isValidTrackingNumber(trackingNumber)) {
+      setLoading(false)
       setTrackingData(null)
+      setShowTimeline(false)
+      setError('Invalid tracking number format. Please use format: ASH-YYYYMMDD-XXXXXX')
+      return
     }
-  }, [initial])
+
+    setLoading(true)
+    setError(null)
+    setTrackingData(null)
+    setShowTimeline(false)
+
+    try {
+      // Use public tracking endpoint (no authentication required)
+      const trackingResponse = await trackingService.trackShipment(trackingNumber)
+      
+      // Transform API data to component format
+      const events = transformStatusHistoryToEvents(trackingResponse.status_history || [])
+      const summary = transformTrackingResponseToSummary(trackingResponse)
+      
+      setTrackingData({ events, summary })
+      setShowTimeline(true)
+      setError(null)
+    } catch (err: any) {
+      // Extract error message from the error object
+      let errorMessage = 'Failed to load tracking information. Please try again.'
+      
+      // Priority: err.message (from Error thrown by trackingService) > err.details > status checks
+      if (err instanceof Error && err.message) {
+        errorMessage = err.message
+      } else if (err?.message) {
+        errorMessage = err.message
+      } else if (err?.details) {
+        // Handle details if it's a string, array, or object
+        if (typeof err.details === 'string') {
+          errorMessage = err.details
+        } else if (Array.isArray(err.details) && err.details.length > 0) {
+          errorMessage = err.details[0]?.message || err.details[0]?.msg || String(err.details[0])
+        } else {
+          errorMessage = String(err.details)
+        }
+      } else if (err?.response?.status === 404) {
+        errorMessage = 'Tracking number not found. Please verify the tracking number and try again.'
+      } else if (err?.response?.status === 422) {
+        errorMessage = 'Invalid tracking number format. Please use format: ASH-YYYYMMDD-XXXXXX'
+      } else if (err?.message?.includes('Network') || err?.message?.includes('fetch')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.'
+      }
+      
+      // Always set the error to display in UI - ensure loading is false first
+      setLoading(false)
+      setError(errorMessage)
+      setTrackingData(null)
+      setShowTimeline(false)
+    } finally {
+      // Ensure loading is always false, even if error handling fails
+      setLoading(false)
+    }
+  }, [])
+
+  // Only fetch tracking data when manually triggered (button click)
+  // No auto-search on page load or URL change
 
   const handleSubmit = (tn: string) => {
     const formatted = formatTrackingNumber(tn)
     setTracking(formatted)
     setHeroTracking(formatted) // Also update the hero input
-    
-    const isValid = isValidTrackingNumber(formatted)
-    setShowTimeline(isValid)
-    
-    if (isValid) {
-      const data = getTrackingData(formatted)
-      setTrackingData(data)
-    } else {
-      setTrackingData(null)
-    }
-    
     router.push(`/track-package?tracking=${encodeURIComponent(formatted)}`)
+    fetchTrackingData(formatted)
   }
 
   const handleHeroSubmit = () => {
@@ -135,17 +250,46 @@ function TrackPackageContent() {
         </div>
       </section>
 
-      {/* Demo Examples Section */}
-      <section className="container mx-auto max-w-7xl px-4 pb-8">
-        <TrackingDemoExamples onTrackingSelect={handleSubmit} />
-      </section>
-
-      {showTimeline && trackingData ? (
+      {loading ? (
+        <section className="container mx-auto max-w-7xl px-4 pb-16">
+          <div className="text-center py-16">
+            <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading tracking information...</p>
+          </div>
+        </section>
+      ) : error ? (
+        <section className="container mx-auto max-w-7xl px-4 pb-16">
+          <div className="text-center py-16">
+            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Icon name="AlertCircle" className="w-10 h-10 text-red-600" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to Track Shipment</h3>
+            <div className="bg-red-50 border-2 border-red-300 rounded-lg p-6 max-w-md mx-auto mb-4 shadow-md">
+              <p className="text-red-900 font-semibold text-base leading-relaxed">
+                {error || 'An error occurred while tracking your shipment.'}
+              </p>
+            </div>
+            <Button
+              onClick={() => {
+                setError(null)
+                fetchTrackingData(tracking)
+              }}
+              variant="outline"
+              className="mb-2"
+            >
+              Try Again
+            </Button>
+            <p className="text-xs text-gray-400 mt-4">
+              Tracking Number: <span className="font-mono font-semibold">{tracking}</span>
+            </p>
+          </div>
+        </section>
+      ) : showTimeline && trackingData ? (
         <section className="container mx-auto max-w-7xl px-4 pb-16">
           <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
             {/* Main Timeline */}
             <div className="space-y-6">
-              <TrackingTimeline events={trackingData.events} currentStatus={trackingData.summary.status} estimatedDelivery={trackingData.summary.eta} />
+              <TrackingTimeline events={trackingData.events} currentStatus={trackingData.summary.status as MockShipmentStatus} estimatedDelivery={trackingData.summary.eta} />
             </div>
             
             {/* Sidebar */}
@@ -204,7 +348,7 @@ function TrackPackageContent() {
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No Tracking Data</h3>
             <p className="text-gray-500 max-w-md mx-auto">
-              Enter tracking number (ASH-YYYYMMDD-XXXXXX) to view shipment details.
+              Enter tracking number to view shipment details.
             </p>
           </div>
         </section>
