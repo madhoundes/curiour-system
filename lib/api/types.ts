@@ -894,33 +894,54 @@ export interface DriverStatisticsResponse {
   undelivered_shipments: number;
 }
 
-// Public Tracking Types (no authentication required)
+/**
+ * Public Tracking Types (no authentication required)
+ * 
+ * These types are used for public tracking endpoints:
+ * - GET /track/{tracking_code} - Full tracking information
+ * - GET /track/status/{tracking_code} - Current status only
+ */
+
+/**
+ * Status history item from public tracking API
+ */
 export interface TrackingStatusHistoryItem {
   status: string;
   previous_status: string;
-  timestamp: string;
+  timestamp: string; // ISO 8601 timestamp
   notes?: string;
 }
 
+/**
+ * Full tracking response from GET /track/{tracking_code}
+ * 
+ * Returns complete shipment information including status history,
+ * sender/receiver details, delivery dates, and proof of delivery photos.
+ */
 export interface PublicTrackingResponse {
   tracking_code: string;
-  current_status: string;
+  current_status: string; // DRAFT | PENDING_PAYMENT | PAID | LABEL_GENERATED | PICKED_UP | IN_WAREHOUSE | IN_TRANSIT | OUT_FOR_DELIVERY | DELIVERED | DELIVERY_ATTEMPTED | UNDELIVERABLE | CANCELLED
   status_history: TrackingStatusHistoryItem[];
   sender_company?: string;
   receiver_company?: string;
   receiver_city?: string;
   receiver_province?: string;
-  estimated_delivery_date?: string;
-  actual_delivery_date?: string;
-  delivery_photos: string[];
-  created_at: string;
-  last_updated: string;
+  estimated_delivery_date?: string; // ISO 8601 timestamp
+  actual_delivery_date?: string; // ISO 8601 timestamp
+  delivery_photos: string[]; // Array of photo URLs
+  created_at: string; // ISO 8601 timestamp
+  last_updated: string; // ISO 8601 timestamp
 }
 
+/**
+ * Lightweight status response from GET /track/status/{tracking_code}
+ * 
+ * Returns only current status for quick checks without full history.
+ */
 export interface PublicStatusResponse {
   tracking_code: string;
-  current_status: string;
-  last_updated: string;
+  current_status: string; // DRAFT | PENDING_PAYMENT | PAID | LABEL_GENERATED | PICKED_UP | IN_WAREHOUSE | IN_TRANSIT | OUT_FOR_DELIVERY | DELIVERED | DELIVERY_ATTEMPTED | UNDELIVERABLE | CANCELLED
+  last_updated: string; // ISO 8601 timestamp
 }
 
 // Notification Subscription Types

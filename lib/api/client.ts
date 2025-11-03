@@ -126,11 +126,21 @@ class ApiClient {
     }
 
     // Other API errors
+    // Extract details - can be string or nested in detail property
+    let details: any = undefined;
+    if (error.detail) {
+      details = error.detail;
+    } else if (error.details) {
+      details = error.details;
+    } else if (typeof error === 'string') {
+      details = error;
+    }
+    
     return {
       error: error.error || 'API Error',
       message: error.message || 'An unexpected error occurred.',
       status: status || 500,
-      details: error.detail,
+      details: details,
     };
   }
 

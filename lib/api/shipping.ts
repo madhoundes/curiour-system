@@ -107,15 +107,24 @@ export class ShippingService {
 
       const response = await apiClient.get<DetailedShipment[]>(
         API_ENDPOINTS.SHIPMENTS.SEARCH,
-        { params: searchParams }
+        searchParams
       );
 
       return response.data;
     } catch (error: any) {
       if (error.response?.status === 401) {
-        throw new Error('Authentication required');
+        throw new Error('Authentication required. Please log in to search shipments.');
       }
-      throw new Error(error.message || 'Failed to search shipments');
+      if (error.response?.status === 403) {
+        throw new Error('Access denied. You do not have permission to search shipments.');
+      }
+      if (error.response?.status === 404) {
+        throw new Error('No shipments found matching your search.');
+      }
+      if (error.response?.status === 422) {
+        throw new Error('Invalid search parameters provided.');
+      }
+      throw new Error(error.message || 'Failed to search shipments. Please try again.');
     }
   }
 
