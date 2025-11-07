@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Icon } from "@/components/ui/icon"
 import { Button } from "@/components/ui/button"
 import { GetInstantShippingQuoteModal } from "./get-instant-shipping-quote-modal"
@@ -8,6 +9,7 @@ import { api } from "@/lib/api"
 import type { UserProfile } from "@/lib/api/types"
 
 export function WelcomeBanner() {
+  const router = useRouter()
   const [showQuoteModal, setShowQuoteModal] = useState(false)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -17,9 +19,22 @@ export function WelcomeBanner() {
       try {
         const userProfileData = await api.profile.getProfile()
         setUserProfile(userProfileData)
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to fetch user profile:', error)
-        // Set userProfile to null if API fails - no fallback mock data
+        
+        // Handle authentication errors by redirecting to login
+        const status = error?.status || error?.response?.status;
+        if (status === 401 || status === 403) {
+          console.log('Authentication failed, redirecting to login')
+          // Clear any stale auth data
+          localStorage.removeItem('auth_token')
+          document.cookie = "mock-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+          // Redirect to login
+          router.push('/login')
+          return
+        }
+        
+        // Set userProfile to null if API fails for other reasons
         setUserProfile(null)
       } finally {
         setIsLoading(false)
@@ -27,7 +42,7 @@ export function WelcomeBanner() {
     }
 
     fetchUserProfile()
-  }, [])
+  }, [router])
 
   const displayName = userProfile 
     ? `${userProfile.first_name} ${userProfile.last_name}`

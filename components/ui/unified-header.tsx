@@ -31,15 +31,28 @@ export function UnifiedHeader({ onSidebarToggle }: UnifiedHeaderProps) {
       try {
         const userProfileData = await api.profile.getProfile()
         setUserProfile(userProfileData)
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to fetch user profile:', error)
-        // Set userProfile to null if API fails - no fallback mock data
+        
+        // Handle authentication errors by redirecting to login
+        const status = error?.status || error?.response?.status;
+        if (status === 401 || status === 403) {
+          console.log('Authentication failed, redirecting to login')
+          // Clear any stale auth data
+          localStorage.removeItem('auth_token')
+          document.cookie = "mock-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+          // Redirect to login
+          router.push('/login')
+          return
+        }
+        
+        // Set userProfile to null if API fails for other reasons
         setUserProfile(null)
       }
     }
 
     fetchUserProfile()
-  }, [])
+  }, [router])
 
   const displayName = userProfile 
     ? `${userProfile.first_name} ${userProfile.last_name}`

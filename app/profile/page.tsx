@@ -207,6 +207,9 @@ export default function ProfileAccountPage() {
         
         businessForm.reset(businessData);
         
+        // Store original data for cancel functionality
+        setOriginalBusinessData(businessData);
+        
         // Update email state
         setUserEmail(profileData.email || "");
         
@@ -221,7 +224,11 @@ export default function ProfileAccountPage() {
         // Load other data from localStorage as fallback for now
         const s = localStorage.getItem(STORAGE_KEYS.settings);
         const i = localStorage.getItem(STORAGE_KEYS.integrations);
-        if (s) settingsForm.reset(JSON.parse(s));
+        if (s) {
+          const settingsData = JSON.parse(s);
+          settingsForm.reset(settingsData);
+          setOriginalSettingsData(settingsData);
+        }
         if (i) integrationsForm.reset(JSON.parse(i));
         
       } catch (error: any) {
@@ -234,8 +241,16 @@ export default function ProfileAccountPage() {
           const s = localStorage.getItem(STORAGE_KEYS.settings);
           const n = localStorage.getItem(STORAGE_KEYS.notifications);
           const i = localStorage.getItem(STORAGE_KEYS.integrations);
-          if (b) businessForm.reset(JSON.parse(b));
-          if (s) settingsForm.reset(JSON.parse(s));
+          if (b) {
+            const businessData = JSON.parse(b);
+            businessForm.reset(businessData);
+            setOriginalBusinessData(businessData);
+          }
+          if (s) {
+            const settingsData = JSON.parse(s);
+            settingsForm.reset(settingsData);
+            setOriginalSettingsData(settingsData);
+          }
           if (n) notificationsForm.reset(JSON.parse(n));
           if (i) integrationsForm.reset(JSON.parse(i));
         } catch {}
@@ -271,6 +286,10 @@ export default function ProfileAccountPage() {
   const [settingsMsg, setSettingsMsg] = useState<string | null>(null);
   const [notificationsMsg, setNotificationsMsg] = useState<string | null>(null);
   const [integrationsMsg, setIntegrationsMsg] = useState<string | null>(null);
+  
+  // Store original form values for cancel functionality
+  const [originalBusinessData, setOriginalBusinessData] = useState<BusinessInfo | null>(null);
+  const [originalSettingsData, setOriginalSettingsData] = useState<AccountSettings | null>(null);
 
   const handleSave = async <T,>(key: string, data: T, onOk: (msg: string) => void, label: string) => {
     // For business info, use API; for others, use localStorage for now
@@ -304,6 +323,14 @@ export default function ProfileAccountPage() {
         
         // Also save to localStorage as backup
         localStorage.setItem(key, JSON.stringify(data));
+        
+        // Update original data after successful save
+        if (key === STORAGE_KEYS.business) {
+          setOriginalBusinessData(data as BusinessInfo);
+        } else if (key === STORAGE_KEYS.settings) {
+          setOriginalSettingsData(data as AccountSettings);
+        }
+        
         onOk(`${label} saved successfully`);
       } catch (error: any) {
         console.error('Failed to save profile:', error);
@@ -313,6 +340,12 @@ export default function ProfileAccountPage() {
       // For other data types, use localStorage
       try {
         localStorage.setItem(key, JSON.stringify(data));
+        
+        // Update original data after successful save
+        if (key === STORAGE_KEYS.settings) {
+          setOriginalSettingsData(data as AccountSettings);
+        }
+        
         onOk(`${label} saved`);
       } catch {
         onOk(`Could not save ${label}`);
@@ -320,9 +353,14 @@ export default function ProfileAccountPage() {
     }
   };
 
-  const handleReset = <T,>(resetFn: (v: T) => void, defaults: T, onOk: (msg: string) => void, label: string) => {
-    resetFn(defaults);
-    onOk(`${label} reset`);
+  const handleCancel = (formType: 'business' | 'settings') => {
+    if (formType === 'business' && originalBusinessData) {
+      businessForm.reset(originalBusinessData);
+      setBusinessMsg(null); // Clear any existing messages
+    } else if (formType === 'settings' && originalSettingsData) {
+      settingsForm.reset(originalSettingsData);
+      setSettingsMsg(null); // Clear any existing messages
+    }
   };
 
   const handleShopifyConnect = async () => {
@@ -711,11 +749,11 @@ export default function ProfileAccountPage() {
                         </Button>
                         <Button
                           type="button"
-                          variant="ghost"
-                          onClick={() => handleReset(businessForm.reset, defaultBusiness, setBusinessMsg, "Business info")}
-                          aria-label="Reset business information to defaults"
+                          variant="outline"
+                          onClick={() => handleCancel('business')}
+                          aria-label="Cancel changes and revert to last saved values"
                         >
-                          Reset
+                          Cancel
                         </Button>
                       </div>
                     </form>
@@ -813,11 +851,11 @@ export default function ProfileAccountPage() {
                         </Button>
                         <Button
                           type="button"
-                          variant="ghost"
-                          onClick={() => handleReset(settingsForm.reset, defaultSettings, setSettingsMsg, "Settings")}
-                          aria-label="Reset account settings to defaults"
+                          variant="outline"
+                          onClick={() => handleCancel('settings')}
+                          aria-label="Cancel changes and revert to last saved values"
                         >
-                          Reset
+                          Cancel
                         </Button>
                       </div>
                     </form>

@@ -1,10 +1,12 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Icon } from "@/components/ui/icon"
 import { adminService } from "@/lib/api/admin"
 import type { UserStatisticsResponse } from "@/lib/api/types"
+import { withReAuth } from "@/lib/utils/re-auth"
 
 interface PerformanceMetric {
   metric: string
@@ -59,6 +61,7 @@ function calculatePerformanceMetrics(data: UserStatisticsResponse): PerformanceM
 }
 
 export function PerformanceSummary() {
+  const router = useRouter()
   const [performanceData, setPerformanceData] = useState<PerformanceMetric[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -68,11 +71,30 @@ export function PerformanceSummary() {
       try {
         setLoading(true)
         setError(null)
-        const response = await adminService.getCurrentUserStatistics()
+        
+        // Use withReAuth to automatically handle 401 errors and re-authenticate
+        const response = await withReAuth(async () => {
+          return await adminService.getCurrentUserStatistics()
+        })
+        
         const metrics = calculatePerformanceMetrics(response.data)
         setPerformanceData(metrics)
-      } catch (err) {
+      } catch (err: any) {
         console.error('Failed to fetch performance data:', err)
+        
+        // Check if it's an authentication error (401 or 403)
+        const status = err?.status || err?.response?.status;
+        const isUnauthorized = status === 401 || status === 403;
+        
+        if (isUnauthorized) {
+          // Clear auth data and redirect to login
+          console.log('Authentication failed, redirecting to login')
+          localStorage.removeItem('auth_token')
+          document.cookie = "mock-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+          router.push('/login')
+          return
+        }
+        
         setError('Failed to load performance data')
       } finally {
         setLoading(false)
@@ -80,7 +102,7 @@ export function PerformanceSummary() {
     }
 
     fetchPerformanceData()
-  }, [])
+  }, [router])
   return (
     <Card>
       <CardHeader>

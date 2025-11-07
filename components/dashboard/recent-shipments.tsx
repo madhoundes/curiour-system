@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { shippingService } from "@/lib/api/shipping"
 import { useState, useEffect } from "react"
 import type { DetailedShipment } from "@/lib/api/types"
+import { withReAuth } from "@/lib/utils/re-auth"
 
 interface RecentShipment {
   id: string
@@ -90,19 +91,35 @@ export function RecentShipments() {
       setIsLoading(true)
       setError(null)
       
-      // Fetch recent shipments from the API (limit to 5 for dashboard)
-      const apiShipments = await shippingService.getShipments({ 
-        limit: 5,
-        skip: 0 
+      // Use withReAuth to automatically handle 401 errors and re-authenticate
+      const apiShipments = await withReAuth(async () => {
+        return await shippingService.getShipments({ 
+          limit: 5,
+          skip: 0 
+        })
       })
       
       // Transform API data to match our interface
       const transformedShipments: RecentShipment[] = apiShipments.map(transformShipmentData)
       
       setShipments(transformedShipments)
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error fetching recent shipments:', err)
-      setError('Failed to load recent shipments')
+      
+      // Check if it's an authentication error after re-auth attempt
+      const isUnauthorized = 
+        err?.status === 401 || 
+        err?.response?.status === 401 ||
+        (err?.message && err.message.includes('401')) ||
+        (err?.message && err.message.includes('Unauthorized'));
+      
+      if (isUnauthorized) {
+        // After re-authentication failed, suggest user to refresh the page
+        setError('Authentication expired. Please refresh the page or log in again.')
+      } else {
+        setError('Failed to load recent shipments')
+      }
+      
       // Set empty array on error instead of fallback to mock data
       setShipments([])
     } finally {

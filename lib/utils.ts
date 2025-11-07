@@ -7,46 +7,50 @@ export function cn(...inputs: ClassValue[]) {
 
 /**
  * Loads the Parcego logo for PDF generation
+ * Uses the original Parcego Master logo from the public folder
  * @returns Base64 encoded PNG logo data
  */
 export const loadLogoForPDF = async (): Promise<string> => {
   try {
-    // Create SVG content
-    const logoSvg = `<svg width="240" height="80" viewBox="0 0 240 80" xmlns="http://www.w3.org/2000/svg">
-      <rect width="240" height="80" rx="12" fill="#0091F5"/>
-      <circle cx="40" cy="40" r="18" fill="white"/>
-      <circle cx="70" cy="40" r="14" fill="rgba(255,255,255,0.8)"/>
-      <text x="100" y="50" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="white">Parcego</text>
-    </svg>`;
+    // Load the original Parcego Master logo SVG
+    const response = await fetch('/Logo/Master-logo.svg');
+    if (!response.ok) {
+      console.error('Failed to load Parcego logo: HTTP', response.status);
+      return '';
+    }
+
+    const logoSvg = await response.text();
     
     // Convert SVG to PNG using canvas
-    return new Promise((resolve, reject) => {
+    return new Promise((resolve) => {
       const img = new Image();
       
       img.onload = () => {
         try {
           const canvas = document.createElement('canvas');
+          // Use appropriate dimensions for PDF (maintain aspect ratio)
           canvas.width = 240;
-          canvas.height = 80;
+          canvas.height = 148; // Maintain aspect ratio (149/92 ≈ 1.62)
           
           const ctx = canvas.getContext('2d');
           if (!ctx) {
-            resolve(''); // Return empty string if canvas not available
+            console.error('Canvas context not available');
+            resolve('');
             return;
           }
           
-          ctx.drawImage(img, 0, 0, 240, 80);
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
           const pngDataUrl = canvas.toDataURL('image/png');
           resolve(pngDataUrl);
         } catch (error) {
           console.error('Error converting SVG to PNG:', error);
-          resolve(''); // Return empty string on error
+          resolve('');
         }
       };
       
       img.onerror = () => {
         console.error('Error loading SVG image');
-        resolve(''); // Return empty string on error
+        resolve('');
       };
       
       // Convert SVG to data URL
@@ -58,7 +62,7 @@ export const loadLogoForPDF = async (): Promise<string> => {
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
   } catch (error) {
-    console.error('Failed to load logo:', error);
+    console.error('Failed to load Parcego logo:', error);
     return '';
   }
 };
@@ -310,20 +314,42 @@ export const generatePdfInvoice = async (invoiceData: {
     try {
       const logoData = await loadLogoForPDF();
       if (logoData) {
-        addLogoToPDF(pdfWithAutoTable, 20, 20, 40, 13, logoData);
+        // Master logo aspect ratio: 149/92 ≈ 1.62:1
+        // Use appropriate width and calculate height to maintain aspect ratio
+        const logoWidth = 50;
+        const logoHeight = logoWidth / 1.62; // Maintain aspect ratio (~31)
+        addLogoToPDF(pdfWithAutoTable, 20, 20, logoWidth, logoHeight, logoData);
+        
+        // Company info - positioned to the right of logo with proper spacing
+        const logoRightEdge = 20 + logoWidth + 10; // 10pt spacing after logo
+        pdfWithAutoTable.setFontSize(20);
+        pdfWithAutoTable.setTextColor(0, 145, 245);
+        pdfWithAutoTable.text('Parcego', logoRightEdge, 30);
+        
+        pdfWithAutoTable.setFontSize(10);
+        pdfWithAutoTable.setTextColor(100, 100, 100);
+        pdfWithAutoTable.text('Professional Shipping Solutions', logoRightEdge, 37);
+      } else {
+        // If logo not available, use text-only layout
+        pdfWithAutoTable.setFontSize(20);
+        pdfWithAutoTable.setTextColor(0, 145, 245);
+        pdfWithAutoTable.text('Parcego', 20, 30);
+        
+        pdfWithAutoTable.setFontSize(10);
+        pdfWithAutoTable.setTextColor(100, 100, 100);
+        pdfWithAutoTable.text('Professional Shipping Solutions', 20, 37);
       }
     } catch (logoError) {
       console.warn('Could not load logo, continuing without it:', logoError);
+      // Fallback to text-only layout
+      pdfWithAutoTable.setFontSize(20);
+      pdfWithAutoTable.setTextColor(0, 145, 245);
+      pdfWithAutoTable.text('Parcego', 20, 30);
+      
+      pdfWithAutoTable.setFontSize(10);
+      pdfWithAutoTable.setTextColor(100, 100, 100);
+      pdfWithAutoTable.text('Professional Shipping Solutions', 20, 37);
     }
-    
-    // Add company info
-    pdfWithAutoTable.setFontSize(20);
-    pdfWithAutoTable.setTextColor(0, 145, 245);
-    pdfWithAutoTable.text('Parcego', 70, 30);
-    
-    pdfWithAutoTable.setFontSize(10);
-    pdfWithAutoTable.setTextColor(100, 100, 100);
-    pdfWithAutoTable.text('Professional Shipping Solutions', 70, 37);
     
     // Invoice title and number
     pdfWithAutoTable.setFontSize(24);
