@@ -213,6 +213,7 @@ class ApiClient {
       }
 
       // Handle 401 Unauthorized - try to refresh token if not already a refresh attempt
+      // Note: This is a fallback - components should use withReAuth wrapper for better control
       if (response.status === 401 && !config.url.includes('refresh') && attempt === 1) {
         try {
           const { authService } = await import('./auth');
@@ -221,11 +222,12 @@ class ApiClient {
           // Retry the original request with the new token
           return this.makeRequest<T>(config, attempt + 1);
         } catch (refreshError) {
-          // If refresh fails, remove invalid token and throw original error
+          // If refresh fails, remove invalid token but don't redirect immediately
+          // Components using withReAuth wrapper will handle re-authentication
           this.removeAuthToken();
-          if (typeof window !== 'undefined') {
-            window.location.href = '/login';
-          }
+          
+          // Throw error so components can handle re-authentication via withReAuth wrapper
+          // Don't redirect here - let the component decide what to do
           throw this.handleError(responseData, response.status);
         }
       }

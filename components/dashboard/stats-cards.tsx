@@ -1,11 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Icon } from "@/components/ui/icon"
 import { dashboardStats } from "@/lib/mock/dashboard"
 import { adminService } from "@/lib/api/admin"
 import type { UserStatisticsResponse } from "@/lib/api/types"
+import { withReAuth } from "@/lib/utils/re-auth"
 
 interface DashboardStats {
   totalShipments: string
@@ -57,6 +59,7 @@ const statsConfig = [
 ]
 
 export function StatsCards() {
+  const router = useRouter()
   const [stats, setStats] = useState<DashboardStats>(dashboardStats)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -67,8 +70,10 @@ export function StatsCards() {
         setIsLoading(true)
         setError(null)
         
-        // Call the new user statistics API endpoint
-        const response = await adminService.getCurrentUserStatistics()
+        // Use withReAuth to automatically handle 401 errors and re-authenticate
+        const response = await withReAuth(async () => {
+          return await adminService.getCurrentUserStatistics()
+        })
         
         if (response.data) {
           const displayStats = convertApiStatsToDisplay(response.data)
@@ -76,8 +81,22 @@ export function StatsCards() {
         } else {
           throw new Error('No data received from API')
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to fetch dashboard stats:', error)
+        
+        // Check if it's an authentication error (401 or 403)
+        const status = error?.status || error?.response?.status;
+        const isUnauthorized = status === 401 || status === 403;
+        
+        if (isUnauthorized) {
+          // Clear auth data and redirect to login
+          console.log('Authentication failed, redirecting to login')
+          localStorage.removeItem('auth_token')
+          document.cookie = "mock-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
+          router.push('/login')
+          return
+        }
+        
         setError('Failed to load statistics')
         // Fallback to mock data
         setStats(dashboardStats)
@@ -87,7 +106,7 @@ export function StatsCards() {
     }
 
     fetchStats()
-  }, [])
+  }, [router])
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       {statsConfig.map((stat, index) => (

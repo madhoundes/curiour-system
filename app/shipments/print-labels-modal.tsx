@@ -6,8 +6,10 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Icon } from "@/components/ui/icon";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import type { DetailedShipment } from "@/lib/api/types";
 import { ShippingService } from "@/lib/api/shipping";
+import { toast } from "sonner";
 
 interface PrintLabelsModalProps {
   open: boolean;
@@ -16,6 +18,45 @@ interface PrintLabelsModalProps {
   shipments: DetailedShipment[];
 }
 
+interface ShipmentGenerationResult {
+  shipmentId: number;
+  trackingCode: string;
+  success: boolean;
+  error?: string;
+  labelUrl?: string;
+}
+
+// Statuses that are not eligible for label generation
+const INELIGIBLE_STATUSES = [
+  'DRAFT',
+  'CANCELLED',
+  'DELIVERED',
+  'UNDELIVERED',
+  'RETURNED_TO_SENDER',
+] as const;
+
+// Check if a shipment is eligible for label generation
+const isEligibleForLabelGeneration = (shipment: DetailedShipment): boolean => {
+  // Check status
+  if (INELIGIBLE_STATUSES.includes(shipment.status as any)) {
+    return false;
+  }
+  
+  // Additional eligibility checks can be added here (e.g., payment status)
+  return true;
+};
+
+// Get error message for ineligible shipment
+const getIneligibleReason = (shipment: DetailedShipment): string => {
+  if (shipment.status === 'DRAFT') {
+    return 'Shipment must be paid before generating a label';
+  }
+  if (INELIGIBLE_STATUSES.includes(shipment.status as any)) {
+    return `Cannot generate label for ${shipment.status.toLowerCase().replace(/_/g, ' ')} shipment`;
+  }
+  return 'Shipment is not eligible for label generation';
+};
+
 const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({
   open,
   onOpenChange,
@@ -23,6 +64,7 @@ const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({
   shipments,
 }) => {
   const [isGenerating, setIsGenerating] = useState(false);
+  const [generationResults, setGenerationResults] = useState<Map<number, ShipmentGenerationResult>>(new Map());
   const shippingService = new ShippingService();
 
   // Filter shipments based on selected IDs
@@ -31,36 +73,176 @@ const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({
     return shipments.filter(shipment => selectedShipmentIds.includes(shipment.id));
   }, [shipments, selectedShipmentIds]);
 
+  // Separate eligible and ineligible shipments
+  const { eligibleShipments, ineligibleShipments } = useMemo(() => {
+    const eligible: DetailedShipment[] = [];
+    const ineligible: DetailedShipment[] = [];
+    
+    selectedShipments.forEach(shipment => {
+      if (isEligibleForLabelGeneration(shipment)) {
+        eligible.push(shipment);
+      } else {
+        ineligible.push(shipment);
+      }
+    });
+    
+    return { eligibleShipments: eligible, ineligibleShipments: ineligible };
+  }, [selectedShipments]);
+
+  // Reset results when modal closes
+  const handleOpenChange = (newOpen: boolean) => {
+    if (!newOpen) {
+      setGenerationResults(new Map());
+    }
+    onOpenChange(newOpen);
+  };
+
   // Generate and download labels using real API
   const handleGenerateLabels = async () => {
-    if (selectedShipments.length === 0) return;
+    if (eligibleShipments.length === 0) {
+      toast.error('No eligible shipments selected', {
+        description: 'All selected shipments are ineligible for label generation (cancelled, delivered, etc.)',
+      });
+      return;
+    }
 
     setIsGenerating(true);
+    setGenerationResults(new Map());
     
+    // Pre-populate results for ineligible shipments
+    const results = new Map<number, ShipmentGenerationResult>();
+    ineligibleShipments.forEach(shipment => {
+      results.set(shipment.id, {
+        shipmentId: shipment.id,
+        trackingCode: shipment.tracking_code,
+        success: false,
+        error: getIneligibleReason(shipment),
+      });
+    });
+
     try {
-      // Generate labels for each selected shipment using real API
-      const labelPromises = selectedShipments.map(async (shipment) => {
+      // Generate labels for each eligible shipment using Promise.allSettled
+      // This allows us to handle partial failures gracefully
+      const labelPromises = eligibleShipments.map(async (shipment) => {
         try {
-          // shipment.id is already a number, no need to convert
           const labelResponse = await shippingService.generateLabel(shipment.id);
+          
           if (labelResponse.label_url) {
             // Open each label in a new tab
             window.open(labelResponse.label_url, '_blank');
+            
+            return {
+              shipmentId: shipment.id,
+              trackingCode: shipment.tracking_code,
+              success: true,
+              labelUrl: labelResponse.label_url,
+            } as ShipmentGenerationResult;
+          } else {
+            throw new Error('No label URL received from API');
           }
-          return labelResponse;
-        } catch (error) {
+        } catch (error: any) {
+          // Extract error message
+          let errorMessage = 'Failed to generate label';
+          
+          // Check for 402 status (payment required) - often indicates DRAFT status
+          if (error?.status === 402 || error?.response?.status === 402) {
+            // Prioritize details field for 402 errors (contains specific API message)
+            if (error?.details && typeof error.details === 'string') {
+              errorMessage = error.details;
+            } else if (error?.response?.data?.details && typeof error.response.data.details === 'string') {
+              errorMessage = error.response.data.details;
+            } else if (error?.message && error.message.includes('paid')) {
+              // Use message if it mentions payment
+              errorMessage = error.message;
+            } else if (error?.response?.data?.detail) {
+              const detail = error.response.data.detail;
+              if (typeof detail === 'string') {
+                errorMessage = detail;
+              } else if (Array.isArray(detail) && detail.length > 0) {
+                errorMessage = detail[0].msg || errorMessage;
+              }
+            } else {
+              errorMessage = 'Shipment must be paid before generating a label';
+            }
+          } else if (error?.message) {
+            errorMessage = error.message;
+          } else if (error?.response?.data?.detail) {
+            // Handle API error responses
+            const detail = error.response.data.detail;
+            if (typeof detail === 'string') {
+              errorMessage = detail;
+            } else if (Array.isArray(detail) && detail.length > 0) {
+              errorMessage = detail[0].msg || errorMessage;
+            }
+          } else if (error?.response?.data?.message) {
+            errorMessage = error.response.data.message;
+          } else if (error?.response?.data?.details) {
+            errorMessage = error.response.data.details;
+          }
+          
           console.error(`Error generating label for shipment ${shipment.id}:`, error);
-          throw error;
+          
+          return {
+            shipmentId: shipment.id,
+            trackingCode: shipment.tracking_code,
+            success: false,
+            error: errorMessage,
+          } as ShipmentGenerationResult;
         }
       });
       
-      await Promise.all(labelPromises);
-      onOpenChange(false); // Close modal after successful generation
+      // Wait for all promises to settle (both success and failure)
+      const settledResults = await Promise.allSettled(labelPromises);
+      
+      // Process settled results
+      settledResults.forEach((result, index) => {
+        if (result.status === 'fulfilled') {
+          results.set(result.value.shipmentId, result.value);
+        } else {
+          // Handle unexpected promise rejection
+          const shipment = eligibleShipments[index];
+          results.set(shipment.id, {
+            shipmentId: shipment.id,
+            trackingCode: shipment.tracking_code,
+            success: false,
+            error: result.reason?.message || 'Unexpected error occurred',
+          });
+        }
+      });
+
+      setGenerationResults(results);
+
+      // Count successes and failures
+      const successful = Array.from(results.values()).filter(r => r.success).length;
+      const failed = Array.from(results.values()).filter(r => !r.success).length;
+
+      // Show summary toast
+      if (successful > 0 && failed === 0) {
+        toast.success(`Successfully generated ${successful} label${successful !== 1 ? 's' : ''}`, {
+          description: 'Labels have been opened in new tabs',
+        });
+        // Close modal after a short delay if all succeeded
+        setTimeout(() => {
+          handleOpenChange(false);
+        }, 1500);
+      } else if (successful > 0 && failed > 0) {
+        toast.warning(`Generated ${successful} label${successful !== 1 ? 's' : ''}, ${failed} failed`, {
+          description: 'Some shipments could not be processed. Check the list below for details.',
+          duration: 5000,
+        });
+      } else {
+        toast.error(`Failed to generate labels`, {
+          description: 'None of the selected shipments could be processed. Check the errors below.',
+          duration: 5000,
+        });
+      }
     } catch (error) {
-      console.error('Error generating labels:', error);
-      // Error handling - could show a toast notification here
-      alert('Failed to generate some labels. Please try again.');
+      console.error('Unexpected error during label generation:', error);
+      toast.error('An unexpected error occurred', {
+        description: 'Please try again or contact support if the issue persists',
+      });
     } finally {
+      // Always resolve the generating state
       setIsGenerating(false);
     }
   };
@@ -91,7 +273,7 @@ const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
@@ -108,12 +290,21 @@ const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({
                 {selectedShipments.length} shipment{selectedShipments.length !== 1 ? 's' : ''} selected
               </p>
               <p className="text-sm text-gray-600">
-                Labels will be generated as a single PDF file
+                {eligibleShipments.length > 0 ? (
+                  <>
+                    {eligibleShipments.length} eligible for label generation
+                    {ineligibleShipments.length > 0 && (
+                      <span className="text-amber-600"> • {ineligibleShipments.length} ineligible (will be skipped)</span>
+                    )}
+                  </>
+                ) : (
+                  'All selected shipments are ineligible for label generation'
+                )}
               </p>
             </div>
             <Button 
               onClick={handleGenerateLabels} 
-              disabled={isGenerating || selectedShipments.length === 0}
+              disabled={isGenerating || eligibleShipments.length === 0}
               className="gap-2"
             >
               {isGenerating ? (
@@ -140,48 +331,108 @@ const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({
               <p className="text-sm">Select shipments from the main list to print labels</p>
             </div>
           ) : (
-            selectedShipments.map((shipment) => (
-              <Card key={shipment.id} className="p-4">
-                <CardContent className="p-0">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h4 className="font-medium truncate">{shipment.tracking_code}</h4>
-                        <Badge 
-                          variant="secondary" 
-                          className={`text-xs ${getStatusColor(shipment.status)}`}
-                        >
-                          {formatStatus(shipment.status)}
-                        </Badge>
-                      </div>
-                      
-                      <div className="grid grid-cols-2 gap-4 text-sm">
-                        <div>
-                          <p className="text-gray-600 mb-1">To:</p>
-                          <p className="font-medium">{shipment.receiver_address.contact_name}</p>
-                          <p className="text-gray-600">
-                            {shipment.receiver_address.city}, {shipment.receiver_address.province}
-                          </p>
+            selectedShipments.map((shipment) => {
+              const isEligible = isEligibleForLabelGeneration(shipment);
+              const result = generationResults.get(shipment.id);
+              const isProcessing = isGenerating && isEligible && !result;
+              
+              return (
+                <Card 
+                  key={shipment.id} 
+                  className={`p-4 transition-all ${
+                    !isEligible 
+                      ? 'opacity-60 border-gray-300' 
+                      : result?.success 
+                        ? 'border-green-300 bg-green-50/30' 
+                        : result?.success === false 
+                          ? 'border-red-300 bg-red-50/30' 
+                          : ''
+                  }`}
+                >
+                  <CardContent className="p-0">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-2">
+                          <h4 className="font-medium truncate">{shipment.tracking_code}</h4>
+                          <Badge 
+                            variant="secondary" 
+                            className={`text-xs ${getStatusColor(shipment.status)}`}
+                          >
+                            {formatStatus(shipment.status)}
+                          </Badge>
+                          {!isEligible && (
+                            <Badge variant="outline" className="text-xs text-amber-600 border-amber-300">
+                              Ineligible
+                            </Badge>
+                          )}
+                          {result?.success && (
+                            <Badge variant="outline" className="text-xs text-green-600 border-green-300">
+                              <Icon name="CheckCircle" size={12} className="mr-1" />
+                              Generated
+                            </Badge>
+                          )}
+                          {result?.success === false && (
+                            <Badge variant="outline" className="text-xs text-red-600 border-red-300">
+                              <Icon name="XCircle" size={12} className="mr-1" />
+                              Failed
+                            </Badge>
+                          )}
+                          {isProcessing && (
+                            <Badge variant="outline" className="text-xs text-blue-600 border-blue-300">
+                              <Icon name="Loader2" size={12} className="mr-1 animate-spin" />
+                              Processing
+                            </Badge>
+                          )}
                         </div>
                         
-                        <div>
-                          <p className="text-gray-600 mb-1">Service:</p>
-                          <p className="font-medium">Standard</p>
-                          <p className="text-gray-600">{shipment.package.weight} kg</p>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                          <div>
+                            <p className="text-gray-600 mb-1">To:</p>
+                            <p className="font-medium">{shipment.receiver_address.contact_name}</p>
+                            <p className="text-gray-600">
+                              {shipment.receiver_address.city}, {shipment.receiver_address.province}
+                            </p>
+                          </div>
+                          
+                          <div>
+                            <p className="text-gray-600 mb-1">Service:</p>
+                            <p className="font-medium">Standard</p>
+                            <p className="text-gray-600">{shipment.package.weight} kg</p>
+                          </div>
                         </div>
+                        
+                        {/* Error message display */}
+                        {result?.success === false && result.error && (
+                          <Alert variant="destructive" className="mt-3">
+                            <Icon name="AlertCircle" size={16} />
+                            <AlertDescription className="text-sm">
+                              {result.error}
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                        
+                        {/* Ineligible reason */}
+                        {!isEligible && !result && (
+                          <Alert className="mt-3 border-amber-300 bg-amber-50/50">
+                            <Icon name="AlertTriangle" size={16} className="text-amber-600" />
+                            <AlertDescription className="text-sm text-amber-800">
+                              {getIneligibleReason(shipment)}
+                            </AlertDescription>
+                          </Alert>
+                        )}
+                      </div>
+                      
+                      <div className="ml-4 text-right">
+                        <p className="text-sm text-gray-600">Created</p>
+                        <p className="text-sm font-medium">
+                          {new Date(shipment.created_at).toLocaleDateString()}
+                        </p>
                       </div>
                     </div>
-                    
-                    <div className="ml-4 text-right">
-                      <p className="text-sm text-gray-600">Created</p>
-                      <p className="text-sm font-medium">
-                        {new Date(shipment.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))
+                  </CardContent>
+                </Card>
+              );
+            })
           )}
         </div>
 
@@ -197,14 +448,14 @@ const PrintLabelsModal: React.FC<PrintLabelsModalProps> = ({
             <div className="flex gap-2">
               <Button 
                 variant="outline" 
-                onClick={() => onOpenChange(false)}
+                onClick={() => handleOpenChange(false)}
                 disabled={isGenerating}
               >
                 Cancel
               </Button>
               <Button 
                 onClick={handleGenerateLabels} 
-                disabled={isGenerating || selectedShipments.length === 0}
+                disabled={isGenerating || eligibleShipments.length === 0}
                 className="gap-2"
               >
                 {isGenerating ? (

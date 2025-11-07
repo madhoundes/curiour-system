@@ -357,6 +357,19 @@ export class AdminService {
      params?: StatisticsParams
    ): Promise<ApiSuccessResponse<UserStatisticsResponse>> {
      try {
+       // Check if user is authenticated before making the request
+       if (typeof window !== 'undefined') {
+         const token = localStorage.getItem('auth_token');
+         if (!token) {
+           throw {
+             error: 'API Error',
+             message: 'Authentication required',
+             status: 401,
+             details: 'Not authenticated'
+           };
+         }
+       }
+
        const response = await apiClient.get<UserStatisticsResponse>(
          API_ENDPOINTS.STATS.USER_STATS,
          { 
@@ -366,8 +379,25 @@ export class AdminService {
        );
        
        return response;
-     } catch (error) {
+     } catch (error: any) {
        console.error('Get current user statistics failed:', error);
+       
+       // Handle ApiErrorResponse structure (from apiClient)
+       const status = error.status || error.response?.status;
+       
+       if (status === 401 || status === 403) {
+         // Clear invalid token
+         if (typeof window !== 'undefined') {
+           localStorage.removeItem('auth_token');
+         }
+         throw {
+           error: error.error || 'API Error',
+           message: error.message || 'Authentication required',
+           status: status,
+           details: error.details || 'Not authenticated'
+         };
+       }
+       
        throw error;
      }
    }

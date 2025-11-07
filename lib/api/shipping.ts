@@ -143,31 +143,58 @@ export class ShippingService {
 
       return response.data;
     } catch (error: any) {
-      if (error.response?.status === 400) {
-        const errorData = error.response.data as ShippingErrorResponse;
-        
-        // Handle specific service area errors
-        if (errorData.detail?.error === 'SENDER_SERVICE_AREA_NOT_SUPPORTED') {
-          throw new Error(`Service Area Not Supported: We do not currently service the sender's area (${errorData.detail.postal_code || 'unknown postal code'}). Please contact support for assistance.`);
+      // Handle API client formatted errors (from handleError method)
+      // API client throws objects with: { error, message, status, details }
+      if (error.status === 400 || error.response?.status === 400) {
+        // Check if error is from API client (has details property directly)
+        if (error.details && typeof error.details === 'object') {
+          const errorDetails = error.details;
+          
+          // Handle specific service area errors
+          if (errorDetails.error === 'SENDER_SERVICE_AREA_NOT_SUPPORTED') {
+            throw new Error(`Service Area Not Supported: We do not currently service the sender's area (${errorDetails.postal_code || 'unknown postal code'}). Please contact support for assistance.`);
+          }
+          
+          if (errorDetails.error === 'RECEIVER_SERVICE_AREA_NOT_SUPPORTED') {
+            throw new Error(`Service Area Not Supported: We do not currently service the receiver's area (${errorDetails.postal_code || 'unknown postal code'}). Please contact support for assistance.`);
+          }
+          
+          // Use the detailed message from the API if available
+          if (errorDetails.message) {
+            throw new Error(errorDetails.message);
+          }
         }
         
-        if (errorData.detail?.error === 'RECEIVER_SERVICE_AREA_NOT_SUPPORTED') {
-          throw new Error(`Service Area Not Supported: We do not currently service the receiver's area (${errorData.detail.postal_code || 'unknown postal code'}). Please contact support for assistance.`);
+        // Handle axios-style errors (has response.data.detail)
+        if (error.response?.data) {
+          const errorData = error.response.data as ShippingErrorResponse;
+          
+          if (errorData.detail?.error === 'SENDER_SERVICE_AREA_NOT_SUPPORTED') {
+            throw new Error(`Service Area Not Supported: We do not currently service the sender's area (${errorData.detail.postal_code || 'unknown postal code'}). Please contact support for assistance.`);
+          }
+          
+          if (errorData.detail?.error === 'RECEIVER_SERVICE_AREA_NOT_SUPPORTED') {
+            throw new Error(`Service Area Not Supported: We do not currently service the receiver's area (${errorData.detail.postal_code || 'unknown postal code'}). Please contact support for assistance.`);
+          }
+          
+          throw new Error(errorData.detail?.message || 'Invalid shipment data');
         }
         
-        throw new Error(errorData.detail.message || 'Invalid shipment data');
+        // Fallback for other 400 errors
+        throw new Error(error.message || error.details?.message || 'Invalid shipment data');
       }
       
       // Handle 422 validation errors specifically
-      if (error.response?.status === 422) {
+      if (error.status === 422 || error.response?.status === 422) {
         console.error('🔍 422 Validation Error in createShipment:');
-        console.error('Status:', error.response.status);
-        console.error('Response data:', error.response.data);
+        console.error('Status:', error.status || error.response?.status);
+        console.error('Response data:', error.details || error.response?.data);
         
         // Log each validation error if details array exists
-        if (error.response.data?.details) {
+        const detailsArray = error.details || error.response?.data?.details;
+        if (Array.isArray(detailsArray)) {
           console.error('📋 Validation Details:');
-          error.response.data.details.forEach((detail: any, index: number) => {
+          detailsArray.forEach((detail: any, index: number) => {
             console.error(`❌ Validation Error ${index + 1}:`, detail);
           });
         }
@@ -175,7 +202,7 @@ export class ShippingService {
         // Create a structured error object that preserves the validation details
         const validationError = new Error('Validation Error');
         (validationError as any).status = 422;
-        (validationError as any).details = error.response.data?.details || [];
+        (validationError as any).details = detailsArray || [];
         (validationError as any).response = error.response;
         throw validationError;
       }
@@ -398,16 +425,21 @@ export class ShippingService {
 
       return response.data;
     } catch (error: any) {
-      if (error.response?.status === 402) {
-        throw new Error('Payment required - shipment must be paid before generating label');
+      // Preserve error details if they exist (from API client)
+      if (error.status === 402 || error.response?.status === 402) {
+        const errorObj: any = new Error(error.details || error.message || 'Payment required - shipment must be paid before generating label');
+        errorObj.status = 402;
+        errorObj.details = error.details || error.response?.data?.details || 'Shipment must be paid before generating a label';
+        errorObj.error = error.error || 'Payment Required';
+        throw errorObj;
       }
-      if (error.response?.status === 404) {
+      if (error.status === 404 || error.response?.status === 404) {
         throw new Error('Shipment not found or not owned by user');
       }
-      if (error.response?.status === 422) {
+      if (error.status === 422 || error.response?.status === 422) {
         throw new Error('Validation error - invalid parameters');
       }
-      if (error.response?.status === 500) {
+      if (error.status === 500 || error.response?.status === 500) {
         throw new Error('Failed to generate label - server error');
       }
       throw error;
@@ -448,44 +480,75 @@ export class ShippingService {
         billing,
         checkoutSession
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Shipping flow failed at step:', error);
       
       // Enhanced error logging for validation errors
-      if ((error as any)?.response?.status === 422) {
+      if (error?.status === 422 || error?.response?.status === 422) {
         console.error('🔍 422 Validation Error Details:');
-        console.error('Status:', (error as any)?.response?.status);
-        console.error('Data:', (error as any)?.response?.data);
-        console.error('Details array:', (error as any)?.response?.data?.details);
+        console.error('Status:', error?.status || error?.response?.status);
+        console.error('Data:', error?.details || error?.response?.data);
+        console.error('Details array:', error?.details || error?.response?.data?.details);
         
         // Log each validation error individually
-        if ((error as any)?.response?.data?.details) {
-          (error as any).response.data.details.forEach((detail: any, index: number) => {
+        const detailsArray = error?.details || error?.response?.data?.details;
+        if (Array.isArray(detailsArray)) {
+          detailsArray.forEach((detail: any, index: number) => {
             console.error(`❌ Validation Error ${index + 1}:`, detail);
           });
         }
       }
       
       console.error('❌ Error details:', {
-        message: error instanceof Error ? error.message : 'Unknown error',
-        stack: error instanceof Error ? error.stack : 'No stack trace',
-        response: (error as any)?.response?.data || 'No response data',
-        status: (error as any)?.response?.status || 'No status code'
+        message: error?.message || (error instanceof Error ? error.message : 'Unknown error'),
+        stack: error instanceof Error ? error.stack : error?.stack || 'No stack trace',
+        response: error?.details || error?.response?.data || 'No response data',
+        status: error?.status || error?.response?.status || 'No status code'
       });
       
-      // Provide more specific error messages based on the error type
-      if (error instanceof Error) {
-        if (error.message.includes('Service Area Not Supported')) {
-          throw new Error(error.message); // Pass through service area errors as-is
-        } else if (error.message.includes('Authentication')) {
-          throw new Error(`Shipping flow failed: Authentication required - ${error.message}`);
-        } else if (error.message.includes('validation')) {
-          throw new Error(`Shipping flow failed: Data validation error - ${error.message}`);
-        } else if (error.message.includes('Network')) {
-          throw new Error(`Shipping flow failed: Network error - ${error.message}`);
-        } else {
-          throw new Error(`Shipping flow failed: ${error.message}`);
+      // Extract error message from various error formats
+      let errorMessage = 'Unknown error';
+      
+      // Check if error is from API client (has details property with nested error info)
+      if (error?.details && typeof error.details === 'object') {
+        const errorDetails = error.details;
+        
+        // Handle service area errors
+        if (errorDetails.error === 'SENDER_SERVICE_AREA_NOT_SUPPORTED' || errorDetails.error === 'RECEIVER_SERVICE_AREA_NOT_SUPPORTED') {
+          errorMessage = `Service Area Not Supported: ${errorDetails.message || 'We do not currently service this area'}${errorDetails.postal_code ? ` (${errorDetails.postal_code})` : ''}. Please contact support for assistance.`;
+        } else if (errorDetails.message) {
+          errorMessage = errorDetails.message;
         }
+      }
+      // Check if error is an Error instance with a message
+      else if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      // Check if error has a message property directly
+      else if (error?.message) {
+        errorMessage = error.message;
+      }
+      // Check axios-style error response
+      else if (error?.response?.data?.detail) {
+        const detail = error.response.data.detail;
+        if (typeof detail === 'object' && detail.message) {
+          errorMessage = detail.message;
+        } else if (typeof detail === 'string') {
+          errorMessage = detail;
+        }
+      }
+      
+      // Provide more specific error messages based on the error type
+      if (errorMessage.includes('Service Area Not Supported')) {
+        throw new Error(errorMessage); // Pass through service area errors as-is
+      } else if (errorMessage.includes('Authentication') || errorMessage.includes('401')) {
+        throw new Error(`Shipping flow failed: Authentication required - ${errorMessage}`);
+      } else if (errorMessage.includes('validation') || errorMessage.includes('Validation')) {
+        throw new Error(`Shipping flow failed: Data validation error - ${errorMessage}`);
+      } else if (errorMessage.includes('Network')) {
+        throw new Error(`Shipping flow failed: Network error - ${errorMessage}`);
+      } else if (errorMessage !== 'Unknown error') {
+        throw new Error(`Shipping flow failed: ${errorMessage}`);
       }
       
       throw new Error(`Shipping flow failed: Unknown error`);

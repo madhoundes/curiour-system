@@ -36,7 +36,7 @@ import type { BillingRecord, BillingRecordsListResponse, UserProfile } from "@/l
 import { toast } from "sonner"
 
 // Mock data (fallback only)
-import { mockPayments, mockInvoices, mockPaymentMethods, mockTaxDocuments } from "./mock-data"
+import { mockPayments, mockInvoices, mockTaxDocuments } from "./mock-data"
 
 // Logo utility functions for PDF generation
 import { loadLogoForPDF, addLogoToPDF, generatePdfInvoice } from "@/lib/utils"
@@ -92,40 +92,6 @@ For questions about this document, contact support@parcego.com
 Thank you for choosing Parcego!`;
 };
 
-// Mock payment form data for testing
-const mockPaymentData: Record<PaymentMethod['type'], Partial<PaymentFormData>> = {
-  card: {
-    cardNumber: '4242 4242 4242 4242',
-    expiryMonth: '12',
-    expiryYear: '25',
-    cvv: '123',
-    cardholderName: 'John Doe (Test)'
-  },
-  ach: {
-    routingNumber: '110000000',
-    accountNumber: '000123456789',
-    accountType: 'checking' as const
-  },
-  paypal: {
-    email: 'test@example.com'
-  }
-}
-
-// Form validation schema
-type PaymentFormData = {
-  cardNumber?: string
-  expiryMonth?: string
-  expiryYear?: string
-  cvv?: string
-  cardholderName?: string
-  routingNumber?: string
-  accountNumber?: string
-  accountType: 'checking' | 'savings'
-  email?: string
-}
-
-// Temporary storage for payment methods (frontend only)
-const tempPaymentStorage: PaymentMethod[] = [...mockPaymentMethods]
 
 // Transformation functions to map API data to local types
 const transformBillingRecordToPayment = (billing: BillingRecord): Payment => {
@@ -165,7 +131,6 @@ export function BillingPage() {
   const [activeTab, setActiveTab] = useState<string>('payment-history')
   const [payments, setPayments] = useState<Payment[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>(tempPaymentStorage)
   const [taxDocuments] = useState<TaxDocument[]>(mockTaxDocuments)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -214,7 +179,7 @@ export function BillingPage() {
         {/* Page Header */}
         <PageHeader
           title="Billing & Payments"
-          description="Manage your billing information, payment methods, and invoices"
+          description="Manage your billing information and invoices"
         />
 
         {/* Summary Cards - Hidden */}
@@ -262,12 +227,6 @@ export function BillingPage() {
               className="h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md flex-shrink-0"
             >
               Invoices
-            </TabsTrigger>
-            <TabsTrigger 
-              value="payment-methods" 
-              className="h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md flex-shrink-0"
-            >
-              Payment Methods
             </TabsTrigger>
             <TabsTrigger 
               value="tax-documents" 
@@ -343,15 +302,6 @@ export function BillingPage() {
             ) : (
               <InvoicesTab invoices={invoices} userProfile={userProfile} />
             )}
-          </TabsContent>
-
-          <TabsContent value="payment-methods" className="mt-6">
-            <PaymentMethodsTab 
-              methods={paymentMethods} 
-              onMethodAdded={(newMethod) => {
-                setPaymentMethods((prev: PaymentMethod[]) => [...prev, newMethod])
-              }}
-            />
           </TabsContent>
 
           <TabsContent value="tax-documents" className="mt-6">
@@ -1025,538 +975,6 @@ function InvoicesTab({ invoices, userProfile }: { invoices: Invoice[]; userProfi
       )
     }
 
-// Add Payment Method Dialog Component
-function AddPaymentMethodDialog({ 
-  isOpen, 
-  onClose,
-  onMethodAdded
-}: { 
-  isOpen: boolean
-  onClose: () => void 
-  onMethodAdded: (method: PaymentMethod) => void
-}) {
-  const [paymentMethodType, setPaymentMethodType] = useState<PaymentMethod['type']>('card')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-
-  const { 
-    control, 
-    handleSubmit, 
-    reset, 
-    watch, 
-    formState: { errors }
-  } = useForm<PaymentFormData>({
-    mode: 'onChange',
-    defaultValues: mockPaymentData[paymentMethodType]
-  })
-
-  // Watch form values for validation
-  const watchedValues = watch()
-
-  // Update form when payment method type changes
-  useEffect(() => {
-    if (isOpen) {
-      const mockData = mockPaymentData[paymentMethodType]
-      reset(mockData)
-    }
-  }, [paymentMethodType, isOpen, reset])
-
-  const handleSubmitForm = async (data: PaymentFormData) => {
-    setIsSubmitting(true)
-
-    try {
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, 1500))
-      
-      // Create mock payment method
-      const newMethod: PaymentMethod = {
-        id: `pm-${Date.now()}`,
-        type: paymentMethodType,
-        label: generatePaymentMethodLabel(paymentMethodType, data),
-        isDefault: false,
-        expiry: paymentMethodType === 'card' ? `${data.expiryMonth}/${data.expiryYear}` : undefined
-      }
-
-      // Add to temporary storage
-      tempPaymentStorage.push(newMethod)
-      
-      // Call parent callback
-      onMethodAdded(newMethod)
-      
-      console.log('Adding payment method:', { type: paymentMethodType, ...data })
-      
-      // Show success message and close dialog
-      onClose()
-      
-      // Reset form to mock data
-      reset(mockPaymentData[paymentMethodType])
-      
-    } catch (error) {
-      console.error('Error adding payment method:', error)
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-
-
-  const generatePaymentMethodLabel = (type: PaymentMethod['type'], data: PaymentFormData): string => {
-    switch (type) {
-      case 'card':
-        return `Visa •••• ${data.cardNumber?.slice(-4) || '4242'}`
-      case 'ach':
-        return `Business ${data.accountType} •••• ${data.accountNumber?.slice(-4) || '6789'}`
-      case 'paypal':
-        return `PayPal - ${data.email || 'test@example.com'}`
-      default:
-        return 'Unknown Payment Method'
-    }
-  }
-
-  const validateForm = () => {
-    if (paymentMethodType === 'card') {
-      return watchedValues.cardNumber && watchedValues.expiryMonth && watchedValues.expiryYear && 
-             watchedValues.cvv && watchedValues.cardholderName
-    } else if (paymentMethodType === 'ach') {
-      return watchedValues.routingNumber && watchedValues.accountNumber && watchedValues.accountType
-    } else if (paymentMethodType === 'paypal') {
-      return watchedValues.email
-    }
-    return false
-  }
-
-  const isFormValid = validateForm()
-
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white" style={{ backgroundColor: 'white' }}>
-        <DialogHeader>
-          <DialogTitle>Add Payment Method</DialogTitle>
-          <DialogDescription>
-            Securely add a new payment method to your account. Your information is encrypted and secure.
-          </DialogDescription>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit(handleSubmitForm)} className="space-y-8">
-          {/* Payment Method Type Selection */}
-          <div className="space-y-4">
-            <Label htmlFor="parcego-payment-method-type" className="text-sm font-medium text-gray-700">Payment Method Type</Label>
-            <Select 
-              value={paymentMethodType} 
-              onValueChange={(value: PaymentMethod['type']) => setPaymentMethodType(value)}
-            >
-              <SelectTrigger id="parcego-payment-method-type">
-                <SelectValue placeholder="Select payment method type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="card">Credit/Debit Card</SelectItem>
-                <SelectItem value="ach">Bank Account (ACH)</SelectItem>
-                <SelectItem value="paypal">PayPal</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Credit Card Form */}
-          {paymentMethodType === 'card' && (
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="parcego-card-number" className="text-sm font-medium text-gray-700">Card Number</Label>
-                <Controller
-                  name="cardNumber"
-                  control={control}
-                  rules={{ required: 'Card number is required' }}
-                  render={({ field }) => (
-                    <Input
-                      {...field}
-                      id="parcego-card-number"
-                      type="text"
-                      placeholder="1234 5678 9012 3456"
-                      maxLength={19}
-                      className="font-mono"
-                    />
-                  )}
-                />
-                {errors.cardNumber && (
-                  <p className="text-sm text-red-600 mt-1">{errors.cardNumber.message}</p>
-                )}
-              </div>
-              
-              <div className="grid grid-cols-3 gap-x-3">
-                <div className="space-y-2">
-                  <Label htmlFor="parcego-expiry-month" className="text-sm font-medium text-gray-700">Month</Label>
-                  <Controller
-                    name="expiryMonth"
-                    control={control}
-                    rules={{ required: 'Month is required' }}
-                    render={({ field }) => (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger id="parcego-expiry-month" className="w-full">
-                          <SelectValue placeholder="MM" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: 12 }, (_, i) => {
-                            const month = String(i + 1).padStart(2, '0')
-                            return (
-                              <SelectItem key={month} value={month}>
-                                {month}
-                              </SelectItem>
-                            )
-                          })}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  {errors.expiryMonth && (
-                    <p className="text-sm text-red-600 mt-1">{errors.expiryMonth.message}</p>
-                  )}
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="parcego-expiry-year" className="text-sm font-medium text-gray-700">Year</Label>
-                  <Controller
-                    name="expiryYear"
-                    control={control}
-                    rules={{ required: 'Year is required' }}
-                    render={({ field }) => (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger id="parcego-expiry-year" className="w-full">
-                          <SelectValue placeholder="YY" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {Array.from({ length: 10 }, (_, i) => {
-                            const year = String(new Date().getFullYear() + i).slice(-2)
-                            return (
-                              <SelectItem key={year} value={year}>
-                                {year}
-                              </SelectItem>
-                            )
-                          })}
-                        </SelectContent>
-                      </Select>
-                    )}
-                  />
-                  {errors.expiryYear && (
-                    <p className="text-sm text-red-600 mt-1">{errors.expiryYear.message}</p>
-                  )}
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="parcego-cvv" className="text-sm font-medium text-gray-700">CVV</Label>
-                  <Controller
-                    name="cvv"
-                    control={control}
-                    rules={{ required: 'CVV is required' }}
-                    render={({ field }) => (
-                      <Input
-                        {...field}
-                        id="parcego-cvv"
-                        type="text"
-                        placeholder="123"
-                        maxLength={4}
-                        className="font-mono w-full"
-                      />
-                    )}
-                  />
-                  {errors.cvv && (
-                    <p className="text-sm text-red-600 mt-1">{errors.cvv.message}</p>
-                  )}
-                </div>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="parcego-cardholder-name" className="text-sm font-medium text-gray-700">Cardholder Name</Label>
-                <Controller
-                  name="cardholderName"
-                  control={control}
-                  rules={{ required: 'Cardholder name is required' }}
-                  render={({ field }) => (
-                    <Input
-                      {...field}
-                      id="parcego-cardholder-name"
-                      type="text"
-                      placeholder="John Doe"
-                    />
-                  )}
-                />
-                {errors.cardholderName && (
-                  <p className="text-sm text-red-600 mt-1">{errors.cardholderName.message}</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ACH Form */}
-          {paymentMethodType === 'ach' && (
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="parcego-routing-number" className="text-sm font-medium text-gray-700">Routing Number</Label>
-                <Controller
-                  name="routingNumber"
-                  control={control}
-                  rules={{ required: 'Routing number is required' }}
-                  render={({ field }) => (
-                    <Input
-                      {...field}
-                      id="parcego-routing-number"
-                      type="text"
-                      placeholder="123456789"
-                      maxLength={9}
-                      className="font-mono"
-                    />
-                  )}
-                />
-                {errors.routingNumber && (
-                  <p className="text-sm text-red-600 mt-1">{errors.routingNumber.message}</p>
-                )}
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="parcego-account-number" className="text-sm font-medium text-gray-700">Account Number</Label>
-                <Controller
-                  name="accountNumber"
-                  control={control}
-                  rules={{ required: 'Account number is required' }}
-                  render={({ field }) => (
-                    <Input
-                      {...field}
-                      id="parcego-account-number"
-                      type="text"
-                      placeholder="1234567890"
-                      className="font-mono"
-                    />
-                  )}
-                />
-                {errors.accountNumber && (
-                  <p className="text-sm text-red-600 mt-1">{errors.accountNumber.message}</p>
-                )}
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="parcego-account-type" className="text-sm font-medium text-gray-700">Account Type</Label>
-                <Controller
-                  name="accountType"
-                  control={control}
-                  rules={{ required: 'Account type is required' }}
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger id="parcego-account-type">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="checking">Checking</SelectItem>
-                        <SelectItem value="savings">Savings</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  )}
-                />
-                {errors.accountType && (
-                  <p className="text-sm text-red-600 mt-1">{errors.accountType.message}</p>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* PayPal Form */}
-          {paymentMethodType === 'paypal' && (
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="parcego-paypal-email" className="text-sm font-medium text-gray-700">PayPal Email</Label>
-                <Controller
-                  name="email"
-                  control={control}
-                  rules={{ 
-                    required: 'Email is required',
-                    pattern: {
-                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                      message: 'Invalid email address'
-                    }
-                  }}
-                  render={({ field }) => (
-                    <Input
-                      {...field}
-                      id="parcego-paypal-email"
-                      type="email"
-                      placeholder="john.doe@example.com"
-                    />
-                  )}
-                />
-                {errors.email && (
-                  <p className="text-sm text-red-600 mt-1">{errors.email.message}</p>
-                )}
-              </div>
-              <div className="text-sm text-muted-foreground">
-                You&apos;ll be redirected to PayPal to complete the setup and authorize future payments.
-              </div>
-            </div>
-          )}
-
-          {/* Security Notice */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <Icon name="Shield" size={20} className="text-blue-600 mt-0.5 flex-shrink-0" />
-              <div className="text-sm text-blue-800">
-                <div className="font-medium mb-1">Your information is secure</div>
-                <div>
-                  All payment information is encrypted and processed securely through Stripe. 
-                  We never store your full card details on our servers.
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Form Actions */}
-          <div className="flex justify-end items-center pt-6 border-t">
-            <div className="flex gap-3">
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={onClose}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button 
-                type="submit" 
-                disabled={!isFormValid || isSubmitting}
-                id="parcego-add-payment-method-submit-btn"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Icon name="Loader2" size={16} className="mr-2 animate-spin" />
-                    Adding...
-                  </>
-                ) : (
-                  'Add Payment Method'
-                )}
-              </Button>
-            </div>
-          </div>
-        </form>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-function PaymentMethodsTab({ 
-  methods, 
-  onMethodAdded 
-}: { 
-  methods: PaymentMethod[]
-  onMethodAdded: (method: PaymentMethod) => void
-}) {
-  const [deleteMethodId, setDeleteMethodId] = useState<string | null>(null)
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
-  const [isAddMethodDialogOpen, setIsAddMethodDialogOpen] = useState(false)
-
-  const handleDeleteMethod = (methodId: string) => {
-    setDeleteMethodId(methodId)
-    setIsDeleteDialogOpen(true)
-  }
-
-  const confirmDelete = () => {
-    if (deleteMethodId) {
-      // Here you would typically call an API to delete the payment method
-      console.log(`Deleting payment method: ${deleteMethodId}`)
-      // For now, we'll just close the dialog
-      setIsDeleteDialogOpen(false)
-      setDeleteMethodId(null)
-    }
-  }
-
-  const cancelDelete = () => {
-    setIsDeleteDialogOpen(false)
-    setDeleteMethodId(null)
-  }
-
-  const methodToDelete = methods.find(method => method.id === deleteMethodId)
-
-  return (
-    <div className="space-y-6">
-      <Card id="parcego-billing-payment-methods">
-        <CardHeader className="px-4 sm:px-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <CardTitle className="text-lg sm:text-xl">Payment Methods</CardTitle>
-              <CardDescription className="text-sm">Manage your payment methods</CardDescription>
-            </div>
-            <Button 
-              id="parcego-billing-add-method-btn"
-              onClick={() => setIsAddMethodDialogOpen(true)}
-              className="w-full sm:w-auto text-sm"
-            >
-              Add Payment Method
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="px-4 sm:px-6">
-          <div className="space-y-4">
-            {methods.map((method) => (
-              <div
-                key={method.id}
-                id={`parcego-billing-method-${method.id}`}
-                className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-3"
-              >
-                <div className="flex items-center gap-4 flex-1 min-w-0">
-                  <PaymentMethodIcon type={method.type} />
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate">{method.label}</div>
-                    {method.expiry && <div className="text-sm text-muted-foreground">Expires {method.expiry}</div>}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {method.isDefault && (
-                    <Badge variant="secondary" className="text-xs">Default</Badge>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleDeleteMethod(method.id)}
-                    className="text-xs"
-                  >
-                    Remove
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Add Payment Method Dialog */}
-      <AddPaymentMethodDialog
-        isOpen={isAddMethodDialogOpen}
-        onClose={() => setIsAddMethodDialogOpen(false)}
-        onMethodAdded={onMethodAdded}
-      />
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Remove Payment Method</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to remove {methodToDelete?.label}? This action cannot be undone.
-              {methodToDelete?.isDefault && (
-                <span className="block mt-2 text-amber-600 font-medium text-sm">
-                  ⚠️ This is your default payment method. Removing it may affect your billing.
-                </span>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={cancelDelete}>Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={confirmDelete}
-              className="bg-destructive text-white hover:bg-destructive/90"
-            >
-              Remove Payment Method
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
-  )
-}
-
 function TaxDocumentsTab({ documents }: { documents: TaxDocument[] }) {
   return (
     <Card id="parcego-billing-tax-documents">
@@ -2115,22 +1533,27 @@ function InvoiceDetailsDialog({ invoice, userProfile }: { invoice: Invoice; user
 
     // Load and add company logo
     const logoData = await loadLogoForPDF();
-    addLogoToPDF(doc, margin, yPosition, 50, 50, logoData); // Optimized dimensions for A4 invoice
+    // Master logo aspect ratio: 149/92 ≈ 1.62:1
+    // Use appropriate width and calculate height to maintain aspect ratio
+    const logoWidth = 60;
+    const logoHeight = logoWidth / 1.62; // Maintain aspect ratio (~37)
+    addLogoToPDF(doc, margin, yPosition, logoWidth, logoHeight, logoData);
 
-    // Company info
+    // Company info - positioned to the right of logo with proper spacing
+    const logoRightEdge = margin + logoWidth + 10; // 10pt spacing after logo
     doc.setFontSize(24)
     doc.setFont('helvetica', 'bold')
-    yPosition = addText('Parcego', margin + 50, yPosition + 15)
+    yPosition = addText('Parcego', logoRightEdge, yPosition + 20)
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
-    yPosition = addText('Courier Business Platform', margin + 50, yPosition + 5)
+    yPosition = addText('Courier Business Platform', logoRightEdge, yPosition + 5)
     
     // Company address
     doc.setFontSize(9)
-    yPosition = addText('123 Business Street', margin + 50, yPosition + 10)
-    yPosition = addText('Suite 100', margin + 50, yPosition + 5)
-    yPosition = addText('New York, NY 10001', margin + 50, yPosition + 5)
-    yPosition = addText('support@parcego.com', margin + 50, yPosition + 5)
+    yPosition = addText('123 Business Street', logoRightEdge, yPosition + 10)
+    yPosition = addText('Suite 100', logoRightEdge, yPosition + 5)
+    yPosition = addText('New York, NY 10001', logoRightEdge, yPosition + 5)
+    yPosition = addText('support@parcego.com', logoRightEdge, yPosition + 5)
 
     // Invoice title and details (right side)
     doc.setFontSize(20)
@@ -2139,12 +1562,16 @@ function InvoiceDetailsDialog({ invoice, userProfile }: { invoice: Invoice; user
     
     doc.setFontSize(10)
     doc.setFont('helvetica', 'normal')
-    doc.text(`Invoice #: INV-${invoice.id.toUpperCase()}`, pageWidth - margin, margin + 25, { align: 'right' })
+    const invoiceNumber = invoice.id.toLowerCase().startsWith('inv-') ? invoice.id.toUpperCase() : `INV-${invoice.id.toUpperCase()}`;
+    doc.text(`Invoice #: ${invoiceNumber}`, pageWidth - margin, margin + 25, { align: 'right' })
     doc.text(`Date: ${formatDate(invoice.date)}`, pageWidth - margin, margin + 30, { align: 'right' })
     doc.text(`Due Date: ${formatDate(invoice.dueDate)}`, pageWidth - margin, margin + 35, { align: 'right' })
     doc.text(`Status: ${invoice.status.toUpperCase()}`, pageWidth - margin, margin + 40, { align: 'right' })
 
-    yPosition = yPosition + 40
+    // Ensure proper spacing before "Bill To" section
+    // Add spacing after company info, ensuring it's below the logo if logo is taller
+    const minYPosition = margin + logoHeight + 10; // Ensure we're below the logo
+    yPosition = Math.max(yPosition + 15, minYPosition)
 
     // Bill To section
     doc.setFontSize(12)
@@ -2211,7 +1638,7 @@ function InvoiceDetailsDialog({ invoice, userProfile }: { invoice: Invoice; user
     doc.line(margin, footerY - 10, pageWidth - margin, footerY - 10)
     
     doc.text('Payment Terms: Net 30 days. Please include invoice number with payment.', margin, footerY)
-    doc.text('Payment Methods: Credit Card, ACH, PayPal', margin, footerY + 5)
+    doc.text('Payment Methods: Credit/Debit Card via Stripe', margin, footerY + 5)
     
     doc.setFontSize(8)
     doc.text('Thank you for your business!', pageWidth / 2, footerY + 15, { align: 'center' })
@@ -2256,7 +1683,7 @@ function InvoiceDetailsDialog({ invoice, userProfile }: { invoice: Invoice; user
           <span className="transition-all duration-200">View</span>
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto rounded-lg bg-white">
+      <DialogContent className="!w-[85vw] !max-w-[1200px] sm:!max-w-[1200px] md:!max-w-[1200px] lg:!max-w-[1200px] xl:!max-w-[1200px] max-h-[90vh] overflow-y-auto rounded-lg bg-white">
         <DialogHeader>
           <DialogTitle>Invoice Preview</DialogTitle>
           <DialogDescription>
@@ -2270,62 +1697,62 @@ function InvoiceDetailsDialog({ invoice, userProfile }: { invoice: Invoice; user
         {/* Invoice Preview Content */}
         <div className="space-y-6">
           {/* Action Buttons */}
-          <div className="flex justify-end items-center gap-3">
+          <div className="flex justify-end items-center gap-3 flex-wrap">
             <Button 
               variant="outline" 
               size="default"
               onClick={handleDownloadPDF}
-              className="h-10 px-4 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-blue-100/50 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 focus:ring-2 focus:ring-blue-200 focus:ring-offset-2"
+              className="h-10 px-4 shrink-0 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:shadow-blue-100/50 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 focus:ring-2 focus:ring-blue-200 focus:ring-offset-2"
               aria-label="Download invoice as PDF"
               title="Download invoice as PDF file"
             >
-              <Icon name="Download" size={16} className="mr-2 transition-all duration-200" />
-              Download PDF
+              <Icon name="Download" size={16} className="mr-2 transition-all duration-200 shrink-0" />
+              <span className="whitespace-nowrap">Download PDF</span>
             </Button>
             <Button 
               onClick={handlePrint}
               disabled={isPrinting}
               id="parcego-invoice-print-btn"
-              className="bg-blue-600 hover:bg-blue-700 text-white h-10 px-4"
+              className="bg-blue-600 hover:bg-blue-700 text-white h-10 px-4 shrink-0"
               size="default"
               aria-label="Print invoice"
             >
               {isPrinting ? (
                 <>
-                  <Icon name="Loader2" size={16} className="mr-2 animate-spin" />
-                  Preparing...
+                  <Icon name="Loader2" size={16} className="mr-2 animate-spin shrink-0" />
+                  <span className="whitespace-nowrap">Preparing...</span>
                 </>
               ) : (
                 <>
-                  <Icon name="Printer" size={16} className="mr-2" />
-                  Print Invoice
+                  <Icon name="Printer" size={16} className="mr-2 shrink-0" />
+                  <span className="whitespace-nowrap">Print Invoice</span>
                 </>
               )}
             </Button>
           </div>
 
           {/* Invoice Summary Card */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 bg-white border border-gray-200 rounded-lg">
-            <div className="text-center">
-                              <div className="text-xl font-bold text-gray-900">{formatCurrency(invoice.amount)}</div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 bg-white border border-gray-200 rounded-lg">
+            <div className="text-center min-w-0">
+              <div className="text-xl font-bold text-gray-900 break-words">{formatCurrency(invoice.amount)}</div>
               <div className="text-sm text-gray-600">Total Amount</div>
             </div>
-            <div className="text-center">
+            <div className="text-center min-w-0">
               <div className="text-lg font-semibold text-gray-900">{invoice.lineItems.length}</div>
               <div className="text-sm text-gray-600">Line Items</div>
             </div>
-            <div className="text-center">
-              <div className="text-lg font-semibold text-gray-900">{formatDate(invoice.date)}</div>
+            <div className="text-center min-w-0">
+              <div className="text-base sm:text-lg font-semibold text-gray-900 break-words">{formatDate(invoice.date)}</div>
               <div className="text-sm text-gray-600">Invoice Date</div>
             </div>
-            <div className="text-center">
-              <div className="text-lg font-semibold text-gray-900">{formatDate(invoice.dueDate)}</div>
+            <div className="text-center min-w-0">
+              <div className="text-base sm:text-lg font-semibold text-gray-900 break-words">{formatDate(invoice.dueDate)}</div>
               <div className="text-sm text-gray-600">Due Date</div>
             </div>
           </div>
 
           {/* Invoice Content - Print Friendly */}
-          <div className="border rounded-lg p-6 bg-white relative" id="parcego-invoice-content">
+          <div className="border rounded-lg p-4 sm:p-6 lg:p-8 bg-white relative overflow-hidden" id="parcego-invoice-content">
             {/* Watermark */}
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-5">
               <div className="text-8xl font-bold text-gray-300 transform -rotate-45">
@@ -2334,10 +1761,10 @@ function InvoiceDetailsDialog({ invoice, userProfile }: { invoice: Invoice; user
             </div>
             
             {/* Header */}
-            <div className="flex justify-between items-start mb-8 relative z-10">
-              <div>
+            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-start gap-6 mb-8 relative z-10">
+              <div className="flex-1 min-w-0 max-w-full xl:max-w-[50%]">
                 <div className="flex items-center gap-3 mb-2">
-                  <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center">
+                  <div className="w-12 h-12 bg-blue-600 rounded-lg flex items-center justify-center flex-shrink-0">
                     <Image 
                       src="/Logo/Logo-icon-only.svg" 
                       alt="Parcego Logo" 
@@ -2346,26 +1773,36 @@ function InvoiceDetailsDialog({ invoice, userProfile }: { invoice: Invoice; user
                       className="w-8 h-8 filter brightness-0 invert"
                     />
                   </div>
-                  <div>
-                    <h1 className="text-xl font-bold text-gray-900 -mt-4">Parcego</h1>
-                    <p className="text-gray-600">Courier Business Platform</p>
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-xl font-bold text-gray-900 -mt-4 truncate">Parcego</h1>
+                    <p className="text-gray-600 truncate">Courier Business Platform</p>
                   </div>
                 </div>
-                <div className="text-sm text-gray-600 mt-2">
+                <div className="text-sm text-gray-600 mt-2 space-y-1">
                   <div>123 Business Street</div>
                   <div>Suite 100</div>
                   <div>New York, NY 10001</div>
-                  <div>support@parcego.com</div>
+                  <div className="break-all">support@parcego.com</div>
                 </div>
               </div>
               
-              <div className="text-right">
+              <div className="text-left xl:text-right flex-shrink-0 xl:ml-8 w-full xl:w-auto min-w-0">
                 <div className="text-xl font-bold text-gray-900 mb-2">INVOICE</div>
                 <div className="space-y-1 text-sm">
-                  <div><span className="font-medium">Invoice #:</span> INV-{invoice.id.toUpperCase()}</div>
-                  <div><span className="font-medium">Date:</span> {formatDate(invoice.date)}</div>
-                  <div><span className="font-medium">Due Date:</span> {formatDate(invoice.dueDate)}</div>
-                  <div><span className="font-medium">Status:</span> 
+                  <div className="flex flex-wrap items-center gap-1 xl:flex-nowrap xl:justify-end">
+                    <span className="font-medium shrink-0">Invoice #:</span> 
+                    <span className="break-words">{invoice.id.toLowerCase().startsWith('inv-') ? invoice.id.toUpperCase() : `INV-${invoice.id.toUpperCase()}`}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1 xl:flex-nowrap xl:justify-end">
+                    <span className="font-medium shrink-0">Date:</span> 
+                    <span className="whitespace-nowrap">{formatDate(invoice.date)}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1 xl:flex-nowrap xl:justify-end">
+                    <span className="font-medium shrink-0">Due Date:</span> 
+                    <span className="whitespace-nowrap">{formatDate(invoice.dueDate)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 xl:justify-end flex-wrap">
+                    <span className="font-medium shrink-0">Status:</span> 
                     <InvoiceStatusBadge status={invoice.status} />
                   </div>
                 </div>
@@ -2375,16 +1812,16 @@ function InvoiceDetailsDialog({ invoice, userProfile }: { invoice: Invoice; user
             {/* Bill To Section */}
             <div className="mb-8 relative z-10">
               <h3 className="text-lg font-semibold text-gray-900 mb-3">Bill To:</h3>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="font-medium">{userProfile?.business_name || 'Business Account'}</div>
-                <div className="text-gray-600">{userProfile ? `${userProfile.first_name} ${userProfile.last_name}` : 'Account Holder'}</div>
-                {userProfile?.street_address && <div className="text-gray-600">{userProfile.street_address}</div>}
+              <div className="bg-gray-50 p-4 lg:p-6 rounded-lg">
+                <div className="font-medium break-words">{userProfile?.business_name || 'Business Account'}</div>
+                <div className="text-gray-600 break-words">{userProfile ? `${userProfile.first_name} ${userProfile.last_name}` : 'Account Holder'}</div>
+                {userProfile?.street_address && <div className="text-gray-600 break-words">{userProfile.street_address}</div>}
                 {(userProfile?.city || userProfile?.province || userProfile?.postal_code) && (
-                  <div className="text-gray-600">
+                  <div className="text-gray-600 break-words">
                     {[userProfile?.city, userProfile?.province, userProfile?.postal_code].filter(Boolean).join(', ')}
                   </div>
                 )}
-                {userProfile?.email && <div className="text-gray-600">{userProfile.email}</div>}
+                {userProfile?.email && <div className="text-gray-600 break-all">{userProfile.email}</div>}
               </div>
             </div>
 
@@ -2434,20 +1871,20 @@ function InvoiceDetailsDialog({ invoice, userProfile }: { invoice: Invoice; user
 
             {/* Footer */}
             <div className="mt-12 pt-6 border-t border-gray-200 relative z-10">
-              <div className="grid grid-cols-2 gap-8 text-sm text-gray-600">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 text-sm text-gray-600">
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">Payment Terms</h4>
                   <p>Net 30 days. Please include invoice number with payment.</p>
                 </div>
                 <div>
                   <h4 className="font-medium text-gray-900 mb-2">Payment Methods</h4>
-                  <p>Credit Card, ACH, PayPal</p>
+                  <p>Credit/Debit Card via Stripe</p>
                 </div>
               </div>
               
               <div className="mt-6 text-center text-xs text-gray-500">
                 <p>Thank you for your business!</p>
-                <p className="mt-1">Questions? Contact us at support@parcego.com</p>
+                <p className="mt-1 break-words">Questions? Contact us at support@parcego.com</p>
               </div>
             </div>
           </div>

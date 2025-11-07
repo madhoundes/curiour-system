@@ -621,7 +621,7 @@ function PurchaseLabelContent() {
                           e.preventDefault();
                           handlePayment();
                         }}
-                        aria-label="Go to Stripe payment"
+                        aria-label="Proceed to checkout"
                       >
                         {isProcessing ? (
                           <div className="flex items-center space-x-2">
@@ -631,7 +631,7 @@ function PurchaseLabelContent() {
                         ) : (
                           <div className="flex items-center space-x-2">
                             <Icon name="CreditCard" size={18} />
-                            <span>Go to Stripe</span>
+                            <span>Proceed to Checkout</span>
                           </div>
                         )}
                       </Button>

@@ -21,6 +21,19 @@ export class ProfileService {
    */
   async getProfile(): Promise<UserProfile> {
     try {
+      // Check if user is authenticated before making the request
+      if (typeof window !== 'undefined') {
+        const token = localStorage.getItem('auth_token');
+        if (!token) {
+          throw {
+            error: 'API Error',
+            message: 'Authentication required',
+            status: 401,
+            details: 'Not authenticated'
+          };
+        }
+      }
+
       const response = await apiClient.get<UserProfile>(
         API_ENDPOINTS.USERS.PROFILE
       );
@@ -30,11 +43,23 @@ export class ProfileService {
     } catch (error: any) {
       console.error('Get profile failed:', error);
       
-      if (error.response?.status === 401) {
-        throw new Error('Authentication required');
+      // Handle ApiErrorResponse structure (from apiClient)
+      const status = error.status || error.response?.status;
+      
+      if (status === 401 || status === 403) {
+        // Clear invalid token
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('auth_token');
+        }
+        throw {
+          error: error.error || 'API Error',
+          message: error.message || 'Authentication required',
+          status: status,
+          details: error.details || 'Not authenticated'
+        };
       }
       
-      throw new Error(error.message || 'Failed to get profile');
+      throw error;
     }
   }
 
