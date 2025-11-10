@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/alert-dialog"
 
 // Mock data types
-import { type Payment, type Invoice, type PaymentMethod, type TaxDocument } from "./types"
+import { type Payment, type Invoice, type PaymentMethod } from "./types"
 
 // Real API imports
 import { shippingService } from "@/lib/api/shipping"
@@ -35,8 +35,6 @@ import { profileService } from "@/lib/api/profile"
 import type { BillingRecord, BillingRecordsListResponse, UserProfile } from "@/lib/api/types"
 import { toast } from "sonner"
 
-// Mock data (fallback only)
-import { mockPayments, mockInvoices, mockTaxDocuments } from "./mock-data"
 
 // Logo utility functions for PDF generation
 import { loadLogoForPDF, addLogoToPDF, generatePdfInvoice } from "@/lib/utils"
@@ -74,23 +72,6 @@ Thank you for choosing Parcego!
 For questions, contact support@parcego.com`;
 };
 
-// Function to generate tax document content for download
-const generateTaxDocumentContent = (doc: TaxDocument): string => {
-  const issueDate = new Date(doc.issuedDate).toLocaleDateString();
-  
-  return `TAX DOCUMENT
-
-Document Type: ${doc.type}
-Tax Year: ${doc.year}
-Issue Date: ${issueDate}
-
-This document contains important tax information for the ${doc.year} tax year.
-Please consult with your tax advisor for proper filing and compliance.
-
-For questions about this document, contact support@parcego.com
-
-Thank you for choosing Parcego!`;
-};
 
 
 // Transformation functions to map API data to local types
@@ -131,7 +112,6 @@ export function BillingPage() {
   const [activeTab, setActiveTab] = useState<string>('payment-history')
   const [payments, setPayments] = useState<Payment[]>([])
   const [invoices, setInvoices] = useState<Invoice[]>([])
-  const [taxDocuments] = useState<TaxDocument[]>(mockTaxDocuments)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -162,9 +142,9 @@ export function BillingPage() {
       } catch (err) {
         console.error('Failed to fetch data:', err)
         setError('Failed to load data')
-        // Fallback to mock data on error
-        setPayments(mockPayments)
-        setInvoices(mockInvoices)
+        // Keep empty arrays on error - no fallback mock data
+        setPayments([])
+        setInvoices([])
       } finally {
         setIsLoading(false)
       }
@@ -227,12 +207,6 @@ export function BillingPage() {
               className="h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md flex-shrink-0"
             >
               Invoices
-            </TabsTrigger>
-            <TabsTrigger 
-              value="tax-documents" 
-              className="h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md flex-shrink-0"
-            >
-              Tax Documents
             </TabsTrigger>
             <TabsTrigger 
               value="preferences" 
@@ -302,10 +276,6 @@ export function BillingPage() {
             ) : (
               <InvoicesTab invoices={invoices} userProfile={userProfile} />
             )}
-          </TabsContent>
-
-          <TabsContent value="tax-documents" className="mt-6">
-            <TaxDocumentsTab documents={taxDocuments} />
           </TabsContent>
 
           <TabsContent value="preferences" className="mt-6">
@@ -974,49 +944,6 @@ function InvoicesTab({ invoices, userProfile }: { invoices: Invoice[]; userProfi
         </Card>
       )
     }
-
-function TaxDocumentsTab({ documents }: { documents: TaxDocument[] }) {
-  return (
-    <Card id="parcego-billing-tax-documents">
-      <CardHeader className="px-4 sm:px-6">
-        <CardTitle className="text-lg sm:text-xl">Tax Documents</CardTitle>
-        <CardDescription className="text-sm">Access your tax documents and forms</CardDescription>
-      </CardHeader>
-      <CardContent className="px-4 sm:px-6">
-        <div className="space-y-4">
-          {documents.map((doc) => (
-            <div
-              key={doc.id}
-              id={`parcego-billing-doc-${doc.id}`}
-              className="flex flex-col sm:flex-row sm:items-center justify-between p-4 border rounded-lg gap-3"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="font-medium truncate">{doc.type} - {doc.year}</div>
-                <div className="text-sm text-muted-foreground">
-                  Issued on {new Date(doc.issuedDate).toLocaleDateString()}
-                </div>
-              </div>
-              <Button 
-                variant="ghost" 
-                size="sm"
-                onClick={() => {
-                  alert('Tax document download is not available. Please contact support.');
-                }}
-                id={`parcego-download-tax-doc-${doc.id}-btn`}
-                className="w-full sm:w-auto transition-all duration-300 hover:scale-105 hover:shadow-md hover:shadow-blue-200/50 hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 focus:ring-2 focus:ring-blue-200 focus:ring-offset-1 text-sm"
-                aria-label={`Download ${doc.type} tax document for ${doc.year}`}
-                title={`Download ${doc.type} tax document for ${doc.year} as text file`}
-              >
-                <Icon name="Download" size={14} className="mr-1" />
-                Download
-              </Button>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  )
-}
 
 // Billing contact form data types
 type BillingContactFormData = {
