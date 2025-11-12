@@ -13,6 +13,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Icon } from "@/components/ui/icon";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -27,6 +28,7 @@ import type { ApiErrorResponse } from "@/lib/api/types";
 const loginFormSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters long"),
+  rememberMe: z.boolean(),
 });
 
 const signupFormSchema = z.object({
@@ -46,13 +48,43 @@ const Login03PageContent = () => {
   const router = useRouter();
   const searchParams = useSearchParams();
 
+  // Helper function to get cookie value
+  const getCookie = (name: string): string | null => {
+    if (typeof window === 'undefined') return null;
+    const value = `; ${document.cookie}`;
+    const parts = value.split(`; ${name}=`);
+    if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+    return null;
+  };
+
+  // Helper function to set cookie
+  const setCookie = (name: string, value: string, days: number) => {
+    if (typeof window === 'undefined') return;
+    const expires = new Date();
+    expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+    document.cookie = `${name}=${value}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`;
+  };
+
   const loginForm = useForm<z.infer<typeof loginFormSchema>>({
     defaultValues: {
       email: "",
       password: "",
+      rememberMe: false,
     },
     resolver: zodResolver(loginFormSchema),
   });
+
+  // Check for remembered email on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const rememberedEmail = getCookie('remembered_email');
+      if (rememberedEmail) {
+        loginForm.setValue('email', rememberedEmail);
+        loginForm.setValue('rememberMe', true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const signupForm = useForm<z.infer<typeof signupFormSchema>>({
     defaultValues: {
@@ -207,7 +239,21 @@ const Login03PageContent = () => {
       // Set authentication cookie for middleware to recognize authenticated user
       // This allows access to protected routes
       if (typeof window !== 'undefined') {
-        document.cookie = 'mock-auth=true; path=/; max-age=86400; SameSite=Lax';
+        const rememberMe = loginForm.getValues('rememberMe');
+        
+        // Set cookie expiration based on remember me option
+        // 30 days if remember me is checked, 24 hours if not
+        const maxAge = rememberMe ? 2592000 : 86400; // 30 days or 24 hours in seconds
+        
+        document.cookie = `mock-auth=true; path=/; max-age=${maxAge}; SameSite=Lax`;
+        
+        // Store email in cookie if remember me is checked
+        if (rememberMe) {
+          setCookie('remembered_email', data.email, 30);
+        } else {
+          // Clear remembered email cookie if not checked
+          document.cookie = 'remembered_email=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        }
       }
       
       // Show success message
@@ -442,6 +488,30 @@ const Login03PageContent = () => {
                           />
                         </FormControl>
                         <FormMessage className="text-red-500" />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={loginForm.control}
+                    name="rememberMe"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                        <FormControl>
+                          <Checkbox
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                            id="remember-me"
+                            aria-label="Remember me"
+                          />
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
+                          <FormLabel
+                            htmlFor="remember-me"
+                            className="text-sm font-normal cursor-pointer"
+                          >
+                            Remember me
+                          </FormLabel>
+                        </div>
                       </FormItem>
                     )}
                   />

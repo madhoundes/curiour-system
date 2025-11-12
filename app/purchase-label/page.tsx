@@ -327,13 +327,13 @@ function PurchaseLabelContent() {
       }
     }
 
-    // Normalize postal codes (remove extra spaces, but keep format for display)
+    // Normalize postal codes (remove extra spaces and dashes, but keep format for display)
     const normalizePostalCode = (code: string): string => {
       if (!code) return "";
-      // Remove extra spaces but keep a single space in the middle if present
-      const cleaned = code.trim().replace(/\s+/g, ' ').toUpperCase();
-      // If no space, add one after 3rd character (A1A 1A1 format)
-      if (cleaned.length === 6 && !cleaned.includes(' ')) {
+      // Remove dashes and normalize spaces, then convert to uppercase
+      const cleaned = code.trim().replace(/[\s-]/g, '').toUpperCase();
+      // Format as A1A 1A1 (add space after 3rd character)
+      if (cleaned.length === 6) {
         return `${cleaned.substring(0, 3)} ${cleaned.substring(3)}`;
       }
       return cleaned;

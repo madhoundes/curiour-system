@@ -5306,15 +5306,17 @@ export default function SuperAdminDashboard() {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel className="font-normal">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{adminName}</p>
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium leading-none">{adminName}</p>
+                      <Badge variant="default" className="bg-purple-600 hover:bg-purple-700 text-white text-xs px-2 py-0.5">
+                        <Icon name="Shield" size={12} className="mr-1" />
+                        Super Admin
+                      </Badge>
+                    </div>
                     <p className="text-xs leading-none text-muted-foreground">{adminEmail}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="cursor-pointer">
-                  <Icon name="User" size={16} className="mr-2" />
-                  <span>Profile</span>
-                </DropdownMenuItem>
                 <DropdownMenuItem className="cursor-pointer">
                   <Icon name="Settings" size={16} className="mr-2" />
                   <span>Settings</span>
