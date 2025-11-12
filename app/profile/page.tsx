@@ -17,6 +17,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Icon } from "@/components/ui/icon";
 import {
   Form,
   FormControl,
@@ -28,6 +30,34 @@ import {
 } from "@/components/ui/form";
 import { PageHeader } from "@/components/ui/page-header";
 
+// Postal code validation helpers
+const isTorontoPostalCode = (postalCode: string): boolean => {
+  const normalized = postalCode.trim().toUpperCase().replace(/\s+/g, '');
+  if (!normalized.startsWith('M')) {
+    return false;
+  }
+  const digit1 = parseInt(normalized.charAt(1));
+  return digit1 >= 1 && digit1 <= 9;
+};
+
+const isMississaugaPostalCode = (postalCode: string): boolean => {
+  const normalized = postalCode.trim().toUpperCase().replace(/\s+/g, '');
+  if (!normalized.startsWith('L')) {
+    return false;
+  }
+  const fsa = normalized.substring(0, 3);
+  const digit1 = parseInt(fsa.charAt(1));
+  const letter2 = fsa.charAt(2);
+  
+  if (digit1 === 4) {
+    return ['T', 'W', 'X', 'Y', 'Z'].includes(letter2);
+  }
+  if (digit1 === 5) {
+    return ['A', 'B', 'C', 'E', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'V', 'W'].includes(letter2);
+  }
+  return false;
+};
+
 const BusinessInfoSchema = z.object({
   business_name: z.string().min(2, "Business name is required"),
   contactName: z.string().min(2, "Contact name is required"),
@@ -35,10 +65,43 @@ const BusinessInfoSchema = z.object({
   phone: z.string().regex(/^\d{10,}$/, "Phone number must have at least 10 digits"),
   addressLine1: z.string().min(2, "Address is required"),
   addressLine2: z.string().optional(),
-  city: z.string().min(2, "City is required"),
+  city: z.enum(["Toronto", "Mississauga"], {
+    message: "City must be Toronto or Mississauga"
+  }),
   state: z.string().min(2, "State is required"),
-  zip: z.string().regex(/^[A-Za-z]\d[A-Za-z] \d[A-Za-z]\d$/, "Invalid postal code format. Use Canadian format: A1A 1A1"),
+  zip: z.string()
+    .min(6, "Postal code is required")
+    .refine((postalCode) => {
+      // More flexible regex that handles spaces, dashes, or no separator
+      const cleaned = postalCode.trim().replace(/[\s-]/g, '');
+      const regex = /^[A-Za-z]\d[A-Za-z]\d[A-Za-z]\d$/;
+      return regex.test(cleaned);
+    }, {
+      message: "Invalid postal code format. Use Canadian format: A1A 1A1 (e.g., M5V 3A8 or L4T 1A1)"
+    })
+    .refine((postalCode) => {
+      const normalized = postalCode.trim().toUpperCase().replace(/\s+/g, '').replace(/-/g, '');
+      return isTorontoPostalCode(normalized) || isMississaugaPostalCode(normalized);
+    }, {
+      message: "Postal code must be in Downtown Toronto (M prefix) or Mississauga (L4T-L5W prefix)"
+    }),
   country: z.string().min(2, "Country is required"),
+}).refine((data) => {
+  // Normalize postal code: remove spaces and dashes, convert to uppercase
+  const normalized = data.zip.trim().toUpperCase().replace(/[\s-]/g, '');
+  
+  if (data.city === "Toronto" && !isTorontoPostalCode(normalized)) {
+    return false;
+  }
+  
+  if (data.city === "Mississauga" && !isMississaugaPostalCode(normalized)) {
+    return false;
+  }
+  
+  return true;
+}, {
+  message: "Postal code does not match the selected city. Toronto postal codes start with M, Mississauga postal codes start with L4T-L5W",
+  path: ["zip"]
 });
 
 const AccountSettingsSchema = z.object({
@@ -104,10 +167,10 @@ export default function ProfileAccountPage() {
       phone: "",
       addressLine1: "",
       addressLine2: "",
-      city: "",
-      state: "",
+      city: "Toronto", // Default to Toronto (service area requirement)
+      state: "Ontario", // Default to Ontario (service area requirement)
       zip: "",
-      country: "",
+      country: "Canada", // Default to Canada (service area requirement)
     }),
     []
   );
@@ -141,7 +204,7 @@ export default function ProfileAccountPage() {
   const businessForm = useForm<BusinessInfo>({
     resolver: zodResolver(BusinessInfoSchema),
     defaultValues: defaultBusiness,
-    mode: "onBlur",
+    mode: "onChange", // Changed to onChange for better real-time validation
   });
   const settingsForm = useForm<AccountSettings>({
     resolver: zodResolver(AccountSettingsSchema),
@@ -192,6 +255,42 @@ export default function ProfileAccountPage() {
         const profileData = await profileService.getProfile();
         
         // Map API response to form data
+        // Normalize city to match schema enum (Toronto or Mississauga)
+        let normalizedCity = profileData.city || "";
+        const originalCity = normalizedCity;
+        
+        if (normalizedCity.toLowerCase().includes('toronto') || normalizedCity.toLowerCase().includes('downtown')) {
+          normalizedCity = "Toronto";
+        } else if (normalizedCity.toLowerCase() === 'mississauga') {
+          normalizedCity = "Mississauga";
+        } else if (!normalizedCity) {
+          normalizedCity = "Toronto"; // Default to Toronto if empty
+        } else {
+          // City is not in service area - set to Toronto as default but show warning
+          normalizedCity = "Toronto";
+          if (originalCity) {
+            setProfileError(`Your current address city "${originalCity}" is not in our service area. Please update it to Toronto or Mississauga.`);
+          }
+        }
+        
+        // Validate postal code if present
+        if (profileData.postal_code) {
+          const postalCode = profileData.postal_code.trim().toUpperCase().replace(/\s+/g, '');
+          const isValidToronto = isTorontoPostalCode(postalCode);
+          const isValidMississauga = isMississaugaPostalCode(postalCode);
+          
+          if (!isValidToronto && !isValidMississauga) {
+            setProfileError(`Your current postal code "${profileData.postal_code}" is not in our service area. Please update it to a Toronto (M prefix) or Mississauga (L4T-L5W prefix) postal code.`);
+          } else if (normalizedCity === "Toronto" && !isValidToronto) {
+            setProfileError(`Your postal code "${profileData.postal_code}" does not match Toronto. Please update your address.`);
+          } else if (normalizedCity === "Mississauga" && !isValidMississauga) {
+            setProfileError(`Your postal code "${profileData.postal_code}" does not match Mississauga. Please update your address.`);
+          }
+        }
+        
+        // Ensure province is Ontario for service area
+        const normalizedProvince = "Ontario";
+        
         const businessData: BusinessInfo = {
           business_name: profileData.business_name || "",
           contactName: `${profileData.first_name || ""} ${profileData.last_name || ""}`.trim(),
@@ -199,10 +298,10 @@ export default function ProfileAccountPage() {
           phone: profileData.phone_number || "",
           addressLine1: profileData.street_address || "",
           addressLine2: profileData.street_address_2 || "",
-          city: profileData.city || "",
-          state: profileData.province || "",
+          city: normalizedCity as "Toronto" | "Mississauga",
+          state: normalizedProvince,
           zip: profileData.postal_code || "",
-          country: profileData.country || "",
+          country: profileData.country || "Canada",
         };
         
         businessForm.reset(businessData);
@@ -309,9 +408,9 @@ export default function ProfileAccountPage() {
           phone_number: businessData.phone,
           street_address: businessData.addressLine1,
           city: businessData.city,
-          province: businessData.state,
+          province: "ON", // Always set to Ontario for service area
           postal_code: businessData.zip,
-          country: businessData.country,
+          country: businessData.country || "Canada",
         };
 
         // Only include optional fields if they have values
@@ -690,14 +789,51 @@ export default function ProfileAccountPage() {
                           </FormItem>
                         )}
                       />
+                      
+                      {/* Service Area Notice */}
+                      <div className="md:col-span-2">
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                          <div className="flex items-start space-x-3">
+                            <Icon name="Info" size={20} className="text-blue-600 mt-0.5 flex-shrink-0" />
+                            <div className="flex-1">
+                              <p className="text-sm font-medium text-blue-900 mb-1">
+                                Service Area Restriction
+                              </p>
+                              <p className="text-sm text-blue-700">
+                                Your business address must be in <strong>Downtown Toronto</strong> or <strong>Mississauga</strong>, Ontario. This is required for pickup service availability.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
                       <FormField
                         control={businessForm.control}
                         name="city"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>City</FormLabel>
+                            <FormLabel>City <span className="text-red-500">*</span></FormLabel>
                             <FormControl>
-                              <Input placeholder="City" {...field} />
+                              <Select
+                                value={field.value}
+                                onValueChange={(value) => {
+                                  field.onChange(value);
+                                  // Auto-set province to Ontario when city changes
+                                  businessForm.setValue("state", "Ontario", { shouldValidate: false });
+                                  // Auto-set country to Canada
+                                  businessForm.setValue("country", "Canada", { shouldValidate: false });
+                                  // Clear postal code validation error if city changes
+                                  setTimeout(() => businessForm.trigger("zip"), 100);
+                                }}
+                              >
+                                <SelectTrigger id="parcego-profile-city">
+                                  <SelectValue placeholder="Select city" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Toronto">Toronto</SelectItem>
+                                  <SelectItem value="Mississauga">Mississauga</SelectItem>
+                                </SelectContent>
+                              </Select>
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -706,25 +842,63 @@ export default function ProfileAccountPage() {
                       <FormField
                         control={businessForm.control}
                         name="state"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>State</FormLabel>
-                            <FormControl>
-                              <Input placeholder="State" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+                        render={({ field }) => {
+                          // Ensure field value is always "Ontario"
+                          if (field.value !== "Ontario") {
+                            field.onChange("Ontario");
+                          }
+                          return (
+                            <FormItem>
+                              <FormLabel>Province <span className="text-red-500">*</span></FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="Ontario" 
+                                  value="Ontario" 
+                                  readOnly 
+                                  className="bg-gray-50 cursor-not-allowed"
+                                  onChange={() => {}} // Prevent changes
+                                  onFocus={(e) => e.target.blur()} // Prevent focus
+                                  tabIndex={-1} // Remove from tab order
+                                />
+                              </FormControl>
+                              <FormDescription>Service area is limited to Ontario</FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
                       />
                       <FormField
                         control={businessForm.control}
                         name="zip"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>ZIP</FormLabel>
+                            <FormLabel>Postal Code <span className="text-red-500">*</span></FormLabel>
                             <FormControl>
-                              <Input placeholder="10001" {...field} />
+                              <Input 
+                                placeholder={businessForm.watch("city") === "Toronto" ? "M5V 3A8" : businessForm.watch("city") === "Mississauga" ? "L5A 1B2" : "A1A 1A1"} 
+                                {...field}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  field.onChange(value);
+                                  // Only trigger validation if postal code looks complete (6+ characters without spaces)
+                                  const cleaned = value.trim().replace(/[\s-]/g, '');
+                                  if (cleaned.length >= 6) {
+                                    // Delay validation slightly to allow user to finish typing
+                                    setTimeout(() => businessForm.trigger("zip"), 300);
+                                  } else if (cleaned.length === 0) {
+                                    // Clear validation errors if field is empty
+                                    businessForm.clearErrors("zip");
+                                  }
+                                }}
+                              />
                             </FormControl>
+                            <FormDescription>
+                              {businessForm.watch("city") === "Toronto" 
+                                ? "Enter a Toronto postal code (starts with M)"
+                                : businessForm.watch("city") === "Mississauga"
+                                ? "Enter a Mississauga postal code (starts with L4T-L5W)"
+                                : "Enter a postal code in Toronto (M prefix) or Mississauga (L4T-L5W prefix)"}
+                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -732,15 +906,30 @@ export default function ProfileAccountPage() {
                       <FormField
                         control={businessForm.control}
                         name="country"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Country</FormLabel>
-                            <FormControl>
-                              <Input placeholder="USA" {...field} />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
+                        render={({ field }) => {
+                          // Ensure field value is always "Canada"
+                          if (field.value !== "Canada") {
+                            field.onChange("Canada");
+                          }
+                          return (
+                            <FormItem>
+                              <FormLabel>Country <span className="text-red-500">*</span></FormLabel>
+                              <FormControl>
+                                <Input 
+                                  placeholder="Canada" 
+                                  value="Canada"
+                                  readOnly 
+                                  className="bg-gray-50 cursor-not-allowed"
+                                  onChange={() => {}} // Prevent changes
+                                  onFocus={(e) => e.target.blur()} // Prevent focus
+                                  tabIndex={-1} // Remove from tab order
+                                />
+                              </FormControl>
+                              <FormDescription>Service area is limited to Canada</FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          );
+                        }}
                       />
 
                       <div className="col-span-full mt-4 flex items-center gap-2">

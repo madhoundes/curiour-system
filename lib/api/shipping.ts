@@ -557,11 +557,11 @@ export class ShippingService {
 
   // Validation helpers
   private validateShipmentData(data: CreateShipmentRequest): void {
-    // Validate sender address
-    this.validateAddress(data.sender_address, 'Sender');
+    // Validate sender address (pickup location - must be in Toronto/Mississauga)
+    this.validateAddress(data.sender_address, 'sender');
     
-    // Validate receiver address
-    this.validateAddress(data.receiver_address, 'Receiver');
+    // Validate receiver address (delivery location - must be in Toronto/Mississauga)
+    this.validateAddress(data.receiver_address, 'receiver');
     
     // Validate package
     this.validatePackage(data.package);
@@ -584,6 +584,65 @@ export class ShippingService {
     // Validate postal code format (basic Canadian format)
     if (!this.isValidPostalCode(address.postal_code)) {
       throw new Error(`${type} address: Invalid postal code format`);
+    }
+
+    // Validate service area - both sender (pickup) and receiver (delivery) must be in Toronto/Mississauga
+    // This matches the backend API requirement that both addresses must be in the service area
+    const city = address.city.trim();
+    const normalizedCity = city.toLowerCase();
+    const postalCode = address.postal_code.trim().toUpperCase().replace(/\s+/g, '');
+    
+    // Validate postal code is in service area
+    const isValidServiceAreaPostalCode = this.isPostalCodeInServiceArea(postalCode);
+    
+    // Check if city is Toronto (including Downtown Toronto) or Mississauga
+    const isToronto = normalizedCity === 'toronto' || normalizedCity.includes('downtown');
+    const isMississauga = normalizedCity === 'mississauga';
+    
+    // Determine address type for error messages
+    const addressTypeLabel = type === 'sender' ? 'pickup location (sender)' : 'delivery location (receiver)';
+    
+    // Validate postal code matches the city
+    if (isToronto && !this.isTorontoPostalCode(postalCode)) {
+      throw new Error(`The ${addressTypeLabel} postal code "${address.postal_code}" does not belong to Toronto. Please enter a valid Toronto postal code (starts with M).`);
+    }
+    
+    if (isMississauga && !this.isMississaugaPostalCode(postalCode)) {
+      throw new Error(`The ${addressTypeLabel} postal code "${address.postal_code}" does not belong to Mississauga. Please enter a valid Mississauga postal code (starts with L4T-L5W).`);
+    }
+    
+    // If city is valid but postal code is not in service area, reject
+    if ((isToronto || isMississauga) && !isValidServiceAreaPostalCode) {
+      throw new Error(`The ${addressTypeLabel} postal code "${address.postal_code}" is not in our service area. ${type === 'sender' ? 'Pickup' : 'Delivery'} is only available in Downtown Toronto (M prefix) and Mississauga (L4T-L5W prefix).`);
+    }
+    
+    // If postal code is valid but city doesn't match, reject
+    if (isValidServiceAreaPostalCode) {
+      if (this.isTorontoPostalCode(postalCode) && !isToronto) {
+        throw new Error(`The ${addressTypeLabel} postal code "${address.postal_code}" belongs to Toronto, but the city field doesn't match. Please select "Toronto" as the city.`);
+      }
+      if (this.isMississaugaPostalCode(postalCode) && !isMississauga) {
+        throw new Error(`The ${addressTypeLabel} postal code "${address.postal_code}" belongs to Mississauga, but the city field doesn't match. Please select "Mississauga" as the city.`);
+      }
+    }
+    
+    // Final check: if city is not in service area
+    if (!isToronto && !isMississauga) {
+      throw new Error(`${type === 'sender' ? 'Pickup' : 'Delivery'} is only supported in Downtown Toronto and Mississauga. Your ${addressTypeLabel} city "${city}" is not in our service area.`);
+    }
+    
+    // Final check: if postal code is not in service area (even if city is correct)
+    if (!isValidServiceAreaPostalCode) {
+      throw new Error(`The ${addressTypeLabel} postal code "${address.postal_code}" is not in our service area. ${type === 'sender' ? 'Pickup' : 'Delivery'} is only available in Downtown Toronto (postal codes starting with M) and Mississauga (postal codes starting with L4T-L5W).`);
+    }
+    
+    // Normalize city name - ensure province is Ontario for both cities
+    if (isToronto) {
+      address.city = 'Toronto';
+      address.province = 'ON'; // Ensure province is Ontario
+    } else if (isMississauga) {
+      address.city = 'Mississauga';
+      address.province = 'ON'; // Ensure province is Ontario
     }
   }
 
@@ -644,9 +703,90 @@ export class ShippingService {
   }
 
   private isValidPostalCode(postalCode: string): boolean {
-    // Canadian postal code format: A1A 1A1 or A1A1A1
-    const canadianPostalRegex = /^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/;
-    return canadianPostalRegex.test(postalCode.trim());
+    if (!postalCode || typeof postalCode !== 'string') {
+      return false;
+    }
+    // More flexible validation: remove spaces and dashes, then check format
+    // Canadian postal code format: A1A 1A1, A1A1A1, or A1A-1A1
+    const cleaned = postalCode.trim().replace(/[\s-]/g, '');
+    if (cleaned.length !== 6) {
+      return false;
+    }
+    // Check format: letter, digit, letter, digit, letter, digit
+    const canadianPostalRegex = /^[A-Za-z]\d[A-Za-z]\d[A-Za-z]\d$/;
+    return canadianPostalRegex.test(cleaned);
+  }
+
+  /**
+   * Check if postal code belongs to Toronto
+   * Toronto postal codes start with M (M1A to M9Z)
+   * Downtown Toronto typically uses M4W, M5H-M5X, M6G-M6S, etc.
+   */
+  private isTorontoPostalCode(postalCode: string): boolean {
+    // Normalize postal code: remove spaces and convert to uppercase
+    const normalized = postalCode.trim().toUpperCase().replace(/\s+/g, '');
+    
+    // Toronto postal codes start with M
+    if (!normalized.startsWith('M')) {
+      return false;
+    }
+    
+    // Extract FSA (first 3 characters: M5V)
+    const fsa = normalized.substring(0, 3);
+    const letter = fsa.charAt(0); // M
+    const digit1 = parseInt(fsa.charAt(1)); // 5
+    const letter2 = fsa.charAt(2); // V
+    
+    // Toronto uses M prefix with various FSAs
+    // Common Downtown Toronto FSAs: M4W, M5A-M5Z, M6A-M6Z
+    // We'll accept all M codes as Toronto (can be refined later)
+    return letter === 'M' && digit1 >= 1 && digit1 <= 9;
+  }
+
+  /**
+   * Check if postal code belongs to Mississauga
+   * Mississauga postal codes start with L, specifically L4T-L5W range
+   */
+  private isMississaugaPostalCode(postalCode: string): boolean {
+    // Normalize postal code: remove spaces and convert to uppercase
+    const normalized = postalCode.trim().toUpperCase().replace(/\s+/g, '');
+    
+    // Mississauga postal codes start with L
+    if (!normalized.startsWith('L')) {
+      return false;
+    }
+    
+    // Extract FSA (first 3 characters: L5A)
+    const fsa = normalized.substring(0, 3);
+    const letter = fsa.charAt(0); // L
+    const digit1 = parseInt(fsa.charAt(1)); // 4 or 5
+    const letter2 = fsa.charAt(2); // T, W, X, Y, Z, A, B, C, etc.
+    
+    // Mississauga uses L4T-L4Z and L5A-L5W ranges
+    if (letter !== 'L') {
+      return false;
+    }
+    
+    // L4T, L4W, L4X, L4Y, L4Z
+    if (digit1 === 4) {
+      const validL4FSAs = ['T', 'W', 'X', 'Y', 'Z'];
+      return validL4FSAs.includes(letter2);
+    }
+    
+    // L5A through L5W (L5A, L5B, L5C, L5E, L5G, L5H, L5J, L5K, L5L, L5M, L5N, L5P, L5R, L5S, L5T, L5V, L5W)
+    if (digit1 === 5) {
+      const validL5FSAs = ['A', 'B', 'C', 'E', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'V', 'W'];
+      return validL5FSAs.includes(letter2);
+    }
+    
+    return false;
+  }
+
+  /**
+   * Check if postal code is in service area (Toronto or Mississauga)
+   */
+  private isPostalCodeInServiceArea(postalCode: string): boolean {
+    return this.isTorontoPostalCode(postalCode) || this.isMississaugaPostalCode(postalCode);
   }
 
   /**

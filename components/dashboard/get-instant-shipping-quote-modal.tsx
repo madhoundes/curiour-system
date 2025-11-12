@@ -43,12 +43,70 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
   const [quoteGenerated, setQuoteGenerated] = useState(false)
   const [estimatedCost, setEstimatedCost] = useState<string>("")
   const [quoteError, setQuoteError] = useState<string>("")
+  const [postalCodeError, setPostalCodeError] = useState<string>("")
+
+  // Postal code validation functions
+  const isTorontoPostalCode = (postalCode: string): boolean => {
+    const normalized = postalCode.trim().toUpperCase().replace(/\s+/g, '');
+    if (!normalized.startsWith('M')) {
+      return false;
+    }
+    const digit1 = parseInt(normalized.charAt(1));
+    return digit1 >= 1 && digit1 <= 9;
+  };
+
+  const isMississaugaPostalCode = (postalCode: string): boolean => {
+    const normalized = postalCode.trim().toUpperCase().replace(/\s+/g, '');
+    if (!normalized.startsWith('L')) {
+      return false;
+    }
+    const fsa = normalized.substring(0, 3);
+    const digit1 = parseInt(fsa.charAt(1));
+    const letter2 = fsa.charAt(2);
+    
+    if (digit1 === 4) {
+      return ['T', 'W', 'X', 'Y', 'Z'].includes(letter2);
+    }
+    if (digit1 === 5) {
+      return ['A', 'B', 'C', 'E', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'V', 'W'].includes(letter2);
+    }
+    return false;
+  };
+
+  const isPostalCodeInServiceArea = (postalCode: string): boolean => {
+    return isTorontoPostalCode(postalCode) || isMississaugaPostalCode(postalCode);
+  };
+
+  const validatePostalCode = (postalCode: string): string | null => {
+    if (!postalCode || postalCode.trim() === '') {
+      return 'Postal code is required';
+    }
+
+    // Basic format validation
+    const canadianPostalCodeRegex = /^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/;
+    if (!canadianPostalCodeRegex.test(postalCode.trim())) {
+      return 'Invalid postal code format. Please use format A1A 1A1';
+    }
+
+    // Check if postal code is in service area
+    if (!isPostalCodeInServiceArea(postalCode)) {
+      return 'This postal code is not in our service area. Delivery is only available in Downtown Toronto (M prefix) and Mississauga (L4T-L5W prefix).';
+    }
+
+    return null;
+  };
 
   const handleInputChange = (field: keyof QuoteFormData, value: string) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }))
+
+    // Validate postal code when it changes
+    if (field === 'destinationPostalCode') {
+      const error = validatePostalCode(value);
+      setPostalCodeError(error || '');
+    }
   }
 
   const handleGeneratePrice = async () => {
@@ -56,8 +114,17 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
       return
     }
 
+    // Validate postal code before making API call
+    const postalCodeValidationError = validatePostalCode(formData.destinationPostalCode);
+    if (postalCodeValidationError) {
+      setPostalCodeError(postalCodeValidationError);
+      setQuoteError(postalCodeValidationError);
+      return;
+    }
+
     setIsGenerating(true)
     setQuoteError("")
+    setPostalCodeError("")
     
     try {
       const quoteRequest: QuoteEstimateRequest = {
@@ -72,9 +139,17 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
       setQuoteGenerated(true)
     } catch (error) {
       console.error('Quote generation failed:', error)
-      setQuoteError(error instanceof Error ? error.message : 'Failed to generate quote. Please try again.')
+      const errorMessage = error instanceof Error ? error.message : 'Failed to generate quote. Please try again.'
+      setQuoteError(errorMessage)
       
-      // Fallback to mock calculation
+      // Don't fallback to mock calculation if it's a service area error
+      if (errorMessage.toLowerCase().includes('service area') || 
+          errorMessage.toLowerCase().includes('not in our service area') ||
+          errorMessage.toLowerCase().includes('not supported')) {
+        return;
+      }
+      
+      // Fallback to mock calculation only for other errors
       const weight = parseFloat(formData.weight) || 1
       const baseRate = 15.99
       const weightMultiplier = weight * 2.5
@@ -125,6 +200,16 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
         </DialogHeader>
 
         <div className="space-y-4 py-4">
+          {/* Service Area Notice */}
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <div className="flex items-start space-x-2">
+              <Icon name="Info" size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
+              <p className="text-xs text-blue-700">
+                <strong>Service Area:</strong> Both <strong>pickup</strong> and <strong>delivery</strong> must be in <strong>Downtown Toronto</strong> or <strong>Mississauga</strong>, Ontario.
+              </p>
+            </div>
+          </div>
+
           {/* Package Size */}
           <div className="space-y-2">
             <Label htmlFor="parcego-package-size">Package Size</Label>
@@ -161,10 +246,28 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
             <Label htmlFor="parcego-destination-postal">Destination Postal Code</Label>
             <Input
               id="parcego-destination-postal"
-              placeholder="Enter postal code"
+              placeholder="M5V 3A8 (Toronto) or L5A 1B2 (Mississauga)"
               value={formData.destinationPostalCode}
               onChange={(e) => handleInputChange("destinationPostalCode", e.target.value)}
+              className={postalCodeError ? 'border-red-500 focus-visible:ring-red-200' : ''}
+              aria-invalid={!!postalCodeError}
+              aria-describedby={postalCodeError ? 'parcego-destination-postal-error' : undefined}
             />
+            {postalCodeError && (
+              <p id="parcego-destination-postal-error" className="text-sm text-red-600 mt-1">
+                {postalCodeError}
+              </p>
+            )}
+            {!postalCodeError && formData.destinationPostalCode && (
+              <p className="text-xs text-green-600 mt-1">
+                ✓ Valid postal code for service area
+              </p>
+            )}
+            {!postalCodeError && !formData.destinationPostalCode && (
+              <p className="text-xs text-gray-500">
+                Enter a postal code in Downtown Toronto (M prefix) or Mississauga (L4T-L5W prefix)
+              </p>
+            )}
           </div>
 
           {/* Generate Price Button */}

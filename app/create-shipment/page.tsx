@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { createStepperSteps, Stepper } from "@/components/ui/stepper";
 import { profileService } from "@/lib/api/profile";
 import { shippingService } from "@/lib/api/shipping";
@@ -42,6 +43,70 @@ export default function CreateShipmentPage() {
   const [profileLoading, setProfileLoading] = useState(true);
   const [senderData, setSenderData] = useState(defaultSenderData);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [senderAddressError, setSenderAddressError] = useState<string | null>(null);
+
+  // Postal code validation functions (reused for sender validation)
+  const isTorontoPostalCode = (postalCode: string): boolean => {
+    const normalized = postalCode.trim().toUpperCase().replace(/\s+/g, '');
+    if (!normalized.startsWith('M')) {
+      return false;
+    }
+    const digit1 = parseInt(normalized.charAt(1));
+    return digit1 >= 1 && digit1 <= 9;
+  };
+
+  const isMississaugaPostalCode = (postalCode: string): boolean => {
+    const normalized = postalCode.trim().toUpperCase().replace(/\s+/g, '');
+    if (!normalized.startsWith('L')) {
+      return false;
+    }
+    const fsa = normalized.substring(0, 3);
+    const digit1 = parseInt(fsa.charAt(1));
+    const letter2 = fsa.charAt(2);
+    
+    if (digit1 === 4) {
+      return ['T', 'W', 'X', 'Y', 'Z'].includes(letter2);
+    }
+    if (digit1 === 5) {
+      return ['A', 'B', 'C', 'E', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'V', 'W'].includes(letter2);
+    }
+    return false;
+  };
+
+  const isPostalCodeInServiceArea = (postalCode: string): boolean => {
+    return isTorontoPostalCode(postalCode) || isMississaugaPostalCode(postalCode);
+  };
+
+  const validateSenderAddress = (city: string, postalCode: string): string | null => {
+    if (!city || !postalCode) {
+      return null; // Don't validate if data is missing
+    }
+
+    const normalizedCity = city.trim().toLowerCase();
+    const normalizedPostalCode = postalCode.trim().toUpperCase().replace(/\s+/g, '');
+    
+    const isToronto = normalizedCity === 'toronto' || normalizedCity.includes('downtown');
+    const isMississauga = normalizedCity === 'mississauga';
+    const isValidPostalCode = isPostalCodeInServiceArea(normalizedPostalCode);
+
+    if (!isToronto && !isMississauga) {
+      return `Your pickup location (sender address) must be in Downtown Toronto or Mississauga. Currently set to "${city}". Please update your profile address.`;
+    }
+
+    if (!isValidPostalCode) {
+      return `Your pickup location postal code "${postalCode}" is not in our service area. Pickup is only available in Downtown Toronto (M prefix) and Mississauga (L4T-L5W prefix). Please update your profile address.`;
+    }
+
+    if (isToronto && !isTorontoPostalCode(normalizedPostalCode)) {
+      return `Your pickup location postal code "${postalCode}" does not belong to Toronto. Please update your profile address.`;
+    }
+
+    if (isMississauga && !isMississaugaPostalCode(normalizedPostalCode)) {
+      return `Your pickup location postal code "${postalCode}" does not belong to Mississauga. Please update your profile address.`;
+    }
+
+    return null;
+  };
 
   // Load user profile data on component mount
   useEffect(() => {
@@ -49,13 +114,14 @@ export default function CreateShipmentPage() {
       try {
         setProfileLoading(true);
         setProfileError(null);
+        setSenderAddressError(null);
         
         const profile = await profileService.getProfile();
         
         // Check if profile data is available before accessing properties
         if (profile) {
           // Map profile data to sender data format
-          setSenderData({
+          const newSenderData = {
             business_name: profile.business_name || (profile.first_name && profile.last_name ? `${profile.first_name} ${profile.last_name}` : "Your Business"),
             contactName: (profile.first_name && profile.last_name ? `${profile.first_name} ${profile.last_name}` : "Contact Name"),
             address: profile.street_address || "Business Address",
@@ -64,7 +130,17 @@ export default function CreateShipmentPage() {
             postalCode: profile.postal_code || "Postal Code",
             phone: profile.phone_number || "Phone Number",
             email: profile.email || "Email Address"
-          });
+          };
+          
+          setSenderData(newSenderData);
+          
+          // Validate sender address
+          if (newSenderData.city && newSenderData.postalCode) {
+            const validationError = validateSenderAddress(newSenderData.city, newSenderData.postalCode);
+            if (validationError) {
+              setSenderAddressError(validationError);
+            }
+          }
         } else {
           console.warn('Profile data is undefined, using default values');
           // Keep default sender data if profile is undefined
@@ -81,13 +157,88 @@ export default function CreateShipmentPage() {
     loadProfile();
   }, []);
 
+  // Set default province to "ON" for recipient address (service area is Ontario)
+  useEffect(() => {
+    if (!formData.recipientProvince || formData.recipientProvince.trim() === '') {
+      updateFormField('recipientProvince', 'ON');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
+  const validatePostalCode = (postalCode: string, city: string): string | null => {
+    if (!postalCode || postalCode.trim() === '') {
+      return 'Postal code is required';
+    }
+
+    // Basic format validation
+    const canadianPostalCodeRegex = /^[A-Za-z]\d[A-Za-z][ -]?\d[A-Za-z]\d$/;
+    if (!canadianPostalCodeRegex.test(postalCode.trim())) {
+      return 'Invalid postal code format. Please use format A1A 1A1';
+    }
+
+    // Check if postal code is in service area
+    if (!isPostalCodeInServiceArea(postalCode)) {
+      return 'This postal code is not in our service area. Delivery is only available in Downtown Toronto (M prefix) and Mississauga (L4T-L5W prefix).';
+    }
+
+    // Check if postal code matches selected city
+    if (city === 'Toronto' && !isTorontoPostalCode(postalCode)) {
+      return 'This postal code does not belong to Toronto. Toronto postal codes start with M.';
+    }
+
+    if (city === 'Mississauga' && !isMississaugaPostalCode(postalCode)) {
+      return 'This postal code does not belong to Mississauga. Mississauga postal codes start with L4T-L5W.';
+    }
+
+    // Auto-detect city from postal code if city is not selected
+    if (!city && isTorontoPostalCode(postalCode)) {
+      updateFormField('recipientCity', 'Toronto');
+    } else if (!city && isMississaugaPostalCode(postalCode)) {
+      updateFormField('recipientCity', 'Mississauga');
+    }
+
+    return null;
+  };
+
+  const [postalCodeError, setPostalCodeError] = useState<string | null>(null);
+
   const handleInputChange = (field: string, value: string | boolean) => {
     updateFormField(field as keyof typeof formData, value);
+    
+    // Auto-set province to "ON" when city is selected (both cities are in Ontario)
+    if (field === 'recipientCity' && (value === 'Toronto' || value === 'Mississauga')) {
+      updateFormField('recipientProvince', 'ON');
+      // Re-validate postal code when city changes
+      if (formData.recipientPostalCode) {
+        const error = validatePostalCode(formData.recipientPostalCode, value as string);
+        setPostalCodeError(error);
+      }
+    }
+
+    // Validate postal code when it changes
+    if (field === 'recipientPostalCode') {
+      const error = validatePostalCode(value as string, formData.recipientCity);
+      setPostalCodeError(error);
+    }
   };
 
   const handleContinueToPackageDetails = async () => {
     try {
       setIsLoading(true);
+      
+      // Validate sender address before proceeding
+      if (senderAddressError) {
+        throw new Error('Please update your profile address to a valid pickup location in Toronto or Mississauga before creating a shipment.');
+      }
+      
+      // Validate postal code before proceeding
+      if (formData.recipientPostalCode) {
+        const error = validatePostalCode(formData.recipientPostalCode, formData.recipientCity);
+        if (error) {
+          setPostalCodeError(error);
+          throw new Error(error);
+        }
+      }
       
       // Validate form data before proceeding
       if (!isFormValid()) {
@@ -164,6 +315,42 @@ export default function CreateShipmentPage() {
                     <span className="text-sm text-yellow-800">
                       Unable to load profile data: {profileError}. Using default values.
                     </span>
+                  </div>
+                </div>
+              )}
+              
+              {senderAddressError && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-start space-x-3">
+                    <Icon name="AlertCircle" size={20} className="text-red-600 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-red-900 mb-1">
+                        Pickup Location Not Supported
+                      </p>
+                      <p className="text-sm text-red-700 mb-2">
+                        {senderAddressError}
+                      </p>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.location.href = '/profile'}
+                        className="mt-2 border-red-300 text-red-700 hover:bg-red-100"
+                      >
+                        <Icon name="Edit" size={14} className="mr-2" />
+                        Update Profile Address
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              {!senderAddressError && senderData.city && senderData.postalCode && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center space-x-2">
+                    <Icon name="CheckCircle" size={16} className="text-green-600 flex-shrink-0" />
+                    <p className="text-sm text-green-700">
+                      ✓ Pickup location verified: {senderData.city}, {senderData.postalCode}
+                    </p>
                   </div>
                 </div>
               )}
@@ -264,6 +451,20 @@ export default function CreateShipmentPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
+              {/* Service Area Notice */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="flex items-start space-x-3">
+                  <Icon name="Info" size={20} className="text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-blue-900 mb-1">
+                      Service Area Restriction
+                    </p>
+                    <p className="text-sm text-blue-700">
+                      Both <strong>pickup</strong> (sender) and <strong>delivery</strong> (recipient) addresses must be in <strong>Downtown Toronto</strong> or <strong>Mississauga</strong>, Ontario. Please ensure both addresses are in one of these areas.
+                    </p>
+                  </div>
+                </div>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="parcego-recipient-name">
@@ -311,14 +512,22 @@ export default function CreateShipmentPage() {
                   <Label htmlFor="parcego-recipient-city">
                     City <span className="text-red-500">*</span>
                   </Label>
-                  <Input
-                    id="parcego-recipient-city"
-                    placeholder="Enter city"
+                  <Select
                     value={formData.recipientCity}
-                    onChange={(e) => handleInputChange('recipientCity', e.target.value)}
-                    className="parcego-form__input"
+                    onValueChange={(value) => handleInputChange('recipientCity', value)}
                     required
-                  />
+                  >
+                    <SelectTrigger id="parcego-recipient-city" className="parcego-form__input">
+                      <SelectValue placeholder="Select city" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Toronto">Toronto</SelectItem>
+                      <SelectItem value="Mississauga">Mississauga</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-xs text-gray-500 mt-1">
+                    💡 Delivery is only available in Downtown Toronto and Mississauga
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="parcego-recipient-province">
@@ -326,12 +535,15 @@ export default function CreateShipmentPage() {
                   </Label>
                   <Input
                     id="parcego-recipient-province"
-                    placeholder="ON, BC, AB, etc."
-                    value={formData.recipientProvince}
-                    onChange={(e) => handleInputChange('recipientProvince', e.target.value)}
-                    className="parcego-form__input"
+                    placeholder="ON"
+                    value={formData.recipientProvince || 'ON'}
+                    readOnly
+                    className="parcego-form__input bg-gray-50 cursor-not-allowed"
                     required
                   />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Ontario (service area only)
+                  </p>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="parcego-recipient-postal-code">
@@ -339,12 +551,29 @@ export default function CreateShipmentPage() {
                   </Label>
                   <Input
                     id="parcego-recipient-postal-code"
-                    placeholder="A1A 1A1"
+                    placeholder={formData.recipientCity === 'Toronto' ? 'M5V 3A8' : formData.recipientCity === 'Mississauga' ? 'L5A 1B2' : 'M5V 3A8 or L5A 1B2'}
                     value={formData.recipientPostalCode}
                     onChange={(e) => handleInputChange('recipientPostalCode', e.target.value)}
-                    className="parcego-form__input"
+                    className={`parcego-form__input ${postalCodeError ? 'border-red-500 focus-visible:ring-red-200' : ''}`}
                     required
+                    aria-invalid={!!postalCodeError}
+                    aria-describedby={postalCodeError ? 'parcego-recipient-postal-code-error' : undefined}
                   />
+                  {postalCodeError && (
+                    <p id="parcego-recipient-postal-code-error" className="text-sm text-red-600 mt-1">
+                      {postalCodeError}
+                    </p>
+                  )}
+                  {!postalCodeError && formData.recipientPostalCode && (
+                    <p className="text-xs text-green-600 mt-1">
+                      ✓ Valid postal code for {formData.recipientCity || 'service area'}
+                    </p>
+                  )}
+                  {!postalCodeError && !formData.recipientPostalCode && (
+                    <p className="text-xs text-gray-500 mt-1">
+                      Enter a postal code in Downtown Toronto (M prefix) or Mississauga (L4T-L5W prefix). Both pickup and delivery must be in the service area.
+                    </p>
+                  )}
                 </div>
               </div>
               
