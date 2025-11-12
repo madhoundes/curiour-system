@@ -199,6 +199,77 @@ function PurchaseLabelContent() {
       }
     }
 
+    // Validate sender (pickup) location - must be in Toronto/Mississauga
+    const senderCity = (senderData.city || '').trim().toLowerCase();
+    const senderPostalCode = (senderData.postal_code || '').trim().toUpperCase().replace(/\s+/g, '');
+    const senderIsToronto = senderCity === 'toronto' || senderCity.includes('downtown');
+    const senderIsMississauga = senderCity === 'mississauga';
+    const senderIsTorontoPostalCode = senderPostalCode.startsWith('M') && parseInt(senderPostalCode.charAt(1)) >= 1 && parseInt(senderPostalCode.charAt(1)) <= 9;
+    const senderIsMississaugaPostalCode = (() => {
+      if (!senderPostalCode.startsWith('L')) return false;
+      const fsa = senderPostalCode.substring(0, 3);
+      const digit1 = parseInt(fsa.charAt(1));
+      const letter2 = fsa.charAt(2);
+      if (digit1 === 4) return ['T', 'W', 'X', 'Y', 'Z'].includes(letter2);
+      if (digit1 === 5) return ['A', 'B', 'C', 'E', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'V', 'W'].includes(letter2);
+      return false;
+    })();
+
+    if (!senderIsToronto && !senderIsMississauga) {
+      throw new Error(`Pickup location (sender address) must be in Downtown Toronto or Mississauga. Your profile address city "${senderData.city}" is not in our service area. Please update your profile address.`);
+    }
+
+    if (!senderIsTorontoPostalCode && !senderIsMississaugaPostalCode) {
+      throw new Error(`Pickup location postal code "${senderData.postal_code}" is not in our service area. Pickup is only available in Downtown Toronto (M prefix) and Mississauga (L4T-L5W prefix). Please update your profile address.`);
+    }
+
+    if (senderIsToronto && !senderIsTorontoPostalCode) {
+      throw new Error(`Pickup location postal code "${senderData.postal_code}" does not belong to Toronto. Please update your profile address.`);
+    }
+
+    if (senderIsMississauga && !senderIsMississaugaPostalCode) {
+      throw new Error(`Pickup location postal code "${senderData.postal_code}" does not belong to Mississauga. Please update your profile address.`);
+    }
+
+    // Validate delivery location - only Toronto and Mississauga are supported
+    const recipientCity = formData.recipientCity.trim().toLowerCase();
+    const isToronto = recipientCity === 'toronto' || recipientCity.includes('downtown toronto');
+    const isMississauga = recipientCity === 'mississauga';
+    
+    if (!isToronto && !isMississauga) {
+      throw new Error(`Delivery is only supported in Downtown Toronto and Mississauga. Your selected city "${formData.recipientCity}" is not in our service area.`);
+    }
+
+    // Validate postal code format and service area
+    const postalCode = formData.recipientPostalCode.trim().toUpperCase().replace(/\s+/g, '');
+    const isTorontoPostalCode = postalCode.startsWith('M') && parseInt(postalCode.charAt(1)) >= 1 && parseInt(postalCode.charAt(1)) <= 9;
+    const isMississaugaPostalCode = (() => {
+      if (!postalCode.startsWith('L')) return false;
+      const fsa = postalCode.substring(0, 3);
+      const digit1 = parseInt(fsa.charAt(1));
+      const letter2 = fsa.charAt(2);
+      if (digit1 === 4) {
+        return ['T', 'W', 'X', 'Y', 'Z'].includes(letter2);
+      }
+      if (digit1 === 5) {
+        return ['A', 'B', 'C', 'E', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'V', 'W'].includes(letter2);
+      }
+      return false;
+    })();
+
+    if (!isTorontoPostalCode && !isMississaugaPostalCode) {
+      throw new Error(`The postal code "${formData.recipientPostalCode}" is not in our service area. Delivery is only available in Downtown Toronto (postal codes starting with M) and Mississauga (postal codes starting with L4T-L5W).`);
+    }
+
+    // Validate postal code matches selected city
+    if (isToronto && !isTorontoPostalCode) {
+      throw new Error(`The postal code "${formData.recipientPostalCode}" does not belong to Toronto. Toronto postal codes start with M.`);
+    }
+
+    if (isMississauga && !isMississaugaPostalCode) {
+      throw new Error(`The postal code "${formData.recipientPostalCode}" does not belong to Mississauga. Mississauga postal codes start with L4T-L5W.`);
+    }
+
     // Validate package dimensions
     const dimensions = ['weight', 'length', 'width', 'height'];
     for (const dim of dimensions) {
@@ -208,6 +279,18 @@ function PurchaseLabelContent() {
       }
     }
 
+    // Normalize postal codes (remove extra spaces, but keep format for display)
+    const normalizePostalCode = (code: string): string => {
+      if (!code) return "";
+      // Remove extra spaces but keep a single space in the middle if present
+      const cleaned = code.trim().replace(/\s+/g, ' ').toUpperCase();
+      // If no space, add one after 3rd character (A1A 1A1 format)
+      if (cleaned.length === 6 && !cleaned.includes(' ')) {
+        return `${cleaned.substring(0, 3)} ${cleaned.substring(3)}`;
+      }
+      return cleaned;
+    };
+
     return {
       sender_address: {
         contact_name: senderData.business_name || `${senderData.first_name} ${senderData.last_name}` || "Contact Name",
@@ -216,7 +299,7 @@ function PurchaseLabelContent() {
         street_address_2: senderData.street_address_2 || "N/A",
         city: senderData.city || "",
         province: senderData.province || "",
-        postal_code: senderData.postal_code || "",
+        postal_code: normalizePostalCode(senderData.postal_code || ""),
         country: senderData.country || "Canada",
         phone_number: senderData.phone_number || "",
         email: senderData.email || ""
@@ -228,7 +311,7 @@ function PurchaseLabelContent() {
         street_address_2: "N/A",
         city: formData.recipientCity,
         province: formData.recipientProvince,
-        postal_code: formData.recipientPostalCode,
+        postal_code: normalizePostalCode(formData.recipientPostalCode),
         country: "Canada",
         phone_number: formData.recipientPhone,
         email: formData.recipientEmail
