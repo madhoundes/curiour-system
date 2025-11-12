@@ -107,17 +107,47 @@ function PurchaseLabelContent() {
   useEffect(() => {
     const paid = searchParams?.get('paid');
     const sessionId = searchParams?.get('session_id');
-    if (paid === '1') {
-      // Show success confirmation immediately
+    if (paid === '1' && sessionId) {
+      console.log('Returned from Stripe with paid status. session_id:', sessionId);
+      
+      // Refresh shipment status after payment
+      const refreshShipmentStatus = async () => {
+        try {
+          // Wait a bit for backend to process payment
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          
+          // If we have a created shipment, refresh it to get updated status
+          if (createdShipment?.shipment?.id) {
+            console.log('Refreshing shipment status for ID:', createdShipment.shipment.id);
+            const shipments = await shippingService.getShipments();
+            const updatedShipment = shipments.find(s => s.id === createdShipment.shipment.id);
+            
+            if (updatedShipment) {
+              console.log('Updated shipment status:', updatedShipment.status);
+              // Update the created shipment with latest data
+              setCreatedShipment({
+                ...createdShipment,
+                shipment: updatedShipment
+              });
+            }
+          }
+        } catch (error) {
+          console.error('Error refreshing shipment status:', error);
+        }
+      };
+      
+      refreshShipmentStatus();
+      
+      // Show success confirmation
       setShowConfirmation(true);
+      
       // Optionally, we could clear the paid flag from URL
       const params = new URLSearchParams(window.location.search);
       params.delete('paid');
       const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
       window.history.replaceState({}, '', newUrl);
-      console.log('Returned from Stripe with paid status. session_id:', sessionId);
     }
-  }, [searchParams]);
+  }, [searchParams, createdShipment]);
 
   // Calculate total cost including additional services
   const calculateTotalCost = (): number => {
@@ -450,11 +480,37 @@ function PurchaseLabelContent() {
     try {
       // Use existing shipment if available, otherwise create a new one
       let shipmentId: number;
+      let shipmentStatus: string | undefined;
       
       if (createdShipment?.shipment?.id) {
         // Use existing shipment to prevent duplicates
         shipmentId = createdShipment.shipment.id;
-        console.log('Using existing shipment ID:', shipmentId);
+        shipmentStatus = createdShipment.shipment.status;
+        console.log('Using existing shipment ID:', shipmentId, 'Status:', shipmentStatus);
+        
+        // Check if shipment is paid, if not refresh status
+        if (shipmentStatus?.toLowerCase() !== 'paid') {
+          console.log('Shipment not paid yet, refreshing status...');
+          try {
+            const shipments = await shippingService.getShipments();
+            const updatedShipment = shipments.find(s => s.id === shipmentId);
+            if (updatedShipment) {
+              shipmentStatus = updatedShipment.status;
+              setCreatedShipment({
+                ...createdShipment,
+                shipment: updatedShipment
+              });
+              console.log('Refreshed shipment status:', shipmentStatus);
+            }
+          } catch (error) {
+            console.error('Error refreshing shipment status:', error);
+          }
+        }
+        
+        // Verify shipment is paid before generating label
+        if (shipmentStatus?.toLowerCase() !== 'paid') {
+          throw new Error(`Cannot generate label for shipment with status '${shipmentStatus}'. Shipment must be paid. Please wait a moment and try again.`);
+        }
       } else {
         // Only create shipment if it doesn't exist
         console.warn('No existing shipment found, creating new one (this should not happen after payment)');
@@ -462,6 +518,11 @@ function PurchaseLabelContent() {
         const shipmentResponse = await shippingService.createShipment(shipmentRequest);
         setCreatedShipment(shipmentResponse);
         shipmentId = shipmentResponse.shipment.id;
+        shipmentStatus = shipmentResponse.shipment.status;
+        
+        if (shipmentStatus?.toLowerCase() !== 'paid') {
+          throw new Error(`Cannot generate label for shipment with status '${shipmentStatus}'. Shipment must be paid.`);
+        }
       }
       
       // Generate label using the real API
@@ -510,11 +571,37 @@ function PurchaseLabelContent() {
 
       // Use existing shipment if available, otherwise create a new one
       let shipmentId: number;
+      let shipmentStatus: string | undefined;
       
       if (createdShipment?.shipment?.id) {
         // Use existing shipment to prevent duplicates
         shipmentId = createdShipment.shipment.id;
-        console.log('Using existing shipment ID for preview:', shipmentId);
+        shipmentStatus = createdShipment.shipment.status;
+        console.log('Using existing shipment ID for preview:', shipmentId, 'Status:', shipmentStatus);
+        
+        // Check if shipment is paid, if not refresh status
+        if (shipmentStatus?.toLowerCase() !== 'paid') {
+          console.log('Shipment not paid yet, refreshing status...');
+          try {
+            const shipments = await shippingService.getShipments();
+            const updatedShipment = shipments.find(s => s.id === shipmentId);
+            if (updatedShipment) {
+              shipmentStatus = updatedShipment.status;
+              setCreatedShipment({
+                ...createdShipment,
+                shipment: updatedShipment
+              });
+              console.log('Refreshed shipment status:', shipmentStatus);
+            }
+          } catch (error) {
+            console.error('Error refreshing shipment status:', error);
+          }
+        }
+        
+        // Verify shipment is paid before generating label
+        if (shipmentStatus?.toLowerCase() !== 'paid') {
+          throw new Error(`Cannot generate label for shipment with status '${shipmentStatus}'. Shipment must be paid. Please wait a moment and try again.`);
+        }
       } else {
         // Only create shipment if it doesn't exist (should not happen after payment)
         console.warn('No existing shipment found for preview, creating new one (this should not happen after payment)');
@@ -522,6 +609,11 @@ function PurchaseLabelContent() {
         const shipmentResponse = await shippingService.createShipment(shipmentRequest);
         setCreatedShipment(shipmentResponse);
         shipmentId = shipmentResponse.shipment.id;
+        shipmentStatus = shipmentResponse.shipment.status;
+        
+        if (shipmentStatus?.toLowerCase() !== 'paid') {
+          throw new Error(`Cannot generate label for shipment with status '${shipmentStatus}'. Shipment must be paid.`);
+        }
       }
       
       // Generate label using the real API
@@ -665,10 +757,49 @@ function PurchaseLabelContent() {
                   clientSecret={checkoutSession.client_secret}
                   amount={parseFloat(checkoutSession.amount || '0') * 100} // Convert to cents
                   currency={checkoutSession.currency?.toLowerCase() || 'cad'}
-                  onSuccess={() => {
+                  onSuccess={async () => {
                     console.log('Payment successful');
                     setShowStripePayment(false);
-                    setShowConfirmation(true);
+                    
+                    // Wait for backend to process payment and update shipment status
+                    if (createdShipment?.shipment?.id) {
+                      console.log('Waiting for shipment status update...');
+                      let attempts = 0;
+                      const maxAttempts = 10;
+                      
+                      const checkShipmentStatus = async () => {
+                        try {
+                          await new Promise(resolve => setTimeout(resolve, 1500));
+                          const shipments = await shippingService.getShipments();
+                          const updatedShipment = shipments.find(s => s.id === createdShipment.shipment.id);
+                          
+                          if (updatedShipment && updatedShipment.status?.toLowerCase() === 'paid') {
+                            console.log('Shipment status updated to PAID');
+                            setCreatedShipment({
+                              ...createdShipment,
+                              shipment: updatedShipment
+                            });
+                            setShowConfirmation(true);
+                            return;
+                          }
+                          
+                          attempts++;
+                          if (attempts < maxAttempts) {
+                            setTimeout(checkShipmentStatus, 1000);
+                          } else {
+                            console.warn('Shipment status update timeout, showing confirmation anyway');
+                            setShowConfirmation(true);
+                          }
+                        } catch (error) {
+                          console.error('Error checking shipment status:', error);
+                          setShowConfirmation(true);
+                        }
+                      };
+                      
+                      checkShipmentStatus();
+                    } else {
+                      setShowConfirmation(true);
+                    }
                   }}
                   onError={(error) => {
                     console.error('Payment failed:', error);
