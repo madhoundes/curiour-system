@@ -365,6 +365,10 @@ function PurchaseLabelContent() {
       console.log('Checkout session keys:', Object.keys(shippingFlow.checkoutSession || {}));
       console.log('Client secret value:', shippingFlow.checkoutSession?.client_secret);
 
+      // Store shipment from shipping flow to prevent duplicate creation
+      setCreatedShipment(shippingFlow.shipment);
+      console.log('Shipment stored:', shippingFlow.shipment);
+
       // Store billing data from shipping flow
       setBillingData(shippingFlow.billing);
       console.log('Billing data stored:', shippingFlow.billing);
@@ -444,16 +448,24 @@ function PurchaseLabelContent() {
     }
 
     try {
-      // Use the unified shipping label service to create properly formatted data
-      const { createShippingLabelFromOrderData } = await import('@/lib/shipping-label-service');
+      // Use existing shipment if available, otherwise create a new one
+      let shipmentId: number;
       
-      // Create shipment and generate label using real API
-      const shipmentRequest = createShipmentRequest();
-      const shipmentResponse = await shippingService.createShipment(shipmentRequest);
-      setCreatedShipment(shipmentResponse);
+      if (createdShipment?.shipment?.id) {
+        // Use existing shipment to prevent duplicates
+        shipmentId = createdShipment.shipment.id;
+        console.log('Using existing shipment ID:', shipmentId);
+      } else {
+        // Only create shipment if it doesn't exist
+        console.warn('No existing shipment found, creating new one (this should not happen after payment)');
+        const shipmentRequest = createShipmentRequest();
+        const shipmentResponse = await shippingService.createShipment(shipmentRequest);
+        setCreatedShipment(shipmentResponse);
+        shipmentId = shipmentResponse.shipment.id;
+      }
       
       // Generate label using the real API
-      const labelResponse = await shippingService.generateLabel(shipmentResponse.shipment.id);
+      const labelResponse = await shippingService.generateLabel(shipmentId);
       
       if (labelResponse.label_url) {
         // Open the label in a new tab for download
@@ -496,32 +508,30 @@ function PurchaseLabelContent() {
     try {
       setIsGeneratingPreview(true);
 
-      // Generate label using the real API for preview
-      if (!createdShipment) {
-        // Create shipment first if not already created
+      // Use existing shipment if available, otherwise create a new one
+      let shipmentId: number;
+      
+      if (createdShipment?.shipment?.id) {
+        // Use existing shipment to prevent duplicates
+        shipmentId = createdShipment.shipment.id;
+        console.log('Using existing shipment ID for preview:', shipmentId);
+      } else {
+        // Only create shipment if it doesn't exist (should not happen after payment)
+        console.warn('No existing shipment found for preview, creating new one (this should not happen after payment)');
         const shipmentRequest = createShipmentRequest();
         const shipmentResponse = await shippingService.createShipment(shipmentRequest);
         setCreatedShipment(shipmentResponse);
-        
-        // Generate label using the real API
-        const labelResponse = await shippingService.generateLabel(shipmentResponse.shipment.id);
-        
-        if (labelResponse.label_url) {
-          // Open the label in a new tab for preview
-          window.open(labelResponse.label_url, '_blank');
-        } else {
-          throw new Error('No label URL received from API');
-        }
+        shipmentId = shipmentResponse.shipment.id;
+      }
+      
+      // Generate label using the real API
+      const labelResponse = await shippingService.generateLabel(shipmentId);
+      
+      if (labelResponse.label_url) {
+        // Open the label in a new tab for preview
+        window.open(labelResponse.label_url, '_blank');
       } else {
-        // Use existing shipment to generate label
-        const labelResponse = await shippingService.generateLabel(createdShipment.shipment.id);
-        
-        if (labelResponse.label_url) {
-          // Open the label in a new tab for preview
-          window.open(labelResponse.label_url, '_blank');
-        } else {
-          throw new Error('No label URL received from API');
-        }
+        throw new Error('No label URL received from API');
       }
     } catch (error) {
       console.error('Error in handlePreviewAndPrint:', error);
