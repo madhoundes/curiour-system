@@ -116,19 +116,37 @@ function PurchaseLabelContent() {
           // Wait a bit for backend to process payment
           await new Promise(resolve => setTimeout(resolve, 2000));
           
-          // If we have a created shipment, refresh it to get updated status
-          if (createdShipment?.shipment?.id) {
-            console.log('Refreshing shipment status for ID:', createdShipment.shipment.id);
+          // Try to get shipment ID from localStorage (persists across redirects)
+          const storedShipmentId = localStorage.getItem('parcego_pending_shipment_id');
+          let shipmentIdToRefresh: number | undefined;
+          
+          if (storedShipmentId) {
+            shipmentIdToRefresh = parseInt(storedShipmentId);
+            console.log('Retrieved shipment ID from localStorage:', shipmentIdToRefresh);
+          } else if (createdShipment?.shipment?.id) {
+            shipmentIdToRefresh = createdShipment.shipment.id;
+            console.log('Using shipment ID from state:', shipmentIdToRefresh);
+          }
+          
+          if (shipmentIdToRefresh) {
+            console.log('Refreshing shipment status for ID:', shipmentIdToRefresh);
             const shipments = await shippingService.getShipments();
-            const updatedShipment = shipments.find(s => s.id === createdShipment.shipment.id);
+            const updatedShipment = shipments.find(s => s.id === shipmentIdToRefresh);
             
             if (updatedShipment) {
               console.log('Updated shipment status:', updatedShipment.status);
               // Update the created shipment with latest data
               setCreatedShipment({
-                ...createdShipment,
-                shipment: updatedShipment
+                success: true,
+                shipment: updatedShipment,
+                tracking_number: updatedShipment.tracking_code || '',
+                checkout_session: null
               });
+              
+              // Clear localStorage after successful retrieval
+              localStorage.removeItem('parcego_pending_shipment_id');
+              localStorage.removeItem('parcego_pending_shipment');
+              console.log('Cleared shipment from localStorage');
             }
           }
         } catch (error) {
@@ -147,7 +165,7 @@ function PurchaseLabelContent() {
       const newUrl = `${window.location.pathname}${params.toString() ? `?${params.toString()}` : ''}`;
       window.history.replaceState({}, '', newUrl);
     }
-  }, [searchParams, createdShipment]);
+  }, [searchParams]);
 
   // Calculate total cost including additional services
   const calculateTotalCost = (): number => {
@@ -395,9 +413,14 @@ function PurchaseLabelContent() {
       console.log('Checkout session keys:', Object.keys(shippingFlow.checkoutSession || {}));
       console.log('Client secret value:', shippingFlow.checkoutSession?.client_secret);
 
-      // Store shipment from shipping flow to prevent duplicate creation
-      setCreatedShipment(shippingFlow.shipment);
-      console.log('Shipment stored:', shippingFlow.shipment);
+        // Store shipment from shipping flow to prevent duplicate creation
+        setCreatedShipment(shippingFlow.shipment);
+        // Also persist to localStorage to survive redirect
+        if (shippingFlow.shipment?.shipment?.id) {
+          localStorage.setItem('parcego_pending_shipment_id', String(shippingFlow.shipment.shipment.id));
+          localStorage.setItem('parcego_pending_shipment', JSON.stringify(shippingFlow.shipment.shipment));
+        }
+        console.log('Shipment stored:', shippingFlow.shipment);
 
       // Store billing data from shipping flow
       setBillingData(shippingFlow.billing);
@@ -482,10 +505,25 @@ function PurchaseLabelContent() {
       let shipmentId: number;
       let shipmentStatus: string | undefined;
       
-      if (createdShipment?.shipment?.id) {
+      // Try to get shipment from state or localStorage
+      let existingShipment = createdShipment?.shipment;
+      if (!existingShipment) {
+        const storedShipmentId = localStorage.getItem('parcego_pending_shipment_id');
+        if (storedShipmentId) {
+          console.log('Retrieving shipment from localStorage:', storedShipmentId);
+          // Fetch the shipment from API
+          const shipments = await shippingService.getShipments();
+          existingShipment = shipments.find(s => s.id === parseInt(storedShipmentId));
+          if (existingShipment) {
+            setCreatedShipment({ shipment: existingShipment });
+          }
+        }
+      }
+      
+      if (existingShipment?.id) {
         // Use existing shipment to prevent duplicates
-        shipmentId = createdShipment.shipment.id;
-        shipmentStatus = createdShipment.shipment.status;
+        shipmentId = existingShipment.id;
+        shipmentStatus = existingShipment.status;
         console.log('Using existing shipment ID:', shipmentId, 'Status:', shipmentStatus);
         
         // Check if shipment is paid, if not refresh status
@@ -573,10 +611,25 @@ function PurchaseLabelContent() {
       let shipmentId: number;
       let shipmentStatus: string | undefined;
       
-      if (createdShipment?.shipment?.id) {
+      // Try to get shipment from state or localStorage
+      let existingShipment = createdShipment?.shipment;
+      if (!existingShipment) {
+        const storedShipmentId = localStorage.getItem('parcego_pending_shipment_id');
+        if (storedShipmentId) {
+          console.log('Retrieving shipment from localStorage for preview:', storedShipmentId);
+          // Fetch the shipment from API
+          const shipments = await shippingService.getShipments();
+          existingShipment = shipments.find(s => s.id === parseInt(storedShipmentId));
+          if (existingShipment) {
+            setCreatedShipment({ shipment: existingShipment });
+          }
+        }
+      }
+      
+      if (existingShipment?.id) {
         // Use existing shipment to prevent duplicates
-        shipmentId = createdShipment.shipment.id;
-        shipmentStatus = createdShipment.shipment.status;
+        shipmentId = existingShipment.id;
+        shipmentStatus = existingShipment.status;
         console.log('Using existing shipment ID for preview:', shipmentId, 'Status:', shipmentStatus);
         
         // Check if shipment is paid, if not refresh status
@@ -761,9 +814,12 @@ function PurchaseLabelContent() {
                     console.log('Payment successful');
                     setShowStripePayment(false);
                     
+                    // Capture shipment ID immediately to avoid stale closure issues
+                    const shipmentId = createdShipment?.shipment?.id;
+                    
                     // Wait for backend to process payment and update shipment status
-                    if (createdShipment?.shipment?.id) {
-                      console.log('Waiting for shipment status update...');
+                    if (shipmentId) {
+                      console.log('Waiting for shipment status update for ID:', shipmentId);
                       let attempts = 0;
                       const maxAttempts = 10;
                       
@@ -771,13 +827,16 @@ function PurchaseLabelContent() {
                         try {
                           await new Promise(resolve => setTimeout(resolve, 1500));
                           const shipments = await shippingService.getShipments();
-                          const updatedShipment = shipments.find(s => s.id === createdShipment.shipment.id);
+                          // Use captured shipmentId instead of closure variable
+                          const updatedShipment = shipments.find(s => s.id === shipmentId);
                           
                           if (updatedShipment && updatedShipment.status?.toLowerCase() === 'paid') {
                             console.log('Shipment status updated to PAID');
                             setCreatedShipment({
-                              ...createdShipment,
-                              shipment: updatedShipment
+                              success: true,
+                              shipment: updatedShipment,
+                              tracking_number: updatedShipment.tracking_code || '',
+                              checkout_session: null
                             });
                             setShowConfirmation(true);
                             return;
