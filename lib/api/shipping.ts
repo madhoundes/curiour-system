@@ -419,9 +419,11 @@ export class ShippingService {
       }
 
       const url = API_ENDPOINTS.LABELS.DOWNLOAD.replace(':shipment_id', shipmentId.toString());
-      const response = await apiClient.get<GenerateLabelResponse>(url, {
-        params: { label_format: labelFormat }
-      });
+      const response = await apiClient.get<GenerateLabelResponse>(
+        url,
+        { label_format: labelFormat },
+        { requiresAuth: true }
+      );
 
       return response.data;
     } catch (error: any) {
