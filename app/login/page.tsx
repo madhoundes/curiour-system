@@ -544,6 +544,26 @@ const Login03PageContent = () => {
                   </button>
                 </p>
               </div>
+              
+              {/* Track Package Link */}
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <Link 
+                  href="https://www.parcego.com/track-package"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full"
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full h-11 bg-orange-50 hover:bg-orange-100 border-orange-200 text-orange-700 hover:text-orange-800 transition-colors"
+                    id="parcego-login-track-package-btn"
+                  >
+                    <Icon name="Package" className="mr-2 h-4 w-4" />
+                    Track your shipment
+                  </Button>
+                </Link>
+              </div>
             </TabsContent>
 
             {/* Signup Tab */}
@@ -655,6 +675,26 @@ const Login03PageContent = () => {
                     Sign in
                   </button>
                 </p>
+              </div>
+              
+              {/* Track Package Link */}
+              <div className="mt-6 pt-4 border-t border-gray-200">
+                <Link 
+                  href="https://www.parcego.com/track-package"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full"
+                >
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full h-11 bg-orange-50 hover:bg-orange-100 border-orange-200 text-orange-700 hover:text-orange-800 transition-colors"
+                    id="parcego-signup-track-package-btn"
+                  >
+                    <Icon name="Package" className="mr-2 h-4 w-4" />
+                    Track your shipment
+                  </Button>
+                </Link>
               </div>
             </TabsContent>
           </Tabs>

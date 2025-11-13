@@ -188,7 +188,6 @@ export default function CourierRouteSimulation() {
   // Fetch assignments data from API
   useEffect(() => {
     const fetchAssignmentsData = async () => {
-      console.log('🔍 [ROUTE] Starting assignments data fetch...');
       
       try {
         // Check authentication
@@ -197,31 +196,37 @@ export default function CourierRouteSimulation() {
         const loginTime = localStorage.getItem("courier_login_time");
 
         if (authenticated !== "true" || !authToken || !loginTime) {
-          console.log('❌ [ROUTE] No authentication found, redirecting to login');
           router.push("/courier-login");
           return;
         }
 
-        // Check token expiry
-        const twentyFourHours = 24 * 60 * 60 * 1000;
+        // Check token expiry based on remember me option
+        const rememberMe = localStorage.getItem("courier_remember_me") === "true";
         const timeSinceLogin = Date.now() - parseInt(loginTime);
-        if (timeSinceLogin >= twentyFourHours) {
-          console.log('❌ [ROUTE] Token expired, redirecting to login');
-          localStorage.clear();
-          router.push("/courier-login");
+        const expirationTime = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000; // 30 days or 24 hours
+        
+        if (timeSinceLogin >= expirationTime) {
+          // Token expired, clear storage and redirect
+          localStorage.removeItem("courier_authenticated");
+          localStorage.removeItem("courier_email");
+          localStorage.removeItem("courier_login_time");
+          localStorage.removeItem("auth_token");
+          localStorage.removeItem("courier_user");
+          localStorage.removeItem("courier_remember_me");
+          document.cookie = "courier_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          
+          const currentPath = window.location.pathname;
+          const redirectUrl = `/courier-login?redirect=${encodeURIComponent(currentPath)}`;
+          router.push(redirectUrl);
           return;
         }
-
-        console.log('✅ [ROUTE] Authentication valid, fetching user data and assignments...');
 
         // Fetch current user data
         const userResponse = await authService.getCurrentUser();
         setCurrentUser(userResponse.data);
-        console.log('✅ [ROUTE] User data received:', userResponse.data);
 
         // Fetch today's assignments
         const assignmentsResponse = await driverService.getTodaysAssignments();
-        console.log('✅ [ROUTE] Assignments data received:', assignmentsResponse);
         
         setAssignments(assignmentsResponse.assignments);
 
@@ -231,16 +236,6 @@ export default function CourierRouteSimulation() {
           ? deliveryId.replace('PCG-DEL-', '') 
           : deliveryId;
         
-        console.log('🔍 [ROUTE] Searching for assignment:', {
-          deliveryId,
-          numericId,
-          availableAssignments: assignmentsResponse.assignments.map(a => ({
-            id: a.id,
-            shipment_id: a.shipment_id,
-            tracking_code: a.tracking_code,
-            status: a.status
-          }))
-        });
         
         const current = assignmentsResponse.assignments.find(
           assignment => assignment.id.toString() === numericId || 
@@ -257,36 +252,21 @@ export default function CourierRouteSimulation() {
           }
           
           setCurrentAssignment(current);
-          console.log('✅ [ROUTE] Current assignment found:', {
-            id: current.id,
-            shipment_id: current.shipment_id,
-            tracking_code: current.tracking_code,
-            status: current.status
-          });
-          
           // Find next assignment
           const currentIndex = assignmentsResponse.assignments.findIndex(a => a.id === current.id);
           const next = assignmentsResponse.assignments[currentIndex + 1] || null;
           setNextAssignment(next);
-          
-          if (next) {
-            console.log('✅ [ROUTE] Next assignment found:', next);
-          } else {
-            console.log('ℹ️ [ROUTE] No next assignment - this is the last delivery');
-          }
         } else {
           console.error('❌ [ROUTE] Assignment not found for deliveryId:', deliveryId);
           setError(`Assignment not found for ID: ${deliveryId}`);
         }
 
         setIsLoading(false);
-        console.log('✅ [ROUTE] Route page loaded successfully');
 
       } catch (error: any) {
         console.error('❌ [ROUTE] Error fetching assignments data:', error);
         
         if (error.message?.includes('Authentication') || error.response?.status === 401) {
-          console.log('❌ [ROUTE] Authentication error, redirecting to login');
           localStorage.clear();
           router.push("/courier-login");
         } else {
@@ -306,13 +286,11 @@ export default function CourierRouteSimulation() {
 
       try {
         setIsLoadingRoute(true);
-        console.log('🔍 [ROUTE] Fetching optimized route for driver:', currentUser.id);
         
         const today = new Date().toISOString().split('T')[0];
         const routeUrl = await routeOptimizationService.getGoogleMapsRoute(currentUser.id, { date: today });
         
         setOptimizedRouteUrl(routeUrl);
-        console.log('✅ [ROUTE] Optimized route URL received:', routeUrl);
       } catch (error: any) {
         console.error('❌ [ROUTE] Error fetching optimized route:', error);
         // Don't set error state, just log it - user can still use individual navigation
@@ -505,7 +483,6 @@ export default function CourierRouteSimulation() {
         const context = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
         setAudioContext(context);
       } catch (error) {
-        console.warn('Audio context not supported:', error);
       }
     }
   }, [audioContext]);
@@ -516,9 +493,7 @@ export default function CourierRouteSimulation() {
       try {
         await audioContext.resume();
         setAudioEnabled(true);
-        console.log('Audio context resumed successfully');
       } catch (error) {
-        console.warn('Failed to resume audio context:', error);
       }
     } else if (audioContext && audioContext.state === 'running') {
       setAudioEnabled(true);
@@ -618,7 +593,6 @@ export default function CourierRouteSimulation() {
   useEffect(() => {
     if (routeStatus && deliveryId) {
       localStorage.setItem(`parcego_route_status_${deliveryId}`, routeStatus);
-      console.log(`💾 [ROUTE] Saved route status to localStorage: ${routeStatus} for ${deliveryId}`);
     }
   }, [routeStatus, deliveryId]);
 
@@ -708,16 +682,6 @@ export default function CourierRouteSimulation() {
     }
     
     try {
-      console.log('🚛 [ROUTE] Starting route for assignment:', {
-        assignmentId: currentAssignment.id,
-        shipmentId: currentAssignment.shipment_id,
-        trackingCode: currentAssignment.tracking_code,
-        currentStatus: currentAssignment.status,
-        statusData: {
-          status: 'IN_TRANSIT',
-          notes: 'Driver started route'
-        }
-      });
       
       // Check current status and determine appropriate transition
       let targetStatus = 'IN_TRANSIT';
@@ -728,19 +692,13 @@ export default function CourierRouteSimulation() {
         notes = 'Driver started route';
       } else if (currentAssignment.status === 'IN_TRANSIT') {
         // Already in transit, no need to change status
-        console.log('ℹ️ [ROUTE] Shipment already in transit, skipping status update');
         setRouteStatus("route_started");
         setIsMapModalOpen(true);
-        console.log('✅ [ROUTE] Route started successfully (already in transit)');
         return;
       } else if (currentAssignment.status === 'DELIVERED') {
-        // Already delivered, skip status update and proceed to delivery steps
-        console.log('ℹ️ [ROUTE] Shipment already delivered, proceeding to delivery steps');
         setRouteStatus("delivered");
-        console.log('✅ [ROUTE] Route started successfully (already delivered)');
         return;
       } else {
-        console.warn('⚠️ [ROUTE] Unexpected current status:', currentAssignment.status);
         targetStatus = 'IN_TRANSIT';
       }
       
@@ -751,7 +709,6 @@ export default function CourierRouteSimulation() {
       
       setRouteStatus("route_started");
       setIsMapModalOpen(true);
-      console.log('✅ [ROUTE] Route started successfully');
     } catch (error: any) {
       console.error('❌ [ROUTE] Error starting route:', error);
       console.error('❌ [ROUTE] Error details:', {
@@ -781,11 +738,9 @@ export default function CourierRouteSimulation() {
     if (!currentAssignment) return;
     
     try {
-      console.log('📍 [ROUTE] Arriving at location for assignment:', currentAssignment.id);
       // No status update to backend here, status remains IN_TRANSIT until Confirm Delivery
       setRouteStatus("arrived");
       setGpsError(""); // Clear any GPS errors
-      console.log('✅ [ROUTE] Arrived at location successfully (status remains IN_TRANSIT)');
     } catch (error: any) {
       console.error('❌ [ROUTE] Error updating arrival status:', error);
       alert('Failed to update arrival status: ' + (error.message || 'Unknown error'));
@@ -800,9 +755,6 @@ export default function CourierRouteSimulation() {
     }
 
     try {
-      console.log('✅ [ROUTE] Bypassing scan - marking package as scanned');
-      console.log('📦 [ROUTE] Assignment:', currentAssignment.tracking_code);
-      
       // Directly set status to scanned without opening modal or validating barcode
       setRouteStatus("scanned");
       setIsBarcodeModalOpen(false);
@@ -811,8 +763,6 @@ export default function CourierRouteSimulation() {
       setIsBarcodeValid(false);
       setBarcodeValidationMessage("");
       setScannedBarcodeType("");
-      
-      console.log('✅ [ROUTE] Package marked as scanned (bypassed)');
     } catch (error: any) {
       console.error('❌ [ROUTE] Error bypassing scan:', error);
     }
@@ -825,7 +775,6 @@ export default function CourierRouteSimulation() {
     }
 
     try {
-      console.log('📱 [ROUTE] Scanning barcode:', barcodeInput);
       
       // Search for shipment using the barcode
       const searchResponse = await driverService.searchShipments(barcodeInput);
@@ -846,7 +795,6 @@ export default function CourierRouteSimulation() {
       }
 
       // Package scanned successfully - no status update needed as it's already DELIVERED
-      console.log('✅ [ROUTE] Package scanned successfully');
 
       setBarcodeError("");
       setRouteStatus("scanned");
@@ -856,7 +804,6 @@ export default function CourierRouteSimulation() {
       setBarcodeValidationMessage("");
       setScannedBarcodeType("");
       
-      console.log('✅ [ROUTE] Barcode scanned successfully');
     } catch (error: any) {
       console.error('❌ [ROUTE] Error scanning barcode:', error);
       setBarcodeError('Failed to scan barcode: ' + (error.message || 'Unknown error'));
@@ -867,7 +814,6 @@ export default function CourierRouteSimulation() {
     if (!currentAssignment) return;
     
     try {
-      console.log('📸 [ROUTE] Capturing photo for assignment:', currentAssignment.id);
       
       // Simulate photo capture success (in real implementation, this would capture actual photo)
       const photoSuccess = Math.random() > 0.1; // 90% success rate
@@ -877,10 +823,8 @@ export default function CourierRouteSimulation() {
         setPhotoError("");
         setRouteStatus("photo_taken");
         setIsPhotoModalOpen(false);
-        console.log('✅ [ROUTE] Photo captured successfully');
       } else {
         setPhotoError("Failed to capture photo. Please try again.");
-        console.log('❌ [ROUTE] Photo capture failed');
       }
     } catch (error: any) {
       console.error('❌ [ROUTE] Error capturing photo:', error);
@@ -920,7 +864,6 @@ export default function CourierRouteSimulation() {
       oscillator.stop(audioContext.currentTime + 0.1);
       
     } catch (error) {
-      console.warn('Failed to play shutter sound:', error);
     }
   };
 
@@ -935,7 +878,6 @@ export default function CourierRouteSimulation() {
       // Check if torch is supported (using type assertion for experimental API)
       const capabilities = videoTrack.getCapabilities() as MediaTrackCapabilities & { torch?: boolean };
       if (!capabilities.torch) {
-        console.warn('Torch not supported on this device');
         setCameraError('Flash control not available on this device');
         return;
       }
@@ -949,7 +891,6 @@ export default function CourierRouteSimulation() {
       setFlashEnabled(newFlashState);
       
     } catch (error) {
-      console.warn('Failed to toggle flash:', error);
       setCameraError('Flash control not available on this device');
     }
   };
@@ -1134,9 +1075,6 @@ export default function CourierRouteSimulation() {
     setIsUploading(true);
     
     try {
-      console.log('📤 [ROUTE] Uploading photos for assignment:', currentAssignment.id);
-      console.log('📦 [ROUTE] Shipment ID:', currentAssignment.shipment_id);
-      console.log('📸 [ROUTE] Number of photos:', capturedPhotos.length);
       
       let successCount = 0;
       let failCount = 0;
@@ -1152,14 +1090,12 @@ export default function CourierRouteSimulation() {
         
         try {
           // Convert data URL to File
-          console.log(`📤 [ROUTE] Converting photo ${i + 1} to File...`);
           const response = await fetch(photo.dataUrl);
           if (!response.ok) {
             throw new Error(`Failed to fetch photo data: ${response.statusText}`);
           }
           
           const blob = await response.blob();
-          console.log(`📤 [ROUTE] Photo ${i + 1} blob size:`, blob.size, 'bytes');
           
           // Validate blob size (max 10MB)
           const maxSize = 10 * 1024 * 1024; // 10MB
@@ -1168,7 +1104,6 @@ export default function CourierRouteSimulation() {
           }
           
           const file = new File([blob], `delivery_photo_${i + 1}.jpg`, { type: 'image/jpeg' });
-          console.log(`📤 [ROUTE] Uploading photo ${i + 1} (${(file.size / 1024).toFixed(2)}KB)...`);
           
           // Upload photo using API
           await driverService.uploadDeliveryPhoto(currentAssignment.shipment_id, {
@@ -1182,7 +1117,6 @@ export default function CourierRouteSimulation() {
           ));
           
           successCount++;
-          console.log(`✅ [ROUTE] Photo ${i + 1} uploaded successfully`);
         } catch (error: any) {
           failCount++;
           console.error(`❌ [ROUTE] Error uploading photo ${i + 1}:`, error);
@@ -1220,7 +1154,6 @@ export default function CourierRouteSimulation() {
         }
         
         setIsPhotoModalOpen(false);
-        console.log(`✅ [ROUTE] ${successCount} photos uploaded successfully, ${failCount} failed`);
       } else {
         alert(`Failed to upload all photos. Please try again.`);
         console.error('❌ [ROUTE] All photos failed to upload');
@@ -1349,10 +1282,94 @@ export default function CourierRouteSimulation() {
     if (!currentAssignment) return;
     
     try {
-      console.log('✅ [ROUTE] Confirming delivery for assignment:', currentAssignment.id);
+      // Validate assignment has valid shipment_id
+      if (!currentAssignment.shipment_id || currentAssignment.shipment_id <= 0) {
+        console.error('❌ [ROUTE] Invalid shipment_id in assignment:', currentAssignment);
+        alert('Error: Invalid shipment ID. Please refresh the page and try again.');
+        return;
+      }
+      
+      // Refresh assignments to ensure we have the latest data before confirming
+      let verifiedShipmentId = currentAssignment.shipment_id;
+      let refreshedAssignment: DriverAssignment | null = null;
+      
+      try {
+        const refreshResponse = await driverService.getTodaysAssignments();
+        const refreshedAssignments = refreshResponse.assignments || [];
+        
+        // Find the current assignment in refreshed data
+        refreshedAssignment = refreshedAssignments.find(
+          a => a.id === currentAssignment.id || 
+               a.tracking_code === currentAssignment.tracking_code ||
+               a.shipment_id === currentAssignment.shipment_id
+        ) || null;
+        
+        if (refreshedAssignment) {
+          // Verify shipment_id matches or update it
+          if (refreshedAssignment.shipment_id && refreshedAssignment.shipment_id > 0) {
+            verifiedShipmentId = refreshedAssignment.shipment_id;
+            
+            if (refreshedAssignment.shipment_id !== currentAssignment.shipment_id) {
+              setCurrentAssignment(refreshedAssignment);
+            }
+            
+            // Verify the shipment is actually assigned to this driver
+            const isAssigned = refreshedAssignments.some(
+              a => a.shipment_id === refreshedAssignment!.shipment_id
+            );
+            
+            if (!isAssigned) {
+              throw new Error('Shipment not found in driver assignments after refresh');
+            }
+            
+          } else {
+            console.error('❌ [ROUTE] Refreshed assignment missing shipment_id:', refreshedAssignment);
+            throw new Error('Refreshed assignment missing shipment ID');
+          }
+        } else {
+          // Continue with current data if refresh fails to find assignment
+        }
+      } catch (refreshError) {
+        // Continue with existing data if refresh fails
+      }
+      
+      // Check current shipment status
+      const currentShipmentStatus = refreshedAssignment?.status || currentAssignment.status;
+      
+      // If shipment is already DELIVERED, skip the update
+      if (currentShipmentStatus === 'DELIVERED' || currentShipmentStatus === 'delivered') {
+        setRouteStatus("delivered");
+        setIsConfirmModalOpen(false);
+        
+        // Clear saved route status since delivery is complete
+        localStorage.removeItem(`parcego_route_status_${deliveryId}`);
+        
+        // Trigger celebration
+        setTimeout(() => {
+          triggerCelebrationConfetti();
+        }, 200);
+        
+        setTimeout(() => {
+          setIsSuccessModalOpen(true);
+          const timeoutId = setTimeout(() => {
+            setIsSuccessModalOpen(false);
+            setSuccessModalTimeout(null);
+            setTimeout(() => {
+              if (nextAssignment) {
+                router.push(`/courier/route/PCG-DEL-${nextAssignment.id}`);
+              } else {
+                router.push('/courier');
+              }
+            }, 300);
+          }, 3300);
+          setSuccessModalTimeout(timeoutId as any);
+        }, 1000);
+        
+        return;
+      }
       
       // Update shipment status to delivered
-      await driverService.updateShipmentStatus(currentAssignment.shipment_id, {
+      await driverService.updateShipmentStatus(verifiedShipmentId, {
         status: 'DELIVERED',
         notes: 'Package successfully delivered'
       });
@@ -1362,7 +1379,6 @@ export default function CourierRouteSimulation() {
 
       // Clear saved route status since delivery is complete
       localStorage.removeItem(`parcego_route_status_${deliveryId}`);
-      console.log(`🗑️ [ROUTE] Cleared saved route status for ${deliveryId}`);
 
       // Update delivery status in persistent storage for main courier page
       try {
@@ -1377,7 +1393,6 @@ export default function CourierRouteSimulation() {
             localStorage.setItem('parcego_remaining_deliveries', String(currentRemaining - 1));
           }
         }
-        console.log('✅ [ROUTE] Delivery status saved to localStorage');
       } catch (storageError) {
         console.error('❌ [ROUTE] Error saving to localStorage:', storageError);
       }
@@ -1409,10 +1424,25 @@ export default function CourierRouteSimulation() {
         setSuccessModalTimeout(timeoutId as any);
       }, 1000); // 1.0 second delay for better UX flow
       
-      console.log('✅ [ROUTE] Delivery confirmed successfully');
     } catch (error: any) {
       console.error('❌ [ROUTE] Error confirming delivery:', error);
-      alert('Failed to confirm delivery: ' + (error.message || 'Unknown error'));
+      
+      // Provide user-friendly error message
+      let errorMessage = error.message || 'Unknown error occurred';
+      
+      // Check if assignment might be stale
+      if (errorMessage.includes('not assigned') || errorMessage.includes('Access denied')) {
+        errorMessage = 'This shipment is no longer assigned to you. It may have been reassigned or removed. Please refresh the page.';
+      }
+      
+      alert(`Failed to confirm delivery: ${errorMessage}`);
+      
+      // Optionally refresh the page if assignment is invalid
+      if (errorMessage.includes('not assigned') || errorMessage.includes('no longer assigned')) {
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      }
     }
   };
 
@@ -1432,8 +1462,6 @@ export default function CourierRouteSimulation() {
     }
     
     try {
-      console.log('⚠️ [ROUTE] Reporting delivery problem for assignment:', currentAssignment.id);
-      
       // Update shipment status to undelivered
       await driverService.updateShipmentStatus(currentAssignment.shipment_id, {
         status: 'UNDELIVERED',
@@ -1452,7 +1480,6 @@ export default function CourierRouteSimulation() {
         localStorage.removeItem(`parcego_assignment_${currentAssignment.id}`);
       }
 
-      console.log('✅ [ROUTE] Problem reported successfully');
       
       // Show alert and redirect back to dashboard
       alert('Delivery problem reported. You will be redirected to the dashboard.');
@@ -1605,7 +1632,6 @@ export default function CourierRouteSimulation() {
       }, 2000);
     }
     
-    console.log("🧪 Development: Simulated successful barcode scan");
   };
 
   const handleCameraError = (error: unknown) => {

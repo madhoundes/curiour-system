@@ -114,26 +114,12 @@ export class DriverService {
     statusData: DriverUpdateShipmentStatusRequest
   ): Promise<DriverUpdateShipmentStatusResponse> {
     try {
-      console.log('🔧 [DRIVER API] updateShipmentStatus called with:', {
-        shipmentId,
-        statusData,
-        statusDataStatus: statusData.status,
-        statusDataStatusType: typeof statusData.status,
-        statusDataStatusLength: statusData.status?.length
-      });
-
       // Validate input
       if (!shipmentId || shipmentId <= 0) {
         throw new Error('Valid shipment ID is required');
       }
 
       if (!statusData.status || statusData.status.trim() === '') {
-        console.error('❌ [DRIVER API] Status validation failed:', {
-          status: statusData.status,
-          statusType: typeof statusData.status,
-          statusLength: statusData.status?.length,
-          statusTrimmed: statusData.status?.trim()
-        });
         throw new Error('Status is required');
       }
 
@@ -147,12 +133,6 @@ export class DriverService {
         shipmentId.toString()
       );
 
-      console.log('🔧 [DRIVER API] Making API call:', {
-        url,
-        method: 'PUT',
-        shipmentId,
-        statusData
-      });
 
       const response = await apiClient.put<DriverUpdateShipmentStatusResponse>(
         url,
@@ -160,45 +140,56 @@ export class DriverService {
         { requiresAuth: true }
       );
 
-      console.log('🔧 [DRIVER API] API response received:', {
-        status: response.status,
-        data: response.data,
-        success: response.data?.success
-      });
 
       return response.data;
     } catch (error: any) {
-      console.error('🔧 [DRIVER API] Error caught in updateShipmentStatus:', {
-        error,
-        errorMessage: error.message,
-        errorStack: error.stack,
-        errorResponse: error.response,
-        errorResponseStatus: error.response?.status,
-        errorResponseData: error.response?.data,
-        errorCode: error.code,
-        errorName: error.name
-      });
-
-      if (error.response?.status === 400) {
-        const errorData = error.response.data;
-        const errorMessage = errorData?.details || errorData?.message || 'Invalid status transition or shipment not found';
-        throw new Error(errorMessage);
+      const status = error.status || error.response?.status;
+      const errorResponse = error.response?.data || error.details || {};
+      
+      // Handle errorData as string or object
+      let errorMessage = 'An unexpected error occurred.';
+      if (typeof errorResponse === 'string') {
+        errorMessage = errorResponse;
+      } else if (errorResponse.details) {
+        errorMessage = errorResponse.details;
+      } else if (errorResponse.message) {
+        errorMessage = errorResponse.message;
+      } else if (error.message) {
+        errorMessage = error.message;
       }
-      if (error.response?.status === 401) {
-        throw new Error('Authentication required');
+      
+      // Only log errors, not verbose details
+      
+      // Provide more specific error messages
+      if (status === 403) {
+        // Use the detailed error message from the API if available
+        const detailsMessage = typeof errorResponse === 'string' 
+          ? errorResponse 
+          : (errorResponse.details || errorResponse.message || errorMessage);
+        throw new Error(detailsMessage || 'Access denied. This shipment is not assigned to you.');
       }
-      if (error.response?.status === 403) {
-        throw new Error('Driver role required');
+      if (status === 404) {
+        throw new Error('Shipment not found. It may have been removed or reassigned.');
       }
-      if (error.response?.status === 404) {
-        throw new Error('Shipment not found');
+      if (status === 401) {
+        throw new Error('Authentication required. Please log in again.');
       }
-      if (error.response?.status === 422) {
-        const errorData = error.response.data;
-        const validationMessage = errorData.detail?.[0]?.msg || errorData.message || 'Validation error';
-        throw new Error(`Validation error: ${validationMessage}`);
+      if (status === 422) {
+        // Handle validation error response (can be array or object)
+        let validationMessage = errorMessage;
+        if (Array.isArray(errorResponse) && errorResponse.length > 0) {
+          validationMessage = errorResponse[0].message || errorResponse[0].msg || errorMessage;
+        } else if (typeof errorResponse === 'object' && errorResponse.detail) {
+          if (Array.isArray(errorResponse.detail) && errorResponse.detail.length > 0) {
+            validationMessage = errorResponse.detail[0].msg || errorResponse.detail[0].message || errorMessage;
+          } else {
+            validationMessage = errorResponse.detail || errorMessage;
+          }
+        }
+        throw new Error(validationMessage || 'Invalid shipment status or data.');
       }
-      throw new Error(error.message || 'Failed to update shipment status');
+      
+      throw new Error(errorMessage);
     }
   }
 

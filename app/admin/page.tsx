@@ -260,7 +260,8 @@ export default function SuperAdminDashboard() {
       case 'joinDate':
         return merchant.created_at;
       case 'totalShipments':
-        return 0; // TODO: Will come from shipment stats API
+        // Get count from state, default to 0
+        return merchantShipmentCounts[merchant.id] || 0;
       default:
         return '';
     }
@@ -322,8 +323,22 @@ export default function SuperAdminDashboard() {
           setMerchants(merchantsList);
           setFilteredMerchants(merchantsList);
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to load merchants:', error);
+        
+        // Check if error is authentication-related (401, 403) or network error
+        const isAuthError = error?.status === 401 || error?.status === 403 || 
+                           error?.response?.status === 401 || error?.response?.status === 403 ||
+                           error?.message?.includes('Authentication') || 
+                           error?.message?.includes('Unauthorized') ||
+                           error?.message?.includes('Forbidden');
+        
+        if (isAuthError) {
+          showErrorToast("Session expired. Please log in again.");
+          logoutAdmin();
+          return;
+        }
+        
         showErrorToast(
           "Unable to fetch merchant data. Please try refreshing the page."
         );
@@ -333,7 +348,7 @@ export default function SuperAdminDashboard() {
     };
 
     loadMerchants();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, logoutAdmin]);
 
   // Load admin statistics from API
   useEffect(() => {
@@ -355,8 +370,22 @@ export default function SuperAdminDashboard() {
           draftShipments: stats.draft_shipments,
           paidShipments: stats.paid_shipments
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to load admin statistics:', error);
+        
+        // Check if error is authentication-related
+        const isAuthError = error?.status === 401 || error?.status === 403 || 
+                           error?.response?.status === 401 || error?.response?.status === 403 ||
+                           error?.message?.includes('Authentication') || 
+                           error?.message?.includes('Unauthorized') ||
+                           error?.message?.includes('Forbidden');
+        
+        if (isAuthError) {
+          showErrorToast("Session expired. Please log in again.");
+          logoutAdmin();
+          return;
+        }
+        
         showErrorToast(
           "Unable to fetch admin statistics. Please try refreshing the page."
         );
@@ -366,7 +395,7 @@ export default function SuperAdminDashboard() {
     };
 
     loadAdminStats();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, logoutAdmin]);
 
   // Load assignments when date changes
   useEffect(() => {
@@ -384,8 +413,22 @@ export default function SuperAdminDashboard() {
         // Fetch statistics for the selected date
         const statsResponse = await adminService.getAssignmentStatistics(dateStr);
         setAssignmentStats(statsResponse.data);
-      } catch (error) {
+      } catch (error: any) {
         console.error('Failed to load assignments:', error);
+        
+        // Check if error is authentication-related
+        const isAuthError = error?.status === 401 || error?.status === 403 || 
+                           error?.response?.status === 401 || error?.response?.status === 403 ||
+                           error?.message?.includes('Authentication') || 
+                           error?.message?.includes('Unauthorized') ||
+                           error?.message?.includes('Forbidden');
+        
+        if (isAuthError) {
+          showErrorToast("Session expired. Please log in again.");
+          logoutAdmin();
+          return;
+        }
+        
         showErrorToast("Unable to fetch assignment data. Please try again.");
       } finally {
         setAssignmentsLoading(false);
@@ -393,18 +436,26 @@ export default function SuperAdminDashboard() {
     };
 
     loadAssignments();
-  }, [isAuthenticated, formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd')]);
+  }, [isAuthenticated, formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd'), logoutAdmin]);
 
   // Real courier data from API
   const [couriers, setCouriers] = useState<User[]>([]);
   const [couriersLoading, setCouriersLoading] = useState(false);
   const [couriersError, setCouriersError] = useState<string | null>(null);
+  
+  // Courier delivery counts (calculated from all assignments)
+  const [courierDeliveryCounts, setCourierDeliveryCounts] = useState<Record<number, number>>({});
+  const [allAssignments, setAllAssignments] = useState<any[]>([]);
+  
+  // Merchant shipment counts (calculated from assignments)
+  const [merchantShipmentCounts, setMerchantShipmentCounts] = useState<Record<number, number>>({});
 
   // Compatibility helper for legacy property names
   const getCourierProperty = (courier: User, property: string): string | number | boolean | string[] | null => {
     switch (property) {
       case 'completedDeliveries':
-        return 0; // Will be updated when statistics API is integrated
+        // Get count from state, default to 0
+        return courierDeliveryCounts[courier.id] || 0;
       case 'vehicle':
         return 'car'; // Default value, will be updated when vehicle info is available
       case 'lastLogin':
@@ -850,15 +901,6 @@ export default function SuperAdminDashboard() {
   const handleReassignAssignment = async (newDriverId: number, notes?: string) => {
     if (!selectedAssignment) return;
 
-    // Debug: Check authentication before making API call
-    const authToken = localStorage.getItem("auth_token");
-    console.log("🔄 Reassign Assignment Debug:", {
-      assignmentId: selectedAssignment.id,
-      newDriverId,
-      notes,
-      hasAuthToken: !!authToken,
-      fullToken: authToken || "No token"
-    });
 
     try {
       await adminService.reassignAssignment(selectedAssignment.id, {
@@ -880,6 +922,25 @@ export default function SuperAdminDashboard() {
     }
   };
 
+  // Helper function to logout admin and redirect to login
+  const logoutAdmin = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      // Clear all admin authentication data
+      localStorage.removeItem("admin_authenticated");
+      localStorage.removeItem("admin_email");
+      localStorage.removeItem("admin_login_time");
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("admin_user");
+      localStorage.removeItem("admin_remember_me");
+      
+      // Clear admin cookie
+      document.cookie = "admin_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      
+      // Redirect to login
+      router.push("/admin-login");
+    }
+  }, [router]);
+
   // Authentication check with token expiration
   useEffect(() => {
     const checkAdminAuth = () => {
@@ -890,25 +951,8 @@ export default function SuperAdminDashboard() {
         const loginTime = localStorage.getItem("admin_login_time");
         const rememberMe = localStorage.getItem("admin_remember_me") === "true";
 
-        console.log("🔐 Admin Auth Debug:", {
-          adminAuth,
-          adminCookie,
-          hasAuthToken: !!authToken,
-          loginTime,
-          rememberMe,
-          fullToken: authToken || "No token"
-        });
-
         // Check if authentication exists
         if (!adminAuth || adminAuth !== "true") {
-          console.log("❌ [ADMIN] No admin authentication found in localStorage");
-          console.log("❌ [ADMIN] Missing authentication data:", {
-            admin_authenticated: adminAuth,
-            auth_token_exists: !!authToken,
-            admin_login_time: loginTime,
-            required: 'All must be present'
-          });
-          
           // Get current path for redirect after login
           const currentPath = window.location.pathname;
           const redirectUrl = currentPath !== '/admin-login' ? `/admin-login?redirect=${encodeURIComponent(currentPath)}` : '/admin-login';
@@ -918,34 +962,18 @@ export default function SuperAdminDashboard() {
 
         // Check if we have required authentication data
         if (!authToken || !loginTime) {
-          console.log("❌ [ADMIN] Missing authentication data (token or login time)");
           const currentPath = window.location.pathname;
           const redirectUrl = currentPath !== '/admin-login' ? `/admin-login?redirect=${encodeURIComponent(currentPath)}` : '/admin-login';
           router.push(redirectUrl);
           return;
         }
 
-        console.log('✅ [ADMIN] Basic auth check passed');
-
         // Check token expiration based on remember me option
         // 30 days if remember me is checked, 24 hours if not
         const timeSinceLogin = Date.now() - parseInt(loginTime);
         const expirationTime = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000; // 30 days or 24 hours
-        
-        console.log('🔍 [ADMIN] Checking token expiry...');
-        console.log('🔍 [ADMIN] Time since login:', {
-          timeSinceLogin,
-          timeSinceLoginMinutes: Math.floor(timeSinceLogin / (1000 * 60)),
-          timeSinceLoginHours: Math.floor(timeSinceLogin / (1000 * 60 * 60)),
-          expirationTime,
-          expirationTimeHours: Math.floor(expirationTime / (1000 * 60 * 60)),
-          rememberMe,
-          isExpired: timeSinceLogin >= expirationTime
-        });
 
         if (timeSinceLogin >= expirationTime) {
-          console.log('⏰ [ADMIN] Session expired, clearing storage and redirecting');
-          
           // Clear all admin authentication data
           localStorage.removeItem("admin_authenticated");
           localStorage.removeItem("admin_email");
@@ -962,13 +990,9 @@ export default function SuperAdminDashboard() {
           // Get current path for redirect after login
           const currentPath = window.location.pathname;
           const redirectUrl = `/admin-login?redirect=${encodeURIComponent(currentPath)}`;
-          
-          console.log('⏰ [ADMIN] Redirecting to login with redirect URL:', redirectUrl);
           router.push(redirectUrl);
           return;
         }
-
-        console.log('✅ [ADMIN] Token not expired, proceeding with authentication...');
 
         // Authentication is valid, set authenticated state
         setIsAuthenticated(true);
@@ -979,8 +1003,6 @@ export default function SuperAdminDashboard() {
 
         if (name) setAdminName(name);
         if (email) setAdminEmail(email);
-
-        console.log('✅ [ADMIN] Authentication successful');
       }
     };
 
@@ -999,11 +1021,25 @@ export default function SuperAdminDashboard() {
         const couriersList = response.data.filter(u => u.role === 'driver');
         setCouriers(couriersList);  // Set the main couriers state
         setFilteredCouriers(couriersList);
-      } catch (error) {
+        setCouriersError(null);
+      } catch (error: any) {
         console.error('Failed to load couriers:', error);
-        showErrorToast(
-          "Unable to fetch courier data. Please try refreshing the page."
-        );
+        
+        // Check if error is authentication-related
+        const isAuthError = error?.status === 401 || error?.status === 403 || 
+                           error?.response?.status === 401 || error?.response?.status === 403 ||
+                           error?.message?.includes('Authentication') || 
+                           error?.message?.includes('Unauthorized') ||
+                           error?.message?.includes('Forbidden');
+        
+        if (isAuthError) {
+          showErrorToast("Session expired. Please log in again.");
+          logoutAdmin();
+          return;
+        }
+        
+        setCouriersError("Failed to load couriers. Please try again.");
+        showErrorToast("Unable to fetch courier data. Please try refreshing the page.");
       } finally {
         setCouriersLoading(false);
         setIsCourierSearchLoading(false);
@@ -1011,7 +1047,240 @@ export default function SuperAdminDashboard() {
     };
 
     loadCouriers();
-  }, [isAuthenticated]);
+  }, [isAuthenticated, logoutAdmin]);
+
+  // Calculate delivery counts from assignments and statistics
+  useEffect(() => {
+    if (!assignments.length || !couriers.length) return;
+
+    // Count completed deliveries per driver from current assignments
+    const counts: Record<number, number> = {};
+    
+    assignments.forEach(assignment => {
+      // Check if assignment is completed
+      const isCompleted = assignment.status === 'completed' || 
+                         assignment.shipment_status === 'DELIVERED' ||
+                         (assignment.status && assignment.status.toLowerCase().includes('delivered'));
+      
+      if (isCompleted && assignment.driver_id) {
+        counts[assignment.driver_id] = (counts[assignment.driver_id] || 0) + 1;
+      }
+    });
+    
+    // Merge with existing counts (accumulate across dates)
+    setCourierDeliveryCounts(prev => {
+      const merged = { ...prev };
+      Object.entries(counts).forEach(([driverId, count]) => {
+        const id = parseInt(driverId);
+        merged[id] = (merged[id] || 0) + count;
+      });
+      return merged;
+    });
+  }, [assignments, couriers.length]);
+
+  // Use assignment statistics to calculate delivery counts (more efficient)
+  useEffect(() => {
+    if (!assignmentStats?.driver_statistics || !couriers.length) return;
+
+    // Extract completed deliveries from assignment statistics
+    const counts: Record<number, number> = {};
+    
+    // assignmentStats.driver_statistics is Record<string, DriverStatistics>
+    // where key is driver_id (as string) and value has 'completed' field
+    Object.entries(assignmentStats.driver_statistics).forEach(([driverIdStr, stats]) => {
+      const driverId = parseInt(driverIdStr);
+      if (!isNaN(driverId) && stats.completed) {
+        // Accumulate across dates
+        counts[driverId] = (counts[driverId] || 0) + stats.completed;
+      }
+    });
+    
+    // Merge with existing counts
+    setCourierDeliveryCounts(prev => {
+      const merged = { ...prev };
+      Object.entries(counts).forEach(([driverId, count]) => {
+        const id = parseInt(driverId);
+        merged[id] = (merged[id] || 0) + count;
+      });
+      return merged;
+    });
+  }, [assignmentStats, couriers.length]);
+
+  // Calculate merchant shipment counts from assignments (more reliable for admin)
+  useEffect(() => {
+    const fetchMerchantShipmentsFromAssignments = async () => {
+      if (!isAuthenticated || !merchants.length) return;
+
+      try {
+        // Fetch assignments for recent dates to get shipment counts
+        const today = new Date();
+        const dates = [];
+        // Fetch last 90 days to get comprehensive shipment counts
+        for (let i = 0; i < 90; i++) {
+          const date = new Date(today);
+          date.setDate(today.getDate() - i);
+          dates.push(formatDateUTC(date, 'yyyy-MM-dd'));
+        }
+
+        // Fetch all assignments and collect unique shipment_ids
+        const allAssignments: any[] = [];
+        const fetchPromises = dates.slice(0, 30).map(async (dateStr) => {
+          try {
+            const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
+            if (assignmentsResponse.data.assignments) {
+              return assignmentsResponse.data.assignments;
+            }
+          } catch (error) {
+            // Skip dates that fail
+            return [];
+          }
+          return [];
+        });
+
+        const results = await Promise.all(fetchPromises);
+        results.forEach(assignments => {
+          allAssignments.push(...assignments);
+        });
+
+        // Get unique shipment_ids
+        const shipmentIds = new Set(allAssignments.map(a => a.shipment_id).filter(Boolean));
+        
+
+        // Fetch shipment details for each shipment_id to get user_id (merchant_id)
+        // Since we can't get all shipments at once, we'll use a batch approach
+        // But first, let's try counting from assignments if they have merchant info
+        
+        // Alternative: Use admin stats if available per merchant
+        // For now, count unique shipments from assignments
+        // Note: This gives shipment count, but we still need merchant_id
+        
+        // Since assignments don't directly have merchant_id, we'll need to
+        // fetch shipments individually or use a different approach
+        
+        // Use admin statistics which might have per-merchant data
+        // Or count from admin stats total and divide (not ideal)
+        
+        // For now, set counts to 0 and log that we need merchant_id from shipments
+        const counts: Record<number, number> = {};
+        
+        // TODO: Need to fetch shipments by shipment_id to get user_id
+        // For now, we'll use a different approach - fetch user statistics per merchant
+        
+        setMerchantShipmentCounts(counts);
+      } catch (error) {
+        console.error('❌ [MERCHANTS] Failed to fetch merchant shipments from assignments:', error);
+      }
+    };
+
+    // Use user statistics API for each merchant (more efficient)
+    const fetchMerchantShipmentsFromStats = async () => {
+      if (!isAuthenticated || !merchants.length) return;
+
+      try {
+        const counts: Record<number, number> = {};
+        
+        // Fetch user statistics for each merchant
+        const statsPromises = merchants.map(async (merchant) => {
+          try {
+            const statsResponse = await adminService.getUserStatistics(merchant.id);
+            if (statsResponse.data) {
+              // Count total shipments from stats
+              const total = (statsResponse.data.delivered_shipments || 0) +
+                           (statsResponse.data.in_transit_shipments || 0) +
+                           (statsResponse.data.in_warehouse_shipments || 0) +
+                           (statsResponse.data.undelivered_shipments || 0) +
+                           (statsResponse.data.unfulfilled_shipments || 0);
+              return { merchantId: merchant.id, count: total };
+            }
+          } catch (error) {
+            console.error(`Failed to get stats for merchant ${merchant.id}:`, error);
+          }
+          return { merchantId: merchant.id, count: 0 };
+        });
+
+        const results = await Promise.all(statsPromises);
+        results.forEach(({ merchantId, count }) => {
+          counts[merchantId] = count;
+        });
+        
+        
+        setMerchantShipmentCounts(counts);
+      } catch (error) {
+        console.error('❌ [MERCHANTS] Failed to fetch merchant shipments from stats:', error);
+      }
+    };
+
+    // Use stats-based approach (more efficient)
+    const timeoutId = setTimeout(fetchMerchantShipmentsFromStats, 1500);
+    return () => clearTimeout(timeoutId);
+  }, [isAuthenticated, merchants.length]);
+
+  // Fetch assignments for last 7 days to calculate total deliveries (optimized)
+  useEffect(() => {
+    const fetchRecentAssignments = async () => {
+      if (!isAuthenticated || !couriers.length) return;
+
+      try {
+        // Fetch assignments for the last 7 days (reasonable range)
+        const today = new Date();
+        const dates = [];
+        for (let i = 0; i < 7; i++) {
+          const date = new Date(today);
+          date.setDate(today.getDate() - i);
+          dates.push(formatDateUTC(date, 'yyyy-MM-dd'));
+        }
+
+        // Fetch assignments for recent dates and calculate counts
+        const allAssignmentsData: any[] = [];
+        const fetchPromises = dates.map(async (dateStr) => {
+          try {
+            const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
+            if (assignmentsResponse.data.assignments) {
+              return assignmentsResponse.data.assignments;
+            }
+          } catch (error) {
+            // Skip dates that fail
+            return [];
+          }
+          return [];
+        });
+
+        const results = await Promise.all(fetchPromises);
+        results.forEach(assignments => {
+          allAssignmentsData.push(...assignments);
+        });
+
+        // Calculate completed deliveries per driver
+        const counts: Record<number, number> = {};
+        
+        allAssignmentsData.forEach(assignment => {
+          const isCompleted = assignment.status === 'completed' || 
+                             assignment.shipment_status === 'DELIVERED' ||
+                             (assignment.status && assignment.status.toLowerCase().includes('delivered'));
+          
+          if (isCompleted && assignment.driver_id) {
+            counts[assignment.driver_id] = (counts[assignment.driver_id] || 0) + 1;
+          }
+        });
+        
+        // Merge with existing counts
+        setCourierDeliveryCounts(prev => {
+          const merged = { ...prev };
+          Object.entries(counts).forEach(([driverId, count]) => {
+            const id = parseInt(driverId);
+            merged[id] = (merged[id] || 0) + count;
+          });
+          return merged;
+        });
+      } catch (error) {
+        console.error('Failed to fetch recent assignments for delivery counts:', error);
+      }
+    };
+
+    // Debounce to avoid too many API calls
+    const timeoutId = setTimeout(fetchRecentAssignments, 2000);
+    return () => clearTimeout(timeoutId);
+  }, [isAuthenticated, couriers.length]);
 
   // Handle timeframe selection
   const handleTimeframeChange = (timeframe: string) => {
@@ -1205,7 +1474,6 @@ export default function SuperAdminDashboard() {
             showCloseButton: true
           });
         } else {
-          console.log('PDF exported successfully:', result.filename);
           showSuccessToast('PDF report downloaded successfully!', {
             duration: 3000,
             showProgressBar: true,
@@ -1214,7 +1482,6 @@ export default function SuperAdminDashboard() {
         }
       } else if (format === 'image') {
         // For future implementation - could export charts as images
-        console.log('Image export not yet implemented');
         showErrorToast('Image export not yet implemented', {
           duration: 3000,
           showCloseButton: true
@@ -3149,15 +3416,15 @@ export default function SuperAdminDashboard() {
           <CardContent className="space-y-4">
             <div className="flex items-center justify-between">
               <span>Help Documentation</span>
-              <Button variant="outline" size="sm" onClick={() => console.log('Manage help documentation')} className="h-9 px-3">Manage</Button>
+              <Button variant="outline" size="sm" onClick={() => {}} className="h-9 px-3">Manage</Button>
             </div>
             <div className="flex items-center justify-between">
               <span>Support Tickets</span>
-              <Button variant="outline" size="sm" onClick={() => console.log('View support ticket queue')} className="h-9 px-3">View Queue</Button>
+              <Button variant="outline" size="sm" onClick={() => {}} className="h-9 px-3">View Queue</Button>
             </div>
             <div className="flex items-center justify-between">
               <span>System Status Page</span>
-              <Button variant="outline" size="sm" onClick={() => console.log('Configure system status page')} className="h-9 px-3">Configure</Button>
+              <Button variant="outline" size="sm" onClick={() => {}} className="h-9 px-3">Configure</Button>
             </div>
           </CardContent>
         </Card>

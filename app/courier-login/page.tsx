@@ -1,14 +1,15 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Icon } from "@/components/ui/icon";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { authService } from "@/lib/api";
@@ -17,24 +18,58 @@ import { authService } from "@/lib/api";
 const courierLoginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(1, "Password is required"),
+  rememberMe: z.boolean(),
 });
 
-export default function CourierLogin() {
+type CourierLoginFormData = z.infer<typeof courierLoginSchema>;
+
+// Helper function to get cookie value
+const getCookie = (name: string): string | null => {
+  if (typeof window === 'undefined') return null;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+  return null;
+};
+
+// Helper function to set cookie
+const setCookie = (name: string, value: string, days: number) => {
+  if (typeof window === 'undefined') return;
+  const expires = new Date();
+  expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+  document.cookie = `${name}=${value}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`;
+};
+
+const CourierLoginContent = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
-  // Initialize form with empty credentials (remove demo data for security)
-  const form = useForm<z.infer<typeof courierLoginSchema>>({
+  // Initialize form
+  const form = useForm<CourierLoginFormData>({
     defaultValues: {
       email: "",
       password: "",
+      rememberMe: false,
     },
     resolver: zodResolver(courierLoginSchema),
   });
 
-  const onSubmit = async (data: z.infer<typeof courierLoginSchema>) => {
+  // Check for remembered email on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const rememberedEmail = getCookie('courier_remembered_email');
+      if (rememberedEmail) {
+        form.setValue('email', rememberedEmail);
+        form.setValue('rememberMe', true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const onSubmit = async (data: CourierLoginFormData) => {
     setError("");
     setIsLoading(true);
 
@@ -94,41 +129,33 @@ export default function CourierLogin() {
 
       // Only run on client side to prevent hydration mismatch
       if (typeof window !== 'undefined') {
-        console.log('🔐 [LOGIN] Storing authentication data...');
+        const rememberMe = data.rememberMe || false;
+        
+        // Store login time as timestamp (number) for easier expiration checking
+        const loginTime = Date.now().toString();
         
         // Store authentication state
         localStorage.setItem("courier_authenticated", "true");
         localStorage.setItem("courier_email", data.email);
-        localStorage.setItem("courier_login_time", Date.now().toString());
+        localStorage.setItem("courier_login_time", loginTime);
         localStorage.setItem("auth_token", accessToken);
         localStorage.setItem("courier_user", JSON.stringify(userData));
-        
-        console.log('✅ [LOGIN] LocalStorage items set:', {
-          courier_authenticated: localStorage.getItem("courier_authenticated"),
-          courier_email: localStorage.getItem("courier_email"),
-          courier_login_time: localStorage.getItem("courier_login_time"),
-          auth_token_length: localStorage.getItem("auth_token")?.length || 0,
-          courier_user_stored: !!localStorage.getItem("courier_user")
-        });
+        localStorage.setItem("courier_remember_me", rememberMe ? "true" : "false");
         
         // Enhanced cookie setting for LAN network compatibility
         const isSecure = window.location.protocol === 'https:';
         const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
         const isLAN = window.location.hostname.startsWith('10.') || window.location.hostname.startsWith('192.168.');
         
-        console.log('🔐 [LOGIN] Environment check:', {
-          protocol: window.location.protocol,
-          hostname: window.location.hostname,
-          isSecure,
-          isLocalhost,
-          isLAN
-        });
+        // Set cookie expiration based on remember me option
+        // 30 days if remember me is checked, 24 hours if not
+        const maxAge = rememberMe ? 2592000 : 86400; // 30 days or 24 hours in seconds
         
         // Set cookie with appropriate security settings based on environment
         const cookieOptions = [
           'courier_authenticated=true',
           'path=/',
-          'max-age=86400',
+          `max-age=${maxAge}`,
           'SameSite=Lax'
         ];
         
@@ -145,22 +172,21 @@ export default function CourierLogin() {
         const cookieValue = cookieOptions.join('; ');
         document.cookie = cookieValue;
         
-        console.log('🍪 [LOGIN] Cookie set:', cookieValue);
-        console.log('🍪 [LOGIN] All cookies:', document.cookie);
+        // Store email in cookie if remember me is checked
+        if (rememberMe) {
+          setCookie('courier_remembered_email', data.email, 30);
+        } else {
+          // Clear remembered email cookie if not checked
+          document.cookie = 'courier_remembered_email=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        }
         
-        // Verify storage before redirect
-        console.log('✅ [LOGIN] Final verification before redirect:');
-        console.log('   - courier_authenticated:', localStorage.getItem("courier_authenticated"));
-        console.log('   - auth_token exists:', !!localStorage.getItem("auth_token"));
-        console.log('   - cookie set:', document.cookie.includes('courier_authenticated=true'));
+        // Get redirect URL from search params, default to /courier
+        const redirectUrl = searchParams.get('redirect') || '/courier';
         
         // Redirect to courier dashboard
-        const delay = isLAN ? 500 : 100;
-        console.log(`🔐 [LOGIN] Redirecting to /courier in ${delay}ms...`);
-        
+        const delay = isLAN ? 500 : 300;
         setTimeout(() => {
-          console.log('🔐 [LOGIN] Executing redirect now...');
-          router.push("/courier");
+          router.push(redirectUrl);
         }, delay);
       }
     } catch (err: any) {
@@ -322,6 +348,30 @@ export default function CourierLogin() {
                 )}
               </div>
 
+              {/* Remember Me Checkbox */}
+              <Controller
+                control={form.control}
+                name="rememberMe"
+                render={({ field }) => (
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="courier-remember-me"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={isLoading}
+                      aria-label="Remember me"
+                    />
+                    <Label
+                      htmlFor="courier-remember-me"
+                      className="text-sm font-normal cursor-pointer"
+                      onClick={() => field.onChange(!field.value)}
+                    >
+                      Remember me
+                    </Label>
+                  </div>
+                )}
+              />
+
               {/* Error Message */}
               {error && (
                 <Alert 
@@ -424,4 +474,25 @@ export default function CourierLogin() {
       </div>
     </div>
   );
-}
+};
+
+// Loading component for Suspense fallback
+const CourierLoginLoadingFallback = () => (
+  <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50 flex items-center justify-center">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+      <p className="text-gray-600">Loading...</p>
+    </div>
+  </div>
+);
+
+// Main page component with Suspense boundary
+const CourierLogin = () => {
+  return (
+    <Suspense fallback={<CourierLoginLoadingFallback />}>
+      <CourierLoginContent />
+    </Suspense>
+  );
+};
+
+export default CourierLogin;
