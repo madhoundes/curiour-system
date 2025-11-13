@@ -880,39 +880,107 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  // Authentication check
+  // Authentication check with token expiration
   useEffect(() => {
     const checkAdminAuth = () => {
       if (typeof window !== 'undefined') {
         const adminAuth = localStorage.getItem("admin_authenticated");
         const adminCookie = document.cookie.includes("admin_authenticated=true");
         const authToken = localStorage.getItem("auth_token");
+        const loginTime = localStorage.getItem("admin_login_time");
+        const rememberMe = localStorage.getItem("admin_remember_me") === "true";
 
         console.log("🔐 Admin Auth Debug:", {
           adminAuth,
           adminCookie,
           hasAuthToken: !!authToken,
+          loginTime,
+          rememberMe,
           fullToken: authToken || "No token"
         });
 
-        if (adminAuth === "true" || adminCookie) {
-          setIsAuthenticated(true);
-
-          // Load admin user information from localStorage
-          const name = localStorage.getItem("admin_name");
-          const email = localStorage.getItem("admin_email");
-
-          if (name) setAdminName(name);
-          if (email) setAdminEmail(email);
-
-          // Debug: Check if we have a valid auth token
-          if (!authToken) {
-            console.warn("⚠️ Admin authenticated but no auth_token found in localStorage");
-          }
-        } else {
-          console.log("Admin not authenticated, redirecting to login...");
-          router.push("/admin-login");
+        // Check if authentication exists
+        if (!adminAuth || adminAuth !== "true") {
+          console.log("❌ [ADMIN] No admin authentication found in localStorage");
+          console.log("❌ [ADMIN] Missing authentication data:", {
+            admin_authenticated: adminAuth,
+            auth_token_exists: !!authToken,
+            admin_login_time: loginTime,
+            required: 'All must be present'
+          });
+          
+          // Get current path for redirect after login
+          const currentPath = window.location.pathname;
+          const redirectUrl = currentPath !== '/admin-login' ? `/admin-login?redirect=${encodeURIComponent(currentPath)}` : '/admin-login';
+          router.push(redirectUrl);
+          return;
         }
+
+        // Check if we have required authentication data
+        if (!authToken || !loginTime) {
+          console.log("❌ [ADMIN] Missing authentication data (token or login time)");
+          const currentPath = window.location.pathname;
+          const redirectUrl = currentPath !== '/admin-login' ? `/admin-login?redirect=${encodeURIComponent(currentPath)}` : '/admin-login';
+          router.push(redirectUrl);
+          return;
+        }
+
+        console.log('✅ [ADMIN] Basic auth check passed');
+
+        // Check token expiration based on remember me option
+        // 30 days if remember me is checked, 24 hours if not
+        const timeSinceLogin = Date.now() - parseInt(loginTime);
+        const expirationTime = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000; // 30 days or 24 hours
+        
+        console.log('🔍 [ADMIN] Checking token expiry...');
+        console.log('🔍 [ADMIN] Time since login:', {
+          timeSinceLogin,
+          timeSinceLoginMinutes: Math.floor(timeSinceLogin / (1000 * 60)),
+          timeSinceLoginHours: Math.floor(timeSinceLogin / (1000 * 60 * 60)),
+          expirationTime,
+          expirationTimeHours: Math.floor(expirationTime / (1000 * 60 * 60)),
+          rememberMe,
+          isExpired: timeSinceLogin >= expirationTime
+        });
+
+        if (timeSinceLogin >= expirationTime) {
+          console.log('⏰ [ADMIN] Session expired, clearing storage and redirecting');
+          
+          // Clear all admin authentication data
+          localStorage.removeItem("admin_authenticated");
+          localStorage.removeItem("admin_email");
+          localStorage.removeItem("admin_user_id");
+          localStorage.removeItem("admin_role");
+          localStorage.removeItem("admin_name");
+          localStorage.removeItem("admin_login_time");
+          localStorage.removeItem("admin_remember_me");
+          localStorage.removeItem("auth_token");
+          
+          // Clear admin authentication cookie
+          document.cookie = "admin_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          
+          // Get current path for redirect after login
+          const currentPath = window.location.pathname;
+          const redirectUrl = `/admin-login?redirect=${encodeURIComponent(currentPath)}`;
+          
+          console.log('⏰ [ADMIN] Redirecting to login with redirect URL:', redirectUrl);
+          router.push(redirectUrl);
+          return;
+        }
+
+        console.log('✅ [ADMIN] Token not expired, proceeding with authentication...');
+
+        // Authentication is valid, set authenticated state
+        setIsAuthenticated(true);
+
+        // Load admin user information from localStorage
+        const name = localStorage.getItem("admin_name");
+        const email = localStorage.getItem("admin_email");
+
+        if (name) setAdminName(name);
+        if (email) setAdminEmail(email);
+
+        console.log('✅ [ADMIN] Authentication successful');
       }
     };
 

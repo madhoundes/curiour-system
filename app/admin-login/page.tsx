@@ -1,16 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Icon } from "@/components/ui/icon";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { authService } from "@/lib/api/auth";
@@ -20,6 +21,7 @@ import { apiClient } from "@/lib/api/client";
 const adminLoginSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(1, "Password is required"),
+  rememberMe: z.boolean(),
 });
 
 type AdminLoginFormData = z.infer<typeof adminLoginSchema>;
@@ -94,8 +96,26 @@ const authenticateAdmin = async (email: string, password: string) => {
   }
 };
 
-export default function AdminLogin() {
+// Helper function to get cookie value
+const getCookie = (name: string): string | null => {
+  if (typeof window === 'undefined') return null;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop()?.split(';').shift() || null;
+  return null;
+};
+
+// Helper function to set cookie
+const setCookie = (name: string, value: string, days: number) => {
+  if (typeof window === 'undefined') return;
+  const expires = new Date();
+  expires.setTime(expires.getTime() + days * 24 * 60 * 60 * 1000);
+  document.cookie = `${name}=${value}; path=/; expires=${expires.toUTCString()}; SameSite=Lax`;
+};
+
+const AdminLoginContent = () => {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -105,9 +125,22 @@ export default function AdminLogin() {
     defaultValues: {
       email: "",
       password: "",
+      rememberMe: false,
     },
     resolver: zodResolver(adminLoginSchema),
   });
+
+  // Check for remembered email on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const rememberedEmail = getCookie('admin_remembered_email');
+      if (rememberedEmail) {
+        form.setValue('email', rememberedEmail);
+        form.setValue('rememberMe', true);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const onSubmit = async (data: AdminLoginFormData) => {
     setError("");
@@ -122,26 +155,48 @@ export default function AdminLogin() {
         
         // Store admin authentication state
         if (typeof window !== 'undefined') {
+          const rememberMe = data.rememberMe || false;
+          
+          // Store login time as timestamp (number) for easier expiration checking
+          const loginTime = Date.now().toString();
+          
           localStorage.setItem("admin_authenticated", "true");
           localStorage.setItem("admin_email", data.email);
           localStorage.setItem("admin_user_id", String(result.user.id));
           localStorage.setItem("admin_role", result.user.role);
           localStorage.setItem("admin_name", `${result.user.first_name} ${result.user.last_name}`);
-          localStorage.setItem("admin_login_time", new Date().toISOString());
+          localStorage.setItem("admin_login_time", loginTime);
+          localStorage.setItem("admin_remember_me", rememberMe ? "true" : "false");
+          
+          // Set cookie expiration based on remember me option
+          // 30 days if remember me is checked, 24 hours if not
+          const maxAge = rememberMe ? 2592000 : 86400; // 30 days or 24 hours in seconds
           
           // Set admin authentication cookie
-          const adminCookieValue = `admin_authenticated=true; path=/; max-age=86400; SameSite=Lax`;
-          document.cookie = adminCookieValue;
+          document.cookie = `admin_authenticated=true; path=/; max-age=${maxAge}; SameSite=Lax`;
+          
+          // Store email in cookie if remember me is checked
+          if (rememberMe) {
+            setCookie('admin_remembered_email', data.email, 30);
+          } else {
+            // Clear remembered email cookie if not checked
+            document.cookie = 'admin_remembered_email=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
+          }
           
           console.log('✅ Admin authentication successful!');
           console.log('User:', result.user.first_name, result.user.last_name);
           console.log('Role:', result.user.role);
           console.log('Token stored:', result.token.substring(0, 20) + '...');
+          console.log('Remember me:', rememberMe);
+          console.log('Login time:', loginTime);
           
-          // Redirect to admin dashboard
+          // Get redirect URL from search params, default to /admin
+          const redirectUrl = searchParams.get('redirect') || '/admin';
+          
+          // Redirect to admin dashboard or redirect URL
           setTimeout(() => {
-            console.log('Redirecting to admin dashboard...');
-            router.push("/admin");
+            console.log('Redirecting to:', redirectUrl);
+            router.push(redirectUrl);
           }, 300);
         }
       } else {
@@ -287,6 +342,30 @@ export default function AdminLogin() {
                 )}
               </div>
 
+              {/* Remember Me Checkbox */}
+              <Controller
+                control={form.control}
+                name="rememberMe"
+                render={({ field }) => (
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="admin-remember-me"
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                      disabled={isLoading}
+                      aria-label="Remember me"
+                    />
+                    <Label
+                      htmlFor="admin-remember-me"
+                      className="text-sm font-normal cursor-pointer"
+                      onClick={() => field.onChange(!field.value)}
+                    >
+                      Remember me
+                    </Label>
+                  </div>
+                )}
+              />
+
               {/* Security Notice */}
             
 
@@ -351,4 +430,25 @@ export default function AdminLogin() {
       </div>
     </div>
   );
-}
+};
+
+// Loading component for Suspense fallback
+const AdminLoginLoadingFallback = () => (
+  <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50 flex items-center justify-center">
+    <div className="text-center">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+      <p className="text-gray-600">Loading...</p>
+    </div>
+  </div>
+);
+
+// Main page component with Suspense boundary
+const AdminLogin = () => {
+  return (
+    <Suspense fallback={<AdminLoginLoadingFallback />}>
+      <AdminLoginContent />
+    </Suspense>
+  );
+};
+
+export default AdminLogin;

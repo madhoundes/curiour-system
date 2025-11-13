@@ -51,11 +51,24 @@ class ApiClient {
   /**
    * Build request headers
    */
-  private buildHeaders(config: ApiRequestConfig): Record<string, string> {
-    const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
-      ...config.headers,
-    };
+  private buildHeaders(config: ApiRequestConfig, isFormData: boolean = false): Record<string, string> {
+    const headers: Record<string, string> = {};
+
+    // Don't set Content-Type for FormData - browser will set it with boundary
+    if (!isFormData) {
+      headers['Content-Type'] = 'application/json';
+    }
+
+    // Merge custom headers (but skip Content-Type for FormData)
+    if (config.headers) {
+      Object.entries(config.headers).forEach(([key, value]) => {
+        // Skip Content-Type header for FormData to let browser set it automatically
+        if (isFormData && key.toLowerCase() === 'content-type') {
+          return;
+        }
+        headers[key] = value;
+      });
+    }
 
     // Add authentication header if required
     if (config.requiresAuth !== false) {
@@ -163,7 +176,10 @@ class ApiClient {
 
     try {
       const url = this.buildUrl(config.url, config.params);
-      const headers = this.buildHeaders(config);
+      
+      // Check if data is FormData instance
+      const isFormData = config.data instanceof FormData;
+      const headers = this.buildHeaders(config, isFormData);
 
       const fetchConfig: RequestInit = {
         method: config.method,
@@ -173,20 +189,25 @@ class ApiClient {
 
       // Add body for POST, PUT, PATCH requests
       if (config.data && ['POST', 'PUT', 'PATCH'].includes(config.method)) {
-        const contentType = headers['Content-Type'] || headers['content-type'];
-        
-        if (contentType === 'application/x-www-form-urlencoded') {
-          // Handle form-urlencoded data for OAuth2
-          const formData = new URLSearchParams();
-          Object.entries(config.data).forEach(([key, value]) => {
-            if (value !== null && value !== undefined) {
-              formData.append(key, String(value));
-            }
-          });
-          fetchConfig.body = formData.toString();
+        if (isFormData) {
+          // For FormData, pass directly - browser will set Content-Type with boundary
+          fetchConfig.body = config.data;
         } else {
-          // Default JSON encoding
-          fetchConfig.body = JSON.stringify(config.data);
+          const contentType = headers['Content-Type'] || headers['content-type'];
+          
+          if (contentType === 'application/x-www-form-urlencoded') {
+            // Handle form-urlencoded data for OAuth2
+            const formData = new URLSearchParams();
+            Object.entries(config.data).forEach(([key, value]) => {
+              if (value !== null && value !== undefined) {
+                formData.append(key, String(value));
+              }
+            });
+            fetchConfig.body = formData.toString();
+          } else {
+            // Default JSON encoding
+            fetchConfig.body = JSON.stringify(config.data);
+          }
         }
       }
 
