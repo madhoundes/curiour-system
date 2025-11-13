@@ -885,15 +885,6 @@ export interface DriverStatisticsParams {
   date_end?: string;
 }
 
-export interface DriverStatisticsResponse {
-  date_start: string;
-  date_end: string;
-  total_deliveries: number;
-  items_in_transit: number;
-  items_in_warehouse: number;
-  undelivered_shipments: number;
-}
-
 /**
  * Public Tracking Types (no authentication required)
  * 

@@ -72,6 +72,7 @@ export default function CourierPerformance() {
   // API Data State
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [statisticsData, setStatisticsData] = useState<DriverStatisticsResponse | null>(null);
+  const [assignments, setAssignments] = useState<any[]>([]);
   const [assignmentCount, setAssignmentCount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -84,43 +85,27 @@ export default function CourierPerformance() {
         setError(null);
 
         // Fetch current user data
-        console.log('🔍 [PERFORMANCE] Fetching user data...');
         const userResponse = await authService.getCurrentUser();
         setCurrentUser(userResponse.data);
 
-        // Calculate date range based on selected period
-        const dateRange = getDateRange(selectedPeriod, fromDate, toDate);
-        
-        // Fetch statistics data
-        console.log('🔍 [PERFORMANCE] Fetching statistics data...', dateRange);
-        const statsResponse = await driverService.getDriverStatistics(dateRange);
-        setStatisticsData(statsResponse);
-
-        // Fetch today's assignments for badge count
-        console.log('🔍 [PERFORMANCE] Fetching today\'s assignments...');
+        // Fetch today's assignments for stats calculation
         const assignmentsResponse = await driverService.getTodaysAssignments();
-        const assignmentCount = assignmentsResponse.assignments?.length || 0;
-        setAssignmentCount(assignmentCount);
-        console.log('✅ [PERFORMANCE] Assignments fetched:', assignmentCount);
+        const assignmentList = assignmentsResponse.assignments || [];
+        setAssignments(assignmentList);
+        setAssignmentCount(assignmentList.length);
 
-        console.log('✅ [PERFORMANCE] Data fetched successfully:', {
-          user: userResponse.data.email,
-          stats: statsResponse,
-          assignmentCount: assignmentCount,
-          breakdown: {
-            total: statsResponse.total_deliveries,
-            inTransit: statsResponse.items_in_transit,
-            inWarehouse: statsResponse.items_in_warehouse,
-            undelivered: statsResponse.undelivered_shipments,
-            calculatedCompleted: Math.max(0, statsResponse.total_deliveries - 
-              statsResponse.undelivered_shipments - 
-              statsResponse.items_in_transit - 
-              statsResponse.items_in_warehouse)
-          }
-        });
+        // For non-today periods, fetch API stats (though we primarily use assignments)
+        if (selectedPeriod !== 'today') {
+          const dateRange = getDateRange(selectedPeriod, fromDate, toDate);
+          const statsResponse = await driverService.getDriverStatistics(dateRange);
+          setStatisticsData(statsResponse);
+        } else {
+          // For today, clear stats data since we use assignments
+          setStatisticsData(null);
+        }
 
       } catch (error: any) {
-        console.error('❌ [PERFORMANCE] Error fetching data:', error);
+        console.error('❌ [PERFORMANCE] Error:', error);
         setError(error.message || 'Failed to load performance data');
       } finally {
         setIsLoading(false);
@@ -234,38 +219,57 @@ export default function CourierPerformance() {
     router.push("/courier-login");
   };
 
-  // Calculate performance data from API statistics
+  // Calculate performance data from assignments (primary source)
   const currentData = useMemo(() => {
+    // Always use assignment-based stats for today
+    if (selectedPeriod === 'today') {
+      const completed = assignments.filter(a => 
+        a.status === 'DELIVERED' || a.assignment_status === 'completed'
+      ).length;
+      const remaining = assignments.length - completed;
+      const successRate = assignments.length > 0 
+        ? Math.round((completed / assignments.length) * 100)
+        : 0;
+      
+      return {
+        deliveries: assignments.length,
+        completed: completed,
+        remaining: remaining,
+        successRate: successRate
+      };
+    }
+    
+    // For other periods, use API stats if available
     if (!statisticsData) {
       return {
         deliveries: 0,
         completed: 0,
         remaining: 0,
-        onTimeRate: 0
+        successRate: 0
       };
     }
 
-    // Calculate completed deliveries (total - undelivered - in_transit - in_warehouse)
+    // Calculate from API stats for historical periods
     const completed = Math.max(0, statisticsData.total_deliveries - 
       statisticsData.undelivered_shipments - 
       statisticsData.items_in_transit - 
       statisticsData.items_in_warehouse);
 
-    // Calculate remaining deliveries
     const remaining = statisticsData.undelivered_shipments + 
       statisticsData.items_in_transit + 
       statisticsData.items_in_warehouse;
 
-    // Mock on-time rate calculation (API doesn't provide this yet)
-    const onTimeRate = completed > 0 ? Math.min(98, 85 + (completed * 0.5)) : 0;
+    const successRate = statisticsData.total_deliveries > 0 
+      ? Math.round((completed / statisticsData.total_deliveries) * 100)
+      : 0;
 
     return {
       deliveries: statisticsData.total_deliveries,
       completed: completed,
       remaining: remaining,
-      onTimeRate: Math.round(onTimeRate * 10) / 10
+      successRate: successRate
     };
-  }, [statisticsData]);
+  }, [statisticsData, assignments, selectedPeriod]);
 
   const completionPct = useMemo(() => {
     if (!currentData || !("completed" in currentData)) return 0;
@@ -599,7 +603,7 @@ export default function CourierPerformance() {
               <div className="bg-white/70 p-4 rounded-lg shadow-sm">
                 <p className="text-sm text-gray-600 mb-2 font-medium">Success Rate</p>
                 <p className="text-3xl font-bold text-green-600">
-                  {isLoading ? '...' : `${currentData.onTimeRate}%`}
+                  {isLoading ? '...' : `${currentData.successRate}%`}
                 </p>
               </div>
             </div>
@@ -862,7 +866,7 @@ export default function CourierPerformance() {
               </CardHeader>
               <CardContent className="space-y-3">
                 <div className="flex items-baseline">
-                  <p className="text-2xl font-bold text-foreground">{currentData.onTimeRate}%</p>
+                  <p className="text-2xl font-bold text-foreground">{currentData.successRate}%</p>
                   <span className="ml-2 text-sm text-muted-foreground">on-time</span>
                 </div>
                 <p className="text-xs text-muted-foreground flex items-center">
@@ -953,7 +957,7 @@ export default function CourierPerformance() {
               </div>
               <div className="p-4 rounded-lg bg-green-50 text-center border border-green-200">
                 <p className="text-xs font-medium text-green-700 uppercase tracking-wider mb-2">On-time Rate</p>
-                <p className="text-xl font-bold text-green-800">{currentData.onTimeRate}%</p>
+                <p className="text-xl font-bold text-green-800">{currentData.successRate}%</p>
                 <p className="text-xs text-green-600 mt-1">target: 90%</p>
               </div>
             </div>

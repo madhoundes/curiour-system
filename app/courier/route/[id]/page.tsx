@@ -792,6 +792,32 @@ export default function CourierRouteSimulation() {
     }
   };
 
+  // Bypass scan - directly mark package as scanned
+  const handleBypassScan = async () => {
+    if (!currentAssignment) {
+      console.error('❌ [ROUTE] No current assignment found');
+      return;
+    }
+
+    try {
+      console.log('✅ [ROUTE] Bypassing scan - marking package as scanned');
+      console.log('📦 [ROUTE] Assignment:', currentAssignment.tracking_code);
+      
+      // Directly set status to scanned without opening modal or validating barcode
+      setRouteStatus("scanned");
+      setIsBarcodeModalOpen(false);
+      setBarcodeError("");
+      setBarcodeInput("");
+      setIsBarcodeValid(false);
+      setBarcodeValidationMessage("");
+      setScannedBarcodeType("");
+      
+      console.log('✅ [ROUTE] Package marked as scanned (bypassed)');
+    } catch (error: any) {
+      console.error('❌ [ROUTE] Error bypassing scan:', error);
+    }
+  };
+
   const handleBarcodeSubmit = async () => {
     if (!barcodeInput || !currentAssignment) {
       setBarcodeError("Please enter a barcode");
@@ -1093,12 +1119,27 @@ export default function CourierRouteSimulation() {
   };
   
   const uploadPhotos = async () => {
-    if (!currentAssignment || capturedPhotos.length === 0) return;
+    if (!currentAssignment || capturedPhotos.length === 0) {
+      console.error('❌ [ROUTE] Cannot upload photos: missing assignment or photos');
+      return;
+    }
+    
+    // Validate shipment_id
+    if (!currentAssignment.shipment_id || currentAssignment.shipment_id <= 0) {
+      console.error('❌ [ROUTE] Invalid shipment_id:', currentAssignment.shipment_id);
+      alert('Error: Invalid shipment ID. Please refresh the page and try again.');
+      return;
+    }
     
     setIsUploading(true);
     
     try {
       console.log('📤 [ROUTE] Uploading photos for assignment:', currentAssignment.id);
+      console.log('📦 [ROUTE] Shipment ID:', currentAssignment.shipment_id);
+      console.log('📸 [ROUTE] Number of photos:', capturedPhotos.length);
+      
+      let successCount = 0;
+      let failCount = 0;
       
       // Upload each photo using the API
       for (let i = 0; i < capturedPhotos.length; i++) {
@@ -1111,9 +1152,23 @@ export default function CourierRouteSimulation() {
         
         try {
           // Convert data URL to File
+          console.log(`📤 [ROUTE] Converting photo ${i + 1} to File...`);
           const response = await fetch(photo.dataUrl);
+          if (!response.ok) {
+            throw new Error(`Failed to fetch photo data: ${response.statusText}`);
+          }
+          
           const blob = await response.blob();
+          console.log(`📤 [ROUTE] Photo ${i + 1} blob size:`, blob.size, 'bytes');
+          
+          // Validate blob size (max 10MB)
+          const maxSize = 10 * 1024 * 1024; // 10MB
+          if (blob.size > maxSize) {
+            throw new Error(`Photo ${i + 1} is too large (${(blob.size / 1024 / 1024).toFixed(2)}MB). Maximum size is 10MB.`);
+          }
+          
           const file = new File([blob], `delivery_photo_${i + 1}.jpg`, { type: 'image/jpeg' });
+          console.log(`📤 [ROUTE] Uploading photo ${i + 1} (${(file.size / 1024).toFixed(2)}KB)...`);
           
           // Upload photo using API
           await driverService.uploadDeliveryPhoto(currentAssignment.shipment_id, {
@@ -1126,32 +1181,55 @@ export default function CourierRouteSimulation() {
             p.id === photo.id ? { ...p, uploadStatus: 'completed' } : p
           ));
           
+          successCount++;
           console.log(`✅ [ROUTE] Photo ${i + 1} uploaded successfully`);
         } catch (error: any) {
+          failCount++;
           console.error(`❌ [ROUTE] Error uploading photo ${i + 1}:`, error);
+          console.error(`❌ [ROUTE] Error details:`, {
+            message: error.message,
+            status: error.status,
+            error: error.error
+          });
           
           // Update status to failed
           setCapturedPhotos(prev => prev.map(p => 
             p.id === photo.id ? { ...p, uploadStatus: 'failed' } : p
           ));
+          
+          // Show error for first failure
+          if (failCount === 1) {
+            const errorMessage = error.message || error.error || 'Unknown error';
+            alert(`Failed to upload photo ${i + 1}: ${errorMessage}`);
+          }
         }
       }
       
       setIsUploading(false);
-      setPhotoUploaded(true);
-      setRouteStatus("photo_taken");
       
-      // Show success toast
-      setTimeout(() => {
-        alert("Proof of delivery uploaded successfully!");
+      // Only mark as uploaded if at least one photo succeeded
+      if (successCount > 0) {
+        setPhotoUploaded(true);
+        setRouteStatus("photo_taken");
+        
+        // Show success message
+        if (failCount === 0) {
+          alert("Proof of delivery uploaded successfully!");
+        } else {
+          alert(`Uploaded ${successCount} of ${capturedPhotos.length} photos. ${failCount} failed.`);
+        }
+        
         setIsPhotoModalOpen(false);
-      }, 500);
-      
-      console.log('✅ [ROUTE] All photos uploaded successfully');
+        console.log(`✅ [ROUTE] ${successCount} photos uploaded successfully, ${failCount} failed`);
+      } else {
+        alert(`Failed to upload all photos. Please try again.`);
+        console.error('❌ [ROUTE] All photos failed to upload');
+      }
     } catch (error: any) {
       console.error('❌ [ROUTE] Error uploading photos:', error);
       setIsUploading(false);
-      alert('Failed to upload photos: ' + (error.message || 'Unknown error'));
+      const errorMessage = error.message || error.error || 'Unknown error';
+      alert(`Failed to upload photos: ${errorMessage}`);
     }
   };
   
@@ -1825,7 +1903,7 @@ export default function CourierRouteSimulation() {
                       )}
                       {step.id === "scan_barcode" && routeStatus === "arrived" && (
                         <Button
-                          onClick={() => setIsBarcodeModalOpen(true)}
+                          onClick={handleBypassScan}
                           size="sm"
                           id="parcego-route-scan-btn"
                         >

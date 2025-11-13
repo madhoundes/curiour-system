@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NotificationBanner } from "@/components/ui/notification-banner";
 import { authService, driverService } from "@/lib/api";
-import type { User, DriverAssignment, DriverStatisticsResponse } from "@/lib/api";
+import type { User, DriverAssignment } from "@/lib/api";
 
 // Mock data removed - using real API data only
 
@@ -90,7 +90,6 @@ function CourierDashboard() {
   // API Data state
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [assignments, setAssignments] = useState<DriverAssignment[]>([]);
-  const [apiStats, setApiStats] = useState<DriverStatisticsResponse | null>(null);
   
   // Notification banner state
   const [showNotificationBanner, setShowNotificationBanner] = useState(true);
@@ -232,40 +231,22 @@ function CourierDashboard() {
   // Extract data fetching logic to avoid duplication
   const fetchDashboardData = async (userData: any) => {
     try {
-      console.log('🔍 [DASHBOARD] Fetching dashboard data...');
-      
       // Fetch today's assignments
       const assignmentsResponse = await driverService.getTodaysAssignments();
-      console.log('✅ [DASHBOARD] Assignments fetched:', {
-        totalAssignments: assignmentsResponse.assignments?.length || 0,
-        date: assignmentsResponse.date,
-        firstAssignment: assignmentsResponse.assignments?.[0]?.tracking_code || 'none'
-      });
       setAssignments(assignmentsResponse.assignments || []);
 
       // Update deliveries based on assignments
       let mappedDeliveries: any[] = [];
       if (assignmentsResponse.assignments && assignmentsResponse.assignments.length > 0) {
-        console.log('📦 [DASHBOARD] Raw assignments data:', assignmentsResponse.assignments);
-        
         mappedDeliveries = assignmentsResponse.assignments
-          .map((assignment, index) => {
-            console.log(`📦 [DASHBOARD] Processing assignment ${index + 1}:`, {
-              id: assignment.id,
-              tracking_code: assignment.tracking_code,
-              assignment_status: assignment.assignment_status,
-              status: assignment.status,
-              receiver_name: assignment.receiver_name
-            });
-            
-            // Map assignment status to delivery status more accurately
+          .map((assignment) => {
+            // Map assignment status to delivery status
             let deliveryStatus: string;
             const status = assignment.status?.toUpperCase();
             const assignmentStatus = assignment.assignment_status?.toLowerCase();
             
-            // Skip UNDELIVERED assignments - they should not appear on the dashboard
+            // Skip UNDELIVERED assignments
             if (status === 'UNDELIVERED') {
-              console.log(`❌ [DASHBOARD] Skipping UNDELIVERED assignment: ${assignment.tracking_code}`);
               return null;
             }
             
@@ -280,89 +261,59 @@ function CourierDashboard() {
             } else {
               deliveryStatus = 'assigned';
             }
-            
-            console.log(`📦 [DASHBOARD] Mapped status for ${assignment.tracking_code}: ${assignment.status} + ${assignment.assignment_status} → ${deliveryStatus}`);
 
             return {
               id: `PCG-DEL-${assignment.id}`,
               trackingNumber: assignment.tracking_code,
               customerName: assignment.receiver_name,
               address: `${assignment.receiver_address}, ${assignment.receiver_city}`,
-              timeWindow: "N/A", // Can be calculated based on estimated_delivery_date
+              timeWindow: "N/A",
               estimatedTime: assignment.estimated_delivery_date || "TBD",
               status: deliveryStatus,
               packageType: assignment.package_type || 'Standard',
               weight: `${assignment.weight} kg`,
               specialInstructions: assignment.special_instructions || '',
-              priority: 'medium' as const // Default priority
+              priority: 'medium' as const
             };
           })
           .filter((delivery) => delivery !== null) as any[];
-        console.log('📦 [DASHBOARD] Mapped deliveries:', mappedDeliveries);
         setDeliveries(mappedDeliveries);
-        
-        console.log('📦 [DASHBOARD] Mapped deliveries:', mappedDeliveries.map(d => ({
-          id: d.id,
-          trackingNumber: d.trackingNumber,
-          customerName: d.customerName,
-          status: d.status
-        })));
       } else {
-        console.log('ℹ️ [DASHBOARD] No assignments found for today');
         setDeliveries([]);
         mappedDeliveries = [];
       }
 
-      // Fetch driver statistics
-      console.log('🔍 [DASHBOARD] Fetching driver statistics...');
-      const statsResponse = await driverService.getDriverStatistics();
-      console.log('✅ [DASHBOARD] Statistics fetched:', {
-        totalDeliveries: statsResponse.total_deliveries,
-        itemsInTransit: statsResponse.items_in_transit,
-        itemsInWarehouse: statsResponse.items_in_warehouse,
-        undeliveredShipments: statsResponse.undelivered_shipments
-      });
-      setApiStats(statsResponse);
+      // Calculate stats from assignments (primary source)
+      const totalAssignments = mappedDeliveries.length || 0;
+      const completed = mappedDeliveries.filter(d => d.status === 'delivered').length || 0;
+      const remaining = totalAssignments - completed;
 
-      // Update stats UI based on mapped deliveries (excluding UNDELIVERED)
-      const totalAssignments = mappedDeliveries.length || 0; // Use filtered deliveries count
-      const completedDeliveries = mappedDeliveries?.filter(d => d.status === 'delivered').length || 0;
-      const remainingDeliveries = totalAssignments - completedDeliveries;
-
-      console.log('📊 [DASHBOARD] Delivery status breakdown:', {
-        totalAssignments,
-        completedDeliveries,
-        remainingDeliveries,
-        deliveryStatuses: mappedDeliveries.map(d => ({
-          id: d.id,
-          trackingNumber: d.trackingNumber,
-          status: d.status
-        }))
-      });
-
-      setStats({
+      // Set stats (assignment-based only)
+      const finalStats = {
         deliveriesToday: totalAssignments,
-        completed: completedDeliveries,
-        remaining: remainingDeliveries,
-        earnings: 0, // TODO: Get from API when available
-        efficiency: completedDeliveries > 0 ? Math.round((completedDeliveries / totalAssignments) * 100) : 0,
-        onTimeRate: 0 // TODO: Calculate based on delivery times when available
-      });
+        completed: completed,
+        remaining: remaining,
+        earnings: 0,
+        efficiency: totalAssignments > 0 
+          ? Math.round((completed / totalAssignments) * 100) 
+          : 0,
+        onTimeRate: 0
+      };
+      
+      setStats(finalStats);
 
       // Update notification banner
       setNotificationBanner({
-        type: remainingDeliveries > 0 ? "warning" : "success",
-        title: remainingDeliveries > 0 ? "Delivery Status Update" : "All Deliveries Complete",
-        message: remainingDeliveries > 0 
-          ? `You have ${remainingDeliveries} pending deliveries that need attention`
+        type: remaining > 0 ? "warning" : "success",
+        title: remaining > 0 ? "Delivery Status Update" : "All Deliveries Complete",
+        message: remaining > 0 
+          ? `You have ${remaining} pending deliveries that need attention`
           : "Great job! All deliveries are complete for today."
       });
-
-      console.log('✅ [DASHBOARD] Dashboard data loaded successfully');
       
     } catch (error: any) {
-      console.error('❌ [DASHBOARD] Error fetching dashboard data:', error);
-      throw error; // Re-throw to be handled by caller
+      console.error('❌ [DASHBOARD] Error:', error);
+      throw error;
     }
   };
 

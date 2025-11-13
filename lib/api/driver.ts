@@ -357,35 +357,46 @@ export class DriverService {
         formData.append('notes', photoData.notes);
       }
 
+      // Don't set Content-Type header - let browser set it with boundary for FormData
       const response = await apiClient.post<DriverUploadDeliveryPhotoResponse>(
         url,
         formData,
         {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
+          // No headers needed - browser will set Content-Type with boundary automatically
         }
       );
 
       return response.data;
     } catch (error: any) {
-      if (error.response?.status === 400) {
-        throw new Error('Invalid file or shipment not found');
+      console.error('❌ [DRIVER] Error uploading delivery photo:', error);
+      
+      // Handle ApiErrorResponse structure (from apiClient)
+      const status = error.status || error.response?.status;
+      const errorMessage = error.message || error.response?.data?.message || error.error || 'An unexpected error occurred';
+      
+      if (status === 400) {
+        throw new Error(errorMessage || 'Invalid file or shipment not found');
       }
-      if (error.response?.status === 401) {
-        throw new Error('Authentication required');
+      if (status === 401) {
+        throw new Error('Authentication required. Please log in again.');
       }
-      if (error.response?.status === 403) {
+      if (status === 403) {
         throw new Error('Driver role required');
       }
-      if (error.response?.status === 404) {
+      if (status === 404) {
         throw new Error('Shipment not found');
       }
-      if (error.response?.status === 422) {
-        const errorData = error.response.data;
-        throw new Error(errorData.detail?.[0]?.msg || 'Validation error');
+      if (status === 413) {
+        throw new Error('File too large. Maximum size is 10MB');
       }
-      throw new Error(error.message || 'Failed to upload delivery photo');
+      if (status === 422) {
+        const errorData = error.response?.data || error.details;
+        const detailMessage = errorData?.detail?.[0]?.msg || errorData?.message || errorMessage;
+        throw new Error(detailMessage || 'Validation error');
+      }
+      
+      // Re-throw with original message if available
+      throw new Error(errorMessage);
     }
   }
 
@@ -444,16 +455,26 @@ export class DriverService {
 
       return response.data;
     } catch (error: any) {
-      if (error.response?.status === 401) {
-        throw new Error('Authentication required');
+      console.error('❌ [DRIVER] Error fetching driver statistics:', error);
+      
+      // Handle ApiErrorResponse structure (from apiClient)
+      const status = error.status || error.response?.status;
+      const errorMessage = error.message || error.response?.data?.message || error.error || 'Failed to fetch driver statistics';
+      
+      if (status === 401) {
+        throw new Error('Authentication required. Please log in again.');
       }
-      if (error.response?.status === 403) {
+      if (status === 403) {
         throw new Error('Driver role required');
       }
-      if (error.response?.status === 422) {
-        throw new Error('Validation error - invalid date parameters');
+      if (status === 422) {
+        const errorData = error.response?.data || error.details;
+        const detailMessage = errorData?.detail?.[0]?.msg || errorData?.message || 'Validation error - invalid date parameters';
+        throw new Error(detailMessage);
       }
-      throw new Error(error.message || 'Failed to get driver statistics');
+      
+      // Re-throw with original message if available
+      throw new Error(errorMessage);
     }
   }
 }
