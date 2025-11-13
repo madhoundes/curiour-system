@@ -372,30 +372,24 @@ function CourierDashboard() {
           return;
         }
 
-        console.log('✅ [DASHBOARD] Using localStorage authentication');
+        // Check token expiration based on remember me option
+        const rememberMe = localStorage.getItem("courier_remember_me") === "true";
+        const timeSinceLogin = Date.now() - parseInt(loginTime);
+        const expirationTime = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000; // 30 days or 24 hours
 
-        // Authentication already validated above, proceed with token expiry check
-        console.log('✅ [DASHBOARD] Basic auth check passed');
-        console.log('🔍 [DASHBOARD] Checking token expiry...');
-          const timeSinceLogin = Date.now() - parseInt(loginTime);
-        const twentyFourHours = 24 * 60 * 60 * 1000;
-        
-        console.log('🔍 [DASHBOARD] Time since login:', {
-          timeSinceLogin,
-          timeSinceLoginMinutes: Math.floor(timeSinceLogin / (1000 * 60)),
-          twentyFourHours,
-          isExpired: timeSinceLogin >= twentyFourHours
-        });
-
-        if (timeSinceLogin >= twentyFourHours) {
-          console.log('⏰ [DASHBOARD] Session expired, clearing storage and redirecting');
-            localStorage.removeItem("courier_authenticated");
-            localStorage.removeItem("courier_email");
-            localStorage.removeItem("courier_login_time");
+        if (timeSinceLogin >= expirationTime) {
+          // Session expired, clear storage and redirect
+          localStorage.removeItem("courier_authenticated");
+          localStorage.removeItem("courier_email");
+          localStorage.removeItem("courier_login_time");
           localStorage.removeItem("auth_token");
           localStorage.removeItem("courier_user");
-            document.cookie = "courier_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-            router.push("/courier-login");
+          localStorage.removeItem("courier_remember_me");
+          document.cookie = "courier_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+          
+          const currentPath = window.location.pathname;
+          const redirectUrl = currentPath !== '/courier-login' ? `/courier-login?redirect=${encodeURIComponent(currentPath)}` : '/courier-login';
+          router.push(redirectUrl);
           return;
         }
 
