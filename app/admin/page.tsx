@@ -147,10 +147,7 @@ export default function SuperAdminDashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subDays(getUTCDate(), 30),
-    to: getUTCDate()
-  });
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(undefined);
   const [selectedTimeframe, setSelectedTimeframe] = useState("30d");
   const [selectedRegion, setSelectedRegion] = useState("all");
   const [selectedMetric, setSelectedMetric] = useState("revenue");
@@ -185,7 +182,7 @@ export default function SuperAdminDashboard() {
   const [assignmentStats, setAssignmentStats] = useState<any>(null);
   const [assignmentsLoading, setAssignmentsLoading] = useState(false);
   // Memoize initial date to prevent unnecessary re-renders (using UTC)
-  const [selectedAssignmentDate, setSelectedAssignmentDate] = useState<Date>(() => getUTCDate());
+  const [selectedAssignmentDate, setSelectedAssignmentDate] = useState<Date | null>(null);
   const [isReassignModalOpen, setIsReassignModalOpen] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState<any>(null);
   const [isManualAssignmentOpen, setIsManualAssignmentOpen] = useState(false);
@@ -400,7 +397,7 @@ export default function SuperAdminDashboard() {
   // Load assignments when date changes
   useEffect(() => {
     const loadAssignments = async () => {
-      if (!isAuthenticated) return;
+      if (!isAuthenticated || !selectedAssignmentDate) return;
 
       try {
         setAssignmentsLoading(true);
@@ -436,7 +433,7 @@ export default function SuperAdminDashboard() {
     };
 
     loadAssignments();
-  }, [isAuthenticated, formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd'), logoutAdmin]);
+  }, [isAuthenticated, selectedAssignmentDate, logoutAdmin]);
 
   // Real courier data from API
   const [couriers, setCouriers] = useState<User[]>([]);
@@ -835,6 +832,7 @@ export default function SuperAdminDashboard() {
 
   // Run automated assignment
   const handleRunAutomation = async () => {
+    if (!selectedAssignmentDate) return;
     try {
       setIsRunningAutomation(true);
       const dateStr = formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd');
@@ -854,7 +852,7 @@ export default function SuperAdminDashboard() {
 
       // Check if the error is about existing assignments
       const errorMessage = error?.details || error?.message || '';
-      const currentDateStr = formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd');
+      const currentDateStr = selectedAssignmentDate ? formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd') : '';
       if (errorMessage.includes('already exist')) {
         showErrorToast(
           `Assignments already exist for ${currentDateStr}. Please manually click 'Clear All Assignments' first, wait for the success message, then try 'Run Automation' again.`,
@@ -883,6 +881,7 @@ export default function SuperAdminDashboard() {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Reload assignments to show updated data
+      if (!selectedAssignmentDate) return;
       const dateStr = formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd');
       const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
       setAssignments(assignmentsResponse.data.assignments || []);
@@ -913,6 +912,7 @@ export default function SuperAdminDashboard() {
       setSelectedAssignment(null);
 
       // Reload assignments
+      if (!selectedAssignmentDate) return;
       const dateStr = formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd');
       const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
       setAssignments(assignmentsResponse.data.assignments || []);
@@ -1008,6 +1008,22 @@ export default function SuperAdminDashboard() {
 
     checkAdminAuth();
   }, [router]);
+
+  // Initialize dates on client side only (prevents build-time errors)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if (!dateRange) {
+        const today = getUTCDate();
+        setDateRange({
+          from: subDays(today, 30),
+          to: today
+        });
+      }
+      if (!selectedAssignmentDate) {
+        setSelectedAssignmentDate(getUTCDate());
+      }
+    }
+  }, [dateRange, selectedAssignmentDate]);
 
   // Load couriers from API
   useEffect(() => {
@@ -2348,7 +2364,7 @@ export default function SuperAdminDashboard() {
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="touch-manipulation">
                   <Icon name="Calendar" size={16} className="mr-2" />
-                  {formatDateUTC(selectedAssignmentDate, 'MMM dd, yyyy')}
+                  {selectedAssignmentDate ? formatDateUTC(selectedAssignmentDate, 'MMM dd, yyyy') : 'Select Date'}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="end">
@@ -2450,7 +2466,7 @@ export default function SuperAdminDashboard() {
         {/* Assignments List */}
         <Card>
           <CardHeader>
-            <CardTitle>Assignments for {formatDateUTC(selectedAssignmentDate, 'MMMM dd, yyyy')}</CardTitle>
+            <CardTitle>Assignments for {selectedAssignmentDate ? formatDateUTC(selectedAssignmentDate, 'MMMM dd, yyyy') : 'Selected Date'}</CardTitle>
           </CardHeader>
           <CardContent>
             {assignmentsLoading ? (
@@ -5451,6 +5467,7 @@ export default function SuperAdminDashboard() {
                 setManualAssignmentForm({ shipmentId: '', driverId: '', notes: '' });
 
                 // Reload assignments
+                if (!selectedAssignmentDate) return;
                 const dateStr = formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd');
                 const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
                 setAssignments(assignmentsResponse.data.assignments || []);
