@@ -543,18 +543,26 @@ export default function ProfileAccountPage() {
       const response = await shopifyService.syncAccount(accountId);
 
       if (response.data?.success) {
-        setIntegrationsMsg("Shopify store synced successfully");
-        toast.success("Shopify store synced successfully");
+        const successMsg = response.data.message || "Shopify store synced successfully";
+        setIntegrationsMsg(successMsg);
+        toast.success(successMsg);
         // Reload accounts list
         await loadShopifyAccounts();
       } else {
-        const errorMsg = "Failed to sync Shopify store";
+        // Use the message from the API response if available
+        const errorMsg = response.data?.message || "Failed to sync Shopify store";
         setIntegrationsMsg(errorMsg);
         toast.error(errorMsg);
       }
     } catch (error: any) {
       console.error("Shopify sync failed:", error);
-      setIntegrationsMsg(error.message || "Failed to sync Shopify store");
+      // Try to extract error message from API response
+      const errorMsg = error.response?.data?.message 
+        || error.response?.data?.error 
+        || error.message 
+        || "Failed to sync Shopify store. Please check your connection and try again.";
+      setIntegrationsMsg(errorMsg);
+      toast.error(errorMsg);
     } finally {
       setIsLoadingShopify(false);
     }
@@ -1213,6 +1221,38 @@ export default function ProfileAccountPage() {
                   <CardDescription>Connect your Shopify store to enable seamless order management and fulfillment automation.</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {/* Setup Instructions */}
+                  {shopifyAccounts.length === 0 && (
+                    <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                      <h3 className="text-sm font-semibold text-blue-900 mb-3 flex items-center gap-2">
+                        <Icon name="Info" size={16} />
+                        Getting Started
+                      </h3>
+                      <ol className="space-y-3 text-sm text-blue-800">
+                        <li className="flex items-start gap-3">
+                          <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-semibold">
+                            1
+                          </span>
+                          <span className="pt-0.5">Install the Parcego app in your Shopify store</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-semibold">
+                            2
+                          </span>
+                          <span className="pt-0.5">Login to Parcego when prompted</span>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <span className="flex-shrink-0 w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-semibold">
+                            3
+                          </span>
+                          <span className="pt-0.5">
+                            Your orders will automatically sync every 10 minutes or you can manually sync in your profile tab
+                          </span>
+                        </li>
+                      </ol>
+                    </div>
+                  )}
+
                   {integrationsMsg && (
                     <Alert className="mb-3" role="status" aria-live="polite">
                       <AlertTitle>Integration</AlertTitle>
@@ -1290,72 +1330,6 @@ export default function ProfileAccountPage() {
                       <AlertDescription>Loading Shopify stores...</AlertDescription>
                     </Alert>
                   )}
-
-                  <Form {...integrationsForm}>
-                    <form
-                      id="parcego-profile-integrations-form"
-                      className="space-y-6"
-                      onSubmit={(e) => {
-                        e.preventDefault();
-                        handleShopifyConnect();
-                      }}
-                      aria-label="Shopify integration form"
-                    >
-                      {/* Shopify Integration */}
-                      <div className="space-y-4">
-                        <div>
-                          <h3 className="text-lg font-medium mb-2">Connect New Shopify Store</h3>
-                          <p className="text-sm text-gray-600 mb-4">
-                            Connect your Shopify store for seamless order management and fulfillment automation.
-                          </p>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 gap-4">
-                          <FormField
-                            control={integrationsForm.control}
-                            name="shopify.shopDomain"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Shop Domain</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    placeholder="your-store.myshopify.com or just your-store" 
-                                    {...field}
-                                    disabled={isConnectingShopify}
-                                  />
-                                </FormControl>
-                                <FormDescription>
-                                  Enter your Shopify store domain. You can use &quot;mystore&quot; or &quot;mystore.myshopify.com&quot;
-                                </FormDescription>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="submit"
-                            disabled={isConnectingShopify}
-                            aria-label="Connect Shopify store"
-                          >
-                            {isConnectingShopify ? "Connecting..." : "Connect Store"}
-                          </Button>
-                          {shopifyAccounts.length > 0 && (
-                            <Button
-                              type="button"
-                              variant="outline"
-                              onClick={loadShopifyAccounts}
-                              disabled={isLoadingShopify}
-                              aria-label="Refresh Shopify stores"
-                            >
-                              Refresh
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </form>
-                  </Form>
                 </CardContent>
               </Card>
             </TabsContent>
