@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Logo } from '@/components/ui/logo';
-import type { Claim } from '@/lib/api/types';
+import type { Claim, UserProfile, BillingRecord } from '@/lib/api/types';
 
 // Format date in UTC
 const formatUTCDate = (date: Date): string => {
@@ -50,9 +50,11 @@ const claimTypeConfig = {
 interface ClaimReportPDFProps {
   claim: Claim;
   isPreview?: boolean;
+  userProfile?: UserProfile | null;
+  billingRecord?: BillingRecord | null;
 }
 
-export const ClaimReportPDF = ({ claim, isPreview = false }: ClaimReportPDFProps) => {
+export const ClaimReportPDF = ({ claim, isPreview = false, userProfile, billingRecord }: ClaimReportPDFProps) => {
   const statusConfig = claimStatusConfig[claim.status as keyof typeof claimStatusConfig] || claimStatusConfig.pending_review;
   const typeConfig = claimTypeConfig[claim.reason as keyof typeof claimTypeConfig] || claimTypeConfig.damage;
   
@@ -114,11 +116,17 @@ export const ClaimReportPDF = ({ claim, isPreview = false }: ClaimReportPDFProps
           </div>
           <div className="flex">
             <span className="w-32 bg-gray-50 px-2 py-1 font-semibold text-gray-700">Claimed Amount</span>
-            <span className="px-2 py-1 text-black">N/A</span>
+            <span className="px-2 py-1 text-black">
+              {billingRecord?.amount ? `$${parseFloat(billingRecord.amount).toFixed(2)} ${billingRecord.currency || 'CAD'}` : 'N/A'}
+            </span>
           </div>
           <div className="flex">
             <span className="w-32 bg-gray-50 px-2 py-1 font-semibold text-gray-700">Payout Amount</span>
-            <span className="px-2 py-1 text-black">N/A</span>
+            <span className="px-2 py-1 text-black">
+              {claim.status === 'approved' && billingRecord?.amount 
+                ? `$${parseFloat(billingRecord.amount).toFixed(2)} ${billingRecord.currency || 'CAD'}` 
+                : claim.status === 'approved' ? 'Pending' : 'N/A'}
+            </span>
           </div>
           <div className="flex">
             <span className="w-32 bg-gray-50 px-2 py-1 font-semibold text-gray-700">Processing Time</span>
@@ -150,7 +158,11 @@ export const ClaimReportPDF = ({ claim, isPreview = false }: ClaimReportPDFProps
           </div>
           <div className="flex">
             <span className="w-32 bg-gray-50 px-2 py-1 font-semibold text-gray-700">Incident Location</span>
-            <span className="px-2 py-1 text-black">N/A</span>
+            <span className="px-2 py-1 text-black">
+              {userProfile?.city && userProfile?.province 
+                ? `${userProfile.city}, ${userProfile.province}${userProfile.country ? `, ${userProfile.country}` : ''}` 
+                : 'N/A'}
+            </span>
           </div>
           <div className="flex">
             <span className="w-32 bg-gray-50 px-2 py-1 font-semibold text-gray-700 align-top">Description</span>
@@ -165,15 +177,19 @@ export const ClaimReportPDF = ({ claim, isPreview = false }: ClaimReportPDFProps
         <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-xs">
           <div className="flex">
             <span className="w-32 bg-gray-50 px-2 py-1 font-semibold text-gray-700">Contact Name</span>
-            <span className="px-2 py-1 text-black">{claim.user_email}</span>
+            <span className="px-2 py-1 text-black">
+              {userProfile?.first_name && userProfile?.last_name 
+                ? `${userProfile.first_name} ${userProfile.last_name}` 
+                : claim.user_email}
+            </span>
           </div>
           <div className="flex">
             <span className="w-32 bg-gray-50 px-2 py-1 font-semibold text-gray-700">Business Name</span>
-            <span className="px-2 py-1 text-black">N/A</span>
+            <span className="px-2 py-1 text-black">{userProfile?.business_name || 'N/A'}</span>
           </div>
           <div className="flex">
             <span className="w-32 bg-gray-50 px-2 py-1 font-semibold text-gray-700">Phone</span>
-            <span className="px-2 py-1 text-black">N/A</span>
+            <span className="px-2 py-1 text-black">{userProfile?.phone_number || 'N/A'}</span>
           </div>
           <div className="flex">
             <span className="w-32 bg-gray-50 px-2 py-1 font-semibold text-gray-700">Email</span>
@@ -231,7 +247,11 @@ export const ClaimReportPDF = ({ claim, isPreview = false }: ClaimReportPDFProps
 };
 
 // Helper function to generate PDF using html2canvas-pro and jsPDF directly
-export const generateClaimPDF = async (claim: Claim): Promise<void> => {
+export const generateClaimPDF = async (
+  claim: Claim, 
+  userProfile?: UserProfile | null, 
+  billingRecord?: BillingRecord | null
+): Promise<void> => {
   try {
     // Dynamic imports to avoid SSR issues
     const html2canvas = (await import('html2canvas-pro')).default;
@@ -260,7 +280,9 @@ export const generateClaimPDF = async (claim: Claim): Promise<void> => {
       // Render the component
       const element = React.createElement(ClaimReportPDF, { 
         claim, 
-        isPreview: false 
+        isPreview: false,
+        userProfile,
+        billingRecord
       });
       
       // Use a Promise to wait for rendering

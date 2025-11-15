@@ -76,15 +76,30 @@ For questions, contact support@parcego.com`;
 
 // Transformation functions to map API data to local types
 const transformBillingRecordToPayment = (billing: BillingRecord): Payment => {
+  // Determine payment status: if paid_at exists, consider it paid regardless of payment_status
+  // This handles cases where backend might not update payment_status but sets paid_at
+  let status: Payment['status'] = 'pending'
+  
+  if (billing.paid_at) {
+    // If paid_at timestamp exists, payment is completed
+    status = 'paid'
+  } else if (billing.payment_status === 'paid') {
+    status = 'paid'
+  } else if (billing.payment_status === 'failed') {
+    status = 'failed'
+  } else if (billing.payment_status === 'cancelled') {
+    status = 'failed' // Map cancelled to failed for UI
+  } else {
+    // Default to pending for 'pending' or any unknown status
+    status = 'pending'
+  }
+
   return {
     id: `pmt-${billing.id}`,
     date: billing.created_at,
     amount: parseFloat(billing.amount),
     currency: billing.currency,
-    status: billing.payment_status === 'paid' ? 'paid' : 
-            billing.payment_status === 'pending' ? 'pending' :
-            billing.payment_status === 'failed' ? 'failed' : 
-            billing.payment_status === 'cancelled' ? 'failed' : 'pending',
+    status,
     method: billing.payment_method || 'Unknown',
     invoiceId: `inv-${billing.id}`,
     downloadUrl: `/api/billing/${billing.id}/receipt`
