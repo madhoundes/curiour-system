@@ -20,7 +20,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { RangeCalendar } from "@/components/ui/range-calendar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
@@ -232,6 +233,21 @@ export default function SuperAdminDashboard() {
   const [isTriggeringPoll, setIsTriggeringPoll] = useState(false);
   const [isRetryingFailed, setIsRetryingFailed] = useState(false);
   const [shopifyFilterStatus, setShopifyFilterStatus] = useState<string>("all");
+
+  // Shopify monitoring state
+  const [errorMetrics, setErrorMetrics] = useState<any>(null);
+  const [errorMetricsLoading, setErrorMetricsLoading] = useState(false);
+  const [errorMetricsHoursBack, setErrorMetricsHoursBack] = useState(24);
+  const [storeHealth, setStoreHealth] = useState<any>(null);
+  const [storeHealthLoading, setStoreHealthLoading] = useState(false);
+  const [errorTrends, setErrorTrends] = useState<any>(null);
+  const [errorTrendsLoading, setErrorTrendsLoading] = useState(false);
+  const [errorTrendsDaysBack, setErrorTrendsDaysBack] = useState(7);
+  const [criticalAlerts, setCriticalAlerts] = useState<any>(null);
+  const [criticalAlertsLoading, setCriticalAlertsLoading] = useState(false);
+  const [healthSummary, setHealthSummary] = useState<any>(null);
+  const [healthSummaryLoading, setHealthSummaryLoading] = useState(false);
+  const [shopifyActiveTab, setShopifyActiveTab] = useState<string>("overview");
 
   // Claims management state
   const [claims, setClaims] = useState<Claim[]>([]);
@@ -3122,6 +3138,102 @@ export default function SuperAdminDashboard() {
     loadShopifyData();
   }, [isAuthenticated, activeSection, shopifyFilterStatus]);
 
+  // Load monitoring data when Shopify section is active
+  useEffect(() => {
+    const loadMonitoringData = async () => {
+      if (!isAuthenticated || activeSection !== "shopify") return;
+
+      try {
+        // Load all monitoring endpoints in parallel
+        await Promise.all([
+          loadErrorMetrics(),
+          loadStoreHealth(),
+          loadErrorTrends(),
+          loadCriticalAlerts(),
+          loadHealthSummary(),
+        ]);
+      } catch (error) {
+        console.error('Failed to load monitoring data:', error);
+      }
+    };
+
+    loadMonitoringData();
+  }, [isAuthenticated, activeSection, errorMetricsHoursBack, errorTrendsDaysBack]);
+
+  // Load error metrics
+  const loadErrorMetrics = async () => {
+    try {
+      setErrorMetricsLoading(true);
+      const response = await shopifyService.getErrorMetrics({ hours_back: errorMetricsHoursBack });
+      setErrorMetrics(response.data);
+    } catch (error: any) {
+      console.error('Failed to load error metrics:', error);
+      if (error.status !== 403) { // Don't show error for non-admin users
+        showErrorToast('Failed to load error metrics');
+      }
+    } finally {
+      setErrorMetricsLoading(false);
+    }
+  };
+
+  // Load store health
+  const loadStoreHealth = async () => {
+    try {
+      setStoreHealthLoading(true);
+      const response = await shopifyService.getStoreHealth();
+      setStoreHealth(response.data);
+    } catch (error) {
+      console.error('Failed to load store health:', error);
+      showErrorToast('Failed to load store health');
+    } finally {
+      setStoreHealthLoading(false);
+    }
+  };
+
+  // Load error trends
+  const loadErrorTrends = async () => {
+    try {
+      setErrorTrendsLoading(true);
+      const response = await shopifyService.getErrorTrends({ days_back: errorTrendsDaysBack });
+      setErrorTrends(response.data);
+    } catch (error: any) {
+      console.error('Failed to load error trends:', error);
+      if (error.status !== 403) { // Don't show error for non-admin users
+        showErrorToast('Failed to load error trends');
+      }
+    } finally {
+      setErrorTrendsLoading(false);
+    }
+  };
+
+  // Load critical alerts
+  const loadCriticalAlerts = async () => {
+    try {
+      setCriticalAlertsLoading(true);
+      const response = await shopifyService.getCriticalAlerts();
+      setCriticalAlerts(response.data);
+    } catch (error) {
+      console.error('Failed to load critical alerts:', error);
+      showErrorToast('Failed to load critical alerts');
+    } finally {
+      setCriticalAlertsLoading(false);
+    }
+  };
+
+  // Load health summary
+  const loadHealthSummary = async () => {
+    try {
+      setHealthSummaryLoading(true);
+      const response = await shopifyService.getHealthSummary();
+      setHealthSummary(response.data);
+    } catch (error) {
+      console.error('Failed to load health summary:', error);
+      showErrorToast('Failed to load health summary');
+    } finally {
+      setHealthSummaryLoading(false);
+    }
+  };
+
   // Handle trigger manual polling
   const handleTriggerPoll = async () => {
     setIsTriggeringPoll(true);
@@ -3313,170 +3425,665 @@ export default function SuperAdminDashboard() {
           </Card>
         </div>
 
-        {/* Scheduler Status Card */}
-        {schedulerStatus && (
-          <Card id="parcego-shopify-scheduler-status">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Icon name="Clock" size={20} />
-                Scheduler Status
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Status</p>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Badge
-                      className={
-                        schedulerStatus.is_running
-                          ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                          : "bg-gray-50 text-gray-800 border-gray-200"
-                      }
-                    >
-                      {schedulerStatus.is_running ? "Running" : "Stopped"}
-                    </Badge>
-                  </div>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Last Run</p>
-                  <p className="text-sm font-medium mt-1">
-                    {schedulerStatus.last_run
-                      ? formatDateUTC(new Date(schedulerStatus.last_run), "MMM dd, yyyy HH:mm")
-                      : "Never"}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Next Run</p>
-                  <p className="text-sm font-medium mt-1">
-                    {schedulerStatus.next_run
-                      ? formatDateUTC(new Date(schedulerStatus.next_run), "MMM dd, yyyy HH:mm")
-                      : "Not scheduled"}
-                  </p>
-                </div>
-              </div>
+        {/* Tabs for Overview and Monitoring */}
+        <Tabs value={shopifyActiveTab} onValueChange={setShopifyActiveTab} className="w-full" id="parcego-shopify-tabs">
+          <TabsList className="grid w-full max-w-md grid-cols-2" id="parcego-shopify-tabs-list">
+            <TabsTrigger value="overview" id="parcego-shopify-tab-overview">
+              <Icon name="LayoutDashboard" size={16} className="mr-2" />
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="monitoring" id="parcego-shopify-tab-monitoring">
+              <Icon name="Activity" size={16} className="mr-2" />
+              Monitoring
+            </TabsTrigger>
+          </TabsList>
 
-              {schedulerStatus.last_poll_stats && (
-                <div className="border-t pt-4">
-                  <p className="text-sm font-medium mb-3">Last Poll Statistics</p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-4 xl:space-y-6 mt-6">
+            {/* Scheduler Status Card */}
+            {schedulerStatus && (
+              <Card id="parcego-shopify-scheduler-status">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Icon name="Clock" size={20} />
+                    Scheduler Status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <p className="text-xs text-muted-foreground">Stores Polled</p>
-                      <p className="text-lg font-bold">{schedulerStatus.last_poll_stats.stores_polled}</p>
+                      <p className="text-sm text-muted-foreground">Status</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <Badge
+                          className={
+                            schedulerStatus.is_running
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : "bg-gray-50 text-gray-800 border-gray-200"
+                          }
+                        >
+                          {schedulerStatus.is_running ? "Running" : "Stopped"}
+                        </Badge>
+                      </div>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Orders Fetched</p>
-                      <p className="text-lg font-bold">{schedulerStatus.last_poll_stats.orders_fetched}</p>
+                      <p className="text-sm text-muted-foreground">Last Run</p>
+                      <p className="text-sm font-medium mt-1">
+                        {schedulerStatus.last_run
+                          ? formatDateUTC(new Date(schedulerStatus.last_run), "MMM dd, yyyy HH:mm")
+                          : "Never"}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-xs text-muted-foreground">Orders Processed</p>
-                      <p className="text-lg font-bold">{schedulerStatus.last_poll_stats.orders_processed}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground">Errors</p>
-                      <p className="text-lg font-bold text-red-600">
-                        {schedulerStatus.last_poll_stats.errors}
+                      <p className="text-sm text-muted-foreground">Next Run</p>
+                      <p className="text-sm font-medium mt-1">
+                        {schedulerStatus.next_run
+                          ? formatDateUTC(new Date(schedulerStatus.next_run), "MMM dd, yyyy HH:mm")
+                          : "Not scheduled"}
                       </p>
                     </div>
                   </div>
+
+                  {schedulerStatus.last_poll_stats && (
+                    <div className="border-t pt-4">
+                      <p className="text-sm font-medium mb-3">Last Poll Statistics</p>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                          <p className="text-xs text-muted-foreground">Stores Polled</p>
+                          <p className="text-lg font-bold">{schedulerStatus.last_poll_stats.stores_polled}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Orders Fetched</p>
+                          <p className="text-lg font-bold">{schedulerStatus.last_poll_stats.orders_fetched}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Orders Processed</p>
+                          <p className="text-lg font-bold">{schedulerStatus.last_poll_stats.orders_processed}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-muted-foreground">Errors</p>
+                          <p className="text-lg font-bold text-red-600">
+                            {schedulerStatus.last_poll_stats.errors}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Accounts List */}
+            <Card id="parcego-shopify-accounts-list">
+              <CardHeader>
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <CardTitle>Connected Shopify Stores</CardTitle>
+                  <div className="flex gap-2">
+                    <Select value={shopifyFilterStatus} onValueChange={setShopifyFilterStatus}>
+                      <SelectTrigger className="w-[140px]" id="parcego-shopify-filter-status">
+                        <SelectValue placeholder="Filter by status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Status</SelectItem>
+                        <SelectItem value="active">Active</SelectItem>
+                        <SelectItem value="error">Error</SelectItem>
+                        <SelectItem value="inactive">Inactive</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {shopifyAccountsLoading ? (
+                  <div className="space-y-3">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-20 w-full" />
+                    ))}
+                  </div>
+                ) : filteredAccounts.length === 0 ? (
+                  <div className="text-center py-12" id="parcego-shopify-empty-state">
+                    <Icon name="Store" size={48} className="mx-auto text-gray-300 mb-4" />
+                    <p className="text-lg font-medium text-gray-900 mb-2">No Shopify stores found</p>
+                    <p className="text-sm text-gray-500">
+                      {shopifyFilterStatus !== "all"
+                        ? `No stores with status "${shopifyFilterStatus}"`
+                        : "No stores are currently connected"}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {filteredAccounts.map((account) => (
+                      <Card
+                        key={account.id}
+                        className="border-gray-200 hover:border-gray-300 transition-colors"
+                        id={`parcego-shopify-account-${account.id}`}
+                      >
+                        <CardContent className="p-4">
+                          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-start gap-3">
+                                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                                  <Icon name="Store" size={24} className="text-blue-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-semibold text-base truncate">{account.shop_name || account.shop_domain}</h3>
+                                  <p className="text-sm text-muted-foreground truncate">{account.shop_domain}</p>
+                                  <div className="flex items-center gap-2 mt-2">
+                                    <Badge
+                                      className={
+                                        account.status === "active"
+                                          ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                          : account.status === "error"
+                                          ? "bg-red-50 text-red-800 border-red-200"
+                                          : "bg-gray-50 text-gray-800 border-gray-200"
+                                      }
+                                    >
+                                      {account.status}
+                                    </Badge>
+                                    {account.last_sync_at && (
+                                      <span className="text-xs text-muted-foreground">
+                                        Last sync: {formatDateUTC(new Date(account.last_sync_at), "MMM dd, yyyy HH:mm")}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                            {account.error_message && (
+                              <Alert className="md:max-w-md">
+                                <AlertDescription className="text-sm text-red-800">
+                                  <Icon name="AlertCircle" size={16} className="inline mr-1" />
+                                  {account.error_message}
+                                </AlertDescription>
+                              </Alert>
+                            )}
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Monitoring Tab */}
+          <TabsContent value="monitoring" className="space-y-4 xl:space-y-6 mt-6">
+            {/* Health Summary Section */}
+            {(healthSummary || healthSummaryLoading) && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <Card id="parcego-shopify-health-summary" className="lg:col-span-2">
+                  <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Icon name="Activity" size={20} />
+                  Integration Health Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {healthSummaryLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                  </div>
+                ) : healthSummary ? (
+                  <>
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1">
+                        <p className="text-sm text-muted-foreground mb-1">Overall Status</p>
+                        <Badge
+                          className={
+                            healthSummary.overall_status === "healthy"
+                              ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                              : healthSummary.overall_status === "warning"
+                              ? "bg-yellow-50 text-yellow-800 border-yellow-200"
+                              : "bg-red-50 text-red-800 border-red-200"
+                          }
+                        >
+                          {healthSummary.overall_status?.toUpperCase() || "UNKNOWN"}
+                        </Badge>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm text-muted-foreground mb-1">Health Score</p>
+                        <p className="text-2xl font-bold">{healthSummary.health_score || 0}/100</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Total Stores</p>
+                        <p className="text-lg font-bold">{healthSummary.stores_total || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Healthy</p>
+                        <p className="text-lg font-bold text-emerald-600">{healthSummary.stores_healthy || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">With Issues</p>
+                        <p className="text-lg font-bold text-red-600">{healthSummary.stores_with_issues || 0}</p>
+                      </div>
+                    </div>
+                    {healthSummary.recommendations && healthSummary.recommendations.length > 0 && (
+                      <div className="pt-4 border-t">
+                        <p className="text-sm font-medium mb-2">Recommendations</p>
+                        <ul className="space-y-1">
+                          {healthSummary.recommendations.map((rec: string, idx: number) => (
+                            <li key={idx} className="text-sm text-muted-foreground flex items-start gap-2">
+                              <Icon name="ArrowRight" size={14} className="mt-0.5 flex-shrink-0" />
+                              {rec}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No data available</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card id="parcego-shopify-system-status">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Icon name="Server" size={20} />
+                  System Status
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {healthSummaryLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-full" />
+                  </div>
+                ) : healthSummary?.system_status ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">Polling Active</span>
+                      <Badge
+                        className={
+                          healthSummary.system_status.polling_active
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                            : "bg-red-50 text-red-800 border-red-200"
+                        }
+                      >
+                        {healthSummary.system_status.polling_active ? "Yes" : "No"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">WebSocket Connected</span>
+                      <Badge
+                        className={
+                          healthSummary.system_status.websocket_connected
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                            : "bg-red-50 text-red-800 border-red-200"
+                        }
+                      >
+                        {healthSummary.system_status.websocket_connected ? "Yes" : "No"}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm">API Rate Limits OK</span>
+                      <Badge
+                        className={
+                          healthSummary.system_status.api_rate_limits_ok
+                            ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                            : "bg-red-50 text-red-800 border-red-200"
+                        }
+                      >
+                        {healthSummary.system_status.api_rate_limits_ok ? "Yes" : "No"}
+                      </Badge>
+                    </div>
+                    <div className="pt-3 border-t">
+                      <p className="text-xs text-muted-foreground mb-1">Last 24h Errors</p>
+                      <p className="text-lg font-bold">{healthSummary.last_24h_errors || 0}</p>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No data available</p>
+                )}
+              </CardContent>
+            </Card>
+              </div>
+            )}
+
+            {/* Critical Alerts Section */}
+            {(criticalAlerts || criticalAlertsLoading) && (
+              <Card id="parcego-shopify-critical-alerts">
+                <CardHeader>
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <Icon name="AlertTriangle" size={20} />
+                  Critical Alerts
+                </CardTitle>
+                {criticalAlerts?.requires_immediate_action && (
+                  <Badge variant="destructive" className="animate-pulse">
+                    Action Required
+                  </Badge>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent>
+              {criticalAlertsLoading ? (
+                <div className="space-y-3">
+                  {[1, 2].map((i) => (
+                    <Skeleton key={i} className="h-20 w-full" />
+                  ))}
+                </div>
+              ) : criticalAlerts?.alerts && criticalAlerts.alerts.length > 0 ? (
+                <div className="space-y-3">
+                  {criticalAlerts.alerts.map((alert: any) => (
+                    <Alert
+                      key={alert.id}
+                      id={`parcego-shopify-alert-${alert.id}`}
+                      className={
+                        alert.severity === "critical"
+                          ? "border-red-500 bg-red-50"
+                          : alert.severity === "high"
+                          ? "border-orange-500 bg-orange-50"
+                          : "border-yellow-500 bg-yellow-50"
+                      }
+                    >
+                      <Icon
+                        name="AlertCircle"
+                        size={16}
+                        className={
+                          alert.severity === "critical"
+                            ? "text-red-600"
+                            : alert.severity === "high"
+                            ? "text-orange-600"
+                            : "text-yellow-600"
+                        }
+                      />
+                      <AlertTitle className="flex items-center justify-between">
+                        <span>{alert.title}</span>
+                        <Badge
+                          variant={
+                            alert.severity === "critical"
+                              ? "destructive"
+                              : alert.severity === "high"
+                              ? "default"
+                              : "secondary"
+                          }
+                        >
+                          {alert.severity.toUpperCase()}
+                        </Badge>
+                      </AlertTitle>
+                      <AlertDescription className="mt-2">
+                        <p className="text-sm">{alert.description}</p>
+                        {alert.store_domain && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Store: {alert.store_domain}
+                          </p>
+                        )}
+                        {alert.action_required && alert.action_url && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="mt-3"
+                            onClick={() => window.open(alert.action_url, "_blank")}
+                          >
+                            Take Action
+                          </Button>
+                        )}
+                      </AlertDescription>
+                    </Alert>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-6 text-muted-foreground">
+                  <Icon name="CheckCircle" size={32} className="mx-auto mb-2 text-emerald-500" />
+                  <p className="text-sm">No critical alerts</p>
                 </div>
               )}
             </CardContent>
           </Card>
         )}
 
-        {/* Accounts List */}
-        <Card id="parcego-shopify-accounts-list">
-          <CardHeader>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <CardTitle>Connected Shopify Stores</CardTitle>
-              <div className="flex gap-2">
-                <Select value={shopifyFilterStatus} onValueChange={setShopifyFilterStatus}>
-                  <SelectTrigger className="w-[140px]" id="parcego-shopify-filter-status">
-                    <SelectValue placeholder="Filter by status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="error">Error</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {shopifyAccountsLoading ? (
-              <div className="space-y-3">
-                {[1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-20 w-full" />
-                ))}
-              </div>
-            ) : filteredAccounts.length === 0 ? (
-              <div className="text-center py-12" id="parcego-shopify-empty-state">
-                <Icon name="Store" size={48} className="mx-auto text-gray-300 mb-4" />
-                <p className="text-lg font-medium text-gray-900 mb-2">No Shopify stores found</p>
-                <p className="text-sm text-gray-500">
-                  {shopifyFilterStatus !== "all"
-                    ? `No stores with status "${shopifyFilterStatus}"`
-                    : "No stores are currently connected"}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {filteredAccounts.map((account) => (
-                  <Card
-                    key={account.id}
-                    className="border-gray-200 hover:border-gray-300 transition-colors"
-                    id={`parcego-shopify-account-${account.id}`}
+            {/* Store Health Metrics */}
+            {(storeHealth || storeHealthLoading) && (
+              <Card id="parcego-shopify-store-health">
+                <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Icon name="Heart" size={20} />
+                Store Health Metrics
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {storeHealthLoading ? (
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : storeHealth?.stores && storeHealth.stores.length > 0 ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-4 pb-4 border-b">
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground">Healthy</p>
+                      <p className="text-2xl font-bold text-emerald-600">
+                        {storeHealth.overall_health?.healthy_stores || 0}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground">Warning</p>
+                      <p className="text-2xl font-bold text-yellow-600">
+                        {storeHealth.overall_health?.warning_stores || 0}
+                      </p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground">Error</p>
+                      <p className="text-2xl font-bold text-red-600">
+                        {storeHealth.overall_health?.error_stores || 0}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    {storeHealth.stores.map((store: any, idx: number) => (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between p-3 border rounded-lg"
+                        id={`parcego-shopify-store-health-${idx}`}
+                      >
+                        <div className="flex-1">
+                          <p className="font-medium">{store.store_domain}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Last sync: {store.last_sync ? formatDateUTC(new Date(store.last_sync), "MMM dd, yyyy HH:mm") : "Never"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="text-right">
+                            <p className="text-xs text-muted-foreground">Health Score</p>
+                            <p className="text-lg font-bold">{store.health_score}/100</p>
+                          </div>
+                          <Badge
+                            className={
+                              store.status === "healthy"
+                                ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+                                : store.status === "warning"
+                                ? "bg-yellow-50 text-yellow-800 border-yellow-200"
+                                : "bg-red-50 text-red-800 border-red-200"
+                            }
+                          >
+                            {store.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-6">No store health data available</p>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+            {/* Error Metrics & Trends */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {/* Error Metrics */}
+              {(errorMetrics || errorMetricsLoading) && (
+                <Card id="parcego-shopify-error-metrics">
+                  <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Icon name="AlertCircle" size={20} />
+                    Error Metrics
+                  </CardTitle>
+                  <Select
+                    value={errorMetricsHoursBack.toString()}
+                    onValueChange={(val) => {
+                      setErrorMetricsHoursBack(parseInt(val));
+                    }}
                   >
-                    <CardContent className="p-4">
-                      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start gap-3">
-                            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                              <Icon name="Store" size={24} className="text-blue-600" />
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="24">Last 24h</SelectItem>
+                      <SelectItem value="48">Last 48h</SelectItem>
+                      <SelectItem value="72">Last 72h</SelectItem>
+                      <SelectItem value="168">Last 7 days</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {errorMetricsLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                  </div>
+                ) : errorMetrics ? (
+                  <div className="space-y-4">
+                    <div>
+                      <p className="text-sm text-muted-foreground mb-1">Total Errors</p>
+                      <p className="text-3xl font-bold">{errorMetrics.total_errors || 0}</p>
+                    </div>
+                    {errorMetrics.errors_by_type && Object.keys(errorMetrics.errors_by_type).length > 0 && (
+                      <div className="pt-4 border-t">
+                        <p className="text-sm font-medium mb-3">Errors by Type</p>
+                        <div className="space-y-2">
+                          {Object.entries(errorMetrics.errors_by_type).map(([type, count]: [string, any]) => (
+                            <div key={type} className="flex items-center justify-between">
+                              <span className="text-sm">{type}</span>
+                              <Badge variant="secondary">{count}</Badge>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-semibold text-base truncate">{account.shop_name || account.shop_domain}</h3>
-                              <p className="text-sm text-muted-foreground truncate">{account.shop_domain}</p>
-                              <div className="flex items-center gap-2 mt-2">
-                                <Badge
-                                  className={
-                                    account.status === "active"
-                                      ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-                                      : account.status === "error"
-                                      ? "bg-red-50 text-red-800 border-red-200"
-                                      : "bg-gray-50 text-gray-800 border-gray-200"
-                                  }
-                                >
-                                  {account.status}
-                                </Badge>
-                                {account.last_sync_at && (
-                                  <span className="text-xs text-muted-foreground">
-                                    Last sync: {formatDateUTC(new Date(account.last_sync_at), "MMM dd, yyyy HH:mm")}
-                                  </span>
-                                )}
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {errorMetrics.errors_by_store && errorMetrics.errors_by_store.length > 0 && (
+                      <div className="pt-4 border-t">
+                        <p className="text-sm font-medium mb-3">Top Stores with Errors</p>
+                        <div className="space-y-2">
+                          {errorMetrics.errors_by_store.slice(0, 5).map((store: any, idx: number) => (
+                            <div key={idx} className="flex items-center justify-between">
+                              <span className="text-sm truncate">{store.store_domain}</span>
+                              <Badge variant="destructive">{store.error_count}</Badge>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-6">No error metrics available</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+              {/* Error Trends */}
+              {(errorTrends || errorTrendsLoading) && (
+                <Card id="parcego-shopify-error-trends">
+                  <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Icon name="TrendingUp" size={20} />
+                    Error Trends
+                  </CardTitle>
+                  <Select
+                    value={errorTrendsDaysBack.toString()}
+                    onValueChange={(val) => {
+                      setErrorTrendsDaysBack(parseInt(val));
+                    }}
+                  >
+                    <SelectTrigger className="w-[120px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="7">Last 7 days</SelectItem>
+                      <SelectItem value="14">Last 14 days</SelectItem>
+                      <SelectItem value="30">Last 30 days</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {errorTrendsLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-3/4" />
+                  </div>
+                ) : errorTrends?.summary ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Total Errors</p>
+                        <p className="text-2xl font-bold">{errorTrends.summary.total_errors || 0}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground mb-1">Avg per Day</p>
+                        <p className="text-2xl font-bold">
+                          {errorTrends.summary.average_per_day?.toFixed(1) || "0"}
+                        </p>
+                      </div>
+                    </div>
+                    {errorTrends.summary?.peak_day && (
+                      <div className="pt-4 border-t">
+                        <p className="text-sm text-muted-foreground mb-1">Peak Day</p>
+                        <p className="text-sm font-medium">
+                          {formatDateUTC(new Date(errorTrends.summary.peak_day), "MMM dd, yyyy")}
+                        </p>
+                        <p className="text-lg font-bold text-red-600">
+                          {errorTrends.summary.peak_day_errors || 0} errors
+                        </p>
+                      </div>
+                    )}
+                    {errorTrends?.trends && errorTrends.trends.length > 0 && (
+                      <div className="pt-4 border-t">
+                        <p className="text-sm font-medium mb-3">Daily Breakdown</p>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {errorTrends.trends.map((trend: any, idx: number) => (
+                            <div key={idx} className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">
+                                {formatDateUTC(new Date(trend.date), "MMM dd")}
+                              </span>
+                              <div className="flex items-center gap-2">
+                                <div className="w-24 bg-gray-200 rounded-full h-2">
+                                  <div
+                                    className="bg-red-500 h-2 rounded-full"
+                                    style={{
+                                      width: `${Math.min((trend.error_count / (errorTrends.summary?.peak_day_errors || 1)) * 100, 100)}%`,
+                                    }}
+                                  />
+                                </div>
+                                <span className="font-medium w-8 text-right">{trend.error_count}</span>
                               </div>
                             </div>
-                          </div>
+                          ))}
                         </div>
-                        {account.error_message && (
-                          <Alert className="md:max-w-md">
-                            <AlertDescription className="text-sm text-red-800">
-                              <Icon name="AlertCircle" size={16} className="inline mr-1" />
-                              {account.error_message}
-                            </AlertDescription>
-                          </Alert>
-                        )}
                       </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground text-center py-6">No trend data available</p>
+                )}
+              </CardContent>
+                </Card>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
       </div>
     );
   };
