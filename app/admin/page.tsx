@@ -3,7 +3,8 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -70,7 +71,8 @@ import CourierCreationModal from "@/components/admin/CourierCreationModal";
 import { adminService } from "@/lib/api/admin";
 import { shopifyService } from "@/lib/api/shopify";
 import { shippingService } from "@/lib/api/shipping";
-import type { User, UserStatisticsResponse } from "@/lib/api/types";
+import { claimsService } from "@/lib/api/claims";
+import type { User, UserStatisticsResponse, Claim } from "@/lib/api/types";
 
 // Extended User type with Shopify integration
 interface ShopifyIntegration {
@@ -231,6 +233,20 @@ export default function SuperAdminDashboard() {
   const [isRetryingFailed, setIsRetryingFailed] = useState(false);
   const [shopifyFilterStatus, setShopifyFilterStatus] = useState<string>("all");
 
+  // Claims management state
+  const [claims, setClaims] = useState<Claim[]>([]);
+  const [claimsLoading, setClaimsLoading] = useState(false);
+  const [claimsPage, setClaimsPage] = useState(1);
+  const [claimsTotalPages, setClaimsTotalPages] = useState(1);
+  const [claimsTotal, setClaimsTotal] = useState(0);
+  const [claimsStatusFilter, setClaimsStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected' | 'resolved'>('all');
+  const [claimsReasonFilter, setClaimsReasonFilter] = useState<string>('all');
+  const [claimsUserIdFilter, setClaimsUserIdFilter] = useState<number | null>(null);
+  const [selectedClaim, setSelectedClaim] = useState<Claim | null>(null);
+  const [isClaimDetailModalOpen, setIsClaimDetailModalOpen] = useState(false);
+  const [isUpdatingClaimStatus, setIsUpdatingClaimStatus] = useState(false);
+  const [claimStatusUpdateNotes, setClaimStatusUpdateNotes] = useState('');
+
 
   const router = useRouter();
 
@@ -268,6 +284,26 @@ export default function SuperAdminDashboard() {
 
   // Merchant search functionality
   const [filteredMerchants, setFilteredMerchants] = useState<MerchantWithShopify[]>([]);
+
+  // Helper function to logout admin and redirect to login
+  // Must be defined before useEffect hooks that use it
+  const logoutAdmin = useCallback(() => {
+    if (typeof window !== 'undefined') {
+      // Clear all admin authentication data
+      localStorage.removeItem("admin_authenticated");
+      localStorage.removeItem("admin_email");
+      localStorage.removeItem("admin_login_time");
+      localStorage.removeItem("auth_token");
+      localStorage.removeItem("admin_user");
+      localStorage.removeItem("admin_remember_me");
+      
+      // Clear admin cookie
+      document.cookie = "admin_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+      
+      // Redirect to login
+      router.push("/admin-login");
+    }
+  }, [router]);
 
   // Load merchants from API
   useEffect(() => {
@@ -922,25 +958,6 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  // Helper function to logout admin and redirect to login
-  const logoutAdmin = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      // Clear all admin authentication data
-      localStorage.removeItem("admin_authenticated");
-      localStorage.removeItem("admin_email");
-      localStorage.removeItem("admin_login_time");
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("admin_user");
-      localStorage.removeItem("admin_remember_me");
-      
-      // Clear admin cookie
-      document.cookie = "admin_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-      
-      // Redirect to login
-      router.push("/admin-login");
-    }
-  }, [router]);
-
   // Authentication check with token expiration
   useEffect(() => {
     const checkAdminAuth = () => {
@@ -1065,6 +1082,49 @@ export default function SuperAdminDashboard() {
     loadCouriers();
   }, [isAuthenticated, logoutAdmin]);
 
+  // Load claims from API
+  useEffect(() => {
+    const loadClaims = async () => {
+      if (!isAuthenticated || activeSection !== 'claims') return;
+
+      try {
+        setClaimsLoading(true);
+        const response = await claimsService.getAllClaimsAdmin({
+          page: claimsPage,
+          per_page: 20,
+          status: claimsStatusFilter === 'all' ? null : claimsStatusFilter,
+          reason: claimsReasonFilter === 'all' ? null : claimsReasonFilter as any,
+          user_id: claimsUserIdFilter
+        });
+
+        setClaims(response.claims);
+        setClaimsTotalPages(response.total_pages);
+        setClaimsTotal(response.total);
+      } catch (error: any) {
+        console.error('Failed to load claims:', error);
+        
+        const isAuthError = error?.status === 401 || error?.status === 403 || 
+                           error?.response?.status === 401 || error?.response?.status === 403 ||
+                           error?.message?.includes('Authentication') || 
+                           error?.message?.includes('Unauthorized') ||
+                           error?.message?.includes('Forbidden');
+        
+        if (isAuthError) {
+          showErrorToast("Session expired. Please log in again.");
+          logoutAdmin();
+          return;
+        }
+        
+        showErrorToast("Unable to fetch claims. Please try refreshing the page.");
+        setClaims([]);
+      } finally {
+        setClaimsLoading(false);
+      }
+    };
+
+    loadClaims();
+  }, [isAuthenticated, activeSection, claimsPage, claimsStatusFilter, claimsReasonFilter, claimsUserIdFilter, logoutAdmin]);
+
   // Calculate delivery counts from assignments and statistics
   useEffect(() => {
     if (!assignments.length || !couriers.length) return;
@@ -1103,9 +1163,9 @@ export default function SuperAdminDashboard() {
     
     // assignmentStats.driver_statistics is Record<string, DriverStatistics>
     // where key is driver_id (as string) and value has 'completed' field
-    Object.entries(assignmentStats.driver_statistics).forEach(([driverIdStr, stats]) => {
+    Object.entries(assignmentStats.driver_statistics).forEach(([driverIdStr, stats]: [string, any]) => {
       const driverId = parseInt(driverIdStr);
-      if (!isNaN(driverId) && stats.completed) {
+      if (!isNaN(driverId) && stats?.completed) {
         // Accumulate across dates
         counts[driverId] = (counts[driverId] || 0) + stats.completed;
       }
@@ -1554,6 +1614,7 @@ export default function SuperAdminDashboard() {
       items: [
         { id: "assignments", label: "Assignments", icon: "ClipboardList", description: "Manage driver assignments" },
         { id: "warehouse", label: "Warehouse", icon: "Warehouse", description: "Warehouse operations" },
+        { id: "claims", label: "Claims", icon: "Shield", description: "Manage shipment claims" },
       ]
     },
     {
@@ -2370,8 +2431,8 @@ export default function SuperAdminDashboard() {
               <PopoverContent className="w-auto p-0" align="end">
                 <Calendar
                   mode="single"
-                  selected={selectedAssignmentDate}
-                  onSelect={(date) => date && setSelectedAssignmentDate(date)}
+                  selected={selectedAssignmentDate ?? undefined}
+                  onSelect={(date) => setSelectedAssignmentDate(date ?? null)}
                 />
               </PopoverContent>
             </Popover>
@@ -3416,6 +3477,415 @@ export default function SuperAdminDashboard() {
             )}
           </CardContent>
         </Card>
+      </div>
+    );
+  };
+
+  // Handle claim status update
+  const handleUpdateClaimStatus = async (claimId: number, status: 'pending' | 'approved' | 'rejected' | 'resolved') => {
+    try {
+      setIsUpdatingClaimStatus(true);
+      await claimsService.updateClaimStatus(claimId, {
+        status,
+        admin_notes: claimStatusUpdateNotes || undefined
+      });
+      
+      showSuccessToast(`Claim status updated to ${status}`);
+      setIsClaimDetailModalOpen(false);
+      setClaimStatusUpdateNotes('');
+      setSelectedClaim(null);
+      
+      // Reload claims
+      const response = await claimsService.getAllClaimsAdmin({
+        page: claimsPage,
+        per_page: 20,
+        status: claimsStatusFilter === 'all' ? null : claimsStatusFilter,
+        reason: claimsReasonFilter === 'all' ? null : claimsReasonFilter as any,
+        user_id: claimsUserIdFilter
+      });
+      setClaims(response.claims);
+      setClaimsTotalPages(response.total_pages);
+      setClaimsTotal(response.total);
+    } catch (error: any) {
+      console.error('Failed to update claim status:', error);
+      showErrorToast(error?.message || 'Failed to update claim status');
+    } finally {
+      setIsUpdatingClaimStatus(false);
+    }
+  };
+
+  const renderClaims = () => {
+    const claimStatusConfig: Record<string, { label: string; color: string; icon: string }> = {
+      approved: { label: "Approved", color: "bg-green-50 text-green-700 border-green-200", icon: "CheckCircle" },
+      pending: { label: "Pending Review", color: "bg-yellow-50 text-yellow-700 border-yellow-200", icon: "Clock" },
+      rejected: { label: "Rejected", color: "bg-red-50 text-red-700 border-red-200", icon: "XCircle" },
+      resolved: { label: "Resolved", color: "bg-blue-50 text-blue-700 border-blue-200", icon: "AlertTriangle" }
+    };
+
+    const claimReasonConfig: Record<string, string> = {
+      damaged: "Damaged",
+      lost: "Lost",
+      delayed: "Delayed",
+      wrong_address: "Wrong Address",
+      missing_items: "Missing Items",
+      other: "Other"
+    };
+
+    return (
+      <div className="space-y-4 xl:space-y-6" id="parcego-admin-claims-section">
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Claims Management</h2>
+            <p className="text-gray-600 mt-1">Review and manage all shipment claims</p>
+          </div>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Claims</CardTitle>
+              <Icon name="FileText" size={16} className="text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{claimsTotal}</div>
+              <p className="text-xs text-muted-foreground">All submitted claims</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Pending</CardTitle>
+              <Icon name="Clock" size={16} className="text-yellow-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-yellow-600">
+                {claims.filter(c => c.status === 'pending').length}
+              </div>
+              <p className="text-xs text-muted-foreground">Awaiting review</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Approved</CardTitle>
+              <Icon name="CheckCircle" size={16} className="text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {claims.filter(c => c.status === 'approved').length}
+              </div>
+              <p className="text-xs text-muted-foreground">Claims approved</p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Rejected</CardTitle>
+              <Icon name="XCircle" size={16} className="text-red-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-red-600">
+                {claims.filter(c => c.status === 'rejected').length}
+              </div>
+              <p className="text-xs text-muted-foreground">Claims rejected</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Filters */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Icon name="Filter" size={20} />
+              Filters
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="claims-status-filter">Status</Label>
+                <Select value={claimsStatusFilter} onValueChange={(value: any) => {
+                  setClaimsStatusFilter(value);
+                  setClaimsPage(1);
+                }}>
+                  <SelectTrigger id="claims-status-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Statuses</SelectItem>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value="approved">Approved</SelectItem>
+                    <SelectItem value="rejected">Rejected</SelectItem>
+                    <SelectItem value="resolved">Resolved</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="claims-reason-filter">Reason</Label>
+                <Select value={claimsReasonFilter} onValueChange={(value) => {
+                  setClaimsReasonFilter(value);
+                  setClaimsPage(1);
+                }}>
+                  <SelectTrigger id="claims-reason-filter">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Reasons</SelectItem>
+                    <SelectItem value="damaged">Damaged</SelectItem>
+                    <SelectItem value="lost">Lost</SelectItem>
+                    <SelectItem value="delayed">Delayed</SelectItem>
+                    <SelectItem value="wrong_address">Wrong Address</SelectItem>
+                    <SelectItem value="missing_items">Missing Items</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="claims-user-filter">User ID</Label>
+                <Input
+                  id="claims-user-filter"
+                  type="number"
+                  placeholder="Filter by User ID"
+                  value={claimsUserIdFilter || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setClaimsUserIdFilter(value ? parseInt(value) : null);
+                    setClaimsPage(1);
+                  }}
+                />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Claims Table */}
+        <Card>
+          <CardHeader>
+            <CardTitle>All Claims</CardTitle>
+            <CardDescription>
+              Showing {claims.length} of {claimsTotal} claims
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {claimsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="flex items-center gap-2">
+                  <Icon name="Loader2" size={20} className="animate-spin" />
+                  <span>Loading claims...</span>
+                </div>
+              </div>
+            ) : claims.length === 0 ? (
+              <div className="text-center py-12">
+                <Icon name="FileText" size={48} className="mx-auto text-gray-400 mb-4" />
+                <p className="text-gray-600">No claims found</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>ID</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead>Shipment</TableHead>
+                      <TableHead>Reason</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {claims.map((claim) => {
+                      const statusInfo = claimStatusConfig[claim.status] || claimStatusConfig.pending;
+                      return (
+                        <TableRow key={claim.id} id={`parcego-claim-row-${claim.id}`}>
+                          <TableCell className="font-medium">#{claim.id}</TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{claim.user_email || `User ${claim.user_id}`}</div>
+                              <div className="text-sm text-muted-foreground">ID: {claim.user_id}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div>
+                              <div className="font-medium">{claim.shipment_tracking_code || 'N/A'}</div>
+                              <div className="text-sm text-muted-foreground">Shipment #{claim.shipment_id}</div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline">
+                              {claimReasonConfig[claim.reason] || claim.reason}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <Badge className={`${statusInfo.color} border`}>
+                              {statusInfo.label}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {new Date(claim.created_at).toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedClaim(claim);
+                                setIsClaimDetailModalOpen(true);
+                              }}
+                              id={`parcego-claim-view-${claim.id}`}
+                            >
+                              <Icon name="Eye" size={16} className="mr-2" />
+                              View
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {claimsTotalPages > 1 && (
+              <div className="flex items-center justify-between mt-4">
+                <div className="text-sm text-muted-foreground">
+                  Page {claimsPage} of {claimsTotalPages}
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setClaimsPage(p => Math.max(1, p - 1))}
+                    disabled={claimsPage === 1 || claimsLoading}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setClaimsPage(p => Math.min(claimsTotalPages, p + 1))}
+                    disabled={claimsPage === claimsTotalPages || claimsLoading}
+                  >
+                    Next
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Claim Detail Modal */}
+        <Dialog open={isClaimDetailModalOpen} onOpenChange={setIsClaimDetailModalOpen}>
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Claim Details #{selectedClaim?.id}</DialogTitle>
+              <DialogDescription>
+                Review claim information and update status
+              </DialogDescription>
+            </DialogHeader>
+            
+            {selectedClaim && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>User</Label>
+                    <p className="text-sm">{selectedClaim.user_email || `User ${selectedClaim.user_id}`}</p>
+                  </div>
+                  <div>
+                    <Label>Shipment</Label>
+                    <p className="text-sm">{selectedClaim.shipment_tracking_code || `Shipment #${selectedClaim.shipment_id}`}</p>
+                  </div>
+                  <div>
+                    <Label>Reason</Label>
+                    <Badge variant="outline">
+                      {claimReasonConfig[selectedClaim.reason] || selectedClaim.reason}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label>Status</Label>
+                    <Badge className={`${claimStatusConfig[selectedClaim.status]?.color || claimStatusConfig.pending.color} border`}>
+                      {claimStatusConfig[selectedClaim.status]?.label || selectedClaim.status}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label>Created</Label>
+                    <p className="text-sm">{new Date(selectedClaim.created_at).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label>Updated</Label>
+                    <p className="text-sm">{new Date(selectedClaim.updated_at).toLocaleString()}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <Label>Description</Label>
+                  <p className="text-sm bg-gray-50 p-3 rounded-md">{selectedClaim.description}</p>
+                </div>
+
+                {selectedClaim.photos && selectedClaim.photos.length > 0 && (
+                  <div>
+                    <Label>Photos</Label>
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      {selectedClaim.photos.map((photo: any, idx: number) => (
+                        <img
+                          key={idx}
+                          src={photo.url || photo}
+                          alt={`Claim photo ${idx + 1}`}
+                          className="w-full h-32 object-cover rounded-md"
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedClaim.status === 'pending' && (
+                  <div className="space-y-4 pt-4 border-t">
+                    <div>
+                      <Label htmlFor="admin-notes">Admin Notes (Optional)</Label>
+                      <Textarea
+                        id="admin-notes"
+                        placeholder="Add notes about this claim decision..."
+                        value={claimStatusUpdateNotes}
+                        onChange={(e) => setClaimStatusUpdateNotes(e.target.value)}
+                        rows={3}
+                      />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => handleUpdateClaimStatus(selectedClaim.id, 'approved')}
+                        disabled={isUpdatingClaimStatus}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        <Icon name="CheckCircle" size={16} className="mr-2" />
+                        Approve
+                      </Button>
+                      <Button
+                        onClick={() => handleUpdateClaimStatus(selectedClaim.id, 'rejected')}
+                        disabled={isUpdatingClaimStatus}
+                        variant="destructive"
+                      >
+                        <Icon name="XCircle" size={16} className="mr-2" />
+                        Reject
+                      </Button>
+                      <Button
+                        onClick={() => handleUpdateClaimStatus(selectedClaim.id, 'resolved')}
+                        disabled={isUpdatingClaimStatus}
+                        variant="outline"
+                      >
+                        <Icon name="AlertTriangle" size={16} className="mr-2" />
+                        Mark Resolved
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     );
   };
@@ -5785,6 +6255,7 @@ export default function SuperAdminDashboard() {
             {activeSection === "couriers" && renderCouriers()}
             {activeSection === "assignments" && renderAssignments()}
             {activeSection === "warehouse" && renderWarehouse()}
+            {activeSection === "claims" && renderClaims()}
             {activeSection === "shopify" && renderShopify()}
             {activeSection === "settings" && renderSettings()}
           </main>

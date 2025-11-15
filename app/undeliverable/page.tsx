@@ -505,8 +505,19 @@ function PackageList({
                 
                 <div className="flex items-center space-x-3 text-sm text-gray-500">
                   <span>Issue: {pkg.issueType}</span>
-                  <span>Created: {new Date(pkg.createdAt).toLocaleDateString()}</span>
-                  <span>Last Updated: {new Date(pkg.updatedAt).toLocaleDateString()}</span>
+                  <span>Created: {(() => {
+                    const date = new Date(pkg.createdAt);
+                    return isNaN(date.getTime()) || date.getTime() === 0 ? 'N/A' : date.toLocaleDateString();
+                  })()}</span>
+                  <span>Last Updated: {(() => {
+                    const date = new Date(pkg.updatedAt);
+                    if (isNaN(date.getTime()) || date.getTime() === 0) {
+                      // Fallback to reportedAt or createdAt
+                      const fallbackDate = new Date(pkg.reportedAt || pkg.createdAt);
+                      return isNaN(fallbackDate.getTime()) || fallbackDate.getTime() === 0 ? 'N/A' : fallbackDate.toLocaleDateString();
+                    }
+                    return date.toLocaleDateString();
+                  })()}</span>
                 </div>
 
                 {pkg.notes && (

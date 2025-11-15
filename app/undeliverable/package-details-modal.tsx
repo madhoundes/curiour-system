@@ -185,6 +185,45 @@ export function PackageDetailsModal({
     pkg.notes ? [pkg.notes] : []
   );
 
+  // Helper function to safely format dates
+  const formatDate = (dateString: string | undefined | null): string => {
+    if (!dateString) return 'N/A';
+    
+    const date = new Date(dateString);
+    // Check if date is valid (not NaN and not epoch date)
+    if (isNaN(date.getTime()) || date.getTime() === 0) {
+      return 'N/A';
+    }
+    
+    // Check if date is the Unix epoch (Jan 1, 1970) which indicates invalid date
+    const epochDate = new Date(0);
+    if (date.getTime() === epochDate.getTime()) {
+      return 'N/A';
+    }
+    
+    return date.toLocaleString();
+  };
+
+  // Get valid updated date, fallback to reportedAt or createdAt
+  const getUpdatedDate = (): string => {
+    if (pkg.updatedAt) {
+      const updatedDate = new Date(pkg.updatedAt);
+      if (!isNaN(updatedDate.getTime()) && updatedDate.getTime() !== 0) {
+        // Check if it's not the epoch date
+        const epochDate = new Date(0);
+        if (updatedDate.getTime() !== epochDate.getTime()) {
+          return formatDate(pkg.updatedAt);
+        }
+      }
+    }
+    // Fallback to reportedAt if updatedAt is invalid
+    if (pkg.reportedAt) {
+      return formatDate(pkg.reportedAt);
+    }
+    // Final fallback to createdAt
+    return formatDate(pkg.createdAt);
+  };
+
   const handleStatusUpdate = async (newStatus: Status) => {
     setIsUpdating(true);
     try {
@@ -407,21 +446,21 @@ export function PackageDetailsModal({
                   <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
                   <div>
                     <p className="text-sm font-medium text-gray-900">Package Created</p>
-                    <p className="text-xs text-gray-500">{new Date(pkg.createdAt).toLocaleString()}</p>
+                    <p className="text-xs text-gray-500">{formatDate(pkg.createdAt)}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
                   <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
                   <div>
                     <p className="text-sm font-medium text-gray-900">Issue Reported</p>
-                    <p className="text-xs text-gray-500">{new Date(pkg.reportedAt).toLocaleString()}</p>
+                    <p className="text-xs text-gray-500">{formatDate(pkg.reportedAt)}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-3">
                   <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
                   <div>
                     <p className="text-sm font-medium text-gray-900">Last Updated</p>
-                    <p className="text-xs text-gray-500">{new Date(pkg.updatedAt).toLocaleString()}</p>
+                    <p className="text-xs text-gray-500">{getUpdatedDate()}</p>
                   </div>
                 </div>
               </div>
