@@ -370,10 +370,11 @@ const Login03PageContent = () => {
           
           toast.error("Please check your input and try again.");
         } 
-        // Handle "Email already registered" error (400)
-        else if (error.status === 400 && error.message?.includes("Email already registered")) {
-          signupForm.setError('email', { message: "This email is already registered. Please use a different email or try logging in." });
-          toast.error("Email already registered. Please use a different email.");
+        // Handle "Email already exists" error (400)
+        else if (error.status === 400) {
+          // When API returns 400, it means email already exists
+          signupForm.setError('email', { message: "There is already an account with this email" });
+          toast.error("There is already an account with this email");
         }
         else {
           // Handle other API errors

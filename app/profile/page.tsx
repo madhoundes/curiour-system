@@ -385,6 +385,7 @@ export default function ProfileAccountPage() {
   const [settingsMsg, setSettingsMsg] = useState<string | null>(null);
   const [notificationsMsg, setNotificationsMsg] = useState<string | null>(null);
   const [integrationsMsg, setIntegrationsMsg] = useState<string | null>(null);
+  const [integrationsMsgType, setIntegrationsMsgType] = useState<'success' | 'error' | null>(null);
   
   // Store original form values for cancel functionality
   const [originalBusinessData, setOriginalBusinessData] = useState<BusinessInfo | null>(null);
@@ -467,6 +468,7 @@ export default function ProfileAccountPage() {
     
     if (!shopDomain || shopDomain.trim() === "") {
       setIntegrationsMsg("Please enter a shop domain (e.g., mystore.myshopify.com)");
+      setIntegrationsMsgType('error');
       return;
     }
 
@@ -497,15 +499,30 @@ export default function ProfileAccountPage() {
           window.location.href = authUrl;
         } else {
           setIntegrationsMsg("Failed to get authorization URL. Please try again.");
+          setIntegrationsMsgType('error');
         }
       } else {
         setIntegrationsMsg("Failed to get authorization URL. Please try again.");
+        setIntegrationsMsgType('error');
       }
     } catch (error: any) {
       console.error("Shopify OAuth initiation failed:", error);
+      
+      // Handle 409 Conflict - Store already connected (not an error state)
+      if (error.response?.status === 409 || error.status === 409) {
+        // Store is already connected, just reload the accounts list
+        setIntegrationsMsg(null);
+        setIntegrationsMsgType(null);
+        await loadShopifyAccounts();
+        setIsConnectingShopify(false);
+        return;
+      }
+      
+      // For other errors, show error message
       setIntegrationsMsg(
         error.message || "Failed to connect to Shopify. Please check your shop domain and try again."
       );
+      setIntegrationsMsgType('error');
       setIsConnectingShopify(false);
     }
   };
@@ -521,17 +538,20 @@ export default function ProfileAccountPage() {
 
       if (response.data?.success) {
         setIntegrationsMsg("Shopify store disconnected successfully");
+        setIntegrationsMsgType('success');
         toast.success("Shopify store disconnected successfully");
         // Reload accounts list
         await loadShopifyAccounts();
       } else {
         const errorMsg = "Failed to disconnect Shopify store";
         setIntegrationsMsg(errorMsg);
+        setIntegrationsMsgType('error');
         toast.error(errorMsg);
       }
     } catch (error: any) {
       console.error("Shopify disconnect failed:", error);
       setIntegrationsMsg(error.message || "Failed to disconnect Shopify store");
+      setIntegrationsMsgType('error');
     } finally {
       setIsDisconnectingShopify(null);
     }
@@ -545,6 +565,7 @@ export default function ProfileAccountPage() {
       if (response.data?.success) {
         const successMsg = response.data.message || "Shopify store synced successfully";
         setIntegrationsMsg(successMsg);
+        setIntegrationsMsgType('success');
         toast.success(successMsg);
         // Reload accounts list
         await loadShopifyAccounts();
@@ -552,6 +573,7 @@ export default function ProfileAccountPage() {
         // Use the message from the API response if available
         const errorMsg = response.data?.message || "Failed to sync Shopify store";
         setIntegrationsMsg(errorMsg);
+        setIntegrationsMsgType('error');
         toast.error(errorMsg);
       }
     } catch (error: any) {
@@ -562,6 +584,7 @@ export default function ProfileAccountPage() {
         || error.message 
         || "Failed to sync Shopify store. Please check your connection and try again.";
       setIntegrationsMsg(errorMsg);
+      setIntegrationsMsgType('error');
       toast.error(errorMsg);
     } finally {
       setIsLoadingShopify(false);
@@ -1254,9 +1277,23 @@ export default function ProfileAccountPage() {
                   )}
 
                   {integrationsMsg && (
-                    <Alert className="mb-3" role="status" aria-live="polite">
-                      <AlertTitle>Integration</AlertTitle>
-                      <AlertDescription>{integrationsMsg}</AlertDescription>
+                    <Alert 
+                      className={`mb-3 ${
+                        integrationsMsgType === 'success' 
+                          ? 'border-green-200 bg-green-50' 
+                          : integrationsMsgType === 'error'
+                          ? 'border-red-200 bg-red-50'
+                          : ''
+                      }`}
+                      role="status" 
+                      aria-live="polite"
+                    >
+                      <AlertTitle className={integrationsMsgType === 'success' ? 'text-green-800' : integrationsMsgType === 'error' ? 'text-red-800' : ''}>
+                        {integrationsMsgType === 'success' ? 'Success' : integrationsMsgType === 'error' ? 'Error' : 'Integration'}
+                      </AlertTitle>
+                      <AlertDescription className={integrationsMsgType === 'success' ? 'text-green-700' : integrationsMsgType === 'error' ? 'text-red-700' : ''}>
+                        {integrationsMsg}
+                      </AlertDescription>
                     </Alert>
                   )}
 
