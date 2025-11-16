@@ -669,26 +669,48 @@ export default function ShipmentsPage() {
                       <td className="px-3 py-2">{s.billing ? formatCurrency(parseFloat(s.billing.amount)) : 'N/A'}</td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1">
-                          {/* View Details Button */}
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  id={`parcego-shipments-view-${s.id}`}
-                                  onClick={() => router.push(`/shipments/${encodeURIComponent(s.id)}`)}
-                                  aria-label={`View details for ${s.id}`}
-                                  className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-150"
-                                >
-                                  <Icon name="Eye" size={16} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent className="bg-black text-white border-black [&>svg]:fill-black [&>svg]:stroke-black">
-                                <p>View shipment details</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
+                          {/* Edit Button for DRAFT shipments, View Button for others */}
+                          {s.status === "DRAFT" ? (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    id={`parcego-shipments-edit-${s.id}`}
+                                    onClick={() => router.push(`/shipments/${encodeURIComponent(s.id)}`)}
+                                    aria-label={`Edit shipment ${s.id}`}
+                                    className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-150"
+                                  >
+                                    <Icon name="Edit" size={16} />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="bg-black text-white border-black [&>svg]:fill-black [&>svg]:stroke-black">
+                                  <p>Edit shipment</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          ) : (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    id={`parcego-shipments-view-${s.id}`}
+                                    onClick={() => router.push(`/shipments/${encodeURIComponent(s.id)}`)}
+                                    aria-label={`View details for ${s.id}`}
+                                    className="h-8 w-8 p-0 hover:bg-blue-50 hover:text-blue-600 transition-colors duration-150"
+                                  >
+                                    <Icon name="Eye" size={16} />
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="bg-black text-white border-black [&>svg]:fill-black [&>svg]:stroke-black">
+                                  <p>View shipment details</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
 
                           {/* Enhanced Reorder/Resend Button */}
                           <TooltipProvider>

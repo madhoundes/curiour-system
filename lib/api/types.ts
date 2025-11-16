@@ -246,6 +246,19 @@ export interface CreateShipmentRequest {
   delivery_notes?: string;
 }
 
+export interface UpdateShipmentRequest {
+  sender_address?: Omit<Address, 'id' | 'created_at'>;
+  receiver_address?: Omit<Address, 'id' | 'created_at'>;
+  package?: Omit<Package, 'id' | 'created_at'>;
+  special_instructions?: string;
+  delivery_notes?: string;
+}
+
+export interface UpdateShipmentResponse {
+  message: string;
+  shipment: Shipment;
+}
+
 export interface Shipment {
   id: number;
   user_id: number;

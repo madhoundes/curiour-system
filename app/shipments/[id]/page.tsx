@@ -11,12 +11,32 @@ import { Progress } from "@/components/ui/progress";
 import { useReactToPrint } from "react-to-print";
 import { formatCurrency } from "@/lib/mock/shipments";
 import { ShippingService } from "@/lib/api/shipping";
-import type { DetailedShipment, ShipmentStatusChange, BillingRecord } from "@/lib/api/types";
+import { TrackingService } from "@/lib/api/tracking";
+import type { DetailedShipment, ShipmentStatusChange, BillingRecord, UpdateShipmentRequest, TrackingStatusHistoryItem } from "@/lib/api/types";
 import { generatePdfInvoice } from "@/lib/utils";
+import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 // Map backend status values to labels and icons for display
 const statusMeta: Record<string, { label: string; icon: string }> = {
+  DRAFT: { label: 'Draft', icon: 'Edit' },
+  PENDING_PAYMENT: { label: 'Pending Payment', icon: 'CreditCard' },
+  PAID: { label: 'Paid', icon: 'DollarSign' },
+  LABEL_GENERATED: { label: 'Label Generated', icon: 'FileText' },
   LABEL_CREATED: { label: 'Label Created', icon: 'FileText' },
+  PICKED_UP: { label: 'Picked Up', icon: 'Package' },
+  IN_WAREHOUSE: { label: 'In Warehouse', icon: 'Warehouse' },
   DROP_OFF_CONFIRMED: { label: 'Drop-off Confirmed', icon: 'MapPin' },
   RECEIVED_AT_FACILITY: { label: 'Scanned at Origin Facility', icon: 'ScanBarcode' },
   IN_TRANSIT: { label: 'In Transit', icon: 'Truck' },
@@ -24,6 +44,7 @@ const statusMeta: Record<string, { label: string; icon: string }> = {
   DELIVERY_ATTEMPTED: { label: 'Delivery Attempted', icon: 'Clock' },
   DELIVERED: { label: 'Delivered', icon: 'CheckCircle' },
   FAILED_DELIVERY: { label: 'Failed Delivery', icon: 'CircleX' },
+  UNDELIVERABLE: { label: 'Undeliverable', icon: 'XCircle' },
   RETURNED_TO_SENDER: { label: 'Returned to Sender', icon: 'RotateCcw' },
   CANCELLED: { label: 'Cancelled', icon: 'Slash' }
 };
@@ -41,8 +62,30 @@ export default function ShipmentDetailPage() {
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [statusHistory, setStatusHistory] = useState<ShipmentStatusChange[]>([]);
   const [billingRecord, setBillingRecord] = useState<BillingRecord | null>(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [isUpdatingShipment, setIsUpdatingShipment] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   const shippingService = new ShippingService();
+  const trackingService = new TrackingService();
+
+  // Helper function to map TrackingStatusHistoryItem to ShipmentStatusChange
+  const mapTrackingHistoryToStatusChange = (
+    trackingHistory: TrackingStatusHistoryItem[],
+    shipmentId: number
+  ): ShipmentStatusChange[] => {
+    return trackingHistory.map((item, index) => ({
+      id: index + 1, // Generate a temporary ID
+      shipment_id: shipmentId,
+      status: item.status as any,
+      previous_status: item.previous_status as any,
+      changed_by_user_id: 0,
+      changed_by_user_name: 'System',
+      change_reason: item.notes || 'Status update',
+      notes: item.notes,
+      created_at: item.timestamp,
+    }));
+  };
 
   // Load shipment data from API
   useEffect(() => {
@@ -75,13 +118,93 @@ export default function ShipmentDetailPage() {
             setBillingRecord(null);
           }
         }
-        // Fetch real status history
+        // Fetch tracking data using tracking endpoint
         try {
-          const history = await shippingService.getShipmentStatusHistory(shipmentId);
-          setStatusHistory(history);
+          if (shipmentData?.tracking_code) {
+            const trackingData = await trackingService.trackShipment(shipmentData.tracking_code);
+            console.log('Tracking data received:', trackingData);
+            
+            if (trackingData.status_history && trackingData.status_history.length > 0) {
+              const mappedHistory = mapTrackingHistoryToStatusChange(
+                trackingData.status_history,
+                shipmentId
+              );
+              setStatusHistory(mappedHistory);
+            } else {
+              // If no history from tracking endpoint, create timeline events from available dates
+              const currentStatus = trackingData.current_status || shipmentData.status;
+              const events: ShipmentStatusChange[] = [];
+              
+              // Create "Label Created" or "Shipment Created" event from created_at
+              if (trackingData.created_at || shipmentData.created_at) {
+                events.push({
+                  id: events.length + 1,
+                  shipment_id: shipmentId,
+                  status: 'LABEL_CREATED' as any,
+                  previous_status: 'DRAFT' as any,
+                  changed_by_user_id: 0,
+                  changed_by_user_name: 'System',
+                  change_reason: 'Shipment created',
+                  notes: 'Shipment label created',
+                  created_at: trackingData.created_at || shipmentData.created_at,
+                });
+              }
+              
+              // Create "Delivered" event from actual_delivery_date if status is DELIVERED
+              if (currentStatus === 'DELIVERED' && trackingData.actual_delivery_date) {
+                events.push({
+                  id: events.length + 1,
+                  shipment_id: shipmentId,
+                  status: 'DELIVERED' as any,
+                  previous_status: 'OUT_FOR_DELIVERY' as any,
+                  changed_by_user_id: 0,
+                  changed_by_user_name: 'System',
+                  change_reason: 'Package delivered',
+                  notes: trackingData.delivery_photos && trackingData.delivery_photos.length > 0 
+                    ? 'Delivered with proof of delivery' 
+                    : 'Package delivered successfully',
+                  created_at: trackingData.actual_delivery_date,
+                });
+              } else if (currentStatus && currentStatus !== 'LABEL_CREATED' && currentStatus !== 'DRAFT') {
+                // For other statuses, create an event with the current status
+                events.push({
+                  id: events.length + 1,
+                  shipment_id: shipmentId,
+                  status: currentStatus as any,
+                  previous_status: 'LABEL_CREATED' as any,
+                  changed_by_user_id: 0,
+                  changed_by_user_name: 'System',
+                  change_reason: 'Status update',
+                  notes: `Current status: ${currentStatus}`,
+                  created_at: trackingData.last_updated || trackingData.created_at || shipmentData.created_at || new Date().toISOString(),
+                });
+              }
+              
+              setStatusHistory(events.length > 0 ? events : []);
+            }
+          } else {
+            console.warn('No tracking code available for shipment:', shipmentId);
+            setStatusHistory([]);
+          }
         } catch (historyErr) {
-          console.error('Failed to load status history:', historyErr);
-          setStatusHistory([]);
+          console.error('Failed to load tracking data:', historyErr);
+          // On error, try to create a fallback event from shipment status
+          if (shipmentData?.status) {
+            const fallbackEvent: ShipmentStatusChange = {
+              id: 1,
+              shipment_id: shipmentId,
+              status: shipmentData.status as any,
+              previous_status: 'DRAFT' as any,
+              changed_by_user_id: 0,
+              changed_by_user_name: 'System',
+              change_reason: 'Status update',
+              notes: `Current status: ${shipmentData.status}`,
+              created_at: shipmentData.created_at || new Date().toISOString(),
+            };
+            setStatusHistory([fallbackEvent]);
+          } else {
+            setStatusHistory([]);
+          }
         }
       } catch (err) {
         console.error('Failed to load shipment:', err);
@@ -93,6 +216,54 @@ export default function ShipmentDetailPage() {
 
     loadShipment();
   }, [id]);
+
+  // Handle shipment update
+  const handleUpdateShipment = async (updateData: UpdateShipmentRequest) => {
+    if (!shipment) return;
+    
+    try {
+      setIsUpdatingShipment(true);
+      const updated = await shippingService.updateShipment(shipment.id, updateData);
+      setShipment(updated.shipment as DetailedShipment);
+      setShowEditModal(false);
+      toast.success('Shipment updated successfully');
+    } catch (error: any) {
+      console.error('Failed to update shipment:', error);
+      toast.error(error.message || 'Failed to update shipment');
+    } finally {
+      setIsUpdatingShipment(false);
+    }
+  };
+
+  // Handle payment
+  const handlePayment = async () => {
+    if (!shipment || !billingRecord) {
+      toast.error('No billing information available');
+      return;
+    }
+
+    if (billingRecord.payment_status === 'paid') {
+      toast.info('This shipment has already been paid');
+      return;
+    }
+
+    try {
+      setIsProcessingPayment(true);
+      // Create checkout session
+      const checkoutSession = await shippingService.createCheckoutSession(billingRecord.id);
+      // Redirect to Stripe checkout
+      if (checkoutSession.checkout_url) {
+        window.location.href = checkoutSession.checkout_url;
+      } else {
+        toast.error('Failed to create payment session');
+      }
+    } catch (error: any) {
+      console.error('Payment failed:', error);
+      toast.error(error.message || 'Failed to process payment');
+    } finally {
+      setIsProcessingPayment(false);
+    }
+  };
 
   // Handle shipment cancellation with API call
   const handleCancelShipment = async () => {
@@ -234,6 +405,38 @@ export default function ShipmentDetailPage() {
               >
                 <Icon name="Printer" size={16} />
               </Button>
+              {/* Edit button for DRAFT shipments */}
+              {shipment.status === "DRAFT" && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowEditModal(true)}
+                  disabled={isUpdatingShipment}
+                  aria-label="Edit shipment"
+                  className="hidden sm:flex items-center"
+                >
+                  <Icon name="Edit" size={16} className="mr-2" /> Edit
+                </Button>
+              )}
+              {/* Payment button for unpaid shipments */}
+              {billingRecord && billingRecord.payment_status !== 'paid' && shipment.status !== "DRAFT" && (
+                <Button 
+                  variant="default" 
+                  onClick={handlePayment}
+                  disabled={isProcessingPayment}
+                  aria-label="Pay for shipment"
+                  className="hidden sm:flex items-center bg-green-600 hover:bg-green-700"
+                >
+                  {isProcessingPayment ? (
+                    <>
+                      <Icon name="Loader2" size={16} className="mr-2 animate-spin" /> Processing...
+                    </>
+                  ) : (
+                    <>
+                      <Icon name="CreditCard" size={16} className="mr-2" /> Pay Now
+                    </>
+                  )}
+                </Button>
+              )}
               {shipment.status === "LABEL_CREATED" && (
                 <Button 
                   variant="destructive" 
@@ -247,6 +450,35 @@ export default function ShipmentDetailPage() {
                     <Icon name="Loader2" size={16} className="animate-spin" />
                   ) : (
                     <Icon name="X" size={16} />
+                  )}
+                </Button>
+              )}
+              {/* Mobile: Icon-only buttons */}
+              {shipment.status === "DRAFT" && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => setShowEditModal(true)}
+                  disabled={isUpdatingShipment}
+                  aria-label="Edit shipment"
+                  className="sm:hidden p-2"
+                  size="sm"
+                >
+                  <Icon name="Edit" size={16} />
+                </Button>
+              )}
+              {billingRecord && billingRecord.payment_status !== 'paid' && shipment.status !== "DRAFT" && (
+                <Button 
+                  variant="default" 
+                  onClick={handlePayment}
+                  disabled={isProcessingPayment}
+                  aria-label="Pay for shipment"
+                  className="sm:hidden p-2 bg-green-600 hover:bg-green-700"
+                  size="sm"
+                >
+                  {isProcessingPayment ? (
+                    <Icon name="Loader2" size={16} className="animate-spin" />
+                  ) : (
+                    <Icon name="CreditCard" size={16} />
                   )}
                 </Button>
               )}
@@ -421,16 +653,21 @@ export default function ShipmentDetailPage() {
                       Progress
                     </span>
                     {(() => {
-                      const total = Math.max(statusHistory.length, 1);
-                      const last = statusHistory[statusHistory.length - 1]?.status;
-                      const pct = last === 'DELIVERED' ? 100 : Math.min(90, Math.round((statusHistory.length / 6) * 100));
+                      const lastHistoryStatus = statusHistory[statusHistory.length - 1]?.status;
+                      const currentStatus = shipment?.status || lastHistoryStatus;
+                      // If shipment is DELIVERED, show 100% regardless of history length
+                      const pct = currentStatus === 'DELIVERED' ? 100 : 
+                                  statusHistory.length > 0 ? Math.min(90, Math.round((statusHistory.length / 6) * 100)) : 0;
                       return <span className="font-medium text-green-600">{pct}% Complete</span>;
                     })()}
                   </div>
                   <div className="relative">
                     {(() => {
-                      const last = statusHistory[statusHistory.length - 1]?.status;
-                      const pct = last === 'DELIVERED' ? 100 : Math.min(90, Math.round((statusHistory.length / 6) * 100));
+                      const lastHistoryStatus = statusHistory[statusHistory.length - 1]?.status;
+                      const currentStatus = shipment?.status || lastHistoryStatus;
+                      // If shipment is DELIVERED, show 100% regardless of history length
+                      const pct = currentStatus === 'DELIVERED' ? 100 : 
+                                  statusHistory.length > 0 ? Math.min(90, Math.round((statusHistory.length / 6) * 100)) : 0;
                       return <Progress value={pct} className="h-3 transition-all duration-1000 ease-out" />;
                     })()}
                     <div className="absolute inset-0 bg-gradient-to-r from-green-400 to-green-600 opacity-20 rounded-full animate-pulse"></div>
@@ -644,7 +881,446 @@ export default function ShipmentDetailPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Edit Shipment Modal */}
+      <Dialog open={showEditModal} onOpenChange={setShowEditModal}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Shipment</DialogTitle>
+            <DialogDescription>
+              Update shipment details. Only DRAFT status shipments can be edited.
+            </DialogDescription>
+          </DialogHeader>
+          
+          {shipment && (
+            <EditShipmentForm
+              shipment={shipment}
+              onSave={handleUpdateShipment}
+              onCancel={() => setShowEditModal(false)}
+              isSaving={isUpdatingShipment}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+// Edit Shipment Form Component
+function EditShipmentForm({ 
+  shipment, 
+  onSave, 
+  onCancel, 
+  isSaving 
+}: { 
+  shipment: DetailedShipment; 
+  onSave: (data: UpdateShipmentRequest) => void; 
+  onCancel: () => void;
+  isSaving: boolean;
+}) {
+  const [formData, setFormData] = useState<UpdateShipmentRequest>({
+    sender_address: {
+      contact_name: shipment.sender_address.contact_name,
+      company_name: shipment.sender_address.company_name || '',
+      street_address: shipment.sender_address.street_address,
+      street_address_2: shipment.sender_address.street_address_2 || '',
+      city: shipment.sender_address.city,
+      province: shipment.sender_address.province,
+      postal_code: shipment.sender_address.postal_code,
+      country: shipment.sender_address.country,
+      phone_number: shipment.sender_address.phone_number,
+      email: shipment.sender_address.email,
+    },
+    receiver_address: {
+      contact_name: shipment.receiver_address.contact_name,
+      company_name: shipment.receiver_address.company_name || '',
+      street_address: shipment.receiver_address.street_address,
+      street_address_2: shipment.receiver_address.street_address_2 || '',
+      city: shipment.receiver_address.city,
+      province: shipment.receiver_address.province,
+      postal_code: shipment.receiver_address.postal_code,
+      country: shipment.receiver_address.country,
+      phone_number: shipment.receiver_address.phone_number,
+      email: shipment.receiver_address.email,
+    },
+    package: {
+      package_type: shipment.package.package_type,
+      weight: shipment.package.weight,
+      length: shipment.package.length,
+      width: shipment.package.width,
+      height: shipment.package.height,
+      declared_value: shipment.package.declared_value,
+      contents_description: shipment.package.contents_description,
+      fragile: shipment.package.fragile,
+      requires_signature: shipment.package.requires_signature,
+      special_instructions: shipment.package.special_instructions || '',
+    },
+    special_instructions: shipment.special_instructions || '',
+    delivery_notes: shipment.delivery_notes || '',
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(formData);
+  };
+
+  const updateField = (section: 'sender_address' | 'receiver_address' | 'package', field: string, value: any) => {
+    setFormData(prev => ({
+      ...prev,
+      [section]: {
+        ...prev[section],
+        [field]: value,
+      },
+    }));
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {/* Sender Address */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">Sender Address</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="sender_contact_name">Contact Name *</Label>
+            <Input
+              id="sender_contact_name"
+              value={formData.sender_address?.contact_name || ''}
+              onChange={(e) => updateField('sender_address', 'contact_name', e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="sender_company">Company Name</Label>
+            <Input
+              id="sender_company"
+              value={formData.sender_address?.company_name || ''}
+              onChange={(e) => updateField('sender_address', 'company_name', e.target.value)}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <Label htmlFor="sender_street">Street Address *</Label>
+            <Input
+              id="sender_street"
+              value={formData.sender_address?.street_address || ''}
+              onChange={(e) => updateField('sender_address', 'street_address', e.target.value)}
+              required
+            />
+          </div>
+          <div className="md:col-span-2">
+            <Label htmlFor="sender_street2">Street Address 2</Label>
+            <Input
+              id="sender_street2"
+              value={formData.sender_address?.street_address_2 || ''}
+              onChange={(e) => updateField('sender_address', 'street_address_2', e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="sender_city">City *</Label>
+            <Input
+              id="sender_city"
+              value={formData.sender_address?.city || ''}
+              onChange={(e) => updateField('sender_address', 'city', e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="sender_province">Province *</Label>
+            <Input
+              id="sender_province"
+              value={formData.sender_address?.province || ''}
+              onChange={(e) => updateField('sender_address', 'province', e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="sender_postal">Postal Code *</Label>
+            <Input
+              id="sender_postal"
+              value={formData.sender_address?.postal_code || ''}
+              onChange={(e) => updateField('sender_address', 'postal_code', e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="sender_country">Country *</Label>
+            <Input
+              id="sender_country"
+              value={formData.sender_address?.country || ''}
+              onChange={(e) => updateField('sender_address', 'country', e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="sender_phone">Phone Number *</Label>
+            <Input
+              id="sender_phone"
+              value={formData.sender_address?.phone_number || ''}
+              onChange={(e) => updateField('sender_address', 'phone_number', e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="sender_email">Email *</Label>
+            <Input
+              id="sender_email"
+              type="email"
+              value={formData.sender_address?.email || ''}
+              onChange={(e) => updateField('sender_address', 'email', e.target.value)}
+              required
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Receiver Address */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">Receiver Address</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="receiver_contact_name">Contact Name *</Label>
+            <Input
+              id="receiver_contact_name"
+              value={formData.receiver_address?.contact_name || ''}
+              onChange={(e) => updateField('receiver_address', 'contact_name', e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="receiver_company">Company Name</Label>
+            <Input
+              id="receiver_company"
+              value={formData.receiver_address?.company_name || ''}
+              onChange={(e) => updateField('receiver_address', 'company_name', e.target.value)}
+            />
+          </div>
+          <div className="md:col-span-2">
+            <Label htmlFor="receiver_street">Street Address *</Label>
+            <Input
+              id="receiver_street"
+              value={formData.receiver_address?.street_address || ''}
+              onChange={(e) => updateField('receiver_address', 'street_address', e.target.value)}
+              required
+            />
+          </div>
+          <div className="md:col-span-2">
+            <Label htmlFor="receiver_street2">Street Address 2</Label>
+            <Input
+              id="receiver_street2"
+              value={formData.receiver_address?.street_address_2 || ''}
+              onChange={(e) => updateField('receiver_address', 'street_address_2', e.target.value)}
+            />
+          </div>
+          <div>
+            <Label htmlFor="receiver_city">City *</Label>
+            <Input
+              id="receiver_city"
+              value={formData.receiver_address?.city || ''}
+              onChange={(e) => updateField('receiver_address', 'city', e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="receiver_province">Province *</Label>
+            <Input
+              id="receiver_province"
+              value={formData.receiver_address?.province || ''}
+              onChange={(e) => updateField('receiver_address', 'province', e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="receiver_postal">Postal Code *</Label>
+            <Input
+              id="receiver_postal"
+              value={formData.receiver_address?.postal_code || ''}
+              onChange={(e) => updateField('receiver_address', 'postal_code', e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="receiver_country">Country *</Label>
+            <Input
+              id="receiver_country"
+              value={formData.receiver_address?.country || ''}
+              onChange={(e) => updateField('receiver_address', 'country', e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="receiver_phone">Phone Number *</Label>
+            <Input
+              id="receiver_phone"
+              value={formData.receiver_address?.phone_number || ''}
+              onChange={(e) => updateField('receiver_address', 'phone_number', e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="receiver_email">Email *</Label>
+            <Input
+              id="receiver_email"
+              type="email"
+              value={formData.receiver_address?.email || ''}
+              onChange={(e) => updateField('receiver_address', 'email', e.target.value)}
+              required
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Package Details */}
+      <div className="space-y-4">
+        <h3 className="text-lg font-semibold">Package Details</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label htmlFor="package_type">Package Type *</Label>
+            <Select
+              value={formData.package?.package_type || 'box'}
+              onValueChange={(value) => updateField('package', 'package_type', value)}
+            >
+              <SelectTrigger id="package_type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="box">Box</SelectItem>
+                <SelectItem value="envelope">Envelope</SelectItem>
+                <SelectItem value="tube">Tube</SelectItem>
+                <SelectItem value="pallet">Pallet</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor="weight">Weight (kg) *</Label>
+            <Input
+              id="weight"
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.package?.weight || 0}
+              onChange={(e) => updateField('package', 'weight', parseFloat(e.target.value) || 0)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="length">Length (cm) *</Label>
+            <Input
+              id="length"
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.package?.length || 0}
+              onChange={(e) => updateField('package', 'length', parseFloat(e.target.value) || 0)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="width">Width (cm) *</Label>
+            <Input
+              id="width"
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.package?.width || 0}
+              onChange={(e) => updateField('package', 'width', parseFloat(e.target.value) || 0)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="height">Height (cm) *</Label>
+            <Input
+              id="height"
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.package?.height || 0}
+              onChange={(e) => updateField('package', 'height', parseFloat(e.target.value) || 0)}
+              required
+            />
+          </div>
+          <div>
+            <Label htmlFor="declared_value">Declared Value ($) *</Label>
+            <Input
+              id="declared_value"
+              type="number"
+              step="0.01"
+              min="0"
+              value={formData.package?.declared_value || 0}
+              onChange={(e) => updateField('package', 'declared_value', parseFloat(e.target.value) || 0)}
+              required
+            />
+          </div>
+          <div className="md:col-span-2">
+            <Label htmlFor="contents_description">Contents Description *</Label>
+            <Textarea
+              id="contents_description"
+              value={formData.package?.contents_description || ''}
+              onChange={(e) => updateField('package', 'contents_description', e.target.value)}
+              required
+            />
+          </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="fragile"
+                checked={formData.package?.fragile || false}
+                onChange={(e) => updateField('package', 'fragile', e.target.checked)}
+                className="rounded"
+              />
+              <Label htmlFor="fragile">Fragile</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="requires_signature"
+                checked={formData.package?.requires_signature || false}
+                onChange={(e) => updateField('package', 'requires_signature', e.target.checked)}
+                className="rounded"
+              />
+              <Label htmlFor="requires_signature">Requires Signature</Label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Special Instructions */}
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="special_instructions">Special Instructions</Label>
+          <Textarea
+            id="special_instructions"
+            value={formData.special_instructions || ''}
+            onChange={(e) => setFormData(prev => ({ ...prev, special_instructions: e.target.value }))}
+            rows={3}
+          />
+        </div>
+        <div>
+          <Label htmlFor="delivery_notes">Delivery Notes</Label>
+          <Textarea
+            id="delivery_notes"
+            value={formData.delivery_notes || ''}
+            onChange={(e) => setFormData(prev => ({ ...prev, delivery_notes: e.target.value }))}
+            rows={3}
+          />
+        </div>
+      </div>
+
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onCancel} disabled={isSaving}>
+          Cancel
+        </Button>
+        <Button type="submit" disabled={isSaving}>
+          {isSaving ? (
+            <>
+              <Icon name="Loader2" size={16} className="mr-2 animate-spin" />
+              Saving...
+            </>
+          ) : (
+            'Save Changes'
+          )}
+        </Button>
+      </DialogFooter>
+    </form>
   );
 }
 

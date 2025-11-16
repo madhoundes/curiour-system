@@ -9,6 +9,8 @@ import { API_ENDPOINTS } from './config';
 import type {
   CreateShipmentRequest,
   CreateShipmentResponse,
+  UpdateShipmentRequest,
+  UpdateShipmentResponse,
   CreateBillingRequest,
   BillingRecord,
   CreateCheckoutSessionResponse,
@@ -214,6 +216,34 @@ export class ShippingService {
   /**
    * Get detailed information about a specific shipment
    */
+  /**
+   * Update a shipment (only allowed for DRAFT status shipments)
+   */
+  async updateShipment(shipmentId: number, data: UpdateShipmentRequest): Promise<UpdateShipmentResponse> {
+    try {
+      const url = API_ENDPOINTS.SHIPMENTS.UPDATE.replace(':id', shipmentId.toString());
+      const response = await apiClient.put<UpdateShipmentResponse>(url, data);
+      return response.data;
+    } catch (error: any) {
+      if (error.response?.status === 400) {
+        throw new Error('Invalid data or service area not supported');
+      }
+      if (error.response?.status === 401) {
+        throw new Error('Authentication required');
+      }
+      if (error.response?.status === 403) {
+        throw new Error('Cannot update shipment (not in DRAFT status)');
+      }
+      if (error.response?.status === 404) {
+        throw new Error('Shipment not found');
+      }
+      if (error.response?.status === 422) {
+        throw new Error('Validation error');
+      }
+      throw new Error(error.message || 'Failed to update shipment');
+    }
+  }
+
   async getShipment(shipmentId: number): Promise<DetailedShipment> {
     try {
       if (!shipmentId || shipmentId <= 0) {
