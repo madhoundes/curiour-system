@@ -61,26 +61,26 @@ const ShipmentContext = createContext<ShipmentContextType | undefined>(undefined
 // Default form data
 const defaultFormData: ShipmentFormData = {
   // Recipient data
-  recipientName: "Sarah Johnson",
-  recipientCompany: "ABC Corp",
-  recipientAddress: "456 Customer Ave, Apt 2B",
-  recipientCity: "Toronto",
-  recipientProvince: "ON",
-  recipientPostalCode: "M5V3A8",
-  recipientPhone: "(555) 987-6543",
-  recipientEmail: "customer@email.com",
+  recipientName: "",
+  recipientCompany: "",
+  recipientAddress: "",
+  recipientCity: "",
+  recipientProvince: "",
+  recipientPostalCode: "",
+  recipientPhone: "",
+  recipientEmail: "",
   
   // Package basics
   packageType: "box",
   serviceType: "standard",
-  specialInstructions: "Handle with care – demo run",
+  specialInstructions: "",
   
   // Package details
-  weight: "2.5",
+  weight: "",
   weightUnit: "lbs",
-  length: "12",
-  width: "8",
-  height: "6",
+  length: "",
+  width: "",
+  height: "",
   dimensionUnit: "in",
   fragile: false,
   valuable: false,
@@ -187,7 +187,7 @@ export const ShipmentProvider: React.FC<{ children: ReactNode }> = ({ children }
         state: formData.recipientProvince,
         postalCode: formData.recipientPostalCode,
         phone: formData.recipientPhone,
-        email: formData.recipientEmail || "customer@email.com"
+        email: formData.recipientEmail || ""
       },
       service: {
         type: formData.serviceType.toUpperCase(),

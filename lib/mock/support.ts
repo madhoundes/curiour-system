@@ -472,74 +472,8 @@ export const mockHelpArticles: HelpArticle[] = [
 ];
 
 // Comprehensive Video Tutorials Data
-export const mockVideoTutorials: VideoTutorial[] = [
-  {
-    id: 'video-001',
-    title: 'Creating Your First Shipment - Step by Step',
-    description: 'Follow along as we walk through the complete process of creating your first shipment, from login to label generation. Perfect for new users getting started with our platform.',
-    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-    thumbnailUrl: '/api/placeholder/400/225',
-    duration: 420,
-    category: 'getting-started',
-    difficulty: 'beginner',
-    tags: ['tutorial', 'first-shipment', 'walkthrough', 'onboarding'],
-    transcript: 'Welcome to our step-by-step guide for creating your first shipment. In this tutorial, we\'ll cover everything you need to know to get started with our courier platform. We\'ll begin with accessing your dashboard, then walk through each step of the shipment creation process, including entering recipient information, package details, selecting shipping options, and finally generating your shipping label. By the end of this video, you\'ll be confident in creating shipments independently.',
-    chapters: [
-      { title: 'Introduction', timestamp: 0 },
-      { title: 'Accessing the Dashboard', timestamp: 30 },
-      { title: 'Starting Shipment Creation', timestamp: 60 },
-      { title: 'Filling the Form', timestamp: 120 },
-      { title: 'Getting Your Quote', timestamp: 240 },
-      { title: 'Purchasing the Label', timestamp: 300 },
-      { title: 'Printing and Next Steps', timestamp: 360 },
-      { title: 'Summary', timestamp: 390 }
-    ],
-    relatedContent: ['article-001', 'faq-001']
-  },
-  {
-    id: 'video-002',
-    title: 'Professional Packaging Techniques',
-    description: 'Learn professional packaging techniques that will ensure your shipments arrive safely and look professional. This comprehensive guide covers materials, methods, and best practices.',
-    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-    thumbnailUrl: '/api/placeholder/400/225',
-    duration: 300,
-    category: 'shipments',
-    difficulty: 'intermediate',
-    tags: ['packaging', 'techniques', 'professional', 'safety'],
-    transcript: 'In this tutorial, we\'ll cover professional packaging techniques that will protect your shipments and impress your customers. We\'ll start with material selection, including choosing the right boxes, cushioning materials, and tape. Then we\'ll demonstrate proper wrapping techniques for different types of items, from fragile electronics to clothing and books. You\'ll learn how to properly secure packages and test their durability before shipping.',
-    chapters: [
-      { title: 'Introduction', timestamp: 0 },
-      { title: 'Material Selection', timestamp: 45 },
-      { title: 'Box Preparation', timestamp: 90 },
-      { title: 'Wrapping Techniques', timestamp: 120 },
-      { title: 'Securing and Testing', timestamp: 180 },
-      { title: 'Final Steps', timestamp: 240 }
-    ],
-    relatedContent: ['article-002', 'faq-004']
-  },
-  {
-    id: 'video-003',
-    title: 'Mastering Shipment Tracking and Notifications',
-    description: 'Learn how to effectively use our tracking system, set up notifications, and keep your customers informed about their package status.',
-    videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ',
-    thumbnailUrl: '/api/placeholder/400/225',
-    duration: 360,
-    category: 'shipments',
-    difficulty: 'intermediate',
-    tags: ['tracking', 'notifications', 'customer-service', 'status-updates'],
-    transcript: 'This tutorial will teach you how to master our tracking system and keep your customers informed. We\'ll cover how to track packages, interpret status updates, set up email and SMS notifications, and use our tracking widget. You\'ll also learn how to handle common tracking issues and provide excellent customer service by keeping customers updated on their shipments.',
-    chapters: [
-      { title: 'Introduction', timestamp: 0 },
-      { title: 'Understanding Tracking Statuses', timestamp: 30 },
-      { title: 'Setting Up Notifications', timestamp: 90 },
-      { title: 'Using the Tracking Widget', timestamp: 150 },
-      { title: 'Customer Communication', timestamp: 210 },
-      { title: 'Troubleshooting', timestamp: 270 },
-      { title: 'Best Practices', timestamp: 300 }
-    ],
-    relatedContent: ['article-003', 'faq-005']
-  }
-];
+// Note: Video tutorials are coming soon
+export const mockVideoTutorials: VideoTutorial[] = [];
 
 // Help Categories Data
 export const helpCategories: HelpCategory[] = [
