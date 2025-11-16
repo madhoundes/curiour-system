@@ -1290,7 +1290,17 @@ function EditShipmentForm({
           <Textarea
             id="special_instructions"
             value={formData.special_instructions || ''}
-            onChange={(e) => setFormData(prev => ({ ...prev, special_instructions: e.target.value }))}
+            onChange={(e) => {
+              const value = e.target.value;
+              setFormData(prev => ({
+                ...prev,
+                special_instructions: value,
+                package: prev.package ? {
+                  ...prev.package,
+                  special_instructions: value
+                } : undefined
+              }));
+            }}
             rows={3}
           />
         </div>

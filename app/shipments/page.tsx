@@ -164,6 +164,7 @@ export default function ShipmentsPage() {
   const [showReorderDialog, setShowReorderDialog] = useState(false);
   const [shipmentToReorder, setShipmentToReorder] = useState<DetailedShipment | null>(null);
   const [isReordering, setIsReordering] = useState(false);
+  const [processingPaymentForId, setProcessingPaymentForId] = useState<number | null>(null);
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [pageSize, setPageSize] = useState<number>(25);
@@ -460,6 +461,121 @@ export default function ShipmentsPage() {
     }
   };
 
+  // Handle payment for a single draft shipment (same flow as creating new shipment)
+  const handlePaymentForShipment = async (shipmentId: number) => {
+    setProcessingPaymentForId(shipmentId);
+    
+    try {
+      // Find the shipment in the list
+      const shipment = allShipments.find(s => s.id === shipmentId);
+      if (!shipment) {
+        throw new Error('Shipment not found');
+      }
+
+      if (shipment.status !== "DRAFT") {
+        throw new Error('Only draft shipments can be paid');
+      }
+
+      console.log('Processing payment for draft shipment:', shipment.id);
+      
+      // Step 1: Get or create billing record
+      let billingId: number;
+      
+      // First, reload shipment data to get updated billing info (in case billing was created in previous attempt)
+      try {
+        const updatedShipment = await shippingService.getShipment(shipment.id);
+        if (updatedShipment.billing && updatedShipment.billing.id) {
+          billingId = updatedShipment.billing.id;
+          console.log('Using existing billing ID from shipment:', billingId);
+        } else {
+          // Billing doesn't exist, create it
+          console.log('Creating new billing record for shipment:', shipment.id);
+          try {
+            const billing = await shippingService.createBilling({
+              shipment_id: shipment.id
+            });
+            billingId = billing.id;
+            console.log('Created billing with ID:', billingId);
+          } catch (createErr: any) {
+            // If billing creation fails because it already exists, fetch it
+            const errorMessage = createErr.message || createErr.details || '';
+            const isAlreadyExists = errorMessage.includes('already exists') || 
+                                   createErr.response?.status === 400 ||
+                                   createErr.status === 400;
+            
+            if (isAlreadyExists) {
+              console.log('Billing already exists, fetching billing records...');
+              const billingRecords = await shippingService.getBillingRecords({ page: 1, per_page: 100 });
+              const existingBilling = billingRecords.items?.find(b => b.shipment_id === shipment.id);
+              if (existingBilling) {
+                billingId = existingBilling.id;
+                console.log('Found existing billing ID:', billingId);
+              } else {
+                throw new Error('Billing exists but could not be found');
+              }
+            } else {
+              throw createErr;
+            }
+          }
+        }
+      } catch (err: any) {
+        console.error('Error handling billing:', err);
+        throw new Error(`Failed to get or create billing: ${err.message || 'Unknown error'}`);
+      }
+      
+      // Step 2: Create checkout session (same as new shipment flow)
+      console.log('Creating checkout session for billing ID:', billingId);
+      const checkoutSession = await shippingService.createCheckoutSession(billingId);
+      console.log('Checkout session created:', checkoutSession);
+      console.log('Checkout URL:', checkoutSession.checkout_url);
+      console.log('Client secret:', checkoutSession.client_secret);
+      
+      // Step 3: Redirect to checkout URL (same as new shipment flow)
+      if (!checkoutSession) {
+        console.error('Checkout session is null or undefined');
+        throw new Error('Failed to create checkout session - no response received');
+      }
+
+      if (checkoutSession.checkout_url) {
+        sessionStorage.setItem('parcego_current_payment_shipment', String(shipment.id));
+        
+        console.log('Redirecting to checkout URL:', checkoutSession.checkout_url);
+        // Redirect to Stripe checkout (same flow as new shipment)
+        // Use setTimeout to ensure state updates complete before redirect
+        setTimeout(() => {
+          window.location.href = checkoutSession.checkout_url;
+        }, 100);
+        return; // Exit after redirect
+      } else if (checkoutSession.client_secret) {
+        console.log('Using client_secret, redirecting to purchase-label page');
+        // Handle Stripe Elements payment form if needed
+        sessionStorage.setItem('parcego_checkout_session', JSON.stringify(checkoutSession));
+        sessionStorage.setItem('parcego_payment_shipment_id', String(shipment.id));
+        setTimeout(() => {
+          router.push(`/purchase-label?shipment_id=${shipment.id}`);
+        }, 100);
+        return;
+      } else {
+        console.error('Invalid checkout session response:', checkoutSession);
+        console.error('Response keys:', Object.keys(checkoutSession || {}));
+        throw new Error(`No valid checkout session received. Response: ${JSON.stringify(checkoutSession)}`);
+      }
+      
+    } catch (error: any) {
+      console.error("Payment processing failed:", error);
+      console.error("Error details:", {
+        message: error.message,
+        details: error.details,
+        response: error.response?.data,
+        status: error.response?.status || error.status
+      });
+      
+      const errorMessage = error.details || error.message || 'Unknown error';
+      alert(`Failed to process payment: ${errorMessage}`);
+      setProcessingPaymentForId(null);
+    }
+  };
+
   // Update table title based on selection state
   const getTableTitle = () => {
     if (selectedCount === 0) {
@@ -568,7 +684,7 @@ export default function ShipmentsPage() {
           <Card>
             <CardContent className="p-4 flex items-center justify-between">
               <span className="text-sm text-gray-700">{selectedIds.size} selected</span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Button 
                   variant="outline" 
                   onClick={() => handleExportCsvClick("selected")} 
@@ -669,6 +785,34 @@ export default function ShipmentsPage() {
                       <td className="px-3 py-2">{s.billing ? formatCurrency(parseFloat(s.billing.amount)) : 'N/A'}</td>
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-1">
+                          {/* Pay Button for DRAFT shipments */}
+                          {s.status === "DRAFT" && (
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    id={`parcego-shipments-pay-${s.id}`}
+                                    onClick={() => handlePaymentForShipment(s.id)}
+                                    disabled={processingPaymentForId === s.id}
+                                    aria-label={`Pay for shipment ${s.id}`}
+                                    className="h-8 w-8 p-0 hover:bg-green-50 hover:text-green-600 transition-colors duration-150"
+                                  >
+                                    {processingPaymentForId === s.id ? (
+                                      <Icon name="Loader2" size={16} className="animate-spin" />
+                                    ) : (
+                                      <Icon name="CreditCard" size={16} />
+                                    )}
+                                  </Button>
+                                </TooltipTrigger>
+                                <TooltipContent className="bg-black text-white border-black [&>svg]:fill-black [&>svg]:stroke-black">
+                                  <p>Pay for this shipment</p>
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
+                          )}
+
                           {/* Edit Button for DRAFT shipments, View Button for others */}
                           {s.status === "DRAFT" ? (
                             <TooltipProvider>
@@ -972,6 +1116,7 @@ export default function ShipmentsPage() {
           onOpenChange={setShowCancelDialog}
         />
       )}
+
     </div>
   );
 }
