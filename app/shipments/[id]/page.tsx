@@ -417,8 +417,8 @@ export default function ShipmentDetailPage() {
                   <Icon name="Edit" size={16} className="mr-2" /> Edit
                 </Button>
               )}
-              {/* Payment button for unpaid shipments */}
-              {billingRecord && billingRecord.payment_status !== 'paid' && shipment.status !== "DRAFT" && (
+              {/* Payment button for draft shipments only */}
+              {shipment.status === "DRAFT" && (
                 <Button 
                   variant="default" 
                   onClick={handlePayment}
@@ -466,7 +466,8 @@ export default function ShipmentDetailPage() {
                   <Icon name="Edit" size={16} />
                 </Button>
               )}
-              {billingRecord && billingRecord.payment_status !== 'paid' && shipment.status !== "DRAFT" && (
+              {/* Payment button for draft shipments only (mobile) */}
+              {shipment.status === "DRAFT" && (
                 <Button 
                   variant="default" 
                   onClick={handlePayment}
@@ -710,33 +711,6 @@ export default function ShipmentDetailPage() {
                   {statusHistory.length === 0 && (
                     <div className="text-sm text-gray-500">No tracking events recorded yet.</div>
                   )}
-                </div>
-
-                {/* Enhanced Timeline Summary */}
-                <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 shadow-sm">
-                  <div className="flex items-center gap-2 text-blue-800 mb-3">
-                    <Icon name="Info" size={18} />
-                    <span className="font-semibold text-lg">Timeline Summary</span>
-                  </div>
-                  <div className="space-y-3">
-                    <p className="text-sm text-blue-700">
-                      Your shipment has completed all stages successfully. The package was delivered on time and in perfect condition.
-                    </p>
-                    <div className="flex items-center justify-between text-xs text-blue-600">
-                      <span>Total Transit Time: 3 days</span>
-                      <span>Status: Fully Complete</span>
-                    </div>
-                    <div className="flex items-center gap-2 pt-2">
-                      <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300">
-                        <Icon name="Shield" size={12} className="mr-1" />
-                        Secure Delivery
-                      </Badge>
-                      <Badge variant="outline" className="bg-green-100 text-green-800 border-green-300">
-                        <Icon name="Clock" size={12} className="mr-1" />
-                        On Time
-                      </Badge>
-                    </div>
-                  </div>
                 </div>
               </CardContent>
             </Card>

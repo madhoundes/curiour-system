@@ -448,15 +448,12 @@ export default function SupportHelpCenter() {
                     </Card>
                   ))
                 ) : (
-                  <div id="parcego-support-no-results" className="text-center py-12">
+                  <div id="parcego-support-no-results" className="text-center py-12 w-full">
                     <Icon name="Video" className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No video tutorials found</h3>
-                    <p className="text-gray-500 mb-4">
-                      No video tutorials available for the selected category
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">Video Tutorials Coming Soon</h3>
+                    <p className="text-gray-500 mb-4 max-w-md mx-auto">
+                      We're working on creating helpful video tutorials to guide you through using our platform. Check back soon for step-by-step video guides!
                     </p>
-                    <Button onClick={() => setActiveCategory('all')}>
-                      View All Categories
-                    </Button>
                   </div>
                 )}
               </div>

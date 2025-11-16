@@ -86,8 +86,44 @@ function PurchaseLabelContent() {
     }
   }, []);
 
-  // Load order data from localStorage
+  // Load order data from localStorage (only for new shipments)
   useEffect(() => {
+    const shipmentIdParam = searchParams?.get('shipment_id');
+    const existingShipmentId = shipmentIdParam ? parseInt(shipmentIdParam, 10) : null;
+    
+    // If we have an existing shipment ID, we don't need orderData from localStorage
+    if (existingShipmentId && existingShipmentId > 0) {
+      console.log('Loading existing shipment data for ID:', existingShipmentId);
+      
+      // Load the existing shipment
+      const loadExistingShipment = async () => {
+        try {
+          const shipment = await shippingService.getShipment(existingShipmentId);
+          setCreatedShipment({ shipment });
+          localStorage.setItem('parcego_pending_shipment_id', String(existingShipmentId));
+          
+          // Load billing data if available
+          if (shipment.billing) {
+            setBillingData({
+              subtotal: shipment.billing.subtotal || '0',
+              tax_rate: shipment.billing.tax_rate || '0',
+              tax_amount: shipment.billing.tax_amount || '0',
+              amount: shipment.billing.total_amount || '0'
+            });
+          }
+          
+          console.log('Existing shipment loaded:', shipment);
+        } catch (error) {
+          console.error('Failed to load existing shipment:', error);
+          setShipmentError('Failed to load shipment information. Please try again.');
+        }
+      };
+      
+      loadExistingShipment();
+      return; // Skip loading orderData from localStorage
+    }
+    
+    // For new shipments, load orderData from localStorage
     const savedOrderData = localStorage.getItem('orderData');
     if (savedOrderData) {
       try {
@@ -99,9 +135,12 @@ function PurchaseLabelContent() {
         setShipmentError('Failed to load order information. Please go back and try again.');
       }
     } else {
-      setShipmentError('No order data found. Please go back to quote preview and try again.');
+      // Only show error if we don't have a shipment_id either
+      if (!existingShipmentId) {
+        setShipmentError('No order data found. Please go back to quote preview and try again.');
+      }
     }
-  }, []);
+  }, [searchParams]);
 
   // Handle redirect back from Stripe return page after successful payment
   useEffect(() => {
@@ -387,7 +426,170 @@ function PurchaseLabelContent() {
     setShipmentError(null);
 
     try {
+      // Check if we're paying for an existing shipment (from URL query parameter)
+      const shipmentIdParam = searchParams?.get('shipment_id');
+      const existingShipmentId = shipmentIdParam ? parseInt(shipmentIdParam, 10) : null;
+
+      // Check sessionStorage for checkout session (set by shipments page)
+      const storedCheckoutSession = sessionStorage.getItem('parcego_checkout_session');
+      const storedShipmentId = sessionStorage.getItem('parcego_payment_shipment_id');
+
       console.log('Starting payment flow...');
+      console.log('Existing shipment ID from URL:', existingShipmentId);
+      console.log('Stored checkout session:', storedCheckoutSession ? 'exists' : 'not found');
+      console.log('Stored shipment ID:', storedShipmentId);
+
+      // If we have an existing shipment ID, use the existing shipment flow
+      if (existingShipmentId && existingShipmentId > 0) {
+        console.log('Processing payment for existing shipment:', existingShipmentId);
+        
+        // Try to use stored checkout session first (set by shipments page)
+        if (storedCheckoutSession) {
+          try {
+            const checkoutSessionData = JSON.parse(storedCheckoutSession);
+            console.log('Using stored checkout session:', checkoutSessionData);
+            
+            // Load the existing shipment
+            const shipment = await shippingService.getShipment(existingShipmentId);
+            setCreatedShipment({ shipment });
+            localStorage.setItem('parcego_pending_shipment_id', String(existingShipmentId));
+            
+            // Use the stored checkout session
+            if (checkoutSessionData.client_secret) {
+              let clientSecret = checkoutSessionData.client_secret;
+              
+              // Decode the URL-encoded client secret
+              try {
+                clientSecret = decodeURIComponent(clientSecret);
+              } catch (e) {
+                console.warn('Failed to decode client secret:', e);
+              }
+              
+              setCheckoutSession({
+                ...checkoutSessionData,
+                client_secret: clientSecret
+              });
+              
+              // Get billing data from shipment
+              if (shipment.billing) {
+                setBillingData({
+                  subtotal: shipment.billing.subtotal || '0',
+                  tax_rate: shipment.billing.tax_rate || '0',
+                  tax_amount: shipment.billing.tax_amount || '0',
+                  amount: shipment.billing.total_amount || '0'
+                });
+              }
+              
+              setShowStripePayment(true);
+              // Clear sessionStorage after using it
+              sessionStorage.removeItem('parcego_checkout_session');
+              sessionStorage.removeItem('parcego_payment_shipment_id');
+              setIsProcessing(false);
+              return;
+            }
+          } catch (parseError) {
+            console.warn('Failed to parse stored checkout session, creating new one:', parseError);
+            // Continue to create new checkout session below
+          }
+        }
+        
+        // If no stored checkout session, create one for the existing shipment
+        console.log('Creating checkout session for existing shipment:', existingShipmentId);
+        
+        // Step 1: Get the shipment
+        const shipment = await shippingService.getShipment(existingShipmentId);
+        
+        if (shipment.status !== 'DRAFT') {
+          throw new Error(`Only draft shipments can be paid. Current status: ${shipment.status}`);
+        }
+        
+        setCreatedShipment({ shipment });
+        localStorage.setItem('parcego_pending_shipment_id', String(existingShipmentId));
+        
+        // Step 2: Get or create billing record
+        let billingId: number;
+        
+        if (shipment.billing && shipment.billing.id) {
+          billingId = shipment.billing.id;
+          console.log('Using existing billing ID from shipment:', billingId);
+        } else {
+          // Billing doesn't exist, create it
+          console.log('Creating new billing record for shipment:', existingShipmentId);
+          try {
+            const billing = await shippingService.createBilling({
+              shipment_id: existingShipmentId
+            });
+            billingId = billing.id;
+            console.log('Created billing with ID:', billingId);
+          } catch (createErr: any) {
+            // If billing creation fails because it already exists, fetch it
+            const errorMessage = createErr.message || createErr.details || '';
+            const isAlreadyExists = errorMessage.includes('already exists') || 
+                                   createErr.response?.status === 400 ||
+                                   createErr.status === 400;
+            
+            if (isAlreadyExists) {
+              console.log('Billing already exists, fetching billing records...');
+              const billingRecords = await shippingService.getBillingRecords({ page: 1, per_page: 100 });
+              const existingBilling = billingRecords.items?.find((b: any) => b.shipment_id === existingShipmentId);
+              if (existingBilling) {
+                billingId = existingBilling.id;
+                console.log('Found existing billing ID:', billingId);
+              } else {
+                throw new Error('Billing exists but could not be found');
+              }
+            } else {
+              throw createErr;
+            }
+          }
+        }
+        
+        // Step 3: Create checkout session
+        const checkoutSession = await shippingService.createCheckoutSession(billingId);
+        console.log('Checkout session created for existing shipment:', checkoutSession);
+        
+        // Get billing data
+        if (shipment.billing) {
+          setBillingData({
+            subtotal: shipment.billing.subtotal || '0',
+            tax_rate: shipment.billing.tax_rate || '0',
+            tax_amount: shipment.billing.tax_amount || '0',
+            amount: shipment.billing.total_amount || '0'
+          });
+        }
+        
+        // Handle Stripe checkout session
+        if (checkoutSession.client_secret) {
+          let clientSecret = checkoutSession.client_secret;
+          
+          // Decode the URL-encoded client secret
+          try {
+            clientSecret = decodeURIComponent(clientSecret);
+          } catch (e) {
+            console.warn('Failed to decode client secret:', e);
+          }
+          
+          setCheckoutSession({
+            ...checkoutSession,
+            client_secret: clientSecret
+          });
+          setShowStripePayment(true);
+          console.log('Showing Stripe Elements payment form for existing shipment');
+        } else if (checkoutSession.checkout_url) {
+          // Fallback: If we have a direct checkout URL, redirect to it
+          console.log('Redirecting to Stripe checkout URL:', checkoutSession.checkout_url);
+          sessionStorage.setItem('parcego_current_payment_shipment', String(existingShipmentId));
+          window.location.href = checkoutSession.checkout_url;
+        } else {
+          throw new Error('No valid payment method received from payment processor');
+        }
+        
+        setIsProcessing(false);
+        return;
+      }
+
+      // NEW SHIPMENT FLOW (original code)
+      console.log('Creating new shipment...');
       
       // Log the data we're about to send
       const shipmentRequest = createShipmentRequest();
@@ -479,6 +681,8 @@ function PurchaseLabelContent() {
         errorMessage = 'Invalid email format. Please check your email addresses.';
       } else if (errorObj.message?.includes('postal')) {
         errorMessage = 'Invalid postal code format. Please check your postal codes.';
+      } else if (errorObj.message?.includes('Only draft shipments')) {
+        errorMessage = errorObj.message;
       } else if (errorObj.response?.status === 500) {
         errorMessage = 'Server error occurred. Please try again in a few minutes.';
       } else if (errorObj.message?.includes('Network')) {
@@ -899,7 +1103,11 @@ function PurchaseLabelContent() {
                         id="parcego-payment-cta-btn"
                         type="button"
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 h-12 text-base font-medium transition-all duration-300 ease-out hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-                        disabled={isProcessing || !formData || !senderData}
+                        disabled={
+                          isProcessing || 
+                          (!searchParams?.get('shipment_id') && (!formData || !senderData)) ||
+                          (searchParams?.get('shipment_id') && !createdShipment)
+                        }
                         onClick={(e) => {
                           e.preventDefault();
                           handlePayment();
@@ -909,7 +1117,11 @@ function PurchaseLabelContent() {
                         {isProcessing ? (
                           <div className="flex items-center space-x-2">
                             <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                            <span>Creating shipment...</span>
+                            <span>
+                              {searchParams?.get('shipment_id') 
+                                ? 'Preparing payment...' 
+                                : 'Creating shipment...'}
+                            </span>
                           </div>
                         ) : (
                           <div className="flex items-center space-x-2">

@@ -155,6 +155,8 @@ export default function ShopifyDashboardPage() {
         <PageHeader
           title="Shopify Integration Dashboard"
           description="Monitor your Shopify store connections, order processing, and integration health"
+          onBack={() => router.back()}
+          backLabel="Back to Dashboard"
         />
 
         {/* Action Bar */}
