@@ -20,12 +20,9 @@ export function WelcomeBanner() {
         const userProfileData = await api.profile.getProfile()
         setUserProfile(userProfileData)
       } catch (error: any) {
-        console.error('Failed to fetch user profile:', error)
-        
         // Handle authentication errors by redirecting to login
         const status = error?.status || error?.response?.status;
         if (status === 401 || status === 403) {
-          console.log('Authentication failed, redirecting to login')
           // Clear any stale auth data
           localStorage.removeItem('auth_token')
           document.cookie = "mock-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
@@ -33,6 +30,9 @@ export function WelcomeBanner() {
           router.push('/login')
           return
         }
+        
+        // Only log non-auth errors
+        console.error('Failed to fetch user profile:', error)
         
         // Set userProfile to null if API fails for other reasons
         setUserProfile(null)
