@@ -87,15 +87,49 @@ const defaultFormData: ShipmentFormData = {
   insurance: false
 };
 
+// Helper function to exclude recipient fields from saved data
+const excludeRecipientFields = (data: ShipmentFormData): Partial<ShipmentFormData> => {
+  const {
+    recipientName,
+    recipientCompany,
+    recipientAddress,
+    recipientCity,
+    recipientProvince,
+    recipientPostalCode,
+    recipientPhone,
+    recipientEmail,
+    ...rest
+  } = data;
+  return rest;
+};
+
+// Helper function to merge saved data with default, excluding recipient fields
+const mergeSavedData = (saved: Partial<ShipmentFormData>): ShipmentFormData => {
+  return {
+    ...defaultFormData,
+    ...excludeRecipientFields(saved as ShipmentFormData),
+    // Always use default (empty) values for recipient fields
+    recipientName: "",
+    recipientCompany: "",
+    recipientAddress: "",
+    recipientCity: "",
+    recipientProvince: "",
+    recipientPostalCode: "",
+    recipientPhone: "",
+    recipientEmail: "",
+  };
+};
+
 // Provider component
 export const ShipmentProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [formData, setFormData] = useState<ShipmentFormData>(() => {
-    // Try to load from localStorage on mount
+    // Try to load from localStorage on mount, but exclude recipient fields
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('parcego-shipment-form-data');
       if (saved) {
         try {
-          return { ...defaultFormData, ...JSON.parse(saved) };
+          const parsed = JSON.parse(saved);
+          return mergeSavedData(parsed);
         } catch (error) {
           console.warn('Failed to parse saved form data:', error);
         }
@@ -109,9 +143,10 @@ export const ShipmentProvider: React.FC<{ children: ReactNode }> = ({ children }
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
       
-      // Save to localStorage
+      // Save to localStorage, but exclude recipient fields
       if (typeof window !== 'undefined') {
-        localStorage.setItem('parcego-shipment-form-data', JSON.stringify(updated));
+        const dataToSave = excludeRecipientFields(updated);
+        localStorage.setItem('parcego-shipment-form-data', JSON.stringify(dataToSave));
       }
       
       return updated;
@@ -123,9 +158,10 @@ export const ShipmentProvider: React.FC<{ children: ReactNode }> = ({ children }
     setFormData(prev => {
       const updated = { ...prev, ...updates };
       
-      // Save to localStorage
+      // Save to localStorage, but exclude recipient fields
       if (typeof window !== 'undefined') {
-        localStorage.setItem('parcego-shipment-form-data', JSON.stringify(updated));
+        const dataToSave = excludeRecipientFields(updated);
+        localStorage.setItem('parcego-shipment-form-data', JSON.stringify(dataToSave));
       }
       
       return updated;
