@@ -80,20 +80,20 @@ export function PerformanceSummary() {
         const metrics = calculatePerformanceMetrics(response.data)
         setPerformanceData(metrics)
       } catch (err: any) {
-        console.error('Failed to fetch performance data:', err)
-        
         // Check if it's an authentication error (401 or 403)
         const status = err?.status || err?.response?.status;
         const isUnauthorized = status === 401 || status === 403;
         
         if (isUnauthorized) {
           // Clear auth data and redirect to login
-          console.log('Authentication failed, redirecting to login')
           localStorage.removeItem('auth_token')
           document.cookie = "mock-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
           router.push('/login')
           return
         }
+        
+        // Only log non-auth errors
+        console.error('Failed to fetch performance data:', err)
         
         setError('Failed to load performance data')
       } finally {

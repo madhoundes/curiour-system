@@ -157,10 +157,20 @@ export default function CreateShipmentPage() {
     loadProfile();
   }, []);
 
-  // Set default province to "ON" for recipient address (service area is Ontario)
+  // Reset recipient fields to empty on mount to ensure no cached values
   useEffect(() => {
-    if (!formData.recipientProvince || formData.recipientProvince.trim() === '') {
-      updateFormField('recipientProvince', 'ON');
+    // Clear all recipient fields to ensure they start empty
+    if (formData.recipientName || formData.recipientCompany || formData.recipientAddress || 
+        formData.recipientCity || formData.recipientPostalCode || formData.recipientPhone || 
+        formData.recipientEmail) {
+      updateFormField('recipientName', '');
+      updateFormField('recipientCompany', '');
+      updateFormField('recipientAddress', '');
+      updateFormField('recipientCity', '');
+      updateFormField('recipientProvince', '');
+      updateFormField('recipientPostalCode', '');
+      updateFormField('recipientPhone', '');
+      updateFormField('recipientEmail', '');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
@@ -213,6 +223,11 @@ export default function CreateShipmentPage() {
         const error = validatePostalCode(formData.recipientPostalCode, value as string);
         setPostalCodeError(error);
       }
+    }
+    
+    // Clear province if city is cleared
+    if (field === 'recipientCity' && !value) {
+      updateFormField('recipientProvince', '');
     }
 
     // Validate postal code when it changes
@@ -536,7 +551,7 @@ export default function CreateShipmentPage() {
                   <Input
                     id="parcego-recipient-province"
                     placeholder="ON"
-                    value={formData.recipientProvince || 'ON'}
+                    value={formData.recipientProvince}
                     readOnly
                     className="parcego-form__input bg-gray-50 cursor-not-allowed"
                     required
