@@ -1,7 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, ReactNode, useEffect } from 'react';
 import { ShippingLabelData } from '@/components/pdf/polished-shipping-label';
+import { getCurrentUserId, getShipmentCacheKey } from '@/lib/shipment-cache-utils';
 
 // Types for shipment form data
 export interface ShipmentFormData {
@@ -87,94 +88,101 @@ const defaultFormData: ShipmentFormData = {
   insurance: false
 };
 
-// Helper function to exclude recipient fields from saved data
-const excludeRecipientFields = (data: ShipmentFormData): Partial<ShipmentFormData> => {
-  const {
-    recipientName,
-    recipientCompany,
-    recipientAddress,
-    recipientCity,
-    recipientProvince,
-    recipientPostalCode,
-    recipientPhone,
-    recipientEmail,
-    ...rest
-  } = data;
-  return rest;
-};
-
-// Helper function to merge saved data with default, excluding recipient fields
-const mergeSavedData = (saved: Partial<ShipmentFormData>): ShipmentFormData => {
-  return {
-    ...defaultFormData,
-    ...excludeRecipientFields(saved as ShipmentFormData),
-    // Always use default (empty) values for recipient fields
-    recipientName: "",
-    recipientCompany: "",
-    recipientAddress: "",
-    recipientCity: "",
-    recipientProvince: "",
-    recipientPostalCode: "",
-    recipientPhone: "",
-    recipientEmail: "",
-  };
-};
 
 // Provider component
 export const ShipmentProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [userId, setUserId] = useState<string | number | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
+  
+  // Load user ID on mount
+  useEffect(() => {
+    const loadUserId = async () => {
+      try {
+        const id = await getCurrentUserId();
+        setUserId(id);
+      } catch (error) {
+        console.warn('Failed to load user ID:', error);
+        setUserId(null);
+      } finally {
+        setIsLoadingUser(false);
+      }
+    };
+    
+    loadUserId();
+  }, []);
+
   const [formData, setFormData] = useState<ShipmentFormData>(() => {
-    // Try to load from localStorage on mount, but exclude recipient fields
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('parcego-shipment-form-data');
+    // Initial load - will be updated once userId is loaded
+    return defaultFormData;
+  });
+
+  // Load cached data once userId is available
+  useEffect(() => {
+    if (!isLoadingUser && typeof window !== 'undefined') {
+      const cacheKey = getShipmentCacheKey(userId);
+      const saved = localStorage.getItem(cacheKey);
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          return mergeSavedData(parsed);
+          setFormData({ ...defaultFormData, ...parsed });
         } catch (error) {
           console.warn('Failed to parse saved form data:', error);
         }
+      } else {
+        // Fallback to legacy non-user-specific key for backward compatibility
+        const legacySaved = localStorage.getItem('parcego-shipment-form-data');
+        if (legacySaved) {
+          try {
+            const parsed = JSON.parse(legacySaved);
+            setFormData({ ...defaultFormData, ...parsed });
+          } catch (error) {
+            console.warn('Failed to parse legacy saved form data:', error);
+          }
+        }
       }
     }
-    return defaultFormData;
-  });
+  }, [userId, isLoadingUser]);
 
   // Update single field
   const updateFormField = useCallback((field: keyof ShipmentFormData, value: string | boolean) => {
     setFormData(prev => {
       const updated = { ...prev, [field]: value };
       
-      // Save to localStorage, but exclude recipient fields
+      // Save to localStorage with user-specific key
       if (typeof window !== 'undefined') {
-        const dataToSave = excludeRecipientFields(updated);
-        localStorage.setItem('parcego-shipment-form-data', JSON.stringify(dataToSave));
+        const cacheKey = getShipmentCacheKey(userId);
+        localStorage.setItem(cacheKey, JSON.stringify(updated));
       }
       
       return updated;
     });
-  }, []);
+  }, [userId]);
 
   // Update multiple fields at once
   const updateMultipleFields = useCallback((updates: Partial<ShipmentFormData>) => {
     setFormData(prev => {
       const updated = { ...prev, ...updates };
       
-      // Save to localStorage, but exclude recipient fields
+      // Save to localStorage with user-specific key
       if (typeof window !== 'undefined') {
-        const dataToSave = excludeRecipientFields(updated);
-        localStorage.setItem('parcego-shipment-form-data', JSON.stringify(dataToSave));
+        const cacheKey = getShipmentCacheKey(userId);
+        localStorage.setItem(cacheKey, JSON.stringify(updated));
       }
       
       return updated;
     });
-  }, []);
+  }, [userId]);
 
   // Reset form to defaults
   const resetForm = useCallback(() => {
     setFormData(defaultFormData);
     if (typeof window !== 'undefined') {
+      const cacheKey = getShipmentCacheKey(userId);
+      localStorage.removeItem(cacheKey);
+      // Also clear legacy non-user-specific key for backward compatibility
       localStorage.removeItem('parcego-shipment-form-data');
     }
-  }, []);
+  }, [userId]);
 
   // Get current form data
   const getFormData = useCallback(() => formData, [formData]);

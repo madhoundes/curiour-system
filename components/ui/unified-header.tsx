@@ -62,9 +62,19 @@ export function UnifiedHeader({ onSidebarToggle }: UnifiedHeaderProps) {
     ? `${userProfile.first_name[0]}${userProfile.last_name[0]}`
     : 'JD'
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     // Clear the mock authentication cookie
     document.cookie = "mock-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
+    
+    // Clear shipment form data cache on logout
+    if (typeof window !== 'undefined') {
+      try {
+        const { clearAllShipmentFormData } = await import('@/lib/shipment-cache-utils');
+        clearAllShipmentFormData();
+      } catch (error) {
+        console.warn('Failed to clear shipment cache on logout:', error);
+      }
+    }
     
     // Mock logout - in real app this would clear auth tokens
     router.push('/login');

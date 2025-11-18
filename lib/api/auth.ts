@@ -90,6 +90,16 @@ export class AuthService {
     } finally {
       // Always remove token locally
       apiClient.removeAuthToken();
+      
+      // Clear shipment form data cache on logout
+      if (typeof window !== 'undefined') {
+        try {
+          const { clearAllShipmentFormData } = await import('@/lib/shipment-cache-utils');
+          clearAllShipmentFormData();
+        } catch (error) {
+          console.warn('Failed to clear shipment cache on logout:', error);
+        }
+      }
     }
   }
 

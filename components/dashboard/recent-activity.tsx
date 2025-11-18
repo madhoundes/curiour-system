@@ -93,6 +93,7 @@ export function RecentActivity() {
       
       setActivities(transformedActivities)
     } catch (err) {
+      console.error('Error fetching recent activities:', err)
       setError('Failed to load recent activities')
       // Fallback to mock data
       const transformedActivities: RecentActivity[] = recentActivities.map(activity => ({
