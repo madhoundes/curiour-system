@@ -49,7 +49,6 @@ interface OrderData {
 }
 
 function PurchaseLabelContent() {
-  console.log('PurchaseLabelPage: Component rendering');
   const router = useRouter();
   const searchParams = useSearchParams();
   const { formData } = useShipment();
@@ -92,8 +91,6 @@ function PurchaseLabelContent() {
     
     // If we have an existing shipment ID, we don't need orderData from localStorage
     if (existingShipmentId && existingShipmentId > 0) {
-      console.log('Loading existing shipment data for ID:', existingShipmentId);
-      
       // Load the existing shipment
       const loadExistingShipment = async () => {
         try {
@@ -107,11 +104,9 @@ function PurchaseLabelContent() {
               subtotal: shipment.billing.subtotal || '0',
               tax_rate: shipment.billing.tax_rate || '0',
               tax_amount: shipment.billing.tax_amount || '0',
-              amount: shipment.billing.total_amount || '0'
+              amount: shipment.billing.amount || '0'
             });
           }
-          
-          console.log('Existing shipment loaded:', shipment);
         } catch (error) {
           console.error('Failed to load existing shipment:', error);
           setShipmentError('Failed to load shipment information. Please try again.');
@@ -128,7 +123,6 @@ function PurchaseLabelContent() {
       try {
         const parsedOrderData = JSON.parse(savedOrderData);
         setOrderData(parsedOrderData);
-        console.log('Order data loaded:', parsedOrderData);
       } catch (error) {
         console.error('Failed to parse order data:', error);
         setShipmentError('Failed to load order information. Please go back and try again.');
@@ -146,8 +140,6 @@ function PurchaseLabelContent() {
     const paid = searchParams?.get('paid');
     const sessionId = searchParams?.get('session_id');
     if (paid === '1' && sessionId) {
-      console.log('Returned from Stripe with paid status. session_id:', sessionId);
-      
       // Refresh shipment status after payment
       const refreshShipmentStatus = async () => {
         try {
@@ -160,19 +152,15 @@ function PurchaseLabelContent() {
           
           if (storedShipmentId) {
             shipmentIdToRefresh = parseInt(storedShipmentId);
-            console.log('Retrieved shipment ID from localStorage:', shipmentIdToRefresh);
           } else if (createdShipment?.shipment?.id) {
             shipmentIdToRefresh = createdShipment.shipment.id;
-            console.log('Using shipment ID from state:', shipmentIdToRefresh);
           }
           
           if (shipmentIdToRefresh) {
-            console.log('Refreshing shipment status for ID:', shipmentIdToRefresh);
             const shipments = await shippingService.getShipments();
             const updatedShipment = shipments.find(s => s.id === shipmentIdToRefresh);
             
             if (updatedShipment) {
-              console.log('Updated shipment status:', updatedShipment.status);
               // Update the created shipment with latest data
               setCreatedShipment({
                 success: true,
@@ -184,7 +172,6 @@ function PurchaseLabelContent() {
               // Clear localStorage after successful retrieval
               localStorage.removeItem('parcego_pending_shipment_id');
               localStorage.removeItem('parcego_pending_shipment');
-              console.log('Cleared shipment from localStorage');
             }
           }
         } catch (error) {
@@ -212,7 +199,6 @@ function PurchaseLabelContent() {
       try {
         const profile = await profileService.getProfile();
         setSenderData(profile);
-        console.log('Profile loaded successfully:', profile);
       } catch (error) {
         console.error('Failed to load sender profile:', error);
         
@@ -411,20 +397,13 @@ function PurchaseLabelContent() {
       const storedCheckoutSession = sessionStorage.getItem('parcego_checkout_session');
       const storedShipmentId = sessionStorage.getItem('parcego_payment_shipment_id');
 
-      console.log('Starting payment flow...');
-      console.log('Existing shipment ID from URL:', existingShipmentId);
-      console.log('Stored checkout session:', storedCheckoutSession ? 'exists' : 'not found');
-      console.log('Stored shipment ID:', storedShipmentId);
 
       // If we have an existing shipment ID, use the existing shipment flow
       if (existingShipmentId && existingShipmentId > 0) {
-        console.log('Processing payment for existing shipment:', existingShipmentId);
-        
         // Try to use stored checkout session first (set by shipments page)
         if (storedCheckoutSession) {
           try {
             const checkoutSessionData = JSON.parse(storedCheckoutSession);
-            console.log('Using stored checkout session:', checkoutSessionData);
             
             // Load the existing shipment
             const shipment = await shippingService.getShipment(existingShipmentId);
@@ -439,7 +418,7 @@ function PurchaseLabelContent() {
               try {
                 clientSecret = decodeURIComponent(clientSecret);
               } catch (e) {
-                console.warn('Failed to decode client secret:', e);
+                // Use original client secret if decoding fails
               }
               
               setCheckoutSession({
@@ -453,7 +432,7 @@ function PurchaseLabelContent() {
                   subtotal: shipment.billing.subtotal || '0',
                   tax_rate: shipment.billing.tax_rate || '0',
                   tax_amount: shipment.billing.tax_amount || '0',
-                  amount: shipment.billing.total_amount || '0'
+                  amount: shipment.billing.amount || '0'
                 });
               }
               
@@ -465,14 +444,11 @@ function PurchaseLabelContent() {
               return;
             }
           } catch (parseError) {
-            console.warn('Failed to parse stored checkout session, creating new one:', parseError);
             // Continue to create new checkout session below
           }
         }
         
         // If no stored checkout session, create one for the existing shipment
-        console.log('Creating checkout session for existing shipment:', existingShipmentId);
-        
         // Step 1: Get the shipment
         const shipment = await shippingService.getShipment(existingShipmentId);
         
@@ -488,16 +464,13 @@ function PurchaseLabelContent() {
         
         if (shipment.billing && shipment.billing.id) {
           billingId = shipment.billing.id;
-          console.log('Using existing billing ID from shipment:', billingId);
         } else {
           // Billing doesn't exist, create it
-          console.log('Creating new billing record for shipment:', existingShipmentId);
           try {
             const billing = await shippingService.createBilling({
               shipment_id: existingShipmentId
             });
             billingId = billing.id;
-            console.log('Created billing with ID:', billingId);
           } catch (createErr: any) {
             // If billing creation fails because it already exists, fetch it
             const errorMessage = createErr.message || createErr.details || '';
@@ -506,12 +479,10 @@ function PurchaseLabelContent() {
                                    createErr.status === 400;
             
             if (isAlreadyExists) {
-              console.log('Billing already exists, fetching billing records...');
               const billingRecords = await shippingService.getBillingRecords({ page: 1, per_page: 100 });
               const existingBilling = billingRecords.items?.find((b: any) => b.shipment_id === existingShipmentId);
               if (existingBilling) {
                 billingId = existingBilling.id;
-                console.log('Found existing billing ID:', billingId);
               } else {
                 throw new Error('Billing exists but could not be found');
               }
@@ -523,7 +494,6 @@ function PurchaseLabelContent() {
         
         // Step 3: Create checkout session
         const checkoutSession = await shippingService.createCheckoutSession(billingId);
-        console.log('Checkout session created for existing shipment:', checkoutSession);
         
         // Get billing data
         if (shipment.billing) {
@@ -531,7 +501,7 @@ function PurchaseLabelContent() {
             subtotal: shipment.billing.subtotal || '0',
             tax_rate: shipment.billing.tax_rate || '0',
             tax_amount: shipment.billing.tax_amount || '0',
-            amount: shipment.billing.total_amount || '0'
+            amount: shipment.billing.amount || '0'
           });
         }
         
@@ -539,22 +509,20 @@ function PurchaseLabelContent() {
         if (checkoutSession.client_secret) {
           let clientSecret = checkoutSession.client_secret;
           
-          // Decode the URL-encoded client secret
-          try {
-            clientSecret = decodeURIComponent(clientSecret);
-          } catch (e) {
-            console.warn('Failed to decode client secret:', e);
-          }
+              // Decode the URL-encoded client secret
+              try {
+                clientSecret = decodeURIComponent(clientSecret);
+              } catch (e) {
+                // Use original client secret if decoding fails
+              }
           
           setCheckoutSession({
             ...checkoutSession,
             client_secret: clientSecret
           });
           setShowStripePayment(true);
-          console.log('Showing Stripe Elements payment form for existing shipment');
         } else if (checkoutSession.checkout_url) {
           // Fallback: If we have a direct checkout URL, redirect to it
-          console.log('Redirecting to Stripe checkout URL:', checkoutSession.checkout_url);
           sessionStorage.setItem('parcego_current_payment_shipment', String(existingShipmentId));
           window.location.href = checkoutSession.checkout_url;
         } else {
@@ -566,15 +534,7 @@ function PurchaseLabelContent() {
       }
 
       // NEW SHIPMENT FLOW (original code)
-      console.log('Creating new shipment...');
-      
-      // Log the data we're about to send
       const shipmentRequest = createShipmentRequest();
-      console.log('Shipment request data:', JSON.stringify(shipmentRequest, null, 2));
-      
-      // Validate that all required fields are present
-      console.log('Validating sender data:', senderData);
-      console.log('Validating form data:', formData);
       
       if (!senderData) {
         throw new Error('Sender profile data is missing. Please refresh the page and try again.');
@@ -587,11 +547,6 @@ function PurchaseLabelContent() {
       // Create shipment request from context data
       const shippingFlow = await shippingService.createShippingFlow(shipmentRequest);
 
-      console.log('Shipping flow created successfully:', shippingFlow);
-      console.log('Checkout session object:', JSON.stringify(shippingFlow.checkoutSession, null, 2));
-      console.log('Checkout session keys:', Object.keys(shippingFlow.checkoutSession || {}));
-      console.log('Client secret value:', shippingFlow.checkoutSession?.client_secret);
-
         // Store shipment from shipping flow to prevent duplicate creation
         setCreatedShipment(shippingFlow.shipment);
         // Also persist to localStorage to survive redirect
@@ -599,11 +554,9 @@ function PurchaseLabelContent() {
           localStorage.setItem('parcego_pending_shipment_id', String(shippingFlow.shipment.shipment.id));
           localStorage.setItem('parcego_pending_shipment', JSON.stringify(shippingFlow.shipment.shipment));
         }
-        console.log('Shipment stored:', shippingFlow.shipment);
 
       // Store billing data from shipping flow
       setBillingData(shippingFlow.billing);
-      console.log('Billing data stored:', shippingFlow.billing);
 
       // Handle Stripe checkout session with client_secret
       if (shippingFlow.checkoutSession?.client_secret) {
@@ -612,10 +565,7 @@ function PurchaseLabelContent() {
         // Decode the URL-encoded client secret
         try {
           clientSecret = decodeURIComponent(clientSecret);
-          console.log('Original client secret:', shippingFlow.checkoutSession.client_secret);
-          console.log('Decoded client secret:', clientSecret);
         } catch (e) {
-          console.warn('Failed to decode client secret:', e);
           clientSecret = shippingFlow.checkoutSession.client_secret;
         }
         
@@ -625,24 +575,15 @@ function PurchaseLabelContent() {
           client_secret: clientSecret
         });
         setShowStripePayment(true);
-        console.log('Showing Stripe Elements payment form with decoded client_secret');
       } else if (shippingFlow.checkoutSession?.checkout_url) {
         // Fallback: If we have a direct checkout URL, redirect to it
-        console.log('Redirecting to Stripe checkout URL:', shippingFlow.checkoutSession.checkout_url);
         window.location.href = shippingFlow.checkoutSession.checkout_url;
       } else {
         throw new Error('No valid payment method received from payment processor');
       }
 
     } catch (error: unknown) {
-      console.error('Payment flow failed:', error);
-      
       const errorObj = error as Error & { response?: { status?: number; data?: any } };
-      console.error('Error details:', {
-        message: errorObj.message,
-        stack: errorObj.stack,
-        response: errorObj.response?.data
-      });
 
       let errorMessage = 'Payment processing failed. ';
       
@@ -691,7 +632,6 @@ function PurchaseLabelContent() {
       if (!existingShipment) {
         const storedShipmentId = localStorage.getItem('parcego_pending_shipment_id');
         if (storedShipmentId) {
-          console.log('Retrieving shipment from localStorage:', storedShipmentId);
           // Fetch the shipment from API
           const shipments = await shippingService.getShipments();
           existingShipment = shipments.find(s => s.id === parseInt(storedShipmentId));
@@ -705,11 +645,9 @@ function PurchaseLabelContent() {
         // Use existing shipment to prevent duplicates
         shipmentId = existingShipment.id;
         shipmentStatus = existingShipment.status;
-        console.log('Using existing shipment ID:', shipmentId, 'Status:', shipmentStatus);
         
         // Check if shipment is paid, if not refresh status
         if (shipmentStatus?.toLowerCase() !== 'paid') {
-          console.log('Shipment not paid yet, refreshing status...');
           try {
             const shipments = await shippingService.getShipments();
             const updatedShipment = shipments.find(s => s.id === shipmentId);
@@ -719,10 +657,9 @@ function PurchaseLabelContent() {
                 ...createdShipment,
                 shipment: updatedShipment
               });
-              console.log('Refreshed shipment status:', shipmentStatus);
             }
           } catch (error) {
-            console.error('Error refreshing shipment status:', error);
+            // Error refreshing status, will use existing status
           }
         }
         
@@ -732,7 +669,6 @@ function PurchaseLabelContent() {
         }
       } else {
         // Only create shipment if it doesn't exist
-        console.warn('No existing shipment found, creating new one (this should not happen after payment)');
         const shipmentRequest = createShipmentRequest();
         const shipmentResponse = await shippingService.createShipment(shipmentRequest);
         setCreatedShipment(shipmentResponse);
@@ -755,8 +691,6 @@ function PurchaseLabelContent() {
       }
       
     } catch (error) {
-      console.error('Error generating PDF:', error);
-      
       const errorObj = error as Error;
       let errorMessage = 'Failed to generate PDF. Please try again.';
       
@@ -774,8 +708,6 @@ function PurchaseLabelContent() {
   
   // Handle preview - generate PDF and open stable modal
   const handlePreviewAndPrint = async () => {
-    console.log('Preview & Print Label clicked - generating preview...');
-    
     if (isGeneratingPreview) {
       return; // Prevent double-clicks
     }
@@ -797,7 +729,6 @@ function PurchaseLabelContent() {
       if (!existingShipment) {
         const storedShipmentId = localStorage.getItem('parcego_pending_shipment_id');
         if (storedShipmentId) {
-          console.log('Retrieving shipment from localStorage for preview:', storedShipmentId);
           // Fetch the shipment from API
           const shipments = await shippingService.getShipments();
           existingShipment = shipments.find(s => s.id === parseInt(storedShipmentId));
@@ -811,11 +742,9 @@ function PurchaseLabelContent() {
         // Use existing shipment to prevent duplicates
         shipmentId = existingShipment.id;
         shipmentStatus = existingShipment.status;
-        console.log('Using existing shipment ID for preview:', shipmentId, 'Status:', shipmentStatus);
         
         // Check if shipment is paid, if not refresh status
         if (shipmentStatus?.toLowerCase() !== 'paid') {
-          console.log('Shipment not paid yet, refreshing status...');
           try {
             const shipments = await shippingService.getShipments();
             const updatedShipment = shipments.find(s => s.id === shipmentId);
@@ -825,10 +754,9 @@ function PurchaseLabelContent() {
                 ...createdShipment,
                 shipment: updatedShipment
               });
-              console.log('Refreshed shipment status:', shipmentStatus);
             }
           } catch (error) {
-            console.error('Error refreshing shipment status:', error);
+            // Error refreshing status, will use existing status
           }
         }
         
@@ -838,7 +766,6 @@ function PurchaseLabelContent() {
         }
       } else {
         // Only create shipment if it doesn't exist (should not happen after payment)
-        console.warn('No existing shipment found for preview, creating new one (this should not happen after payment)');
         const shipmentRequest = createShipmentRequest();
         const shipmentResponse = await shippingService.createShipment(shipmentRequest);
         setCreatedShipment(shipmentResponse);
@@ -860,8 +787,6 @@ function PurchaseLabelContent() {
         throw new Error('No label URL received from API');
       }
     } catch (error) {
-      console.error('Error in handlePreviewAndPrint:', error);
-      
       const errorObj = error as Error;
       let errorMessage = 'Failed to generate label preview.';
       
@@ -918,7 +843,6 @@ function PurchaseLabelContent() {
             iframe.contentWindow.print();
           }
         } catch (error) {
-          console.error('Error printing:', error);
           // Fallback - open in new tab
           window.open(pdfBlobUrl, '_blank');
         }
@@ -992,7 +916,6 @@ function PurchaseLabelContent() {
                   amount={parseFloat(checkoutSession.amount || '0') * 100} // Convert to cents
                   currency={checkoutSession.currency?.toLowerCase() || 'cad'}
                   onSuccess={async () => {
-                    console.log('Payment successful');
                     setShowStripePayment(false);
                     
                     // Capture shipment ID immediately to avoid stale closure issues
@@ -1000,7 +923,6 @@ function PurchaseLabelContent() {
                     
                     // Wait for backend to process payment and update shipment status
                     if (shipmentId) {
-                      console.log('Waiting for shipment status update for ID:', shipmentId);
                       let attempts = 0;
                       const maxAttempts = 10;
                       
@@ -1012,7 +934,6 @@ function PurchaseLabelContent() {
                           const updatedShipment = shipments.find(s => s.id === shipmentId);
                           
                           if (updatedShipment && updatedShipment.status?.toLowerCase() === 'paid') {
-                            console.log('Shipment status updated to PAID');
                             setCreatedShipment({
                               success: true,
                               shipment: updatedShipment,
@@ -1027,11 +948,9 @@ function PurchaseLabelContent() {
                           if (attempts < maxAttempts) {
                             setTimeout(checkShipmentStatus, 1000);
                           } else {
-                            console.warn('Shipment status update timeout, showing confirmation anyway');
                             setShowConfirmation(true);
                           }
                         } catch (error) {
-                          console.error('Error checking shipment status:', error);
                           setShowConfirmation(true);
                         }
                       };
@@ -1042,7 +961,6 @@ function PurchaseLabelContent() {
                     }
                   }}
                   onError={(error) => {
-                    console.error('Payment failed:', error);
                     setShipmentError(error || 'Payment failed. Please try again.');
                     setShowStripePayment(false);
                   }}
@@ -1083,7 +1001,7 @@ function PurchaseLabelContent() {
                         disabled={
                           isProcessing || 
                           (!searchParams?.get('shipment_id') && (!formData || !senderData)) ||
-                          (searchParams?.get('shipment_id') && !createdShipment)
+                          (!!searchParams?.get('shipment_id') && !createdShipment)
                         }
                         onClick={(e) => {
                           e.preventDefault();
@@ -1270,8 +1188,9 @@ function PurchaseLabelContent() {
                   className="w-full h-full border-0"
                   title="Shipping Label Preview"
                   id="parcego-preview-iframe"
-                  onLoad={() => console.log('PDF preview loaded successfully')}
-                  onError={() => console.error('Error loading PDF preview')}
+                  onError={() => {
+                    // Error loading PDF preview
+                  }}
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gray-50">
