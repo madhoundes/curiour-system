@@ -13,7 +13,6 @@ import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { createStepperSteps, Stepper } from "@/components/ui/stepper";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Separator } from "@/components/ui/separator";
 import type { CreateShipmentRequest, UserProfile } from "@/lib/api/types";
 import { StripePaymentForm } from "@/components/ui/stripe-payment-form";
 
@@ -206,28 +205,6 @@ function PurchaseLabelContent() {
     }
   }, [searchParams]);
 
-  // Calculate total cost including additional services
-  const calculateTotalCost = (): number => {
-    if (!orderData) return 0;
-    
-    // Use billing data if available (from shipping flow), otherwise fall back to orderData
-    const basePrice = billingData ? parseFloat(billingData.subtotal) : orderData.selectedQuote.price;
-    
-    let total = basePrice;
-    
-    // Only add additional fees if we're using orderData (legacy flow)
-    // The billing data already includes all fees
-    if (!billingData) {
-      if (orderData.fragile) total += 3.00;
-      if (orderData.valuable) total += 5.00;
-      if (orderData.insurance) total += 8.00;
-    } else {
-      // If we have billing data, use the total amount directly
-      total = parseFloat(billingData.amount);
-    }
-    
-    return total;
-  };
 
   // Load sender profile data
   useEffect(() => {
@@ -1004,7 +981,7 @@ function PurchaseLabelContent() {
             </Card>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          <div className="max-w-2xl mx-auto">
             {/* Stripe Payment Section */}
             <div className="space-y-6">
               {/* Stripe Elements Payment Form */}
@@ -1138,82 +1115,6 @@ function PurchaseLabelContent() {
                   </CardContent>
                 </Card>
               )}
-            </div>
-
-            {/* Order Summary */}
-            <div className="space-y-6">
-              <Card id="parcego-payment-summary-card">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-base font-semibold">Order Summary</CardTitle>
-                  <CardDescription>Review your shipment details and pricing</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {/* Only show cost breakdown after payment processing starts or billing data is available */}
-                  {(billingData || showStripePayment) && (
-                    <>
-                      <div className="space-y-2 text-sm">
-                        {billingData ? (
-                          // Show billing data from shipping flow
-                          <>
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Subtotal</span>
-                              <span className="font-medium">${parseFloat(billingData.subtotal).toFixed(2)}</span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Tax ({(parseFloat(billingData.tax_rate) * 100).toFixed(1)}%)</span>
-                              <span className="font-medium">${parseFloat(billingData.tax_amount).toFixed(2)}</span>
-                            </div>
-                          </>
-                        ) : (
-                          // Fallback to orderData (legacy flow)
-                          <>
-                            <div className="flex items-center justify-between">
-                              <span className="text-muted-foreground">Base shipping cost</span>
-                              <span className="font-medium">${orderData?.selectedQuote?.price?.toFixed(2) || '0.00'}</span>
-                            </div>
-                            
-                            {orderData?.fragile && (
-                              <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">Fragile handling</span>
-                                <span className="font-medium">$3.00</span>
-                              </div>
-                            )}
-                            
-                            {orderData?.valuable && (
-                              <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">High value handling</span>
-                                <span className="font-medium">$5.00</span>
-                              </div>
-                            )}
-                            
-                            {orderData?.insurance && (
-                              <div className="flex items-center justify-between">
-                                <span className="text-muted-foreground">Additional insurance</span>
-                                <span className="font-medium">$8.00</span>
-                              </div>
-                            )}
-                          </>
-                        )}
-                      </div>
-                      <Separator />
-                      <div className="flex items-center justify-between">
-                        <span className="text-sm font-semibold">Total</span>
-                        <span className="text-xl font-bold">${calculateTotalCost().toFixed(2)}</span>
-                      </div>
-                    </>
-                  )}
-
-                  {/* Error Display */}
-                  {shipmentError && (
-                    <div className="p-3 bg-red-50 border border-red-200 rounded-md">
-                      <div className="flex items-center space-x-2">
-                        <Icon name="AlertCircle" size={16} className="text-red-600" />
-                        <span className="text-sm text-red-700">{shipmentError}</span>
-                      </div>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
             </div>
           </div>
         </div>
