@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -142,6 +142,7 @@ const STORAGE_KEYS = {
 } as const;
 
 function ProfileAccountPageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const prefersReducedMotion =
     typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -439,6 +440,11 @@ function ProfileAccountPageContent() {
         }
         
         onOk(`${label} saved successfully`);
+        
+        // Redirect to create shipment page after successful business info save
+        if (key === STORAGE_KEYS.business) {
+          router.push('/create-shipment');
+        }
       } catch (error: any) {
         console.error('Failed to save profile:', error);
         onOk(`Failed to save ${label}: ${error.message || 'Unknown error'}`);

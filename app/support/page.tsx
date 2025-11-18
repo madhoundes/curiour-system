@@ -421,9 +421,9 @@ export default function SupportHelpCenter() {
           <TabsContent value="videos" className="space-y-6">
             <div>
               <h3 className="text-2xl font-semibold text-gray-900 mb-4">Video Tutorials</h3>
-              <div id="parcego-support-video-section" className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {filteredVideos.length > 0 ? (
-                  filteredVideos.map((video) => (
+              {filteredVideos.length > 0 ? (
+                <div id="parcego-support-video-section" className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {filteredVideos.map((video) => (
                     <Card
                       key={video.id}
                       id={`parcego-support-video-${video.id}`}
@@ -446,17 +446,19 @@ export default function SupportHelpCenter() {
                         </CardDescription>
                       </CardHeader>
                     </Card>
-                  ))
-                ) : (
-                  <div id="parcego-support-no-results" className="text-center py-12 w-full">
-                    <Icon name="Video" className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Video Tutorials Coming Soon</h3>
-                    <p className="text-gray-500 mb-4 max-w-md mx-auto">
+                  ))}
+                </div>
+              ) : (
+                <div id="parcego-support-no-results" className="flex items-center justify-center min-h-[400px] w-full">
+                  <div className="text-center max-w-lg mx-auto px-4">
+                    <Icon name="Video" className="h-16 w-16 text-gray-400 mx-auto mb-6" />
+                    <h3 className="text-xl font-semibold text-gray-900 mb-3">Video Tutorials Coming Soon</h3>
+                    <p className="text-gray-600 text-base leading-relaxed">
                       We're working on creating helpful video tutorials to guide you through using our platform. Check back soon for step-by-step video guides!
                     </p>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </TabsContent>
         </Tabs>
