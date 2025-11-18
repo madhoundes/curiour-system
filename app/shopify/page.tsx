@@ -149,43 +149,40 @@ export default function ShopifyDashboardPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="container mx-auto px-4 py-6">
-        {/* Page Header */}
-        <PageHeader
-          title="Shopify Integration Dashboard"
-          description="Monitor your Shopify store connections, order processing, and integration health"
-          onBack={() => router.back()}
-          backLabel="Back to Dashboard"
-        />
+    <div className="flex flex-1 flex-col space-y-6">
+      {/* Page Header */}
+      <PageHeader
+        title="Shopify Integration Dashboard"
+        description="Monitor your Shopify store connections, order processing, and integration health"
+      />
 
-        {/* Action Bar */}
-        <div
-          className={`mb-6 flex items-center justify-between ${
-            prefersReducedMotion ? "" : "animate-in fade-in slide-in-from-bottom-1 duration-300"
-          }`}
-        >
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={isLoadingSummary || isLoadingActivity || isLoadingAlerts}
-              aria-label="Refresh dashboard data"
-              id="parcego-shopify-dashboard-refresh-btn"
-            >
-              <Icon name="RefreshCw" size={16} className="mr-2" />
-              Refresh
-            </Button>
-          </div>
+      {/* Action Bar */}
+      <div
+        className={`flex items-center justify-between ${
+          prefersReducedMotion ? "" : "animate-in fade-in slide-in-from-bottom-1 duration-300"
+        }`}
+      >
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isLoadingSummary || isLoadingActivity || isLoadingAlerts}
+            aria-label="Refresh dashboard data"
+            id="parcego-shopify-dashboard-refresh-btn"
+          >
+            <Icon name="RefreshCw" size={16} className="mr-2" />
+            Refresh
+          </Button>
         </div>
+      </div>
 
-        {/* Main Content Grid */}
-        <div
-          className={`grid grid-cols-1 gap-6 lg:grid-cols-3 ${
-            prefersReducedMotion ? "" : "animate-in fade-in slide-in-from-bottom-2 duration-300"
-          }`}
-        >
+      {/* Main Content Grid */}
+      <div
+        className={`grid grid-cols-1 gap-6 lg:grid-cols-3 ${
+          prefersReducedMotion ? "" : "animate-in fade-in slide-in-from-bottom-2 duration-300"
+        }`}
+      >
           {/* Left Column - Main Stats and Stores */}
           <div className="lg:col-span-2 space-y-6">
             {/* Summary Stats */}
@@ -273,7 +270,6 @@ export default function ShopifyDashboardPage() {
             </Card>
           </div>
         </div>
-      </div>
     </div>
   );
 }

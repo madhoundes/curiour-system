@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useWizardBack } from "@/lib/wizard";
 import { useShipment } from "@/lib/shipment-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,10 +32,12 @@ const defaultSenderData = {
 
 export default function CreateShipmentPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const wizardBack = useWizardBack();
   const { 
     formData, 
     updateFormField, 
+    resetForm,
     isFormValid 
   } = useShipment();
   
@@ -44,6 +46,7 @@ export default function CreateShipmentPage() {
   const [senderData, setSenderData] = useState(defaultSenderData);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [senderAddressError, setSenderAddressError] = useState<string | null>(null);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   // Postal code validation functions (reused for sender validation)
   const isTorontoPostalCode = (postalCode: string): boolean => {
@@ -157,20 +160,17 @@ export default function CreateShipmentPage() {
     loadProfile();
   }, []);
 
-  // Reset recipient fields to empty on mount to ensure no cached values
+  // Initialize form - allow cached data to load
   useEffect(() => {
-    // Clear all recipient fields to ensure they start empty
-    if (formData.recipientName || formData.recipientCompany || formData.recipientAddress || 
-        formData.recipientCity || formData.recipientPostalCode || formData.recipientPhone || 
-        formData.recipientEmail) {
-      updateFormField('recipientName', '');
-      updateFormField('recipientCompany', '');
-      updateFormField('recipientAddress', '');
-      updateFormField('recipientCity', '');
-      updateFormField('recipientProvince', '');
-      updateFormField('recipientPostalCode', '');
-      updateFormField('recipientPhone', '');
-      updateFormField('recipientEmail', '');
+    // Only run once on initial mount
+    if (hasInitialized) return;
+    setHasInitialized(true);
+  }, [hasInitialized]);
+
+  // Set default province to "ON" for recipient address (service area is Ontario)
+  useEffect(() => {
+    if (!formData.recipientProvince || formData.recipientProvince.trim() === '') {
+      updateFormField('recipientProvince', 'ON');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Only run once on mount
@@ -211,9 +211,20 @@ export default function CreateShipmentPage() {
   };
 
   const [postalCodeError, setPostalCodeError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [hasAttemptedSubmit, setHasAttemptedSubmit] = useState(false);
 
   const handleInputChange = (field: string, value: string | boolean) => {
     updateFormField(field as keyof typeof formData, value);
+    
+    // Clear error for this field when user starts typing
+    if (hasAttemptedSubmit && fieldErrors[field]) {
+      setFieldErrors(prev => {
+        const newErrors = { ...prev };
+        delete newErrors[field];
+        return newErrors;
+      });
+    }
     
     // Auto-set province to "ON" when city is selected (both cities are in Ontario)
     if (field === 'recipientCity' && (value === 'Toronto' || value === 'Mississauga')) {
@@ -222,50 +233,255 @@ export default function CreateShipmentPage() {
       if (formData.recipientPostalCode) {
         const error = validatePostalCode(formData.recipientPostalCode, value as string);
         setPostalCodeError(error);
+        if (hasAttemptedSubmit) {
+          setFieldErrors(prev => ({
+            ...prev,
+            recipientPostalCode: error || ''
+          }));
+        }
       }
-    }
-    
-    // Clear province if city is cleared
-    if (field === 'recipientCity' && !value) {
-      updateFormField('recipientProvince', '');
     }
 
     // Validate postal code when it changes
     if (field === 'recipientPostalCode') {
       const error = validatePostalCode(value as string, formData.recipientCity);
       setPostalCodeError(error);
+      if (hasAttemptedSubmit) {
+        setFieldErrors(prev => {
+          const newErrors = { ...prev };
+          if (error) {
+            newErrors.recipientPostalCode = error;
+          } else {
+            delete newErrors.recipientPostalCode;
+          }
+          return newErrors;
+        });
+      }
     }
-  };
-
-  const handleContinueToPackageDetails = async () => {
-    try {
-      setIsLoading(true);
+    
+    // Validate phone number when it changes
+    if (field === 'recipientPhone' && hasAttemptedSubmit) {
+      const phoneValue = value as string;
+      const digitsOnly = phoneValue.replace(/\D/g, '');
       
-      // Validate sender address before proceeding
-      if (senderAddressError) {
-        throw new Error('Please update your profile address to a valid pickup location in Toronto or Mississauga before creating a shipment.');
+      let phoneError = '';
+      if (!phoneValue.trim()) {
+        phoneError = 'Phone number is required';
+      } else if (digitsOnly.length < 10) {
+        phoneError = 'Phone number must be at least 10 digits';
+      } else if (digitsOnly.length > 11) {
+        phoneError = 'Phone number is too long';
+      } else if (digitsOnly.length === 11 && digitsOnly[0] !== '1') {
+        phoneError = 'Invalid country code. Use 1 for North America';
       }
       
-      // Validate postal code before proceeding
-      if (formData.recipientPostalCode) {
-        const error = validatePostalCode(formData.recipientPostalCode, formData.recipientCity);
-        if (error) {
-          setPostalCodeError(error);
-          throw new Error(error);
+      setFieldErrors(prev => {
+        const newErrors = { ...prev };
+        if (phoneError) {
+          newErrors.recipientPhone = phoneError;
+        } else {
+          delete newErrors.recipientPhone;
+        }
+        return newErrors;
+      });
+    }
+    
+    // Validate email when it changes
+    if (field === 'recipientEmail' && hasAttemptedSubmit) {
+      const emailValue = (value as string).trim();
+      let emailError = '';
+      
+      if (!emailValue) {
+        emailError = 'Email address is required';
+      } else {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(emailValue)) {
+          emailError = 'Please enter a valid email address';
+        } else {
+          const [localPart, domain] = emailValue.split('@');
+          
+          if (localPart.length > 64) {
+            emailError = 'Email address is too long';
+          } else if (localPart.startsWith('.') || localPart.endsWith('.')) {
+            emailError = 'Email cannot start or end with a period';
+          } else if (localPart.includes('..')) {
+            emailError = 'Email cannot contain consecutive periods';
+          } else if (domain && !domain.includes('.')) {
+            emailError = 'Email must have a valid domain (e.g., example.com)';
+          }
+          
+          // Check for common typos
+          const domainLower = domain?.toLowerCase();
+          const possibleTypos: Record<string, string> = {
+            'gmial.com': 'gmail.com',
+            'gmai.com': 'gmail.com',
+            'yahooo.com': 'yahoo.com',
+            'yaho.com': 'yahoo.com',
+            'hotmial.com': 'hotmail.com',
+            'outlok.com': 'outlook.com'
+          };
+          
+          if (domainLower && possibleTypos[domainLower]) {
+            emailError = `Did you mean ${possibleTypos[domainLower]}?`;
+          }
         }
       }
       
-      // Validate form data before proceeding
-      if (!isFormValid()) {
-        throw new Error('Please fill in all required recipient information');
-      }
+      setFieldErrors(prev => {
+        const newErrors = { ...prev };
+        if (emailError) {
+          newErrors.recipientEmail = emailError;
+        } else {
+          delete newErrors.recipientEmail;
+        }
+        return newErrors;
+      });
+    }
+  };
 
+  const validateAllFields = (): boolean => {
+    const errors: Record<string, string> = {};
+    
+    // Validate sender address
+    if (senderAddressError) {
+      errors.senderAddress = senderAddressError;
+    }
+    
+    // Validate recipient fields
+    if (!formData.recipientName || formData.recipientName.trim() === '') {
+      errors.recipientName = 'Full name is required';
+    }
+    
+    if (!formData.recipientAddress || formData.recipientAddress.trim() === '') {
+      errors.recipientAddress = 'Street address is required';
+    }
+    
+    if (!formData.recipientCity || formData.recipientCity.trim() === '') {
+      errors.recipientCity = 'City is required';
+    }
+    
+    if (!formData.recipientProvince || formData.recipientProvince.trim() === '') {
+      errors.recipientProvince = 'Province is required';
+    }
+    
+    if (!formData.recipientPostalCode || formData.recipientPostalCode.trim() === '') {
+      errors.recipientPostalCode = 'Postal code is required';
+    } else {
+      const postalError = validatePostalCode(formData.recipientPostalCode, formData.recipientCity);
+      if (postalError) {
+        errors.recipientPostalCode = postalError;
+        setPostalCodeError(postalError);
+      } else {
+        setPostalCodeError(null);
+      }
+    }
+    
+    // Phone validation - Canadian/North American format
+    if (!formData.recipientPhone || formData.recipientPhone.trim() === '') {
+      errors.recipientPhone = 'Phone number is required';
+    } else {
+      // Remove all non-digit characters for validation
+      const digitsOnly = formData.recipientPhone.replace(/\D/g, '');
+      
+      // Check if it's a valid North American phone number (10 digits)
+      if (digitsOnly.length < 10) {
+        errors.recipientPhone = 'Phone number must be at least 10 digits';
+      } else if (digitsOnly.length > 11) {
+        errors.recipientPhone = 'Phone number is too long';
+      } else if (digitsOnly.length === 11 && digitsOnly[0] !== '1') {
+        errors.recipientPhone = 'Invalid country code. Use 1 for North America';
+      } else if (digitsOnly.length === 10 || (digitsOnly.length === 11 && digitsOnly[0] === '1')) {
+        // Valid format - extract area code and check if it's valid
+        const areaCode = digitsOnly.length === 11 ? digitsOnly.substring(1, 4) : digitsOnly.substring(0, 3);
+        const invalidAreaCodes = ['000', '111', '555']; // Common invalid area codes
+        
+        if (invalidAreaCodes.includes(areaCode)) {
+          errors.recipientPhone = 'Invalid area code';
+        }
+      }
+    }
+    
+    // Email validation - comprehensive check
+    if (!formData.recipientEmail || formData.recipientEmail.trim() === '') {
+      errors.recipientEmail = 'Email address is required';
+    } else {
+      const email = formData.recipientEmail.trim();
+      
+      // Basic format check
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        errors.recipientEmail = 'Please enter a valid email address';
+      } else {
+        // Additional validation checks
+        const [localPart, domain] = email.split('@');
+        
+        // Check local part (before @)
+        if (localPart.length > 64) {
+          errors.recipientEmail = 'Email address is too long';
+        } else if (localPart.startsWith('.') || localPart.endsWith('.')) {
+          errors.recipientEmail = 'Email cannot start or end with a period';
+        } else if (localPart.includes('..')) {
+          errors.recipientEmail = 'Email cannot contain consecutive periods';
+        }
+        
+        // Check domain part (after @)
+        if (domain && domain.length > 255) {
+          errors.recipientEmail = 'Domain name is too long';
+        } else if (domain && !domain.includes('.')) {
+          errors.recipientEmail = 'Email must have a valid domain (e.g., example.com)';
+        } else if (domain && domain.split('.').some(part => part.length === 0)) {
+          errors.recipientEmail = 'Invalid domain format';
+        }
+        
+        // Check for common typos in popular domains
+        const commonDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com'];
+        const domainLower = domain?.toLowerCase();
+        const possibleTypos: Record<string, string> = {
+          'gmial.com': 'gmail.com',
+          'gmai.com': 'gmail.com',
+          'yahooo.com': 'yahoo.com',
+          'yaho.com': 'yahoo.com',
+          'hotmial.com': 'hotmail.com',
+          'outlok.com': 'outlook.com'
+        };
+        
+        if (domainLower && possibleTypos[domainLower]) {
+          errors.recipientEmail = `Did you mean ${possibleTypos[domainLower]}?`;
+        }
+      }
+    }
+    
+    setFieldErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleContinueToPackageDetails = async () => {
+    setHasAttemptedSubmit(true);
+    
+    // Validate all fields
+    const isValid = validateAllFields();
+    
+    if (!isValid) {
+      // Scroll to first error
+      const firstErrorField = Object.keys(fieldErrors)[0];
+      if (firstErrorField) {
+        const element = document.getElementById(`parcego-recipient-${firstErrorField}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          element.focus();
+        }
+      }
+      return;
+    }
+    
+    try {
+      setIsLoading(true);
+      
       // In a real implementation, you might want to save draft shipment data here
       // For now, we'll just proceed to the next step
       router.push('/package-details');
     } catch (error) {
       console.error('Error proceeding to package details:', error);
-      // You could show a toast notification here
     } finally {
       setIsLoading(false);
     }
@@ -490,9 +706,16 @@ export default function CreateShipmentPage() {
                     placeholder="Enter recipient's full name"
                     value={formData.recipientName}
                     onChange={(e) => handleInputChange('recipientName', e.target.value)}
-                    className="parcego-form__input"
+                    className={`parcego-form__input ${fieldErrors.recipientName ? 'border-red-500 focus-visible:ring-red-200' : ''}`}
                     required
+                    aria-invalid={!!fieldErrors.recipientName}
+                    aria-describedby={fieldErrors.recipientName ? 'parcego-recipient-name-error' : undefined}
                   />
+                  {fieldErrors.recipientName && (
+                    <p id="parcego-recipient-name-error" className="text-sm text-red-600 mt-1">
+                      {fieldErrors.recipientName}
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="parcego-recipient-company">Company (Optional)</Label>
@@ -515,9 +738,16 @@ export default function CreateShipmentPage() {
                   placeholder="Enter street address"
                   value={formData.recipientAddress}
                   onChange={(e) => handleInputChange('recipientAddress', e.target.value)}
-                  className="parcego-form__input"
+                  className={`parcego-form__input ${fieldErrors.recipientAddress ? 'border-red-500 focus-visible:ring-red-200' : ''}`}
                   required
+                  aria-invalid={!!fieldErrors.recipientAddress}
+                  aria-describedby={fieldErrors.recipientAddress ? 'parcego-recipient-address-error' : undefined}
                 />
+                {fieldErrors.recipientAddress && (
+                  <p id="parcego-recipient-address-error" className="text-sm text-red-600 mt-1">
+                    {fieldErrors.recipientAddress}
+                  </p>
+                )}
               </div>
               
 
@@ -532,7 +762,12 @@ export default function CreateShipmentPage() {
                     onValueChange={(value) => handleInputChange('recipientCity', value)}
                     required
                   >
-                    <SelectTrigger id="parcego-recipient-city" className="parcego-form__input">
+                    <SelectTrigger 
+                      id="parcego-recipient-city" 
+                      className={`parcego-form__input ${fieldErrors.recipientCity ? 'border-red-500 focus-visible:ring-red-200' : ''}`}
+                      aria-invalid={!!fieldErrors.recipientCity}
+                      aria-describedby={fieldErrors.recipientCity ? 'parcego-recipient-city-error' : undefined}
+                    >
                       <SelectValue placeholder="Select city" />
                     </SelectTrigger>
                     <SelectContent>
@@ -540,9 +775,15 @@ export default function CreateShipmentPage() {
                       <SelectItem value="Mississauga">Mississauga</SelectItem>
                     </SelectContent>
                   </Select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    💡 Delivery is only available in Downtown Toronto and Mississauga
-                  </p>
+                  {fieldErrors.recipientCity ? (
+                    <p id="parcego-recipient-city-error" className="text-sm text-red-600 mt-1">
+                      {fieldErrors.recipientCity}
+                    </p>
+                  ) : (
+                    <p className="text-xs text-gray-500 mt-1">
+                      💡 Delivery is only available in Downtown Toronto and Mississauga
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="parcego-recipient-province">
@@ -551,7 +792,7 @@ export default function CreateShipmentPage() {
                   <Input
                     id="parcego-recipient-province"
                     placeholder="ON"
-                    value={formData.recipientProvince}
+                    value={formData.recipientProvince || 'ON'}
                     readOnly
                     className="parcego-form__input bg-gray-50 cursor-not-allowed"
                     required
@@ -569,22 +810,22 @@ export default function CreateShipmentPage() {
                     placeholder={formData.recipientCity === 'Toronto' ? 'M5V 3A8' : formData.recipientCity === 'Mississauga' ? 'L5A 1B2' : 'M5V 3A8 or L5A 1B2'}
                     value={formData.recipientPostalCode}
                     onChange={(e) => handleInputChange('recipientPostalCode', e.target.value)}
-                    className={`parcego-form__input ${postalCodeError ? 'border-red-500 focus-visible:ring-red-200' : ''}`}
+                    className={`parcego-form__input ${(postalCodeError || fieldErrors.recipientPostalCode) ? 'border-red-500 focus-visible:ring-red-200' : ''}`}
                     required
-                    aria-invalid={!!postalCodeError}
-                    aria-describedby={postalCodeError ? 'parcego-recipient-postal-code-error' : undefined}
+                    aria-invalid={!!(postalCodeError || fieldErrors.recipientPostalCode)}
+                    aria-describedby={(postalCodeError || fieldErrors.recipientPostalCode) ? 'parcego-recipient-postal-code-error' : undefined}
                   />
-                  {postalCodeError && (
+                  {(postalCodeError || fieldErrors.recipientPostalCode) && (
                     <p id="parcego-recipient-postal-code-error" className="text-sm text-red-600 mt-1">
-                      {postalCodeError}
+                      {postalCodeError || fieldErrors.recipientPostalCode}
                     </p>
                   )}
-                  {!postalCodeError && formData.recipientPostalCode && (
+                  {!postalCodeError && !fieldErrors.recipientPostalCode && formData.recipientPostalCode && (
                     <p className="text-xs text-green-600 mt-1">
                       ✓ Valid postal code for {formData.recipientCity || 'service area'}
                     </p>
                   )}
-                  {!postalCodeError && !formData.recipientPostalCode && (
+                  {!postalCodeError && !fieldErrors.recipientPostalCode && !formData.recipientPostalCode && (
                     <p className="text-xs text-gray-500 mt-1">
                       Enter a postal code in Downtown Toronto (M prefix) or Mississauga (L4T-L5W prefix). Both pickup and delivery must be in the service area.
                     </p>
@@ -599,12 +840,30 @@ export default function CreateShipmentPage() {
                   </Label>
                   <Input
                     id="parcego-recipient-phone"
+                    type="tel"
                     placeholder="(555) 123-4567"
                     value={formData.recipientPhone}
                     onChange={(e) => handleInputChange('recipientPhone', e.target.value)}
-                    className="parcego-form__input"
+                    className={`parcego-form__input ${fieldErrors.recipientPhone ? 'border-red-500 focus-visible:ring-red-200' : ''}`}
                     required
+                    aria-invalid={!!fieldErrors.recipientPhone}
+                    aria-describedby={fieldErrors.recipientPhone ? 'parcego-recipient-phone-error' : 'parcego-recipient-phone-hint'}
                   />
+                  {fieldErrors.recipientPhone ? (
+                    <p id="parcego-recipient-phone-error" className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                      <Icon name="AlertCircle" size={14} />
+                      {fieldErrors.recipientPhone}
+                    </p>
+                  ) : formData.recipientPhone && formData.recipientPhone.replace(/\D/g, '').length >= 10 ? (
+                    <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                      <Icon name="CheckCircle" size={14} />
+                      Valid phone number
+                    </p>
+                  ) : (
+                    <p id="parcego-recipient-phone-hint" className="text-xs text-gray-500 mt-1">
+                      Enter 10-digit phone number (e.g., 555-123-4567)
+                    </p>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="parcego-recipient-email">
@@ -616,9 +875,26 @@ export default function CreateShipmentPage() {
                     placeholder="recipient@example.com"
                     value={formData.recipientEmail}
                     onChange={(e) => handleInputChange('recipientEmail', e.target.value)}
-                    className="parcego-form__input"
+                    className={`parcego-form__input ${fieldErrors.recipientEmail ? 'border-red-500 focus-visible:ring-red-200' : ''}`}
                     required
+                    aria-invalid={!!fieldErrors.recipientEmail}
+                    aria-describedby={fieldErrors.recipientEmail ? 'parcego-recipient-email-error' : 'parcego-recipient-email-hint'}
                   />
+                  {fieldErrors.recipientEmail ? (
+                    <p id="parcego-recipient-email-error" className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                      <Icon name="AlertCircle" size={14} />
+                      {fieldErrors.recipientEmail}
+                    </p>
+                  ) : formData.recipientEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.recipientEmail) ? (
+                    <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                      <Icon name="CheckCircle" size={14} />
+                      Valid email address
+                    </p>
+                  ) : (
+                    <p id="parcego-recipient-email-hint" className="text-xs text-gray-500 mt-1">
+                      We'll send tracking updates to this email
+                    </p>
+                  )}
                 </div>
               </div>
             </CardContent>
@@ -707,8 +983,8 @@ export default function CreateShipmentPage() {
             
             <Button
               onClick={handleContinueToPackageDetails}
-              disabled={isLoading || !isFormValid()}
-              className="parcego-action-btn parcego-action-btn--continue bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 h-12 text-base font-medium transition-all duration-300 ease-out hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+              disabled={isLoading}
+              className="parcego-action-btn parcego-action-btn--continue bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 h-12 text-base font-medium transition-all duration-300 ease-out hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
               id="parcego-continue-package-details-btn"
             >
               {isLoading ? (

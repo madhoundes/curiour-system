@@ -104,20 +104,34 @@ export default function ShipmentDetailPage() {
         
         const shipmentData = await shippingService.getShipment(shipmentId);
         setShipment(shipmentData);
-        // Prefer billing from shipment payload
+        
+        // Load billing information - try multiple sources
+        let billingData: BillingRecord | null = null;
+        
+        // 1. Check if billing is included in shipment payload
         if (shipmentData?.billing) {
-          setBillingRecord(shipmentData.billing as unknown as BillingRecord);
-        } else {
-          // Fallback: fetch user billing records and find by shipment_id
+          billingData = shipmentData.billing as unknown as BillingRecord;
+          console.log('Billing loaded from shipment payload:', billingData);
+        } 
+        
+        // 2. If not in payload, fetch from billing records endpoint
+        if (!billingData) {
           try {
-            const list = await shippingService.getBillingRecords({ page: 1, per_page: 50 });
-            const match = list.items?.find((b) => b.shipment_id === shipmentId) || null;
-            setBillingRecord(match);
+            console.log('Fetching billing records for shipment:', shipmentId);
+            const list = await shippingService.getBillingRecords({ page: 1, per_page: 100 });
+            const match = list.items?.find((b) => b.shipment_id === shipmentId);
+            if (match) {
+              billingData = match;
+              console.log('Billing loaded from billing records:', billingData);
+            } else {
+              console.warn('No billing record found for shipment:', shipmentId);
+            }
           } catch (billingErr) {
-            console.error('Failed to load billing record:', billingErr);
-            setBillingRecord(null);
+            console.error('Failed to load billing records:', billingErr);
           }
         }
+        
+        setBillingRecord(billingData);
         // Fetch tracking data using tracking endpoint
         try {
           if (shipmentData?.tracking_code) {
@@ -752,63 +766,82 @@ export default function ShipmentDetailPage() {
                 >
                   <Icon name="FileText" size={16} className="mr-2" /> Download Label
                 </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={async () => {
-                    if (!shipment.billing) {
-                      alert('No billing information available for this shipment.');
-                      return;
-                    }
-                    
-                    try {
-                      await generatePdfInvoice({
-                        invoiceNumber: `INV-${shipment.tracking_code.replace('-', '')}`,
-                        issueDate: new Date().toLocaleDateString(),
-                        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(),
-                        billTo: {
-                          name: shipment.receiver_address.contact_name,
-                          address: shipment.receiver_address.street_address,
-                          city: shipment.receiver_address.city,
-                          province: shipment.receiver_address.province,
-                          postalCode: shipment.receiver_address.postal_code,
-                          country: shipment.receiver_address.country
-                        },
-                        lineItems: [
-                          {
-                            description: `Standard Delivery Service`,
-                            quantity: 1,
-                            unitPrice: parseFloat(shipment.billing.subtotal),
-                            amount: parseFloat(shipment.billing.subtotal)
+                {/* Only show download invoice button if billing data is available */}
+                {(shipment.billing || billingRecord) ? (
+                  <Button 
+                    variant="outline" 
+                    onClick={async () => {
+                      // Use billingRecord state if shipment.billing is not available
+                      const billing = shipment.billing || billingRecord;
+                      
+                      if (!billing) {
+                        toast.error('No billing information available for this shipment.');
+                        return;
+                      }
+                      
+                      try {
+                        await generatePdfInvoice({
+                          invoiceNumber: `INV-${shipment.tracking_code.replace(/-/g, '')}`,
+                          issueDate: new Date(billing.created_at || shipment.created_at).toLocaleDateString(),
+                          dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+                          billTo: {
+                            name: shipment.receiver_address.contact_name,
+                            company: shipment.receiver_address.company_name,
+                            address: shipment.receiver_address.street_address,
+                            city: shipment.receiver_address.city,
+                            province: shipment.receiver_address.province,
+                            postalCode: shipment.receiver_address.postal_code,
+                            country: shipment.receiver_address.country
                           },
-                          {
-                            description: 'Taxes & Fees',
-                            quantity: 1,
-                            unitPrice: parseFloat(shipment.billing.tax_amount),
-                            amount: parseFloat(shipment.billing.tax_amount)
-                          }
-                        ],
-                        subtotal: parseFloat(shipment.billing.subtotal),
-                        tax: parseFloat(shipment.billing.tax_amount),
-                        total: parseFloat(shipment.billing.amount),
-                        currency: 'CAD',
-                        status: shipment.status,
-                        shipmentDetails: {
-                          trackingNumber: shipment.tracking_code,
-                          service: 'Standard Delivery',
-                          weight: `${shipment.package.weight} kg`,
-                          deliveryDate: new Date(shipment.created_at).toLocaleDateString()
-                        },
-                        notes: 'Thank you for choosing Parcego! Your package was delivered with care.'
-                      });
-                    } catch (error) {
-                      console.error('Failed to generate PDF invoice:', error);
-                      alert('Failed to generate invoice. Please try again.');
-                    }
-                  }}
-                  id="parcego-download-invoice-btn"
-                >
-                  <Icon name="FileDown" size={16} className="mr-2" /> Download Invoice
-                </Button>
+                          lineItems: [
+                            {
+                              description: `Standard Delivery Service - ${shipment.tracking_code}`,
+                              quantity: 1,
+                              unitPrice: parseFloat(billing.subtotal),
+                              amount: parseFloat(billing.subtotal)
+                            },
+                            {
+                              description: `Taxes & Fees (${(parseFloat(billing.tax_rate) * 100).toFixed(1)}%)`,
+                              quantity: 1,
+                              unitPrice: parseFloat(billing.tax_amount),
+                              amount: parseFloat(billing.tax_amount)
+                            }
+                          ],
+                          subtotal: parseFloat(billing.subtotal),
+                          tax: parseFloat(billing.tax_amount),
+                          total: parseFloat(billing.amount),
+                          currency: billing.currency || 'CAD',
+                          status: billing.payment_status?.toUpperCase() || shipment.status,
+                          shipmentDetails: {
+                            trackingNumber: shipment.tracking_code,
+                            service: 'Standard Delivery',
+                            weight: `${shipment.package.weight} kg`,
+                            deliveryDate: shipment.estimated_delivery_date 
+                              ? new Date(shipment.estimated_delivery_date).toLocaleDateString()
+                              : new Date(shipment.created_at).toLocaleDateString()
+                          },
+                          notes: 'Thank you for choosing Parcego! Your package was delivered with care.'
+                        });
+                        toast.success('Invoice downloaded successfully');
+                      } catch (error) {
+                        console.error('Failed to generate PDF invoice:', error);
+                        toast.error('Failed to generate invoice. Please try again.');
+                      }
+                    }}
+                    id="parcego-download-invoice-btn"
+                  >
+                    <Icon name="FileDown" size={16} className="mr-2" /> Download Invoice
+                  </Button>
+                ) : (
+                  <Button 
+                    variant="outline" 
+                    disabled
+                    title="Invoice will be available after payment is completed"
+                    id="parcego-download-invoice-btn-disabled"
+                  >
+                    <Icon name="FileDown" size={16} className="mr-2" /> Download Invoice
+                  </Button>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

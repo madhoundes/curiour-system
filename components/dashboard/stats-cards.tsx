@@ -82,20 +82,20 @@ export function StatsCards() {
           throw new Error('No data received from API')
         }
       } catch (error: any) {
+        console.error('Failed to fetch dashboard stats:', error)
+        
         // Check if it's an authentication error (401 or 403)
         const status = error?.status || error?.response?.status;
         const isUnauthorized = status === 401 || status === 403;
         
         if (isUnauthorized) {
           // Clear auth data and redirect to login
+          console.log('Authentication failed, redirecting to login')
           localStorage.removeItem('auth_token')
           document.cookie = "mock-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT"
           router.push('/login')
           return
         }
-        
-        // Only log non-auth errors
-        console.error('Failed to fetch dashboard stats:', error)
         
         setError('Failed to load statistics')
         // Fallback to mock data

@@ -18,7 +18,8 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { CheckCircle, Calendar as CalendarIcon } from "lucide-react";
 import { profileService } from "@/lib/api/profile";
 import { claimsService } from "@/lib/api/claims";
-import type { CreateClaimRequest } from "@/lib/api/types";
+import { shippingService } from "@/lib/api/shipping";
+import type { CreateClaimRequest, DetailedShipment } from "@/lib/api/types";
 
 // Types for the claims form
 interface ClaimFormData {
@@ -123,6 +124,9 @@ export default function ClaimsPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [shipments, setShipments] = useState<DetailedShipment[]>([]);
+  const [shipmentsLoading, setShipmentsLoading] = useState(false);
+  const [shipmentsError, setShipmentsError] = useState<string | null>(null);
 
   const [claimNumber, setClaimNumber] = useState<string>("");
 
@@ -162,6 +166,40 @@ export default function ClaimsPage() {
     };
 
     loadProfile();
+  }, []);
+
+  // Load user shipments on component mount
+  useEffect(() => {
+    const loadShipments = async () => {
+      try {
+        setShipmentsLoading(true);
+        setShipmentsError(null);
+        
+        // Fetch all user shipments (API already filters by current user)
+        const userShipments = await shippingService.getShipments({ 
+          limit: 1000 // Get a large number to show all shipments
+        });
+        
+        // Filter to only show shipments with tracking codes and exclude CANCELLED and DRAFT statuses
+        const validShipments = userShipments.filter(
+          shipment => 
+            shipment.tracking_code && 
+            shipment.tracking_code.trim() !== '' &&
+            shipment.status !== 'CANCELLED' &&
+            shipment.status !== 'DRAFT'
+        );
+        
+        setShipments(validShipments);
+      } catch (error) {
+        console.error('Failed to load shipments:', error);
+        setShipmentsError('Unable to load shipments. You can still enter a tracking number manually.');
+        setShipments([]);
+      } finally {
+        setShipmentsLoading(false);
+      }
+    };
+
+    loadShipments();
   }, []);
 
   // Handle form data updates
@@ -237,11 +275,20 @@ export default function ClaimsPage() {
         throw new Error('Please select a claim type');
       }
 
+      // Find shipment_id from tracking_code
+      const selectedShipment = shipments.find(
+        s => s.tracking_code === formData.shipmentNumber
+      );
+      
+      if (!selectedShipment) {
+        throw new Error('Selected shipment not found. Please select a valid shipment.');
+      }
+
       // Map form data to API request format
       const claimRequest: CreateClaimRequest = {
         description: formData.description.trim(),
         reason: formData.claimType as 'damaged' | 'lost' | 'late_delivery' | 'wrong_address' | 'missing_items' | 'other',
-        shipment_id: parseInt(formData.shipmentNumber) || 1 // For now, using a default shipment ID
+        shipment_id: selectedShipment.id
       };
 
       // Submit the claim to the API
@@ -297,17 +344,78 @@ export default function ClaimsPage() {
             <div className="space-y-4">
               <div>
                 <Label htmlFor="parcego-claims-shipment-number">Shipment Number *</Label>
-                <Input
-                  id="parcego-claims-shipment-number"
-                  placeholder="Enter your shipment tracking number"
-                  value={formData.shipmentNumber}
-                  onChange={(e) => handleInputChange("shipmentNumber", e.target.value)}
-                  className={`mt-2 ${
-                    formData.shipmentNumber.length === 0 && submitError?.includes('Shipment number')
-                      ? 'border-red-300 focus:border-red-500' 
-                      : ''
-                  }`}
-                />
+                {shipmentsLoading ? (
+                  <div className="mt-2">
+                    <Select disabled>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Loading shipments..." />
+                      </SelectTrigger>
+                    </Select>
+                    <p className="text-xs text-gray-500 mt-1">Loading your shipments...</p>
+                  </div>
+                ) : shipmentsError ? (
+                  <div className="mt-2 space-y-2">
+                    <Input
+                      id="parcego-claims-shipment-number"
+                      placeholder="Enter your shipment tracking number"
+                      value={formData.shipmentNumber}
+                      onChange={(e) => handleInputChange("shipmentNumber", e.target.value)}
+                      className={`${
+                        formData.shipmentNumber.length === 0 && submitError?.includes('Shipment number')
+                          ? 'border-red-300 focus:border-red-500' 
+                          : ''
+                      }`}
+                    />
+                    <p className="text-xs text-amber-600">{shipmentsError}</p>
+                  </div>
+                ) : shipments.length > 0 ? (
+                  <Select
+                    value={formData.shipmentNumber}
+                    onValueChange={(value) => handleInputChange("shipmentNumber", value)}
+                  >
+                    <SelectTrigger
+                      id="parcego-claims-shipment-number"
+                      className={`mt-2 ${
+                        formData.shipmentNumber.length === 0 && submitError?.includes('Shipment number')
+                          ? 'border-red-300 focus:border-red-500' 
+                          : ''
+                      }`}
+                    >
+                      <SelectValue placeholder="Select a shipment">
+                        {formData.shipmentNumber ? (
+                          <span>{formData.shipmentNumber}</span>
+                        ) : undefined}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {shipments.map((shipment) => (
+                        <SelectItem key={shipment.id} value={shipment.tracking_code || ''}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{shipment.tracking_code}</span>
+                            <span className="text-sm text-gray-500">
+                              {shipment.status} • Created {new Date(shipment.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="mt-2 space-y-2">
+                    <Input
+                      id="parcego-claims-shipment-number"
+                      placeholder="Enter your shipment tracking number"
+                      value={formData.shipmentNumber}
+                      onChange={(e) => handleInputChange("shipmentNumber", e.target.value)}
+                      className={`${
+                        formData.shipmentNumber.length === 0 && submitError?.includes('Shipment number')
+                          ? 'border-red-300 focus:border-red-500' 
+                          : ''
+                      }`}
+                    />
+                    <p className="text-xs text-gray-500">No shipments found. Please enter your tracking number manually.</p>
+                  </div>
+                )}
                 {formData.shipmentNumber.length === 0 && submitError?.includes('Shipment number') && (
                   <p className="text-xs text-red-600 mt-1">Shipment number is required</p>
                 )}

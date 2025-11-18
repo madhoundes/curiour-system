@@ -520,16 +520,25 @@ function QuotePreviewPageContent() {
 
   // Load form data and generate quotes
   useEffect(() => {
-    const savedData = localStorage.getItem('parcego-shipment-form-data');
-    if (savedData) {
-      const data = JSON.parse(savedData);
-      setFormData(data);
-      
-      // Fetch real quote from API
-      fetchQuoteEstimate(data);
-    } else {
-      router.push('/create-shipment');
-    }
+    const loadFormData = async () => {
+      try {
+        const { loadShipmentFormData } = await import('@/lib/shipment-cache-utils');
+        const data = await loadShipmentFormData();
+        
+        if (data) {
+          setFormData(data);
+          // Fetch real quote from API
+          fetchQuoteEstimate(data);
+        } else {
+          router.push('/create-shipment');
+        }
+      } catch (error) {
+        console.error('Failed to load form data:', error);
+        router.push('/create-shipment');
+      }
+    };
+    
+    loadFormData();
   }, [router]);
 
   const handleBackToPackageDetails = () => {

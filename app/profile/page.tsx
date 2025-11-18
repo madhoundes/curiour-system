@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -140,9 +141,16 @@ const STORAGE_KEYS = {
   integrations: "parcego_profile_integrations",
 } as const;
 
-export default function ProfileAccountPage() {
+function ProfileAccountPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const prefersReducedMotion =
     typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  
+  // Get active tab from URL query parameter, default to "business"
+  const tabParam = searchParams?.get('tab');
+  const validTabs = ['business', 'settings', 'notifications', 'api'];
+  const activeTab = tabParam && validTabs.includes(tabParam) ? tabParam : 'business';
   
   // Loading and error states
   const [isLoading, setIsLoading] = useState(true);
@@ -432,6 +440,11 @@ export default function ProfileAccountPage() {
         }
         
         onOk(`${label} saved successfully`);
+        
+        // Redirect to create shipment page after successful business info save
+        if (key === STORAGE_KEYS.business) {
+          router.push('/create-shipment');
+        }
       } catch (error: any) {
         console.error('Failed to save profile:', error);
         onOk(`Failed to save ${label}: ${error.message || 'Unknown error'}`);
@@ -666,7 +679,7 @@ export default function ProfileAccountPage() {
           }`}
         >
           <Tabs 
-            defaultValue="business"
+            value={activeTab}
             id="parcego-profile-tabs" 
             className="w-full mb-8"
           >
@@ -1377,4 +1390,28 @@ export default function ProfileAccountPage() {
   );
 }
 
+// Loading fallback for Suspense
+function ProfileAccountPageLoading() {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="container mx-auto px-4 py-6">
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading profile...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Main export with Suspense boundary
+export default function ProfileAccountPage() {
+  return (
+    <Suspense fallback={<ProfileAccountPageLoading />}>
+      <ProfileAccountPageContent />
+    </Suspense>
+  );
+}
 
