@@ -258,6 +258,85 @@ export default function CreateShipmentPage() {
         });
       }
     }
+    
+    // Validate phone number when it changes
+    if (field === 'recipientPhone' && hasAttemptedSubmit) {
+      const phoneValue = value as string;
+      const digitsOnly = phoneValue.replace(/\D/g, '');
+      
+      let phoneError = '';
+      if (!phoneValue.trim()) {
+        phoneError = 'Phone number is required';
+      } else if (digitsOnly.length < 10) {
+        phoneError = 'Phone number must be at least 10 digits';
+      } else if (digitsOnly.length > 11) {
+        phoneError = 'Phone number is too long';
+      } else if (digitsOnly.length === 11 && digitsOnly[0] !== '1') {
+        phoneError = 'Invalid country code. Use 1 for North America';
+      }
+      
+      setFieldErrors(prev => {
+        const newErrors = { ...prev };
+        if (phoneError) {
+          newErrors.recipientPhone = phoneError;
+        } else {
+          delete newErrors.recipientPhone;
+        }
+        return newErrors;
+      });
+    }
+    
+    // Validate email when it changes
+    if (field === 'recipientEmail' && hasAttemptedSubmit) {
+      const emailValue = (value as string).trim();
+      let emailError = '';
+      
+      if (!emailValue) {
+        emailError = 'Email address is required';
+      } else {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(emailValue)) {
+          emailError = 'Please enter a valid email address';
+        } else {
+          const [localPart, domain] = emailValue.split('@');
+          
+          if (localPart.length > 64) {
+            emailError = 'Email address is too long';
+          } else if (localPart.startsWith('.') || localPart.endsWith('.')) {
+            emailError = 'Email cannot start or end with a period';
+          } else if (localPart.includes('..')) {
+            emailError = 'Email cannot contain consecutive periods';
+          } else if (domain && !domain.includes('.')) {
+            emailError = 'Email must have a valid domain (e.g., example.com)';
+          }
+          
+          // Check for common typos
+          const domainLower = domain?.toLowerCase();
+          const possibleTypos: Record<string, string> = {
+            'gmial.com': 'gmail.com',
+            'gmai.com': 'gmail.com',
+            'yahooo.com': 'yahoo.com',
+            'yaho.com': 'yahoo.com',
+            'hotmial.com': 'hotmail.com',
+            'outlok.com': 'outlook.com'
+          };
+          
+          if (domainLower && possibleTypos[domainLower]) {
+            emailError = `Did you mean ${possibleTypos[domainLower]}?`;
+          }
+        }
+      }
+      
+      setFieldErrors(prev => {
+        const newErrors = { ...prev };
+        if (emailError) {
+          newErrors.recipientEmail = emailError;
+        } else {
+          delete newErrors.recipientEmail;
+        }
+        return newErrors;
+      });
+    }
   };
 
   const validateAllFields = (): boolean => {
@@ -297,14 +376,79 @@ export default function CreateShipmentPage() {
       }
     }
     
+    // Phone validation - Canadian/North American format
     if (!formData.recipientPhone || formData.recipientPhone.trim() === '') {
       errors.recipientPhone = 'Phone number is required';
+    } else {
+      // Remove all non-digit characters for validation
+      const digitsOnly = formData.recipientPhone.replace(/\D/g, '');
+      
+      // Check if it's a valid North American phone number (10 digits)
+      if (digitsOnly.length < 10) {
+        errors.recipientPhone = 'Phone number must be at least 10 digits';
+      } else if (digitsOnly.length > 11) {
+        errors.recipientPhone = 'Phone number is too long';
+      } else if (digitsOnly.length === 11 && digitsOnly[0] !== '1') {
+        errors.recipientPhone = 'Invalid country code. Use 1 for North America';
+      } else if (digitsOnly.length === 10 || (digitsOnly.length === 11 && digitsOnly[0] === '1')) {
+        // Valid format - extract area code and check if it's valid
+        const areaCode = digitsOnly.length === 11 ? digitsOnly.substring(1, 4) : digitsOnly.substring(0, 3);
+        const invalidAreaCodes = ['000', '111', '555']; // Common invalid area codes
+        
+        if (invalidAreaCodes.includes(areaCode)) {
+          errors.recipientPhone = 'Invalid area code';
+        }
+      }
     }
     
+    // Email validation - comprehensive check
     if (!formData.recipientEmail || formData.recipientEmail.trim() === '') {
       errors.recipientEmail = 'Email address is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.recipientEmail)) {
-      errors.recipientEmail = 'Please enter a valid email address';
+    } else {
+      const email = formData.recipientEmail.trim();
+      
+      // Basic format check
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        errors.recipientEmail = 'Please enter a valid email address';
+      } else {
+        // Additional validation checks
+        const [localPart, domain] = email.split('@');
+        
+        // Check local part (before @)
+        if (localPart.length > 64) {
+          errors.recipientEmail = 'Email address is too long';
+        } else if (localPart.startsWith('.') || localPart.endsWith('.')) {
+          errors.recipientEmail = 'Email cannot start or end with a period';
+        } else if (localPart.includes('..')) {
+          errors.recipientEmail = 'Email cannot contain consecutive periods';
+        }
+        
+        // Check domain part (after @)
+        if (domain && domain.length > 255) {
+          errors.recipientEmail = 'Domain name is too long';
+        } else if (domain && !domain.includes('.')) {
+          errors.recipientEmail = 'Email must have a valid domain (e.g., example.com)';
+        } else if (domain && domain.split('.').some(part => part.length === 0)) {
+          errors.recipientEmail = 'Invalid domain format';
+        }
+        
+        // Check for common typos in popular domains
+        const commonDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com'];
+        const domainLower = domain?.toLowerCase();
+        const possibleTypos: Record<string, string> = {
+          'gmial.com': 'gmail.com',
+          'gmai.com': 'gmail.com',
+          'yahooo.com': 'yahoo.com',
+          'yaho.com': 'yahoo.com',
+          'hotmial.com': 'hotmail.com',
+          'outlok.com': 'outlook.com'
+        };
+        
+        if (domainLower && possibleTypos[domainLower]) {
+          errors.recipientEmail = `Did you mean ${possibleTypos[domainLower]}?`;
+        }
+      }
     }
     
     setFieldErrors(errors);
@@ -696,17 +840,28 @@ export default function CreateShipmentPage() {
                   </Label>
                   <Input
                     id="parcego-recipient-phone"
+                    type="tel"
                     placeholder="(555) 123-4567"
                     value={formData.recipientPhone}
                     onChange={(e) => handleInputChange('recipientPhone', e.target.value)}
                     className={`parcego-form__input ${fieldErrors.recipientPhone ? 'border-red-500 focus-visible:ring-red-200' : ''}`}
                     required
                     aria-invalid={!!fieldErrors.recipientPhone}
-                    aria-describedby={fieldErrors.recipientPhone ? 'parcego-recipient-phone-error' : undefined}
+                    aria-describedby={fieldErrors.recipientPhone ? 'parcego-recipient-phone-error' : 'parcego-recipient-phone-hint'}
                   />
-                  {fieldErrors.recipientPhone && (
-                    <p id="parcego-recipient-phone-error" className="text-sm text-red-600 mt-1">
+                  {fieldErrors.recipientPhone ? (
+                    <p id="parcego-recipient-phone-error" className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                      <Icon name="AlertCircle" size={14} />
                       {fieldErrors.recipientPhone}
+                    </p>
+                  ) : formData.recipientPhone && formData.recipientPhone.replace(/\D/g, '').length >= 10 ? (
+                    <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                      <Icon name="CheckCircle" size={14} />
+                      Valid phone number
+                    </p>
+                  ) : (
+                    <p id="parcego-recipient-phone-hint" className="text-xs text-gray-500 mt-1">
+                      Enter 10-digit phone number (e.g., 555-123-4567)
                     </p>
                   )}
                 </div>
@@ -723,11 +878,21 @@ export default function CreateShipmentPage() {
                     className={`parcego-form__input ${fieldErrors.recipientEmail ? 'border-red-500 focus-visible:ring-red-200' : ''}`}
                     required
                     aria-invalid={!!fieldErrors.recipientEmail}
-                    aria-describedby={fieldErrors.recipientEmail ? 'parcego-recipient-email-error' : undefined}
+                    aria-describedby={fieldErrors.recipientEmail ? 'parcego-recipient-email-error' : 'parcego-recipient-email-hint'}
                   />
-                  {fieldErrors.recipientEmail && (
-                    <p id="parcego-recipient-email-error" className="text-sm text-red-600 mt-1">
+                  {fieldErrors.recipientEmail ? (
+                    <p id="parcego-recipient-email-error" className="text-sm text-red-600 mt-1 flex items-center gap-1">
+                      <Icon name="AlertCircle" size={14} />
                       {fieldErrors.recipientEmail}
+                    </p>
+                  ) : formData.recipientEmail && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.recipientEmail) ? (
+                    <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                      <Icon name="CheckCircle" size={14} />
+                      Valid email address
+                    </p>
+                  ) : (
+                    <p id="parcego-recipient-email-hint" className="text-xs text-gray-500 mt-1">
+                      We'll send tracking updates to this email
                     </p>
                   )}
                 </div>
