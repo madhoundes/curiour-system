@@ -24,7 +24,7 @@ import { authService, shopifyService } from "@/lib/api";
 import { API_CONFIG } from "@/lib/api/config";
 import { toast } from "sonner";
 import type { ApiErrorResponse } from "@/lib/api/types";
-import { clearShipmentFormData } from "@/lib/shipment-cache-utils";
+import { clearRecipientAddressOnly } from "@/lib/shipment-cache-utils";
 
 const loginFormSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -237,8 +237,8 @@ const Login03PageContent = () => {
 
       const response = await authService.login(loginData);
       
-      // Clear shipment form cache on login to prevent data from previous user
-      await clearShipmentFormData();
+      // Clear only recipient address on login, preserve package details
+      await clearRecipientAddressOnly();
       
       // Set authentication cookie for middleware to recognize authenticated user
       // This allows access to protected routes
@@ -326,8 +326,8 @@ const Login03PageContent = () => {
 
       const response = await authService.register(registerData);
       
-      // Clear shipment form cache on registration to start fresh
-      await clearShipmentFormData();
+      // Clear only recipient address on registration, preserve package details
+      await clearRecipientAddressOnly();
       
       // Show success message
       toast.success("Registration successful! Please check your email to verify your account.", {

@@ -13,7 +13,6 @@ import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { authService } from "@/lib/api";
-import { clearShipmentFormData } from "@/lib/shipment-cache-utils";
 
 // Form validation schema
 const courierLoginSchema = z.object({
@@ -102,9 +101,6 @@ const CourierLoginContent = () => {
       }
 
       console.log('✅ [LOGIN] Access token received:', accessToken.substring(0, 20) + '...');
-
-      // Clear shipment form cache on login to prevent data from previous user
-      await clearShipmentFormData();
 
       // Token is stored by authService automatically, now get user data
       console.log('🔍 [LOGIN] Fetching user data with token...');
