@@ -14,6 +14,7 @@ export const FLOW_STEPS: WizardStep[] = [
   { path: "/package-details", title: "Package Details" },
   { path: "/quote-preview", title: "Quote Preview" },
   { path: "/purchase-label", title: "Purchase Label" },
+  { path: "/payment-success", title: "Payment Success" },
   { path: "/label/preview", title: "Label Preview" },
   { path: "/find-dropoff", title: "Find Drop-off Location" },
   { path: "/dropoff-confirmation", title: "Drop-off Confirmation" }

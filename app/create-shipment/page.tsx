@@ -705,13 +705,43 @@ function CreateShipmentContent() {
           {/* Recipient Information */}
           <Card className="parcego-card parcego-card--recipient">
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Icon name="MapPin" size={20} className="text-green-600" />
-                <span>Recipient Information</span>
-              </CardTitle>
-              <CardDescription>
-                Enter the delivery destination and recipient details
-              </CardDescription>
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <CardTitle className="flex items-center space-x-2">
+                    <Icon name="MapPin" size={20} className="text-green-600" />
+                    <span>Recipient Information</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Enter the delivery destination and recipient details
+                  </CardDescription>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    if (confirm('Clear all recipient information? This will reset all recipient fields but keep your package details.')) {
+                      // Clear all recipient fields
+                      updateFormField('recipientName', '');
+                      updateFormField('recipientCompany', '');
+                      updateFormField('recipientAddress', '');
+                      updateFormField('recipientCity', '');
+                      updateFormField('recipientProvince', '');
+                      updateFormField('recipientPostalCode', '');
+                      updateFormField('recipientPhone', '');
+                      updateFormField('recipientEmail', '');
+                      // Clear any field errors
+                      setFieldErrors({});
+                      setPostalCodeError(null);
+                    }
+                  }}
+                  className="parcego-recipient-clear-btn border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                  aria-label="Clear all recipient information"
+                  title="Clear all recipient fields"
+                >
+                  <Icon name="Trash2" size={16} className="mr-2" />
+                  Clear Recipient
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Service Area Notice */}
