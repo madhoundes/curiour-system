@@ -13,8 +13,8 @@ export const getShipmentCacheKey = (userId?: string | number | null): string => 
   if (userId) {
     return `parcego-shipment-form-data-${userId}`;
   }
-  // Fallback to non-user-specific key if no user ID (for backward compatibility)
-  return 'parcego-shipment-form-data';
+  // Return user-specific key format even without userId (will be empty until userId loads)
+  return `parcego-shipment-form-data-${userId || 'temp'}`;
 };
 
 /**
@@ -45,12 +45,6 @@ export const loadShipmentFormData = async (): Promise<ShipmentFormData | null> =
     
     if (saved) {
       return JSON.parse(saved);
-    }
-    
-    // Fallback to legacy non-user-specific key for backward compatibility
-    const legacySaved = localStorage.getItem('parcego-shipment-form-data');
-    if (legacySaved) {
-      return JSON.parse(legacySaved);
     }
     
     return null;
@@ -85,8 +79,6 @@ export const clearShipmentFormData = async (): Promise<void> => {
     const userId = await getCurrentUserId();
     const cacheKey = getShipmentCacheKey(userId);
     localStorage.removeItem(cacheKey);
-    // Also clear legacy non-user-specific key for backward compatibility
-    localStorage.removeItem('parcego-shipment-form-data');
   } catch (error) {
     console.warn('Failed to clear shipment form data cache:', error);
   }
@@ -100,9 +92,6 @@ export const clearAllShipmentFormData = (): void => {
   if (typeof window === 'undefined') return;
   
   try {
-    // Clear legacy non-user-specific key
-    localStorage.removeItem('parcego-shipment-form-data');
-    
     // Clear all user-specific keys by pattern
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {

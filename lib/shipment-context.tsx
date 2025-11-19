@@ -128,17 +128,6 @@ export const ShipmentProvider: React.FC<{ children: ReactNode }> = ({ children }
         } catch (error) {
           console.warn('Failed to parse saved form data:', error);
         }
-      } else {
-        // Fallback to legacy non-user-specific key for backward compatibility
-        const legacySaved = localStorage.getItem('parcego-shipment-form-data');
-        if (legacySaved) {
-          try {
-            const parsed = JSON.parse(legacySaved);
-            setFormData({ ...defaultFormData, ...parsed });
-          } catch (error) {
-            console.warn('Failed to parse legacy saved form data:', error);
-          }
-        }
       }
     }
   }, [userId, isLoadingUser]);
@@ -179,8 +168,6 @@ export const ShipmentProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (typeof window !== 'undefined') {
       const cacheKey = getShipmentCacheKey(userId);
       localStorage.removeItem(cacheKey);
-      // Also clear legacy non-user-specific key for backward compatibility
-      localStorage.removeItem('parcego-shipment-form-data');
     }
   }, [userId]);
 
