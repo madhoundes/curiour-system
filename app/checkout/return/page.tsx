@@ -3,6 +3,7 @@
 import React, { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { shippingService } from "@/lib/api/shipping";
+import { clearShipmentFormData } from "@/lib/shipment-cache-utils";
 
 function CheckoutReturnContent() {
   const router = useRouter();
@@ -32,8 +33,15 @@ function CheckoutReturnContent() {
         // Check if payment is complete
         const isComplete = sessionStatus === "complete" || sessionStatus === "completed" || paymentStatus === "paid";
         
-        // If session is complete, redirect to success
+        // If session is complete, clear cache and redirect to success
         if (isComplete) {
+          try {
+            await clearShipmentFormData();
+            console.log('✅ Shipment form cache cleared after successful payment');
+          } catch (cacheError) {
+            console.warn('Failed to clear shipment form cache:', cacheError);
+            // Don't block the redirect if cache clearing fails
+          }
           router.replace(`/purchase-label?paid=1&session_id=${sessionId}`);
           return;
         }

@@ -8,7 +8,9 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Icon } from "@/components/ui/icon"
 import { api } from "@/lib/api"
-import type { QuoteEstimateRequest, QuoteEstimateResponse } from "@/lib/api/types"
+import type { QuoteEstimateRequest } from "@/lib/api/types"
+import { useShipment } from "@/lib/shipment-context"
+import { toast } from "sonner"
 
 interface GetInstantShippingQuoteModalProps {
   open: boolean
@@ -110,11 +112,41 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
   }
 
   const handleGeneratePrice = async () => {
-    if (!formData.packageSize || !formData.weight || !formData.destinationPostalCode) {
+    // Reset previous errors
+    setQuoteError("")
+    setPostalCodeError("")
+    setQuoteGenerated(false)
+    setEstimatedCost("")
+
+    // Validate all required fields
+    if (!formData.packageSize) {
+      setQuoteError("Please select a package size")
       return
     }
 
-    // Validate postal code before making API call
+    if (!formData.weight) {
+      setQuoteError("Please enter package weight")
+      return
+    }
+
+    // Validate weight is a positive number
+    const weight = parseFloat(formData.weight)
+    if (isNaN(weight) || weight <= 0) {
+      setQuoteError("Weight must be a positive number")
+      return
+    }
+
+    if (weight > 50) {
+      setQuoteError("Weight cannot exceed 50 kg. For heavier packages, please contact support.")
+      return
+    }
+
+    if (!formData.destinationPostalCode) {
+      setQuoteError("Please enter destination postal code")
+      return
+    }
+
+    // Validate postal code format and service area
     const postalCodeValidationError = validatePostalCode(formData.destinationPostalCode);
     if (postalCodeValidationError) {
       setPostalCodeError(postalCodeValidationError);
@@ -123,41 +155,84 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
     }
 
     setIsGenerating(true)
-    setQuoteError("")
-    setPostalCodeError("")
     
     try {
       const quoteRequest: QuoteEstimateRequest = {
         package_size: formData.packageSize as 'small' | 'medium' | 'large',
-        weight: parseFloat(formData.weight),
-        destination_postal_code: formData.destinationPostalCode
+        weight: weight,
+        destination_postal_code: formData.destinationPostalCode.trim().toUpperCase()
       }
 
+      console.log('Requesting quote with:', quoteRequest)
       const response = await api.quotes.getEstimate(quoteRequest)
+      
+      if (!response || typeof response.estimated_price !== 'number') {
+        throw new Error('Invalid response from server')
+      }
+
+      if (response.estimated_price <= 0) {
+        throw new Error('Invalid price calculation')
+      }
       
       setEstimatedCost(response.estimated_price.toFixed(2))
       setQuoteGenerated(true)
-    } catch (error) {
+      console.log('Quote generated successfully:', response)
+    } catch (error: any) {
       console.error('Quote generation failed:', error)
-      const errorMessage = error instanceof Error ? error.message : 'Failed to generate quote. Please try again.'
-      setQuoteError(errorMessage)
       
-      // Don't fallback to mock calculation if it's a service area error
-      if (errorMessage.toLowerCase().includes('service area') || 
-          errorMessage.toLowerCase().includes('not in our service area') ||
-          errorMessage.toLowerCase().includes('not supported')) {
+      // Extract error message from different error formats
+      let errorMessage = 'Failed to generate quote. Please try again.'
+      
+      if (error?.message) {
+        errorMessage = error.message
+      } else if (error?.error) {
+        errorMessage = error.error
+      } else if (error?.details) {
+        if (typeof error.details === 'string') {
+          errorMessage = error.details
+        } else if (Array.isArray(error.details) && error.details.length > 0) {
+          errorMessage = error.details[0]?.message || error.details[0]?.msg || String(error.details[0])
+        }
+      }
+
+      // Check for specific error types
+      if (errorMessage.toLowerCase().includes('network') || errorMessage.toLowerCase().includes('fetch')) {
+        errorMessage = 'Network error. Please check your internet connection and try again.'
+      } else if (errorMessage.toLowerCase().includes('timeout')) {
+        errorMessage = 'Request timed out. Please try again.'
+      } else if (errorMessage.toLowerCase().includes('service area') || 
+                 errorMessage.toLowerCase().includes('not in our service area') ||
+                 errorMessage.toLowerCase().includes('not supported')) {
+        // Service area error - don't fallback to mock calculation
+        setQuoteError(errorMessage)
+        return;
+      } else if (errorMessage.toLowerCase().includes('validation')) {
+        // Validation error from API
+        setQuoteError(errorMessage)
         return;
       }
       
-      // Fallback to mock calculation only for other errors
-      const weight = parseFloat(formData.weight) || 1
-      const baseRate = 15.99
-      const weightMultiplier = weight * 2.5
-      const distanceFactor = 1.2
-      const total = (baseRate + weightMultiplier) * distanceFactor
+      // For other errors, show error but provide fallback calculation
+      setQuoteError(`${errorMessage} (Showing estimated price)`)
       
-      setEstimatedCost(total.toFixed(2))
-      setQuoteGenerated(true)
+      // Fallback to mock calculation for non-service-area errors
+      try {
+        const baseRate = 15.99
+        const weightMultiplier = weight * 2.5
+        const sizeMultiplier = formData.packageSize === 'large' ? 1.3 : formData.packageSize === 'medium' ? 1.15 : 1.0
+        const distanceFactor = 1.2
+        const total = (baseRate + weightMultiplier) * sizeMultiplier * distanceFactor
+        
+        if (total > 0 && total < 10000) { // Sanity check
+          setEstimatedCost(total.toFixed(2))
+          setQuoteGenerated(true)
+        } else {
+          throw new Error('Invalid calculation result')
+        }
+      } catch (calcError) {
+        console.error('Fallback calculation failed:', calcError)
+        setQuoteError('Unable to calculate shipping cost. Please try again or contact support.')
+      }
     } finally {
       setIsGenerating(false)
     }
@@ -212,7 +287,7 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
 
           {/* Package Size */}
           <div className="space-y-2">
-            <Label htmlFor="parcego-package-size">Package Size</Label>
+            <Label htmlFor="parcego-package-size">Package Size <span className="text-red-500">*</span></Label>
             <Select value={formData.packageSize} onValueChange={(value) => handleInputChange("packageSize", value)}>
               <SelectTrigger>
                 <SelectValue placeholder="Select package size" />
@@ -225,20 +300,47 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
                 ))}
               </SelectContent>
             </Select>
+            {formData.packageSize && (
+              <p className="text-xs text-green-600">
+                ✓ {packageSizeOptions.find(opt => opt.value === formData.packageSize)?.label} package selected
+              </p>
+            )}
           </div>
 
           {/* Weight */}
           <div className="space-y-2">
-            <Label htmlFor="parcego-weight">Weight (lbs)</Label>
+            <Label htmlFor="parcego-weight">Weight (kg) <span className="text-red-500">*</span></Label>
             <Input
               id="parcego-weight"
               type="number"
-              placeholder="Enter weight in pounds"
+              placeholder="Enter weight in kilograms"
               value={formData.weight}
               onChange={(e) => handleInputChange("weight", e.target.value)}
               min="0.1"
+              max="50"
               step="0.1"
+              className={formData.weight && (parseFloat(formData.weight) <= 0 || parseFloat(formData.weight) > 50) ? 'border-red-500' : ''}
             />
+            {formData.weight && parseFloat(formData.weight) > 50 && (
+              <p className="text-xs text-red-600">
+                Weight cannot exceed 50 kg
+              </p>
+            )}
+            {formData.weight && parseFloat(formData.weight) <= 0 && (
+              <p className="text-xs text-red-600">
+                Weight must be greater than 0
+              </p>
+            )}
+            {formData.weight && parseFloat(formData.weight) > 0 && parseFloat(formData.weight) <= 50 && (
+              <p className="text-xs text-green-600">
+                ✓ Valid weight
+              </p>
+            )}
+            {!formData.weight && (
+              <p className="text-xs text-gray-500">
+                Enter weight between 0.1 and 50 kg
+              </p>
+            )}
           </div>
 
           {/* Destination Postal Code */}
@@ -282,25 +384,55 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
 
           {/* Error Display */}
           {quoteError && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex items-center">
-                <Icon name="AlertCircle" size={16} className="text-red-600 mr-2" />
-                <span className="text-sm font-medium text-red-800">Error</span>
+            <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 shadow-sm">
+              <div className="flex items-start space-x-3">
+                <Icon name="AlertCircle" size={20} className="text-red-600 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-red-900 mb-1">
+                    Unable to Generate Quote
+                  </p>
+                  <p className="text-sm text-red-700 leading-relaxed">{quoteError}</p>
+                  {quoteError.toLowerCase().includes('service area') && (
+                    <p className="text-xs text-red-600 mt-2">
+                      💡 Tip: Make sure both pickup and delivery addresses are in Downtown Toronto or Mississauga.
+                    </p>
+                  )}
+                </div>
               </div>
-              <p className="text-sm text-red-700 mt-1">{quoteError}</p>
+            </div>
+          )}
+
+          {/* Loading State */}
+          {isGenerating && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="flex items-center space-x-3">
+                <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-blue-900">Calculating shipping cost...</p>
+                  <p className="text-xs text-blue-700 mt-1">Please wait while we process your request</p>
+                </div>
+              </div>
             </div>
           )}
 
           {/* Estimated Cost Display */}
-          {quoteGenerated && estimatedCost && (
-            <div className="bg-white border border-green-200 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-semibold text-green-800">Estimated Shipping Cost:</span>
+          {quoteGenerated && estimatedCost && !isGenerating && (
+            <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center space-x-2">
+                  <Icon name="CheckCircle" size={20} className="text-green-600" />
+                  <span className="text-sm font-semibold text-green-900">Estimated Shipping Cost</span>
+                </div>
                 <span className="text-3xl font-extrabold text-green-700">${estimatedCost}</span>
               </div>
-              <p className="text-xs font-medium text-green-700 mt-1">
-                Price includes base rate, weight surcharge, and distance factor
-              </p>
+              <div className="space-y-1">
+                <p className="text-xs font-medium text-green-800">
+                  ✓ Price includes base rate, weight surcharge, and distance factor
+                </p>
+                <p className="text-xs text-green-700">
+                  📦 {packageSizeOptions.find(opt => opt.value === formData.packageSize)?.label} package • {formData.weight} kg • {formData.destinationPostalCode}
+                </p>
+              </div>
             </div>
           )}
         </div>

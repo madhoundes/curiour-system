@@ -310,154 +310,185 @@ export const generatePdfInvoice = async (invoiceData: {
       }
     }
     
+    // Header section with logo and company info
+    let currentY = 20;
+    
     // Load and add logo
     try {
       const logoData = await loadLogoForPDF();
       if (logoData) {
         // Master logo aspect ratio: 149/92 ≈ 1.62:1
-        // Use appropriate width and calculate height to maintain aspect ratio
-        const logoWidth = 50;
-        const logoHeight = logoWidth / 1.62; // Maintain aspect ratio (~31)
-        addLogoToPDF(pdfWithAutoTable, 20, 20, logoWidth, logoHeight, logoData);
-        
-        // Company info - positioned to the right of logo with proper spacing
-        const logoRightEdge = 20 + logoWidth + 10; // 10pt spacing after logo
-        pdfWithAutoTable.setFontSize(20);
-        pdfWithAutoTable.setTextColor(0, 145, 245);
-        pdfWithAutoTable.text('Parcego', logoRightEdge, 30);
-        
-        pdfWithAutoTable.setFontSize(10);
-        pdfWithAutoTable.setTextColor(100, 100, 100);
-        pdfWithAutoTable.text('Professional Shipping Solutions', logoRightEdge, 37);
-      } else {
-        // If logo not available, use text-only layout
-        pdfWithAutoTable.setFontSize(20);
-        pdfWithAutoTable.setTextColor(0, 145, 245);
-        pdfWithAutoTable.text('Parcego', 20, 30);
-        
-        pdfWithAutoTable.setFontSize(10);
-        pdfWithAutoTable.setTextColor(100, 100, 100);
-        pdfWithAutoTable.text('Professional Shipping Solutions', 20, 37);
+        const logoWidth = 40;
+        const logoHeight = logoWidth / 1.62; // Maintain aspect ratio (~25)
+        addLogoToPDF(pdfWithAutoTable, 20, currentY, logoWidth, logoHeight, logoData);
       }
     } catch (logoError) {
       console.warn('Could not load logo, continuing without it:', logoError);
-      // Fallback to text-only layout
-      pdfWithAutoTable.setFontSize(20);
-      pdfWithAutoTable.setTextColor(0, 145, 245);
-      pdfWithAutoTable.text('Parcego', 20, 30);
-      
-      pdfWithAutoTable.setFontSize(10);
-      pdfWithAutoTable.setTextColor(100, 100, 100);
-      pdfWithAutoTable.text('Professional Shipping Solutions', 20, 37);
     }
     
-    // Invoice title and number
-    pdfWithAutoTable.setFontSize(24);
-    pdfWithAutoTable.setTextColor(0, 0, 0);
-    pdfWithAutoTable.text('INVOICE', 20, 60);
+    // Company info - top left
+    pdfWithAutoTable.setFontSize(16);
+    pdfWithAutoTable.setTextColor(0, 145, 245);
+    pdfWithAutoTable.setFont('helvetica', 'bold');
+    pdfWithAutoTable.text('Parcego', 20, currentY + 35);
     
-    pdfWithAutoTable.setFontSize(12);
-    pdfWithAutoTable.text(`Invoice #: ${invoiceData.invoiceNumber}`, 20, 70);
-    pdfWithAutoTable.text(`Issue Date: ${invoiceData.issueDate}`, 20, 78);
-    pdfWithAutoTable.text(`Due Date: ${invoiceData.dueDate}`, 20, 86);
+    pdfWithAutoTable.setFontSize(9);
+    pdfWithAutoTable.setTextColor(100, 100, 100);
+    pdfWithAutoTable.setFont('helvetica', 'normal');
+    pdfWithAutoTable.text('Courier Business Platform', 20, currentY + 42);
+    pdfWithAutoTable.text('123 Business Street', 20, currentY + 48);
+    pdfWithAutoTable.text('Suite 100', 20, currentY + 54);
+    pdfWithAutoTable.text('New York, NY 10001', 20, currentY + 60);
+    pdfWithAutoTable.text('support@parcego.com', 20, currentY + 66);
+    
+    // Invoice title and details - top right
+    const pageWidth = pdfWithAutoTable.internal.pageSize.width;
+    const rightMargin = 20;
+    
+    pdfWithAutoTable.setFontSize(28);
+    pdfWithAutoTable.setTextColor(0, 0, 0);
+    pdfWithAutoTable.setFont('helvetica', 'bold');
+    pdfWithAutoTable.text('INVOICE', pageWidth - rightMargin - 50, currentY + 10);
+    
+    pdfWithAutoTable.setFontSize(10);
+    pdfWithAutoTable.setFont('helvetica', 'normal');
+    pdfWithAutoTable.setTextColor(60, 60, 60);
+    pdfWithAutoTable.text(`Invoice #: ${invoiceData.invoiceNumber}`, pageWidth - rightMargin - 60, currentY + 25);
+    pdfWithAutoTable.text(`Date: ${invoiceData.issueDate}`, pageWidth - rightMargin - 60, currentY + 32);
+    pdfWithAutoTable.text(`Due Date: ${invoiceData.dueDate}`, pageWidth - rightMargin - 60, currentY + 39);
     
     if (invoiceData.status) {
-      pdfWithAutoTable.text(`Status: ${invoiceData.status}`, 20, 94);
+      // Status badge
+      pdfWithAutoTable.setFontSize(9);
+      pdfWithAutoTable.setFont('helvetica', 'bold');
+      const statusText = invoiceData.status.toUpperCase();
+      const statusColor = invoiceData.status.toLowerCase() === 'paid' ? [34, 197, 94] : [234, 179, 8];
+      pdfWithAutoTable.setTextColor(statusColor[0], statusColor[1], statusColor[2]);
+      pdfWithAutoTable.text(statusText, pageWidth - rightMargin - 30, currentY + 48);
     }
     
-    // Bill To section
-    pdfWithAutoTable.setFontSize(14);
-    pdfWithAutoTable.text('Bill To:', 20, 110);
+    currentY = 95;
     
-    pdfWithAutoTable.setFontSize(11);
-    let yPos = 120;
+    // Bill To section - left column
+    pdfWithAutoTable.setFontSize(12);
+    pdfWithAutoTable.setFont('helvetica', 'bold');
+    pdfWithAutoTable.setTextColor(0, 0, 0);
+    pdfWithAutoTable.text('BILL TO:', 20, currentY);
+    
+    pdfWithAutoTable.setFontSize(10);
+    pdfWithAutoTable.setFont('helvetica', 'normal');
+    pdfWithAutoTable.setTextColor(60, 60, 60);
+    let yPos = currentY + 8;
+    
+    pdfWithAutoTable.setFont('helvetica', 'bold');
     pdfWithAutoTable.text(invoiceData.billTo.name, 20, yPos);
-    yPos += 7;
+    pdfWithAutoTable.setFont('helvetica', 'normal');
+    yPos += 6;
     
     if (invoiceData.billTo.company) {
       pdfWithAutoTable.text(invoiceData.billTo.company, 20, yPos);
-      yPos += 7;
+      yPos += 6;
     }
     
     pdfWithAutoTable.text(invoiceData.billTo.address, 20, yPos);
-    yPos += 7;
+    yPos += 6;
     pdfWithAutoTable.text(`${invoiceData.billTo.city}, ${invoiceData.billTo.province} ${invoiceData.billTo.postalCode}`, 20, yPos);
-    yPos += 7;
+    yPos += 6;
     pdfWithAutoTable.text(invoiceData.billTo.country, 20, yPos);
     
-    // Shipment details if provided
+    // Shipment details - right column
     if (invoiceData.shipmentDetails) {
-      pdfWithAutoTable.setFontSize(14);
-      pdfWithAutoTable.text('Shipment Details:', 120, 110);
+      pdfWithAutoTable.setFontSize(12);
+      pdfWithAutoTable.setFont('helvetica', 'bold');
+      pdfWithAutoTable.setTextColor(0, 0, 0);
+      pdfWithAutoTable.text('SHIPMENT DETAILS:', 110, currentY);
       
-      pdfWithAutoTable.setFontSize(11);
-      let shipYPos = 120;
+      pdfWithAutoTable.setFontSize(10);
+      pdfWithAutoTable.setFont('helvetica', 'normal');
+      pdfWithAutoTable.setTextColor(60, 60, 60);
+      let shipYPos = currentY + 8;
       
       if (invoiceData.shipmentDetails.trackingNumber) {
-        pdfWithAutoTable.text(`Tracking: ${invoiceData.shipmentDetails.trackingNumber}`, 120, shipYPos);
-        shipYPos += 7;
+        pdfWithAutoTable.text(`Tracking: ${invoiceData.shipmentDetails.trackingNumber}`, 110, shipYPos);
+        shipYPos += 6;
       }
       
       if (invoiceData.shipmentDetails.service) {
-        pdfWithAutoTable.text(`Service: ${invoiceData.shipmentDetails.service}`, 120, shipYPos);
-        shipYPos += 7;
+        pdfWithAutoTable.text(`Service: ${invoiceData.shipmentDetails.service}`, 110, shipYPos);
+        shipYPos += 6;
       }
       
       if (invoiceData.shipmentDetails.weight) {
-        pdfWithAutoTable.text(`Weight: ${invoiceData.shipmentDetails.weight}`, 120, shipYPos);
-        shipYPos += 7;
+        pdfWithAutoTable.text(`Weight: ${invoiceData.shipmentDetails.weight}`, 110, shipYPos);
+        shipYPos += 6;
       }
       
       if (invoiceData.shipmentDetails.deliveryDate) {
-        pdfWithAutoTable.text(`Delivery: ${invoiceData.shipmentDetails.deliveryDate}`, 120, shipYPos);
+        pdfWithAutoTable.text(`Delivery: ${invoiceData.shipmentDetails.deliveryDate}`, 110, shipYPos);
       }
     }
+    
+    // Update yPos to the maximum of both columns
+    yPos = Math.max(yPos, currentY + 40);
     
     // Line items table
     const tableData = invoiceData.lineItems.map(item => [
       item.description,
       item.quantity?.toString() || '1',
-      item.unitPrice ? `${invoiceData.currency}${item.unitPrice.toFixed(2)}` : '-',
-      `${invoiceData.currency}${item.amount.toFixed(2)}`
+      item.unitPrice ? `$${item.unitPrice.toFixed(2)}` : '-',
+      `$${item.amount.toFixed(2)}`
     ]);
     
     pdfWithAutoTable.autoTable({
-      startY: yPos + 20,
+      startY: yPos + 15,
       head: [['Description', 'Qty', 'Unit Price', 'Amount']],
       body: tableData,
-      theme: 'grid',
+      theme: 'striped',
       headStyles: {
         fillColor: [0, 145, 245],
-        textColor: 255,
-        fontSize: 11,
-        fontStyle: 'bold'
+        textColor: [255, 255, 255],
+        fontSize: 10,
+        fontStyle: 'bold',
+        halign: 'left'
       },
       bodyStyles: {
-        fontSize: 10
+        fontSize: 9,
+        textColor: [60, 60, 60]
       },
       columnStyles: {
-        0: { cellWidth: 80 },
+        0: { cellWidth: 100, halign: 'left' },
         1: { cellWidth: 20, halign: 'center' },
-        2: { cellWidth: 40, halign: 'right' },
-        3: { cellWidth: 40, halign: 'right' }
-      }
+        2: { cellWidth: 35, halign: 'right' },
+        3: { cellWidth: 35, halign: 'right' }
+      },
+      margin: { left: 20, right: 20 }
     });
     
-    // Totals
+    // Totals section
     const finalY = pdfWithAutoTable.lastAutoTable?.finalY || yPos + 80;
-    const totalsX = 130;
-    let totalsY = finalY + 20;
+    const labelX = 130;
+    const valueX = 180;
+    let totalsY = finalY + 15;
     
-    pdfWithAutoTable.setFontSize(11);
-    pdfWithAutoTable.text(`Subtotal: ${invoiceData.currency}${invoiceData.subtotal.toFixed(2)}`, totalsX, totalsY);
-    totalsY += 8;
-    pdfWithAutoTable.text(`Tax: ${invoiceData.currency}${invoiceData.tax.toFixed(2)}`, totalsX, totalsY);
-    totalsY += 8;
+    // Subtotal
+    pdfWithAutoTable.setFontSize(10);
+    pdfWithAutoTable.setFont('helvetica', 'normal');
+    pdfWithAutoTable.setTextColor(60, 60, 60);
+    pdfWithAutoTable.text('Subtotal:', labelX, totalsY);
+    pdfWithAutoTable.text(`$${invoiceData.subtotal.toFixed(2)}`, valueX, totalsY);
+    totalsY += 7;
+    
+    // Tax
+    pdfWithAutoTable.text('Tax:', labelX, totalsY);
+    pdfWithAutoTable.text(`$${invoiceData.tax.toFixed(2)}`, valueX, totalsY);
+    totalsY += 10;
     
     // Total with emphasis
     pdfWithAutoTable.setFontSize(12);
     pdfWithAutoTable.setFont('helvetica', 'bold');
-    pdfWithAutoTable.text(`Total: ${invoiceData.currency}${invoiceData.total.toFixed(2)}`, totalsX, totalsY);
+    pdfWithAutoTable.setTextColor(0, 0, 0);
+    pdfWithAutoTable.text('TOTAL:', labelX, totalsY);
+    pdfWithAutoTable.text(`${invoiceData.currency}$${invoiceData.total.toFixed(2)}`, valueX, totalsY);
     
     // Notes
     if (invoiceData.notes) {
@@ -479,8 +510,10 @@ export const generatePdfInvoice = async (invoiceData: {
     const formattedDate = `${String(date.getUTCMonth() + 1).padStart(2, '0')}/${String(date.getUTCDate()).padStart(2, '0')}/${date.getUTCFullYear()}`;
     pdfWithAutoTable.text(`Generated on ${formattedDate}`, 20, pageHeight - 12);
     
-    // Save the PDF
-    const filename = `${invoiceData.invoiceNumber.replace(/[^a-zA-Z0-9]/g, '-')}-${new Date().toISOString().split('T')[0]}.pdf`;
+    // Save the PDF with timestamp to ensure fresh download
+    const timestamp = new Date().getTime();
+    const dateStr = new Date().toISOString().split('T')[0];
+    const filename = `invoice-${invoiceData.invoiceNumber.replace(/[^a-zA-Z0-9]/g, '-')}-${dateStr}-${timestamp}.pdf`;
     pdfWithAutoTable.save(filename);
     
   } catch (error) {
