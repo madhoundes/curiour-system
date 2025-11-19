@@ -103,17 +103,51 @@ export default function ClaimsHistoryPage() {
       setLoading(true);
       setError(null);
       
-      const response = await claimsService.getClaims({
+      // Convert 'all' to null for API, keep other statuses as-is
+      const statusParam: 'pending' | 'approved' | 'rejected' | 'resolved' | null = 
+        params.status === 'all' || params.status === undefined ? null : params.status;
+      
+      console.log('🔍 Fetching claims with params:', {
         page: params.page || currentPage,
         per_page: 10,
-        status: params.status === 'all' || params.status === undefined ? null : params.status
+        status: statusParam,
+        rawStatus: params.status
       });
+      
+      const apiParams: GetClaimsParams = {
+        page: params.page || currentPage,
+        per_page: 10
+      };
+      
+      // Only add status if it's not null
+      if (statusParam !== null) {
+        apiParams.status = statusParam;
+      }
+      
+      console.log('📡 API params being sent:', apiParams);
+      
+      const response = await claimsService.getClaims(apiParams);
 
+      console.log('✅ Claims fetched successfully:', {
+        totalClaims: response.total,
+        claimsReturned: response.claims.length,
+        page: response.page,
+        totalPages: response.total_pages
+      });
+      
+      console.log('📋 Claims data:', response.claims.map(c => ({
+        id: c.id,
+        status: c.status,
+        reason: c.reason,
+        tracking: c.shipment_tracking_code
+      })));
+      
       setClaims(response.claims);
       setTotalPages(response.total_pages);
       setTotalClaims(response.total);
       setCurrentPage(response.page);
     } catch (err: any) {
+      console.error('❌ Error fetching claims:', err);
       setError(err.message || 'Failed to fetch claims');
       setClaims([]);
     } finally {
@@ -128,8 +162,11 @@ export default function ClaimsHistoryPage() {
 
   // Handle status filter change
   const handleStatusFilterChange = (status: 'all' | 'pending' | 'approved' | 'rejected' | 'resolved') => {
+    console.log('Status filter changed to:', status);
     setStatusFilter(status);
     setCurrentPage(1);
+    setTypeFilter('all'); // Reset type filter when status changes
+    setSearchQuery(''); // Reset search when status changes
     fetchClaims({ 
       page: 1, 
       status: status 
@@ -302,9 +339,12 @@ export default function ClaimsHistoryPage() {
               <Label htmlFor="search">Search Claims</Label>
               <Input
                 id="search"
-                placeholder="Search by ID, shipment, name..."
+                placeholder="Search by ID, shipment, description..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1); // Reset to first page when searching
+                }}
                 className="w-full"
               />
             </div>
@@ -312,7 +352,7 @@ export default function ClaimsHistoryPage() {
             <div className="space-y-2">
               <Label htmlFor="status">Claim Status</Label>
               <Select value={statusFilter} onValueChange={handleStatusFilterChange}>
-                <SelectTrigger>
+                <SelectTrigger id="status">
                   <SelectValue placeholder="All Statuses" />
                 </SelectTrigger>
                 <SelectContent>
@@ -327,8 +367,11 @@ export default function ClaimsHistoryPage() {
 
             <div className="space-y-2">
               <Label htmlFor="type">Claim Type</Label>
-              <Select value={typeFilter} onValueChange={setTypeFilter}>
-                <SelectTrigger>
+              <Select value={typeFilter} onValueChange={(value) => {
+                setTypeFilter(value);
+                setCurrentPage(1); // Reset to first page when filter changes
+              }}>
+                <SelectTrigger id="type">
                   <SelectValue placeholder="All Types" />
                 </SelectTrigger>
                 <SelectContent>

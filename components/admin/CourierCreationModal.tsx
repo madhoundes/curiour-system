@@ -31,14 +31,7 @@ const courierCreationSchema = z.object({
     .string()
     .min(10, "Phone number must be at least 10 digits")
     .regex(/^\+?[\d\s\-\(\)]+$/, "Please enter a valid phone number"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
-  business_name: z
-    .string()
-    .min(2, "Business name must be at least 2 characters")
-    .max(100, "Business name must be less than 100 characters"),
-  role: z.enum(["user", "driver", "admin"]).refine(val => val !== undefined, {
-    message: "Please select a role"
-  })
+  password: z.string().min(6, "Password must be at least 6 characters")
 });
 
 type CourierCreationFormData = z.infer<typeof courierCreationSchema>;
@@ -67,13 +60,8 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
     setValue,
     watch
   } = useForm<CourierCreationFormData>({
-    resolver: zodResolver(courierCreationSchema),
-    defaultValues: {
-      role: "driver" // Default to driver role for courier creation
-    }
+    resolver: zodResolver(courierCreationSchema)
   });
-
-  const selectedRole = watch("role");
 
   const handleClose = () => {
     if (isSubmitting) return;
@@ -110,9 +98,9 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
         email: data.email,
         first_name: data.first_name,
         last_name: data.last_name,
-        business_name: data.business_name,
+        business_name: `${data.first_name} ${data.last_name}`, // Auto-generate from name
         phone_number: data.phone_number,
-        role: data.role,
+        role: "driver", // Always create as driver/courier
         password: data.password
       };
 
@@ -181,7 +169,7 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
   };
 
   const isValidSingleStep = () => {
-    return !errors.first_name && !errors.last_name && !errors.email && !errors.password && !errors.business_name && !errors.role;
+    return !errors.first_name && !errors.last_name && !errors.email && !errors.password && !errors.phone_number;
   };
 
   const renderStepContent = () => {
@@ -236,20 +224,6 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
         </div>
 
         <div className="space-y-2">
-          <Label htmlFor="business_name">Business Name *</Label>
-          <Input
-            id="business_name"
-            {...register("business_name")}
-            className={errors.business_name ? "border-red-500" : ""}
-            placeholder="Enter business name"
-            autoComplete="off"
-          />
-          {errors.business_name && (
-            <p className="text-sm text-red-600">{errors.business_name.message}</p>
-          )}
-        </div>
-
-        <div className="space-y-2">
           <Label htmlFor="phone_number">Phone Number *</Label>
           <Input
             id="phone_number"
@@ -266,24 +240,14 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
           )}
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="role">Role *</Label>
-          <Select
-            value={selectedRole}
-            onValueChange={(value) => setValue("role", value as "user" | "driver" | "admin")}
-          >
-            <SelectTrigger className={errors.role ? "border-red-500" : ""}>
-              <SelectValue placeholder="Select a role" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="driver">Driver/Courier</SelectItem>
-              <SelectItem value="user">User/Customer</SelectItem>
-              <SelectItem value="admin">Administrator</SelectItem>
-            </SelectContent>
-          </Select>
-          {errors.role && (
-            <p className="text-sm text-red-600">{errors.role.message}</p>
-          )}
+        {/* Role is always Driver/Courier - shown as info */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="flex items-center gap-2">
+            <Icon name="Info" size={16} className="text-blue-600" />
+            <p className="text-sm text-blue-700">
+              <strong>Role:</strong> This account will be created as a <strong>Driver/Courier</strong>
+            </p>
+          </div>
         </div>
 
         <div className="space-y-2">
@@ -310,10 +274,10 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
         <DialogHeader className="space-y-4">
           <DialogTitle className="text-2xl font-bold flex items-center gap-2">
             <Icon name="UserPlus" size={24} />
-            Create New User Account
+            Create New Courier Account
           </DialogTitle>
           <DialogDescription>
-            Add a new user to the Parcego platform. Fill out all required information to create their account.
+            Add a new courier/driver to the Parcego platform. Fill out all required information to create their account.
           </DialogDescription>
         </DialogHeader>
 
@@ -417,7 +381,7 @@ export const CourierCreationModal = ({ isOpen, onClose, onSuccess }: CourierCrea
               disabled={!isValidSingleStep() || isSubmitting}
               className="bg-blue-600 hover:bg-blue-700"
             >
-              {isSubmitting ? "Creating Account..." : `Create ${watch('role') === 'driver' ? 'Courier' : watch('role') === 'admin' ? 'Admin' : 'User'} Account`}
+              {isSubmitting ? "Creating Account..." : "Create Courier Account"}
             </Button>
           </div>
         </div>
