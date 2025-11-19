@@ -15,6 +15,7 @@ import { createStepperSteps, Stepper } from "@/components/ui/stepper";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import type { CreateShipmentRequest, UserProfile } from "@/lib/api/types";
 import { StripePaymentForm } from "@/components/ui/stripe-payment-form";
+import { clearShipmentFormData } from "@/lib/shipment-cache-utils";
 
 
 interface OrderData {
@@ -1039,7 +1040,19 @@ function PurchaseLabelContent() {
       </div>
 
       {/* Payment Success Confirmation Dialog */}
-      <Dialog open={showConfirmation} onOpenChange={setShowConfirmation}>
+      <Dialog open={showConfirmation} onOpenChange={async (open) => {
+        if (!open) {
+          // When closing the modal, clear cache and redirect to create-shipment
+          try {
+            await clearShipmentFormData();
+            console.log('✅ Cache cleared after closing purchase label modal');
+          } catch (error) {
+            console.warn('Failed to clear cache:', error);
+          }
+          router.push('/create-shipment');
+        }
+        setShowConfirmation(open);
+      }}>
         <DialogContent className="max-w-2xl bg-white">
           <DialogHeader className="text-center">
             <DialogTitle className="text-xl font-bold text-gray-900 mb-2">

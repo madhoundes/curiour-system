@@ -16,6 +16,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { authService } from "@/lib/api/auth";
 import { apiClient } from "@/lib/api/client";
+import { clearShipmentFormData } from "@/lib/shipment-cache-utils";
 
 // Form validation schema
 const adminLoginSchema = z.object({
@@ -55,6 +56,9 @@ const authenticateAdmin = async (email: string, password: string) => {
         error: "Authentication failed. No token received." 
       };
     }
+    
+    // Clear shipment form cache on login to prevent data from previous user
+    await clearShipmentFormData();
     
     // Step 3: Fetch current user information using the token
     // The token is already set by authService.login(), so we can make authenticated requests
