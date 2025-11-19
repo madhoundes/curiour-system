@@ -1451,153 +1451,42 @@ function InvoiceDetailsDialog({ invoice, userProfile }: { invoice: Invoice; user
   }
 
   const handleDownloadPDF = async () => {
-    // Dynamically import jsPDF to avoid SSR issues
-    const { jsPDF } = await import('jspdf')
-    
-    // Create PDF document
-    const doc = new jsPDF('p', 'pt', 'a4')
-    const pageWidth = doc.internal.pageSize.getWidth()
-    const pageHeight = doc.internal.pageSize.getHeight()
-    const margin = 40
-    let yPosition = margin
-
-    // Define proper types for jsPDF text options
-    interface TextOptions {
-      align?: 'left' | 'center' | 'right'
-      angle?: number
+    try {
+      // Use the improved generatePdfInvoice function
+      const invoiceNumber = invoice.id.toLowerCase().startsWith('inv-') ? invoice.id.toUpperCase() : `INV-${invoice.id.toUpperCase()}`;
+      
+      await generatePdfInvoice({
+        invoiceNumber: invoiceNumber,
+        issueDate: formatDate(invoice.date),
+        dueDate: formatDate(invoice.dueDate),
+        billTo: {
+          name: 'Acme Business Solutions',
+          company: 'John Smith, CEO',
+          address: '456 Commerce Ave',
+          city: 'Business District',
+          province: 'CA',
+          postalCode: '90210',
+          country: 'United States'
+        },
+        lineItems: invoice.lineItems.map(item => ({
+          description: item.description,
+          quantity: 1,
+          unitPrice: item.amount,
+          amount: item.amount
+        })),
+        subtotal: invoice.amount,
+        tax: 0,
+        total: invoice.amount,
+        currency: invoice.currency || 'CAD',
+        status: invoice.status,
+        notes: 'Thank you for choosing Parcego! Your package was delivered with care.'
+      });
+      
+      toast.success('Invoice downloaded successfully');
+    } catch (error) {
+      console.error('Failed to download PDF:', error);
+      toast.error('Failed to download invoice. Please try again.');
     }
-
-    // Helper function for adding text
-    const addText = (text: string, x: number, y: number, options?: TextOptions) => {
-      doc.text(text, x, y, options)
-      return y
-    }
-
-    // Load and add company logo
-    const logoData = await loadLogoForPDF();
-    // Master logo aspect ratio: 149/92 ≈ 1.62:1
-    // Use appropriate width and calculate height to maintain aspect ratio
-    const logoWidth = 60;
-    const logoHeight = logoWidth / 1.62; // Maintain aspect ratio (~37)
-    addLogoToPDF(doc, margin, yPosition, logoWidth, logoHeight, logoData);
-
-    // Company info - positioned to the right of logo with proper spacing
-    const logoRightEdge = margin + logoWidth + 10; // 10pt spacing after logo
-    doc.setFontSize(24)
-    doc.setFont('helvetica', 'bold')
-    yPosition = addText('Parcego', logoRightEdge, yPosition + 20)
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    yPosition = addText('Courier Business Platform', logoRightEdge, yPosition + 5)
-    
-    // Company address
-    doc.setFontSize(9)
-    yPosition = addText('123 Business Street', logoRightEdge, yPosition + 10)
-    yPosition = addText('Suite 100', logoRightEdge, yPosition + 5)
-    yPosition = addText('New York, NY 10001', logoRightEdge, yPosition + 5)
-    yPosition = addText('support@parcego.com', logoRightEdge, yPosition + 5)
-
-    // Invoice title and details (right side)
-    doc.setFontSize(20)
-    doc.setFont('helvetica', 'bold')
-    doc.text('INVOICE', pageWidth - margin, margin + 15, { align: 'right' })
-    
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    const invoiceNumber = invoice.id.toLowerCase().startsWith('inv-') ? invoice.id.toUpperCase() : `INV-${invoice.id.toUpperCase()}`;
-    doc.text(`Invoice #: ${invoiceNumber}`, pageWidth - margin, margin + 25, { align: 'right' })
-    doc.text(`Date: ${formatDate(invoice.date)}`, pageWidth - margin, margin + 30, { align: 'right' })
-    doc.text(`Due Date: ${formatDate(invoice.dueDate)}`, pageWidth - margin, margin + 35, { align: 'right' })
-    doc.text(`Status: ${invoice.status.toUpperCase()}`, pageWidth - margin, margin + 40, { align: 'right' })
-
-    // Ensure proper spacing before "Bill To" section
-    // Add spacing after company info, ensuring it's below the logo if logo is taller
-    const minYPosition = margin + logoHeight + 10; // Ensure we're below the logo
-    yPosition = Math.max(yPosition + 15, minYPosition)
-
-    // Bill To section
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'bold')
-    yPosition = addText('Bill To:', margin, yPosition + 15)
-    
-    doc.setFillColor(245, 245, 245)
-    doc.rect(margin, yPosition + 5, pageWidth - 2 * margin, 30, 'F')
-    
-    doc.setFontSize(10)
-    doc.setFont('helvetica', 'normal')
-    yPosition = addText('Acme Business Solutions', margin + 5, yPosition + 12)
-    yPosition = addText('John Smith, CEO', margin + 5, yPosition + 5)
-    yPosition = addText('456 Commerce Ave', margin + 5, yPosition + 5)
-    yPosition = addText('Business District, CA 90210', margin + 5, yPosition + 5)
-    yPosition = addText('john.smith@acme.com', margin + 5, yPosition + 5)
-
-    yPosition = yPosition + 15
-
-    // Services table
-    doc.setFontSize(12)
-    doc.setFont('helvetica', 'bold')
-    yPosition = addText('Services', margin, yPosition + 10)
-    
-    // Table header
-    doc.setFillColor(240, 240, 240)
-    doc.rect(margin, yPosition + 5, pageWidth - 2 * margin, 10, 'F')
-    doc.setFontSize(10)
-    yPosition = addText('Description', margin + 5, yPosition + 10)
-    doc.text('Amount', pageWidth - margin - 5, yPosition, { align: 'right' })
-
-    // Table rows
-    doc.setFont('helvetica', 'normal')
-    invoice.lineItems.forEach((item) => {
-      yPosition = yPosition + 8
-      doc.line(margin, yPosition - 3, pageWidth - margin, yPosition - 3)
-      doc.text(item.description, margin + 5, yPosition)
-      doc.text(formatCurrency(item.amount), pageWidth - margin - 5, yPosition, { align: 'right' })
-    })
-
-    // Totals
-    yPosition = yPosition + 15
-    doc.setFont('helvetica', 'normal')
-    doc.text('Subtotal:', pageWidth - margin - 50, yPosition)
-    doc.text(formatCurrency(invoice.amount), pageWidth - margin - 5, yPosition, { align: 'right' })
-    
-    yPosition = yPosition + 6
-    doc.text('Tax (0%):', pageWidth - margin - 50, yPosition)
-    doc.text(formatCurrency(0), pageWidth - margin - 5, yPosition, { align: 'right' })
-    
-    yPosition = yPosition + 6
-    doc.line(pageWidth - margin - 60, yPosition - 3, pageWidth - margin, yPosition - 3)
-    
-    doc.setFont('helvetica', 'bold')
-    doc.setFontSize(12)
-    yPosition = yPosition + 6
-    doc.text('Total:', pageWidth - margin - 50, yPosition)
-    doc.text(formatCurrency(invoice.amount), pageWidth - margin - 5, yPosition, { align: 'right' })
-
-    // Footer
-    const footerY = pageHeight - 40
-    doc.setFontSize(9)
-    doc.setFont('helvetica', 'normal')
-    doc.line(margin, footerY - 10, pageWidth - margin, footerY - 10)
-    
-    doc.text('Payment Terms: Net 30 days. Please include invoice number with payment.', margin, footerY)
-    doc.text('Payment Methods: Credit/Debit Card via Stripe', margin, footerY + 5)
-    
-    doc.setFontSize(8)
-    doc.text('Thank you for your business!', pageWidth / 2, footerY + 15, { align: 'center' })
-    doc.text('Questions? Contact us at support@parcego.com', pageWidth / 2, footerY + 20, { align: 'center' })
-
-    // Add watermark for status
-    if (invoice.status !== 'paid') {
-      doc.setFontSize(60)
-      doc.setTextColor(200, 200, 200)
-      doc.text(invoice.status.toUpperCase(), pageWidth / 2, pageHeight / 2, {
-        align: 'center',
-        angle: 45
-      })
-    }
-
-    // Save the PDF
-    doc.save(`invoice-${invoice.id}.pdf`)
   }
 
   return (

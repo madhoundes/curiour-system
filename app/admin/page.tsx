@@ -263,6 +263,33 @@ export default function SuperAdminDashboard() {
   const [isUpdatingClaimStatus, setIsUpdatingClaimStatus] = useState(false);
   const [claimStatusUpdateNotes, setClaimStatusUpdateNotes] = useState('');
 
+  // Client-side filtering for claims (since backend doesn't filter by reason/status properly)
+  const filteredClaims = useMemo(() => {
+    const filtered = claims.filter(claim => {
+      // Filter by status
+      const matchesStatus = claimsStatusFilter === 'all' || claim.status === claimsStatusFilter;
+      
+      // Filter by reason
+      const matchesReason = claimsReasonFilter === 'all' || claim.reason === claimsReasonFilter;
+      
+      // Filter by user ID
+      const matchesUserId = claimsUserIdFilter === null || claim.user_id === claimsUserIdFilter;
+      
+      return matchesStatus && matchesReason && matchesUserId;
+    });
+    
+    console.log('🔍 [Admin] Client-side filtering applied:', {
+      totalClaims: claims.length,
+      filteredClaims: filtered.length,
+      filters: {
+        status: claimsStatusFilter,
+        reason: claimsReasonFilter,
+        userId: claimsUserIdFilter
+      }
+    });
+    
+    return filtered;
+  }, [claims, claimsStatusFilter, claimsReasonFilter, claimsUserIdFilter]);
 
   const router = useRouter();
 
@@ -1105,13 +1132,32 @@ export default function SuperAdminDashboard() {
 
       try {
         setClaimsLoading(true);
-        const response = await claimsService.getAllClaimsAdmin({
+        
+        const apiParams = {
           page: claimsPage,
           per_page: 20,
           status: claimsStatusFilter === 'all' ? null : claimsStatusFilter,
           reason: claimsReasonFilter === 'all' ? null : claimsReasonFilter as any,
           user_id: claimsUserIdFilter
+        };
+        
+        console.log('🔍 [Admin] Fetching claims with filters:', apiParams);
+        
+        const response = await claimsService.getAllClaimsAdmin(apiParams);
+
+        console.log('✅ [Admin] Claims fetched:', {
+          total: response.total,
+          returned: response.claims.length,
+          page: response.page,
+          totalPages: response.total_pages
         });
+        
+        console.log('📋 [Admin] Claims data:', response.claims.map(c => ({
+          id: c.id,
+          status: c.status,
+          reason: c.reason,
+          tracking: c.shipment_tracking_code
+        })));
 
         setClaims(response.claims);
         setClaimsTotalPages(response.total_pages);
@@ -4242,7 +4288,7 @@ export default function SuperAdminDashboard() {
                     <SelectItem value="all">All Reasons</SelectItem>
                     <SelectItem value="damaged">Damaged</SelectItem>
                     <SelectItem value="lost">Lost</SelectItem>
-                    <SelectItem value="delayed">Delayed</SelectItem>
+                    <SelectItem value="late_delivery">Late Delivery</SelectItem>
                     <SelectItem value="wrong_address">Wrong Address</SelectItem>
                     <SelectItem value="missing_items">Missing Items</SelectItem>
                     <SelectItem value="other">Other</SelectItem>
@@ -4273,7 +4319,9 @@ export default function SuperAdminDashboard() {
           <CardHeader>
             <CardTitle>All Claims</CardTitle>
             <CardDescription>
-              Showing {claims.length} of {claimsTotal} claims
+              Showing {filteredClaims.length} of {claimsTotal} claims
+              {(claimsStatusFilter !== 'all' || claimsReasonFilter !== 'all' || claimsUserIdFilter !== null) && 
+                ` (${filteredClaims.length} match filters)`}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -4284,10 +4332,25 @@ export default function SuperAdminDashboard() {
                   <span>Loading claims...</span>
                 </div>
               </div>
-            ) : claims.length === 0 ? (
+            ) : filteredClaims.length === 0 ? (
               <div className="text-center py-12">
                 <Icon name="FileText" size={48} className="mx-auto text-gray-400 mb-4" />
-                <p className="text-gray-600">No claims found</p>
+                <p className="text-gray-600">
+                  {claims.length === 0 ? 'No claims found' : 'No claims match the selected filters'}
+                </p>
+                {claims.length > 0 && (
+                  <Button 
+                    variant="outline" 
+                    className="mt-4"
+                    onClick={() => {
+                      setClaimsStatusFilter('all');
+                      setClaimsReasonFilter('all');
+                      setClaimsUserIdFilter(null);
+                    }}
+                  >
+                    Clear Filters
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -4304,7 +4367,7 @@ export default function SuperAdminDashboard() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {claims.map((claim) => {
+                    {filteredClaims.map((claim) => {
                       const statusInfo = claimStatusConfig[claim.status] || claimStatusConfig.pending;
                       return (
                         <TableRow key={claim.id} id={`parcego-claim-row-${claim.id}`}>

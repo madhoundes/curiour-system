@@ -9,6 +9,8 @@ import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { Separator } from "@/components/ui/separator";
 import { ShippingLabelReady } from "@/components/ui/shipping-label-ready";
+import { clearShipmentFormData } from "@/lib/shipment-cache-utils";
+import { toast } from "sonner";
 
 function PaymentSuccessContent() {
   const router = useRouter();
@@ -21,6 +23,20 @@ function PaymentSuccessContent() {
 
   // Get session_id from URL parameters
   const sessionId = searchParams.get('session_id');
+
+  // Clear shipment form cache on successful payment
+  useEffect(() => {
+    const clearCache = async () => {
+      try {
+        await clearShipmentFormData();
+        console.log('✅ Shipment form cache cleared after successful payment');
+      } catch (error) {
+        console.warn('Failed to clear shipment form cache:', error);
+      }
+    };
+    
+    clearCache();
+  }, []); // Run once on mount
 
   // Immediately redirect to purchase-label page with paid flag
   useEffect(() => {
@@ -101,7 +117,15 @@ function PaymentSuccessContent() {
     }
   };
 
-  const handleCreateNewShipment = () => {
+  const handleCreateNewShipment = async () => {
+    try {
+      // Clear the cache before creating a new shipment
+      await clearShipmentFormData();
+      console.log('✅ Cache cleared before creating new shipment');
+      toast.success('Ready to create a new shipment');
+    } catch (error) {
+      console.warn('Failed to clear cache:', error);
+    }
     router.push('/create-shipment');
   };
 

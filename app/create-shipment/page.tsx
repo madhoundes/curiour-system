@@ -166,6 +166,39 @@ function CreateShipmentContent() {
     setHasInitialized(true);
   }, [hasInitialized]);
 
+  // Pre-fill form from URL parameters (from quote modal)
+  useEffect(() => {
+    const weight = searchParams.get('weight');
+    const postalCode = searchParams.get('destinationPostalCode');
+    const packageSize = searchParams.get('packageSize');
+    
+    if (weight || postalCode || packageSize) {
+      console.log('Pre-filling form from quote modal:', { weight, postalCode, packageSize });
+      
+      // Update form fields with data from quote modal
+      if (weight) {
+        updateFormField('weight', weight);
+      }
+      
+      if (postalCode) {
+        updateFormField('recipientPostalCode', postalCode);
+        
+        // Auto-detect city from postal code
+        if (isTorontoPostalCode(postalCode)) {
+          updateFormField('recipientCity', 'Toronto');
+        } else if (isMississaugaPostalCode(postalCode)) {
+          updateFormField('recipientCity', 'Mississauga');
+        }
+      }
+      
+      // Note: packageSize from quote modal doesn't directly map to our form
+      // Quote uses: small/medium/large
+      // Form uses: box/envelope/tube/pallet
+      // We'll just use the default 'box' for now
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Only run once on mount
+
   // Set default province to "ON" for recipient address (service area is Ontario)
   useEffect(() => {
     if (!formData.recipientProvince || formData.recipientProvince.trim() === '') {
@@ -970,34 +1003,65 @@ function CreateShipmentContent() {
           </Card>
 
           {/* Action Buttons */}
-          <div className="flex justify-between items-center pt-6 border-t border-gray-200">
-            <Button
-              variant="outline"
-              onClick={handleBackToDashboard}
-              className="parcego-action-btn parcego-action-btn--cancel"
-              id="parcego-cancel-shipment-btn"
-            >
-              Cancel
-            </Button>
-            
-            <Button
-              onClick={handleContinueToPackageDetails}
-              disabled={isLoading}
-              className="parcego-action-btn parcego-action-btn--continue bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 h-12 text-base font-medium transition-all duration-300 ease-out hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
-              id="parcego-continue-package-details-btn"
-            >
-              {isLoading ? (
-                <div className="flex items-center space-x-2">
-                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                  <span>Processing...</span>
+          <div className="pt-6 border-t border-gray-200">
+            {/* Error Summary */}
+            {(Object.keys(fieldErrors).length > 0 || postalCodeError || senderAddressError) && (
+              <div className="mb-4 bg-red-50 border-2 border-red-300 rounded-lg p-4">
+                <div className="flex items-start space-x-3">
+                  <Icon name="AlertCircle" size={20} className="text-red-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-red-900 mb-1">
+                      Please fix the following errors:
+                    </p>
+                    <ul className="text-sm text-red-700 space-y-1 list-disc list-inside">
+                      {senderAddressError && (
+                        <li>Sender address: {senderAddressError}</li>
+                      )}
+                      {Object.entries(fieldErrors).map(([field, error]) => (
+                        <li key={field}>
+                          {field.replace('recipient', '').replace(/([A-Z])/g, ' $1').trim()}: {error}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
                 </div>
-              ) : (
-                <>
-                  Continue to Package Details
-                  <Icon name="ArrowRight" size={18} className="ml-2 transition-transform duration-200 group-hover:translate-x-1" />
-                </>
-              )}
-            </Button>
+              </div>
+            )}
+
+            <div className="flex justify-between items-center">
+              <Button
+                variant="outline"
+                onClick={handleBackToDashboard}
+                className="parcego-action-btn parcego-action-btn--cancel"
+                id="parcego-cancel-shipment-btn"
+              >
+                Cancel
+              </Button>
+              
+              <Button
+                onClick={handleContinueToPackageDetails}
+                disabled={isLoading || Object.keys(fieldErrors).length > 0 || !!postalCodeError || !!senderAddressError}
+                className="parcego-action-btn parcego-action-btn--continue bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 h-12 text-base font-medium transition-all duration-300 ease-out hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                id="parcego-continue-package-details-btn"
+                title={
+                  Object.keys(fieldErrors).length > 0 || postalCodeError || senderAddressError
+                    ? 'Please fix all errors before continuing'
+                    : ''
+                }
+              >
+                {isLoading ? (
+                  <div className="flex items-center space-x-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                    <span>Processing...</span>
+                  </div>
+                ) : (
+                  <>
+                    Continue to Package Details
+                    <Icon name="ArrowRight" size={18} className="ml-2 transition-transform duration-200 group-hover:translate-x-1" />
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         </div>
       </div>

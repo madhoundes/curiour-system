@@ -542,7 +542,7 @@ export interface GetAllClaimsAdminParams {
   page?: number;
   per_page?: number;
   status?: 'pending' | 'approved' | 'rejected' | 'resolved' | null;
-  reason?: 'damaged' | 'lost' | 'delayed' | 'other' | null;
+  reason?: 'damaged' | 'lost' | 'late_delivery' | 'wrong_address' | 'missing_items' | 'other' | null;
   user_id?: number | null;
 }
 
