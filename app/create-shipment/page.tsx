@@ -725,7 +725,7 @@ function CreateShipmentContent() {
                       updateFormField('recipientCompany', '');
                       updateFormField('recipientAddress', '');
                       updateFormField('recipientCity', '');
-                      updateFormField('recipientProvince', '');
+                      updateFormField('recipientProvince', 'ON'); // Keep default province
                       updateFormField('recipientPostalCode', '');
                       updateFormField('recipientPhone', '');
                       updateFormField('recipientEmail', '');

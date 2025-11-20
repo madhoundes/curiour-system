@@ -24,7 +24,7 @@ import { authService, shopifyService } from "@/lib/api";
 import { API_CONFIG } from "@/lib/api/config";
 import { toast } from "sonner";
 import type { ApiErrorResponse } from "@/lib/api/types";
-import { clearRecipientAddressOnly } from "@/lib/shipment-cache-utils";
+import { clearShipmentFormData } from "@/lib/shipment-cache-utils";
 
 const loginFormSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -207,7 +207,8 @@ const Login03PageContent = () => {
       } else {
         // No Shopify params - normal login flow
         console.log("No Shopify params detected, redirecting to dashboard...");
-        router.push("/dashboard");
+        // Use window.location.href for hard reload to clear React state
+        window.location.href = "/dashboard";
       }
     } catch (error: any) {
       console.error("Shopify OAuth error:", error);
@@ -219,7 +220,8 @@ const Login03PageContent = () => {
       }
       
       // Always redirect to dashboard on error
-      router.push("/dashboard");
+      // Use window.location.href for hard reload to clear React state
+      window.location.href = "/dashboard";
     }
   };
 
@@ -237,8 +239,15 @@ const Login03PageContent = () => {
 
       const response = await authService.login(loginData);
       
-      // Clear only recipient address on login, preserve package details
-      await clearRecipientAddressOnly();
+      // Clear entire shipment cache on login to start fresh
+      const { clearAllShipmentFormData } = await import('@/lib/shipment-cache-utils');
+      clearAllShipmentFormData(); // Clear all user caches
+      await clearShipmentFormData(); // Also clear current user cache
+      
+      // Also clear orderData which is used for quote preview
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('orderData');
+      }
       
       // Set authentication cookie for middleware to recognize authenticated user
       // This allows access to protected routes
@@ -270,7 +279,8 @@ const Login03PageContent = () => {
       } catch (redirectError) {
         console.error("Redirect error:", redirectError);
         // Fallback: always redirect to dashboard even if there's an error
-        router.push("/dashboard");
+        // Use window.location.href for hard reload to clear React state
+        window.location.href = "/dashboard";
       }
     } catch (error) {
       console.error("Login failed:", error);
@@ -326,8 +336,15 @@ const Login03PageContent = () => {
 
       const response = await authService.register(registerData);
       
-      // Clear only recipient address on registration, preserve package details
-      await clearRecipientAddressOnly();
+      // Clear entire shipment cache on registration to start fresh
+      const { clearAllShipmentFormData } = await import('@/lib/shipment-cache-utils');
+      clearAllShipmentFormData(); // Clear all user caches
+      await clearShipmentFormData(); // Also clear current user cache
+      
+      // Also clear orderData which is used for quote preview
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('orderData');
+      }
       
       // Show success message
       toast.success("Registration successful! Please check your email to verify your account.", {

@@ -28,8 +28,14 @@ function PaymentSuccessContent() {
   useEffect(() => {
     const clearCache = async () => {
       try {
+        const { clearAllShipmentFormData } = await import('@/lib/shipment-cache-utils');
+        clearAllShipmentFormData();
         await clearShipmentFormData();
-        console.log('✅ Shipment form cache cleared after successful payment');
+        
+        // Clear orderData as well
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('orderData');
+        }
       } catch (error) {
         console.warn('Failed to clear shipment form cache:', error);
       }
@@ -120,13 +126,22 @@ function PaymentSuccessContent() {
   const handleCreateNewShipment = async () => {
     try {
       // Clear the cache before creating a new shipment
+      const { clearAllShipmentFormData } = await import('@/lib/shipment-cache-utils');
+      clearAllShipmentFormData();
       await clearShipmentFormData();
-      console.log('✅ Cache cleared before creating new shipment');
+      
+      // Clear orderData as well
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('orderData');
+      }
+      
       toast.success('Ready to create a new shipment');
     } catch (error) {
       console.warn('Failed to clear cache:', error);
     }
-    router.push('/create-shipment');
+    
+    // Use hard reload to reset React state
+    window.location.href = '/create-shipment';
   };
 
   const handleViewShipments = () => {
