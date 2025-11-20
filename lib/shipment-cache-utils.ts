@@ -85,39 +85,6 @@ export const clearShipmentFormData = async (): Promise<void> => {
 };
 
 /**
- * Clear only recipient address fields from shipment form cache
- * Preserves package details (weight, dimensions, etc.)
- */
-export const clearRecipientAddressOnly = async (): Promise<void> => {
-  if (typeof window === 'undefined') return;
-  
-  try {
-    const userId = await getCurrentUserId();
-    const cacheKey = getShipmentCacheKey(userId);
-    const saved = localStorage.getItem(cacheKey);
-    
-    if (saved) {
-      const data = JSON.parse(saved);
-      
-      // Clear only recipient fields
-      data.recipientName = '';
-      data.recipientCompany = '';
-      data.recipientAddress = '';
-      data.recipientCity = '';
-      data.recipientProvince = '';
-      data.recipientPostalCode = '';
-      data.recipientPhone = '';
-      data.recipientEmail = '';
-      
-      // Save back with recipient fields cleared
-      localStorage.setItem(cacheKey, JSON.stringify(data));
-    }
-  } catch (error) {
-    console.warn('Failed to clear recipient address from cache:', error);
-  }
-};
-
-/**
  * Clear all shipment form data caches (for logout)
  * This clears all user-specific caches by pattern matching
  */
@@ -129,7 +96,7 @@ export const clearAllShipmentFormData = (): void => {
     const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && key.startsWith('parcego-shipment-form-data-')) {
+      if (key && key.startsWith('parcego-shipment-form-data')) {
         keysToRemove.push(key);
       }
     }
@@ -139,4 +106,3 @@ export const clearAllShipmentFormData = (): void => {
     console.warn('Failed to clear all shipment form data caches:', error);
   }
 };
-

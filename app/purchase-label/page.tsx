@@ -1044,12 +1044,20 @@ function PurchaseLabelContent() {
         if (!open) {
           // When closing the modal, clear cache and redirect to create-shipment
           try {
+            const { clearAllShipmentFormData } = await import('@/lib/shipment-cache-utils');
+            clearAllShipmentFormData();
             await clearShipmentFormData();
-            console.log('✅ Cache cleared after closing purchase label modal');
+            
+            // Clear orderData as well
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('orderData');
+            }
           } catch (error) {
             console.warn('Failed to clear cache:', error);
           }
-          router.push('/create-shipment');
+          
+          // Use hard reload to reset React state
+          window.location.href = '/create-shipment';
         }
         setShowConfirmation(open);
       }}>
