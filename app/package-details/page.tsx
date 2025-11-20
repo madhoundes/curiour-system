@@ -75,13 +75,45 @@ export default function PackageDetailsPage() {
           {/* Package Dimensions & Weight */}
           <Card className="parcego-card parcego-card--dimensions">
             <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Icon name="Ruler" size={20} className="text-indigo-600" />
-                <span>Package Dimensions & Weight</span>
-              </CardTitle>
-              <CardDescription>
-                Enter the exact measurements and weight of your package
-              </CardDescription>
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <CardTitle className="flex items-center space-x-2">
+                    <Icon name="Ruler" size={20} className="text-indigo-600" />
+                    <span>Package Dimensions & Weight</span>
+                  </CardTitle>
+                  <CardDescription>
+                    Enter the exact measurements and weight of your package
+                  </CardDescription>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    if (confirm('Clear all package details? This will reset weight, dimensions, and handling options.')) {
+                      // Clear package weight and dimensions
+                      updateFormField('weight', '');
+                      updateFormField('length', '');
+                      updateFormField('width', '');
+                      updateFormField('height', '');
+                      // Reset to defaults
+                      updateFormField('weightUnit', 'lbs');
+                      updateFormField('dimensionUnit', 'in');
+                      updateFormField('fragile', false);
+                      updateFormField('valuable', false);
+                      updateFormField('insurance', false);
+                      updateFormField('packageType', 'box');
+                      updateFormField('serviceType', 'standard');
+                      updateFormField('specialInstructions', '');
+                    }
+                  }}
+                  className="parcego-package-clear-btn border-orange-200 text-orange-600 hover:bg-orange-50 hover:border-orange-300"
+                  aria-label="Clear all package details"
+                  title="Clear all package fields"
+                >
+                  <Icon name="Trash2" size={16} className="mr-2" />
+                  Clear Package
+                </Button>
+              </div>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Weight Section */}
