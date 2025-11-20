@@ -2631,8 +2631,10 @@ export default function SuperAdminDashboard() {
                           <div className="text-sm text-gray-500">{assignment.driver_email}</div>
                         </td>
                         <td className="p-4">
-                          <div className="font-medium">{assignment.shipment_tracking_number}</div>
-                          <div className="text-sm text-gray-500">{assignment.destination}</div>
+                          <div className="font-medium">Shipment #{assignment.shipment_id}</div>
+                          <div className="text-sm text-gray-500">
+                            {assignment.shipment_tracking_number || assignment.tracking_code || 'No tracking'}
+                          </div>
                         </td>
                         <td className="p-4">
                           <Badge variant={
