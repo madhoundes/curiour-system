@@ -1524,10 +1524,38 @@ export default function CourierRouteSimulation() {
     setIsScanning(false);
   };
 
-  const handleBarcodeDetected = (result: { rawValue: string }[]) => {
-    if (result && result.length > 0) {
-      const detectedCode = result[0].rawValue;
-      const detectedType = (result[0] as any).format || 'unknown';
+  const handleBarcodeDetected = (result: unknown) => {
+    try {
+      // Handle different result formats from @yudiel/react-qr-scanner
+      // The library can return: array of results, single result object, or string
+      let detectedCode: string = '';
+      let detectedType: string = 'unknown';
+      
+      // Check if result is an array
+      if (Array.isArray(result) && result.length > 0) {
+        const firstResult = result[0] as any;
+        detectedCode = firstResult.rawValue || firstResult.text || firstResult.value || String(firstResult);
+        detectedType = firstResult.format || firstResult.type || 'unknown';
+      }
+      // Check if result is a single object
+      else if (result && typeof result === 'object') {
+        const resultObj = result as any;
+        detectedCode = resultObj.rawValue || resultObj.text || resultObj.value || resultObj.code || '';
+        detectedType = resultObj.format || resultObj.type || 'unknown';
+      }
+      // Check if result is a string
+      else if (typeof result === 'string') {
+        detectedCode = result;
+        detectedType = 'unknown';
+      }
+      
+      // Only process if we have a valid code
+      if (!detectedCode || detectedCode.trim().length === 0) {
+        console.warn('⚠️ [SCAN] Empty barcode detected');
+        return;
+      }
+      
+      console.log('✅ [SCAN] Barcode detected:', { code: detectedCode, type: detectedType });
       
       setBarcodeInput(detectedCode);
       setScannedBarcodeType(detectedType);
@@ -1575,6 +1603,10 @@ export default function CourierRouteSimulation() {
           handleBarcodeSubmit();
         }, 1000);
       }
+    } catch (error) {
+      console.error('❌ [SCAN] Error processing barcode detection:', error);
+      setBarcodeError('Failed to process scanned barcode. Please try again.');
+      setIsScanning(false);
     }
   };
 
@@ -1929,7 +1961,7 @@ export default function CourierRouteSimulation() {
                       )}
                       {step.id === "scan_barcode" && routeStatus === "arrived" && (
                         <Button
-                          onClick={handleBypassScan}
+                          onClick={() => setIsBarcodeModalOpen(true)}
                           size="sm"
                           id="parcego-route-scan-btn"
                         >
