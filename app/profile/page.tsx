@@ -547,24 +547,19 @@ function ProfileAccountPageContent() {
 
     try {
       setIsDisconnectingShopify(accountId);
-      const response = await shopifyService.disconnect(accountId);
+      await shopifyService.disconnect(accountId);
 
-      if (response.data?.success) {
-        setIntegrationsMsg("Shopify store disconnected successfully");
-        setIntegrationsMsgType('success');
-        toast.success("Shopify store disconnected successfully");
-        // Reload accounts list
-        await loadShopifyAccounts();
-      } else {
-        const errorMsg = "Failed to disconnect Shopify store";
-        setIntegrationsMsg(errorMsg);
-        setIntegrationsMsgType('error');
-        toast.error(errorMsg);
-      }
+      // apiClient throws for non-2xx, so reaching here always means success
+      setIntegrationsMsg("Shopify store disconnected successfully");
+      setIntegrationsMsgType('success');
+      toast.success("Shopify store disconnected successfully");
+      await loadShopifyAccounts();
     } catch (error: any) {
       console.error("Shopify disconnect failed:", error);
-      setIntegrationsMsg(error.message || "Failed to disconnect Shopify store");
+      const errorMsg = error.response?.data?.message || error.message || "Failed to disconnect Shopify store";
+      setIntegrationsMsg(errorMsg);
       setIntegrationsMsgType('error');
+      toast.error(errorMsg);
     } finally {
       setIsDisconnectingShopify(null);
     }
@@ -575,23 +570,14 @@ function ProfileAccountPageContent() {
       setIsLoadingShopify(true);
       const response = await shopifyService.syncAccount(accountId);
 
-      if (response.data?.success) {
-        const successMsg = response.data.message || "Shopify store synced successfully";
-        setIntegrationsMsg(successMsg);
-        setIntegrationsMsgType('success');
-        toast.success(successMsg);
-        // Reload accounts list
-        await loadShopifyAccounts();
-      } else {
-        // Use the message from the API response if available
-        const errorMsg = response.data?.message || "Failed to sync Shopify store";
-        setIntegrationsMsg(errorMsg);
-        setIntegrationsMsgType('error');
-        toast.error(errorMsg);
-      }
+      // apiClient throws for non-2xx, so reaching here always means success
+      const successMsg = response.data?.message || "Shopify store synced successfully";
+      setIntegrationsMsg(successMsg);
+      setIntegrationsMsgType('success');
+      toast.success(successMsg);
+      await loadShopifyAccounts();
     } catch (error: any) {
       console.error("Shopify sync failed:", error);
-      // Try to extract error message from API response
       const errorMsg = error.response?.data?.message 
         || error.response?.data?.error 
         || error.message 
