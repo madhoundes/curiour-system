@@ -666,6 +666,7 @@ function ProfileAccountPageContent() {
         >
           <Tabs 
             value={activeTab}
+            onValueChange={(tab) => router.push(`/profile?tab=${tab}`, { scroll: false })}
             id="parcego-profile-tabs" 
             className="w-full mb-8"
           >
