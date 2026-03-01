@@ -233,6 +233,7 @@ export default function SuperAdminDashboard() {
   const [isTriggeringPoll, setIsTriggeringPoll] = useState(false);
   const [isRetryingFailed, setIsRetryingFailed] = useState(false);
   const [shopifyFilterStatus, setShopifyFilterStatus] = useState<string>("all");
+  const [dismissedStoreAlerts, setDismissedStoreAlerts] = useState<Set<number>>(new Set());
 
   // Shopify monitoring state
   const [errorMetrics, setErrorMetrics] = useState<any>(null);
@@ -1726,98 +1727,192 @@ export default function SuperAdminDashboard() {
     }
   };
 
-  const renderOverview = () => (
-    <div className="space-y-4 xl:space-y-6" id="parcego-admin-overview-section">
-      {/* Platform Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 xl:gap-6">
-        <Card id="parcego-admin-stat-merchants" className="relative overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base font-bold">Total Merchants</CardTitle>
-            <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center shadow-sm">
-              <Icon name="Users" size={24} className="text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {statsLoading || merchantsLoading ? (
-              <Skeleton className="h-9 w-24 mb-2" />
-            ) : (
-              <>
-                <div className="text-2xl xl:text-3xl font-bold">{platformStats.totalMerchants.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">All registered merchants</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+  const renderOverview = () => {
+    const recentMerchants = [...merchants]
+      .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+      .slice(0, 5);
 
-        <Card id="parcego-admin-stat-couriers" className="relative overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base font-bold">Active Couriers</CardTitle>
-            <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center shadow-sm">
-              <Icon name="Truck" size={24} className="text-emerald-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {statsLoading || couriersLoading ? (
-              <Skeleton className="h-9 w-24 mb-2" />
-            ) : (
-              <>
-                <div className="text-2xl xl:text-3xl font-bold">{platformStats.activeCouriers.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">Currently active drivers</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+    const total = adminStats?.totalShipments || 0;
+    const shipmentBreakdown = [
+      { label: "Delivered", value: adminStats?.deliveredShipments || 0, color: "bg-emerald-500", textColor: "text-emerald-600" },
+      { label: "In Transit", value: adminStats?.inTransitShipments || 0, color: "bg-blue-500", textColor: "text-blue-600" },
+      { label: "In Warehouse", value: adminStats?.inWarehouseShipments || 0, color: "bg-amber-500", textColor: "text-amber-600" },
+      { label: "Undelivered", value: adminStats?.undeliveredShipments || 0, color: "bg-red-500", textColor: "text-red-600" },
+      { label: "Cancelled", value: adminStats?.cancelledShipments || 0, color: "bg-gray-400", textColor: "text-gray-500" },
+    ];
 
-        <Card id="parcego-admin-stat-shipments" className="relative overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base font-bold">Total Shipments</CardTitle>
-            <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center shadow-sm">
-              <Icon name="Package" size={24} className="text-indigo-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            {statsLoading ? (
-              <Skeleton className="h-9 w-24 mb-2" />
-            ) : (
-              <>
-                <div className="text-2xl xl:text-3xl font-bold">{platformStats.totalShipments.toLocaleString()}</div>
-                <p className="text-xs text-muted-foreground">All time shipments</p>
-              </>
-            )}
-          </CardContent>
-        </Card>
+    return (
+      <div className="space-y-4 xl:space-y-6" id="parcego-admin-overview-section">
+        {/* Row 1: Platform Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+          <Card id="parcego-admin-stat-merchants" className="relative overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-semibold text-muted-foreground">Total Merchants</CardTitle>
+              <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Icon name="Users" size={18} className="text-blue-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {statsLoading || merchantsLoading ? <Skeleton className="h-8 w-20" /> : (
+                <>
+                  <div className="text-2xl font-bold">{platformStats.totalMerchants.toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Registered merchants</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
 
-        {/* Monthly Revenue card hidden - not available in current API */}
-        {/* <Card id="parcego-admin-stat-revenue" className="relative overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base font-bold">Monthly Revenue</CardTitle>
-            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center shadow-sm">
-              <Icon name="DollarSign" size={24} className="text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl xl:text-3xl font-bold">${platformStats.monthlyRevenue.toLocaleString()}</div>
-            <p className="text-xs text-muted-foreground">+15% from last month</p>
-          </CardContent>
-        </Card> */}
+          <Card id="parcego-admin-stat-couriers" className="relative overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-semibold text-muted-foreground">Active Couriers</CardTitle>
+              <div className="w-9 h-9 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <Icon name="Truck" size={18} className="text-emerald-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {statsLoading || couriersLoading ? <Skeleton className="h-8 w-20" /> : (
+                <>
+                  <div className="text-2xl font-bold">{platformStats.activeCouriers.toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Currently active</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
 
-        {/* <Card id="parcego-admin-stat-health" className="relative overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base font-bold">System Health</CardTitle>
-            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center shadow-sm">
-              <Icon name="Activity" size={24} className="text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{platformStats.systemHealth}%</div>
-            <p className="text-xs text-green-600">All systems operational</p>
-          </CardContent>
-        </Card> */}
+          <Card id="parcego-admin-stat-shipments" className="relative overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-semibold text-muted-foreground">Total Shipments</CardTitle>
+              <div className="w-9 h-9 bg-indigo-100 rounded-lg flex items-center justify-center">
+                <Icon name="Package" size={18} className="text-indigo-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {statsLoading ? <Skeleton className="h-8 w-20" /> : (
+                <>
+                  <div className="text-2xl font-bold">{platformStats.totalShipments.toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground mt-0.5">All time</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
 
+          <Card id="parcego-admin-stat-delivered" className="relative overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-semibold text-muted-foreground">Delivered</CardTitle>
+              <div className="w-9 h-9 bg-green-100 rounded-lg flex items-center justify-center">
+                <Icon name="CheckCircle" size={18} className="text-green-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {statsLoading ? <Skeleton className="h-8 w-20" /> : (
+                <>
+                  <div className="text-2xl font-bold text-green-600">{(adminStats?.deliveredShipments || 0).toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Successfully delivered</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card id="parcego-admin-stat-intransit" className="relative overflow-hidden">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-semibold text-muted-foreground">In Transit</CardTitle>
+              <div className="w-9 h-9 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Icon name="Navigation" size={18} className="text-blue-600" />
+              </div>
+            </CardHeader>
+            <CardContent>
+              {statsLoading ? <Skeleton className="h-8 w-20" /> : (
+                <>
+                  <div className="text-2xl font-bold text-blue-600">{(adminStats?.inTransitShipments || 0).toLocaleString()}</div>
+                  <p className="text-xs text-muted-foreground mt-0.5">Currently moving</p>
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Row 2: Shipment Breakdown + Recent Merchants */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 xl:gap-6">
+          {/* Shipment Status Breakdown */}
+          <Card id="parcego-admin-shipment-breakdown">
+            <CardHeader>
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Icon name="PieChart" size={18} className="text-gray-500" />
+                Shipment Status Breakdown
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {statsLoading ? (
+                <div className="space-y-3">
+                  {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-7 w-full" />)}
+                </div>
+              ) : total === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No shipment data available</p>
+              ) : (
+                shipmentBreakdown.map(({ label, value, color, textColor }) => {
+                  const pct = total > 0 ? Math.round((value / total) * 100) : 0;
+                  return (
+                    <div key={label}>
+                      <div className="flex items-center justify-between text-sm mb-1">
+                        <span className="text-gray-600">{label}</span>
+                        <span className={`font-semibold ${textColor}`}>{value.toLocaleString()} <span className="text-xs text-muted-foreground font-normal">({pct}%)</span></span>
+                      </div>
+                      <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                        <div className={`h-full ${color} rounded-full transition-all duration-500`} style={{ width: `${pct}%` }} />
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Recent Merchants */}
+          <Card id="parcego-admin-recent-merchants">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <Icon name="UserPlus" size={18} className="text-gray-500" />
+                Recently Joined Merchants
+              </CardTitle>
+              <Button variant="ghost" size="sm" onClick={() => setActiveSection("merchants")} className="text-xs text-blue-600 hover:text-blue-700 h-7 px-2">
+                View all
+              </Button>
+            </CardHeader>
+            <CardContent>
+              {merchantsLoading ? (
+                <div className="space-y-3">
+                  {[1,2,3,4,5].map(i => <Skeleton key={i} className="h-10 w-full" />)}
+                </div>
+              ) : recentMerchants.length === 0 ? (
+                <p className="text-sm text-muted-foreground text-center py-6">No merchants yet</p>
+              ) : (
+                <div className="space-y-2">
+                  {recentMerchants.map((merchant) => (
+                    <div key={merchant.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                          <span className="text-xs font-bold text-blue-600">
+                            {String(getMerchantProperty(merchant, 'businessName') || '?').charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{String(getMerchantProperty(merchant, 'businessName') || 'Unknown')}</p>
+                          <p className="text-xs text-muted-foreground truncate">{merchant.email}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                        {getStatusBadge(String(getMerchantProperty(merchant, 'status')))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
-
-    </div>
-  );
+    );
+  };
 
   const renderMerchants = () => {
     // Mobile Card Component
@@ -3475,12 +3570,12 @@ export default function SuperAdminDashboard() {
 
         {/* Tabs for Overview and Monitoring */}
         <Tabs value={shopifyActiveTab} onValueChange={setShopifyActiveTab} className="w-full" id="parcego-shopify-tabs">
-          <TabsList className="grid w-full max-w-md grid-cols-2" id="parcego-shopify-tabs-list">
-            <TabsTrigger value="overview" id="parcego-shopify-tab-overview">
+          <TabsList className="w-full max-w-md" id="parcego-shopify-tabs-list">
+            <TabsTrigger value="overview" className="flex-1" id="parcego-shopify-tab-overview">
               <Icon name="LayoutDashboard" size={16} className="mr-2" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="monitoring" id="parcego-shopify-tab-monitoring">
+            <TabsTrigger value="monitoring" className="flex-1" id="parcego-shopify-tab-monitoring">
               <Icon name="Activity" size={16} className="mr-2" />
               Monitoring
             </TabsTrigger>
@@ -3574,6 +3669,7 @@ export default function SuperAdminDashboard() {
                         <SelectItem value="all">All Status</SelectItem>
                         <SelectItem value="active">Active</SelectItem>
                         <SelectItem value="error">Error</SelectItem>
+                        <SelectItem value="expired">Expired</SelectItem>
                         <SelectItem value="inactive">Inactive</SelectItem>
                       </SelectContent>
                     </Select>
@@ -3636,13 +3732,27 @@ export default function SuperAdminDashboard() {
                                 </div>
                               </div>
                             </div>
-                            {account.error_message && (
-                              <Alert className="md:max-w-md">
-                                <AlertDescription className="text-sm text-red-800">
-                                  <Icon name="AlertCircle" size={16} className="inline mr-1" />
-                                  {account.error_message}
-                                </AlertDescription>
-                              </Alert>
+                            {account.error_message && !dismissedStoreAlerts.has(account.id) && (
+                              <div className="flex items-start gap-2 md:max-w-md">
+                                <Alert className="flex-1 border-amber-200 bg-amber-50">
+                                  <AlertDescription className="text-sm text-amber-800">
+                                    <Icon name="AlertCircle" size={16} className="inline mr-1 text-amber-600" />
+                                    {account.status === "expired"
+                                      ? "OAuth token expired — merchant needs to reconnect their store"
+                                      : `Integration issue detected: ${account.error_message}`}
+                                  </AlertDescription>
+                                </Alert>
+                                <button
+                                  onClick={() =>
+                                    setDismissedStoreAlerts((prev) => new Set(prev).add(account.id))
+                                  }
+                                  className="mt-1 flex-shrink-0 text-gray-400 hover:text-gray-600 transition-colors"
+                                  title="Dismiss alert"
+                                  aria-label="Dismiss alert"
+                                >
+                                  <Icon name="X" size={16} />
+                                </button>
+                              </div>
                             )}
                           </div>
                         </CardContent>
