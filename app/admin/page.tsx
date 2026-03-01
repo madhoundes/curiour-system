@@ -3475,12 +3475,12 @@ export default function SuperAdminDashboard() {
 
         {/* Tabs for Overview and Monitoring */}
         <Tabs value={shopifyActiveTab} onValueChange={setShopifyActiveTab} className="w-full" id="parcego-shopify-tabs">
-          <TabsList className="grid w-full max-w-md grid-cols-2" id="parcego-shopify-tabs-list">
-            <TabsTrigger value="overview" id="parcego-shopify-tab-overview">
+          <TabsList className="w-full max-w-md" id="parcego-shopify-tabs-list">
+            <TabsTrigger value="overview" className="flex-1" id="parcego-shopify-tab-overview">
               <Icon name="LayoutDashboard" size={16} className="mr-2" />
               Overview
             </TabsTrigger>
-            <TabsTrigger value="monitoring" id="parcego-shopify-tab-monitoring">
+            <TabsTrigger value="monitoring" className="flex-1" id="parcego-shopify-tab-monitoring">
               <Icon name="Activity" size={16} className="mr-2" />
               Monitoring
             </TabsTrigger>
