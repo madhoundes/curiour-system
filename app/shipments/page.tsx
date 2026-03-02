@@ -505,13 +505,38 @@ export default function ShipmentsPage() {
             
             if (isAlreadyExists) {
               console.log('Billing already exists, fetching billing records...');
-              const billingRecords = await shippingService.getBillingRecords({ page: 1, per_page: 100 });
-              const existingBilling = billingRecords.items?.find(b => b.shipment_id === shipment.id);
-              if (existingBilling) {
-                billingId = existingBilling.id;
-                console.log('Found existing billing ID:', billingId);
+
+              // Re-check shipment details first; backend may have attached billing after create attempt.
+              const refreshedShipment = await shippingService.getShipment(shipment.id);
+              if (refreshedShipment.billing?.id) {
+                billingId = refreshedShipment.billing.id;
+                console.log('Found existing billing ID from refreshed shipment:', billingId);
               } else {
-                throw new Error('Billing exists but could not be found');
+                // Fallback: paginate billing records until we find the shipment billing record.
+                let currentPage = 1;
+                let foundBillingId: number | null = null;
+
+                while (!foundBillingId && currentPage <= 50) {
+                  const billingRecords = await shippingService.getBillingRecords({ page: currentPage, per_page: 100 });
+                  const existingBilling = billingRecords.items?.find((b) => b.shipment_id === shipment.id);
+
+                  if (existingBilling) {
+                    foundBillingId = existingBilling.id;
+                    break;
+                  }
+
+                  if (!billingRecords.has_next || currentPage >= billingRecords.pages) {
+                    break;
+                  }
+                  currentPage += 1;
+                }
+
+                if (foundBillingId) {
+                  billingId = foundBillingId;
+                  console.log('Found existing billing ID via paginated lookup:', billingId);
+                } else {
+                  throw new Error('Billing exists but could not be found');
+                }
               }
             } else {
               throw createErr;
@@ -527,7 +552,6 @@ export default function ShipmentsPage() {
       console.log('Creating checkout session for billing ID:', billingId);
       const checkoutSession = await shippingService.createCheckoutSession(billingId);
       console.log('Checkout session created:', checkoutSession);
-      console.log('Checkout URL:', checkoutSession.checkout_url);
       console.log('Client secret:', checkoutSession.client_secret);
       
       // Step 3: Redirect to checkout URL (same as new shipment flow)
@@ -536,17 +560,7 @@ export default function ShipmentsPage() {
         throw new Error('Failed to create checkout session - no response received');
       }
 
-      if (checkoutSession.checkout_url) {
-        sessionStorage.setItem('parcego_current_payment_shipment', String(shipment.id));
-        
-        console.log('Redirecting to checkout URL:', checkoutSession.checkout_url);
-        // Redirect to Stripe checkout (same flow as new shipment)
-        // Use setTimeout to ensure state updates complete before redirect
-        setTimeout(() => {
-          window.location.href = checkoutSession.checkout_url;
-        }, 100);
-        return; // Exit after redirect
-      } else if (checkoutSession.client_secret) {
+      if (checkoutSession.client_secret) {
         console.log('Using client_secret, redirecting to purchase-label page');
         // Handle Stripe Elements payment form if needed
         sessionStorage.setItem('parcego_checkout_session', JSON.stringify(checkoutSession));

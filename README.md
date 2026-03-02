@@ -167,7 +167,7 @@ npm run lint             # Code quality check ✅
 
 ## 📷 Camera Access Setup
 
-For camera functionality over network LAN, HTTPS is required. See [HTTPS-SETUP.md](./HTTPS-SETUP.md) for detailed instructions.
+For camera functionality over network LAN, HTTPS is required. See [HTTPS-SETUP.md](./docs/HTTPS-SETUP.md) for detailed instructions.
 
 **Quick HTTPS setup:**
 ```bash
@@ -280,7 +280,7 @@ This project is licensed under the MIT License.
 ## 🔗 Links
 
 - **Live Demo**: [Coming Soon]
-- **Documentation**: [In Development]
+- **Documentation**: [docs/](./docs/)
 - **API Reference**: [Backend Integration Required]
 - **Support**: [Contact via Support Center]
 

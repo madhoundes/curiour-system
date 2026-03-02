@@ -308,7 +308,6 @@ export interface CreateCheckoutSessionRequest {
 export interface CreateCheckoutSessionResponse {
   checkout_session_id: string;
   client_secret: string;
-  checkout_url: string;
 }
 
 // Session status types

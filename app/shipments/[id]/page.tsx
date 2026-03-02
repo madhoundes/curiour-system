@@ -265,11 +265,13 @@ export default function ShipmentDetailPage() {
       setIsProcessingPayment(true);
       // Create checkout session
       const checkoutSession = await shippingService.createCheckoutSession(billingRecord.id);
-      // Redirect to Stripe checkout
-      if (checkoutSession.checkout_url) {
-        window.location.href = checkoutSession.checkout_url;
+      // Embedded checkout flow (primary path for this backend)
+      if (checkoutSession.client_secret) {
+        sessionStorage.setItem('parcego_checkout_session', JSON.stringify(checkoutSession));
+        sessionStorage.setItem('parcego_payment_shipment_id', String(shipment.id));
+        router.push(`/purchase-label?shipment_id=${shipment.id}`);
       } else {
-        toast.error('Failed to create payment session');
+        toast.error('Failed to create payment session: missing checkout data');
       }
     } catch (error: any) {
       console.error('Payment failed:', error);

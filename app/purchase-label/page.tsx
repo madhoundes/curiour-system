@@ -522,10 +522,6 @@ function PurchaseLabelContent() {
             client_secret: clientSecret
           });
           setShowStripePayment(true);
-        } else if (checkoutSession.checkout_url) {
-          // Fallback: If we have a direct checkout URL, redirect to it
-          sessionStorage.setItem('parcego_current_payment_shipment', String(existingShipmentId));
-          window.location.href = checkoutSession.checkout_url;
         } else {
           throw new Error('No valid payment method received from payment processor');
         }
@@ -576,9 +572,6 @@ function PurchaseLabelContent() {
           client_secret: clientSecret
         });
         setShowStripePayment(true);
-      } else if (shippingFlow.checkoutSession?.checkout_url) {
-        // Fallback: If we have a direct checkout URL, redirect to it
-        window.location.href = shippingFlow.checkoutSession.checkout_url;
       } else {
         throw new Error('No valid payment method received from payment processor');
       }
