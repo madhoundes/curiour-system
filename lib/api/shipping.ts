@@ -46,7 +46,7 @@ export class ShippingService {
     try {
       const response = await apiClient.get<ShipmentsListResponse>(
         API_ENDPOINTS.SHIPMENTS.LIST,
-        { params }
+        params
       );
 
       // Return just the shipments array from the paginated response
@@ -347,6 +347,7 @@ export class ShippingService {
 
   /**
    * Create a Stripe checkout session for payment processing
+   * Embedded checkout flow: expects client_secret from backend
    */
   async createCheckoutSession(billing_id: number): Promise<CreateCheckoutSessionResponse> {
     try {
@@ -354,13 +355,20 @@ export class ShippingService {
         throw new Error('Valid billing ID is required');
       }
 
-      const response = await apiClient.post<CreateCheckoutSessionResponse>(
+      const response = await apiClient.post<CreateCheckoutSessionResponse | { data?: CreateCheckoutSessionResponse }>(
         API_ENDPOINTS.BILLING.CREATE_CHECKOUT_SESSION,
         {}, // Empty request body
         { params: { billing_id } } // Pass billing_id as query parameter
       );
 
-      return response.data;
+      const raw = response.data as Record<string, unknown>;
+      // Normalize embedded checkout response
+      const nested = raw?.data as Record<string, unknown> | undefined;
+      const sessionId = (raw?.session_id ?? nested?.session_id ?? raw?.checkout_session_id ?? nested?.checkout_session_id) as string | undefined;
+      return {
+        checkout_session_id: sessionId ?? '',
+        client_secret: (raw?.client_secret ?? nested?.client_secret ?? '') as string,
+      };
     } catch (error: any) {
       if (error.response?.status === 400) {
         throw new Error('Billing not found or invalid status');
@@ -382,7 +390,7 @@ export class ShippingService {
     try {
       const response = await apiClient.get<BillingRecordsListResponse>(
         API_ENDPOINTS.BILLING.LIST,
-        { params }
+        params
       );
 
       return response.data;
