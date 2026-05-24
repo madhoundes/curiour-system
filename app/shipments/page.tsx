@@ -161,9 +161,6 @@ export default function ShipmentsPage() {
   const [showPrintLabelsModal, setShowPrintLabelsModal] = useState(false);
   const [showCancelDialog, setShowCancelDialog] = useState(false);
   const [shipmentToCancel, setShipmentToCancel] = useState<{ id: number; tracking_code: string } | null>(null);
-  const [showReorderDialog, setShowReorderDialog] = useState(false);
-  const [shipmentToReorder, setShipmentToReorder] = useState<DetailedShipment | null>(null);
-  const [isReordering, setIsReordering] = useState(false);
   const [processingPaymentForId, setProcessingPaymentForId] = useState<number | null>(null);
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
@@ -311,49 +308,6 @@ export default function ShipmentsPage() {
   const openCancelDialog = (shipment: DetailedShipment) => {
     setShipmentToCancel({ id: shipment.id, tracking_code: shipment.tracking_code });
     setShowCancelDialog(true);
-  };
-
-  // Enhanced reorder functionality with better UX
-  const handleReorderShipment = async (shipment: DetailedShipment) => {
-    setShipmentToReorder(shipment);
-    setShowReorderDialog(true);
-  };
-
-  const confirmReorder = async () => {
-    if (!shipmentToReorder) return;
-
-    setIsReordering(true);
-    
-    try {
-      // Simulate API call delay for better UX
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Navigate to create shipment with pre-filled data
-      const queryParams = new URLSearchParams({
-        from: shipmentToReorder.id.toString(),
-        recipient: shipmentToReorder.receiver_address.contact_name,
-        address: shipmentToReorder.receiver_address.street_address,
-        city: shipmentToReorder.receiver_address.city,
-        province: shipmentToReorder.receiver_address.province || '',
-        postalCode: shipmentToReorder.receiver_address.postal_code,
-        country: shipmentToReorder.receiver_address.country,
-        service: 'standard', // Default service since it's not in DetailedShipment
-        weight: shipmentToReorder.package.weight.toString(),
-        notes: `Reordered from shipment ${shipmentToReorder.tracking_code}`
-      });
-
-      router.push(`/create-shipment?${queryParams.toString()}`);
-      
-      // Close dialog and reset state
-      setShowReorderDialog(false);
-      setShipmentToReorder(null);
-      
-    } catch (error) {
-      console.error("Failed to reorder shipment:", error);
-      alert("Failed to reorder shipment. Please try again.");
-    } finally {
-      setIsReordering(false);
-    }
   };
 
   const handleExportCsv = () => {
@@ -870,33 +824,6 @@ export default function ShipmentsPage() {
                             </TooltipProvider>
                           )}
 
-                          {/* Enhanced Reorder/Resend Button */}
-                          <TooltipProvider>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  id={`parcego-shipments-reorder-${s.id}`}
-                                  onClick={() => handleReorderShipment(s)}
-                                  aria-label={`Reorder/resend ${s.id}`}
-                                  className="h-8 w-8 p-0 hover:bg-green-50 hover:text-green-600 transition-colors duration-150"
-                                  disabled={s.status === "CANCELLED"}
-                                >
-                                  <Icon name="Repeat" size={16} />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent className="bg-black text-white border-black [&>svg]:fill-black [&>svg]:stroke-black">
-                                <p>
-                                  {s.status === "CANCELLED" 
-                                    ? "Cannot reorder cancelled shipments" 
-                                    : "Reorder/Resend this shipment"
-                                  }
-                                </p>
-                              </TooltipContent>
-                            </Tooltip>
-                          </TooltipProvider>
-
                           {/* Cancel Shipment Button */}
                           <TooltipProvider>
                             <Tooltip>
@@ -1048,65 +975,6 @@ export default function ShipmentsPage() {
             >
               <Icon name="XCircle" size={16} className="mr-2" />
               Cancel Shipments
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* Enhanced Reorder Confirmation Dialog */}
-      <AlertDialog open={showReorderDialog} onOpenChange={setShowReorderDialog}>
-        <AlertDialogContent id="parcego-reorder-shipment-dialog" className="max-w-md bg-white">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <Icon name="Repeat" size={20} className="text-green-600" />
-              Reorder Shipment
-            </AlertDialogTitle>
-            <div className="text-left">
-              {shipmentToReorder && (
-                <div className="space-y-3">
-                  <p>
-                    Create a new shipment based on <strong>{shipmentToReorder.tracking_code}</strong>?
-                  </p>
-                  <div className="bg-white/40 p-3 rounded-lg space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Recipient:</span>
-                      <span className="font-medium">{shipmentToReorder.receiver_address.contact_name}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Service:</span>
-                      <span className="font-medium">Standard</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Weight:</span>
-                      <span className="font-medium">{shipmentToReorder.package.weight.toFixed(2)} kg</span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-gray-500">
-                    All recipient details will be pre-filled for faster ordering.
-                  </p>
-                </div>
-              )}
-            </div>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel id="parcego-reorder-shipment-cancel-btn">Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={confirmReorder}
-              id="parcego-reorder-shipment-confirm-btn"
-              className="bg-green-600 hover:bg-green-700 focus:ring-green-500"
-              disabled={isReordering}
-            >
-              {isReordering ? (
-                <>
-                  <Icon name="Loader2" size={16} className="mr-2 animate-spin" />
-                  Creating...
-                </>
-              ) : (
-                <>
-                  <Icon name="Repeat" size={16} className="mr-2" />
-                  Create New Shipment
-                </>
-              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
