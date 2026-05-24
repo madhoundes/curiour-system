@@ -246,7 +246,16 @@ class ApiClient {
           // If refresh fails, remove invalid token but don't redirect immediately
           // Components using withReAuth wrapper will handle re-authentication
           this.removeAuthToken();
-          
+
+          // Drop any cached profile tied to the now-invalid session so the
+          // next call after re-auth doesn't serve stale data.
+          try {
+            const { profileService } = await import('./profile');
+            profileService.invalidateProfileCache();
+          } catch {
+            // Cache invalidation is best-effort.
+          }
+
           // Throw error so components can handle re-authentication via withReAuth wrapper
           // Don't redirect here - let the component decide what to do
           throw this.handleError(responseData, response.status);

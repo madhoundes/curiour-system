@@ -58,7 +58,7 @@ export default function PackageDetailsPage() {
         {/* Page Header */}
         <PageHeader
           title="Package Details"
-          description="Enter the package specifications and handling requirements"
+          description="Enter the package specifications"
         />
 
         {/* Stepper Component */}
@@ -89,21 +89,15 @@ export default function PackageDetailsPage() {
                   variant="outline" 
                   size="sm"
                   onClick={() => {
-                    if (confirm('Clear all package details? This will reset weight, dimensions, and handling options.')) {
-                      // Clear package weight and dimensions
+                    if (confirm('Clear all package details? This will reset weight and dimensions.')) {
                       updateFormField('weight', '');
                       updateFormField('length', '');
                       updateFormField('width', '');
                       updateFormField('height', '');
-                      // Reset to defaults
                       updateFormField('weightUnit', 'lbs');
                       updateFormField('dimensionUnit', 'in');
-                      updateFormField('fragile', false);
-                      updateFormField('valuable', false);
-                      updateFormField('insurance', false);
                       updateFormField('packageType', 'box');
                       updateFormField('serviceType', 'standard');
-                      updateFormField('specialInstructions', '');
                     }
                   }}
                   className="parcego-package-clear-btn border-orange-200 text-orange-600 hover:bg-orange-50 hover:border-orange-300"
@@ -216,82 +210,6 @@ export default function PackageDetailsPage() {
             </CardContent>
           </Card>
 
-          {/* Package Handling Options */}
-          <Card className="parcego-card parcego-card--handling">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Icon name="Shield" size={20} className="text-amber-600" />
-                <span>Package Handling Options</span>
-              </CardTitle>
-              <CardDescription>
-                Select any special handling requirements for your package
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Handling Checkboxes */}
-              <div className="space-y-4">
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    id="parcego-package-fragile"
-                    checked={formData.fragile}
-                    onChange={(e) => handleInputChange('fragile', e.target.checked)}
-                    className="parcego-checkbox w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                  />
-                  <Label htmlFor="parcego-package-fragile" className="text-sm font-medium text-gray-700">
-                    Fragile - Handle with extra care
-                  </Label>
-                </div>
-                
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    id="parcego-package-valuable"
-                    checked={formData.valuable}
-                    onChange={(e) => handleInputChange('valuable', e.target.checked)}
-                    className="parcego-checkbox w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                  />
-                  <Label htmlFor="parcego-package-valuable" className="text-sm font-medium text-gray-700">
-                    Valuable contents - Requires signature
-                  </Label>
-                </div>
-                
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="checkbox"
-                    id="parcego-package-insurance"
-                    checked={formData.insurance}
-                    onChange={(e) => handleInputChange('insurance', e.target.checked)}
-                    className="parcego-checkbox w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                  />
-                  <Label htmlFor="parcego-package-insurance" className="text-sm font-medium text-gray-700">
-                    Additional insurance coverage
-                  </Label>
-                </div>
-              </div>
-
-              {/* Insurance Amount (if insurance is selected) */}
-              {formData.insurance && (
-                <div className="space-y-2">
-                  <Label htmlFor="parcego-package-insurance-amount">Insurance Amount (CAD)</Label>
-                  <Input
-                    id="parcego-package-insurance-amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="100.00"
-                    value={formData.insuranceAmount || ''}
-                    onChange={(e) => handleInputChange('insuranceAmount', e.target.value)}
-                    className="parcego-form__input"
-                  />
-                  <p className="text-sm text-gray-600">
-                    Enter the declared value for additional insurance coverage
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Package Status */}
           <Card className="parcego-card parcego-card--package-status">
             <CardHeader>
@@ -312,7 +230,7 @@ export default function PackageDetailsPage() {
                   </span>
                 </div>
                 <p className="text-sm text-green-700">
-                  All package details including dimensions, weight, and handling requirements have been saved. 
+                  All package details including dimensions and weight have been saved. 
                   The complete shipping label with all information will be available in the next step.
                 </p>
               </div>

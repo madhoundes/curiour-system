@@ -5,6 +5,7 @@
 
 import { apiClient } from './client';
 import { API_ENDPOINTS } from './config';
+import { centsToDollarsNumber } from './money';
 import type {
   QuoteEstimateRequest,
   QuoteEstimateResponse,
@@ -37,8 +38,12 @@ export class QuotesService {
         request
       );
 
-      // The API returns quote data directly in response.data
-      return response.data;
+      // The server returns prices as integer cents (e.g. 5432 for $54.32);
+      // convert to dollars at the boundary so the UI can use the value as-is.
+      return {
+        ...response.data,
+        estimated_price: centsToDollarsNumber(response.data.estimated_price),
+      };
     } catch (error: any) {
       console.error('Quote estimation failed:', error);
       

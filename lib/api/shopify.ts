@@ -5,6 +5,7 @@
 
 import { apiClient } from './client';
 import { API_ENDPOINTS } from './config';
+import { centsToDollarsNumber } from './money';
 import type { 
   ShopifyInstallParams, 
   ShopifyInstallResponse,
@@ -270,8 +271,18 @@ export class ShopifyService {
         params,
         { requiresAuth: true }
       );
-      
-      return response;
+
+      // Server returns order_amount in integer cents; convert to dollars at the boundary.
+      return {
+        ...response,
+        data: {
+          ...response.data,
+          events: response.data.events.map((event) => ({
+            ...event,
+            order_amount: centsToDollarsNumber(event.order_amount),
+          })),
+        },
+      };
     } catch (error) {
       console.error('Failed to fetch Shopify dashboard activity:', error);
       throw error;

@@ -5,6 +5,7 @@
 
 import { apiClient } from './client';
 import { API_ENDPOINTS } from './config';
+import { profileService } from './profile';
 import type { 
   RegisterRequest, 
   RegisterResponse, 
@@ -69,6 +70,9 @@ export class AuthService {
       // Store the token if login is successful
       if (response.data.access_token) {
         apiClient.setAuthToken(response.data.access_token);
+        // The previously cached profile (if any) belongs to a different
+        // session/user; clear it so the next getProfile() refetches.
+        profileService.invalidateProfileCache();
       }
 
       return response;
@@ -90,7 +94,10 @@ export class AuthService {
     } finally {
       // Always remove token locally
       apiClient.removeAuthToken();
-      
+
+      // Drop any cached profile so the next user starts with a clean slate.
+      profileService.invalidateProfileCache();
+
       // Clear shipment form data cache on logout
       if (typeof window !== 'undefined') {
         try {
@@ -112,8 +119,9 @@ export class AuthService {
       return response;
     } catch (error) {
       console.error('Token verification failed:', error);
-      // Remove invalid token
+      // Remove invalid token and any cached profile tied to it
       apiClient.removeAuthToken();
+      profileService.invalidateProfileCache();
       throw error;
     }
   }
@@ -133,8 +141,9 @@ export class AuthService {
       return response;
     } catch (error) {
       console.error('Token refresh failed:', error);
-      // Remove invalid token
+      // Remove invalid token and any cached profile tied to it
       apiClient.removeAuthToken();
+      profileService.invalidateProfileCache();
       throw error;
     }
   }

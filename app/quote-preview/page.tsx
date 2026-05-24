@@ -1,18 +1,19 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, Suspense } from "react";
+import React, { useState, useEffect, useMemo, Suspense, useCallback, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useWizardBack } from "@/lib/wizard";
-import { useShipment } from "@/lib/shipment-context";
+import { useShipment, type ShipmentFormData } from "@/lib/shipment-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Icon } from "@/components/ui/icon";
 import { PageHeader } from "@/components/ui/page-header";
 import { createStepperSteps, Stepper } from "@/components/ui/stepper";
-import { quotesService } from "@/lib/api/quotes";
 import { profileService } from "@/lib/api/profile";
-import type { QuoteEstimateRequest, QuoteEstimateResponse, UserProfile } from "@/lib/api/types";
+import { shippingService } from "@/lib/api/shipping";
+import { buildCreateShipmentRequest } from "@/lib/shipment/build-shipment-request";
+import type { BillingRecord, UserProfile } from "@/lib/api/types";
 
 interface ShipmentData {
   recipientName: string;
@@ -37,18 +38,33 @@ interface ShipmentData {
   insurance: boolean;
 }
 
-interface QuoteOption {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  deliveryTime: string;
-  features: string[];
-  recommended?: boolean;
-}
+// Storage keys used to reconcile the in-progress draft shipment between
+// /quote-preview and /purchase-label, and across page reloads.
+const PENDING_SHIPMENT_ID_KEY = 'parcego_pending_shipment_id';
+const PENDING_SHIPMENT_FINGERPRINT_KEY = 'parcego_pending_shipment_fingerprint';
+
+// Compute a lightweight fingerprint of the inputs that affect pricing so we
+// can detect when the cached draft no longer matches the current form data.
+const computeShipmentFingerprint = (
+  data: ShipmentData,
+  sender: UserProfile,
+): string =>
+  [
+    data.packageType,
+    data.weight,
+    data.weightUnit,
+    data.length,
+    data.width,
+    data.height,
+    data.dimensionUnit,
+    (data.recipientPostalCode || '').trim().toUpperCase().replace(/\s+/g, ''),
+    (data.recipientCity || '').trim().toLowerCase(),
+    (sender.postal_code || '').trim().toUpperCase().replace(/\s+/g, ''),
+    (sender.city || '').trim().toLowerCase(),
+  ].join('|');
 
 // Enhanced Shipment Summary Component with Reorder Info and Shipping Label Preview
-const ShipmentSummary = ({ formData, fieldErrors }: { formData: ShipmentData; fieldErrors: Record<string, string> }) => {
+const ShipmentSummary = ({ formData }: { formData: ShipmentData }) => {
   const { generateTrackingNumber, updateMultipleFields, getShippingLabelData, isFormValid } = useShipment();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -351,11 +367,6 @@ const ShipmentSummary = ({ formData, fieldErrors }: { formData: ShipmentData; fi
             <div>
               <span className="text-gray-600">Weight:</span>{" "}
               <span className="font-medium">{formData.weight} {formData.weightUnit}</span>
-              {fieldErrors.weight && (
-                <p className="text-xs text-red-600 mt-1" role="alert" aria-live="polite">
-                  {fieldErrors.weight}
-                </p>
-              )}
             </div>
             <div>
               <span className="text-gray-600">Service:</span>{" "}
@@ -417,118 +428,25 @@ function QuotePreviewPageContent() {
   const router = useRouter();
   const wizardBack = useWizardBack();
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedQuote, setSelectedQuote] = useState<string>('standard');
   const [formData, setFormData] = useState<ShipmentData | null>(null);
-  const [quoteOptions, setQuoteOptions] = useState<QuoteOption[]>([]);
-  const [quoteError, setQuoteError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [senderData, setSenderData] = useState<UserProfile | null>(null);
+  const [profileError, setProfileError] = useState<string | null>(null);
+  const [shipmentInfo, setShipmentInfo] = useState<{ id: number; trackingCode?: string } | null>(null);
+  const [billing, setBilling] = useState<BillingRecord | null>(null);
+  const [prepareError, setPrepareError] = useState<string | null>(null);
+  const [isPreparing, setIsPreparing] = useState(false);
+  // Guard against React 18 strict-mode double effect invocation creating two
+  // shipments back-to-back.
+  const isPreparingRef = useRef(false);
 
-  // Map form data to API request format
-  const mapFormDataToQuoteRequest = (data: ShipmentData): QuoteEstimateRequest => {
-    // Map package type to API package size
-    const packageSizeMap: Record<string, 'small' | 'medium' | 'large'> = {
-      'envelope': 'small',
-      'box': 'medium',
-      'tube': 'medium',
-      'pallet': 'large'
-    };
-
-    return {
-      package_size: packageSizeMap[data.packageType] || 'medium',
-      weight: parseFloat(data.weight) || 1,
-      destination_postal_code: data.recipientPostalCode
-    };
-  };
-
-  // Convert API response to quote options format
-  const mapApiResponseToQuoteOptions = (apiResponse: QuoteEstimateResponse): QuoteOption[] => {
-    if (!apiResponse) {
-      throw new Error('Invalid API response');
-    }
-    
-    return [
-      {
-        id: 'standard',
-        name: 'Parcego Standard',
-        description: `Reliable delivery to ${apiResponse.service_area || 'your destination'}`,
-        price: apiResponse.estimated_price || 0,
-        deliveryTime: '3-5 business days',
-        features: ['Basic tracking', 'Standard handling', 'Email notifications'],
-        recommended: true
-      }
-    ];
-  };
-
-  // Fetch quote from API
-  const fetchQuoteEstimate = async (data: ShipmentData) => {
-    try {
-      setQuoteError(null);
-      setFieldErrors({});
-      const request = mapFormDataToQuoteRequest(data);
-      console.log('Sending quote request:', request);
-      
-      const response = await quotesService.getEstimate(request);
-      console.log('Received quote response:', response);
-      
-      if (!response) {
-        throw new Error('No response received from quotes API');
-      }
-      
-      const quotes = mapApiResponseToQuoteOptions(response);
-      setQuoteOptions(quotes);
-      
-      // Set the recommended option as selected
-      const recommended = quotes.find(q => q.recommended);
-      if (recommended) {
-        setSelectedQuote(recommended.id);
-      }
-    } catch (error: any) {
-      console.error('Failed to fetch quote:', error);
-      // Handle API validation errors (422)
-      if (error && typeof error === 'object' && (error.status === 422 || error?.error === 'Validation Error')) {
-        const message = error.message || 'Please check your input and try again.';
-        setQuoteError(`Quote estimation failed: ${message}`);
-        if (Array.isArray(error.details)) {
-          const errorsMap: Record<string, string> = {};
-          error.details.forEach((d: any) => {
-            if (d?.field && d?.message) {
-              errorsMap[d.field] = d.message;
-            }
-          });
-          setFieldErrors(errorsMap);
-        }
-      } else {
-        setQuoteError(error?.message || 'Failed to get shipping quote');
-      }
-      
-      // Fallback to basic quote structure on error
-      const fallbackQuote: QuoteOption[] = [
-        {
-          id: 'standard',
-          name: 'Parcego Standard',
-          description: 'Reliable delivery for everyday shipments',
-          price: 15.99, // Basic fallback price
-          deliveryTime: '3-5 business days',
-          features: ['Basic tracking', 'Standard handling', 'Email notifications'],
-          recommended: true
-        }
-      ];
-      setQuoteOptions(fallbackQuote);
-      setSelectedQuote('standard');
-    }
-  };
-
-  // Load form data and generate quotes
+  // Load form data and redirect to /create-shipment if it isn't cached
   useEffect(() => {
     const loadFormData = async () => {
       try {
         const { loadShipmentFormData } = await import('@/lib/shipment-cache-utils');
         const data = await loadShipmentFormData();
-        
         if (data) {
           setFormData(data);
-          // Fetch real quote from API
-          fetchQuoteEstimate(data);
         } else {
           router.push('/create-shipment');
         }
@@ -537,55 +455,143 @@ function QuotePreviewPageContent() {
         router.push('/create-shipment');
       }
     };
-    
+
     loadFormData();
   }, [router]);
+
+  // Load the authenticated user's profile (used as the sender). The profile
+  // service caches the response so the duplicate call inside ShipmentSummary
+  // is effectively free.
+  useEffect(() => {
+    let cancelled = false;
+    profileService
+      .getProfile()
+      .then((profile) => {
+        if (cancelled) return;
+        setSenderData(profile);
+        setProfileError(null);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('Failed to load sender profile:', err);
+        if (err instanceof Error && err.message.includes('Authentication')) {
+          setProfileError('Please log in to access your profile information.');
+        } else {
+          setProfileError('Failed to load profile information. Please try refreshing the page.');
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Create (or reuse) the shipment and its billing record for this flow.
+  // The billing response is the source of truth for the cost breakdown.
+  const prepareShipment = useCallback(async () => {
+    if (!formData || !senderData) return;
+    if (isPreparingRef.current) return;
+
+    isPreparingRef.current = true;
+    setIsPreparing(true);
+    setPrepareError(null);
+
+    try {
+      const fingerprint = computeShipmentFingerprint(formData, senderData);
+
+      if (typeof window !== 'undefined') {
+        const cachedId = localStorage.getItem(PENDING_SHIPMENT_ID_KEY);
+        const cachedFingerprint = localStorage.getItem(PENDING_SHIPMENT_FINGERPRINT_KEY);
+        const cachedIdNum = cachedId ? parseInt(cachedId, 10) : NaN;
+
+        if (
+          Number.isFinite(cachedIdNum) &&
+          cachedIdNum > 0 &&
+          cachedFingerprint === fingerprint
+        ) {
+          try {
+            const existing = await shippingService.getShipment(cachedIdNum);
+            const status = (existing.status || '').toUpperCase();
+            if (status === 'DRAFT' && existing.billing) {
+              setShipmentInfo({ id: existing.id, trackingCode: existing.tracking_code });
+              setBilling(existing.billing as BillingRecord);
+              return;
+            }
+          } catch {
+            // Fall through and create a fresh shipment.
+          }
+        }
+
+        // Anything we cached is no longer reusable — drop it before creating.
+        localStorage.removeItem(PENDING_SHIPMENT_ID_KEY);
+        localStorage.removeItem(PENDING_SHIPMENT_FINGERPRINT_KEY);
+      }
+
+      const request = buildCreateShipmentRequest(formData as ShipmentFormData, senderData);
+      const created = await shippingService.createShipment(request);
+      const newBilling = await shippingService.createBilling({ shipment_id: created.shipment.id });
+
+      setShipmentInfo({ id: created.shipment.id, trackingCode: created.shipment.tracking_code });
+      setBilling(newBilling);
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(PENDING_SHIPMENT_ID_KEY, String(created.shipment.id));
+        localStorage.setItem(PENDING_SHIPMENT_FINGERPRINT_KEY, fingerprint);
+      }
+    } catch (err: unknown) {
+      console.error('Failed to prepare shipment/billing:', err);
+      const message =
+        err instanceof Error
+          ? err.message
+          : 'Failed to create shipment. Please try again.';
+      setPrepareError(message);
+    } finally {
+      isPreparingRef.current = false;
+      setIsPreparing(false);
+    }
+  }, [formData, senderData]);
+
+  // Trigger preparation as soon as the inputs are available.
+  useEffect(() => {
+    if (!formData || !senderData) return;
+    if (billing || prepareError) return;
+    void prepareShipment();
+  }, [formData, senderData, billing, prepareError, prepareShipment]);
+
+  const handleRetryPrepare = () => {
+    setPrepareError(null);
+    void prepareShipment();
+  };
 
   const handleBackToPackageDetails = () => {
     wizardBack();
   };
 
   const handleContinueToPayment = () => {
+    if (!shipmentInfo || !billing) return;
     setIsLoading(true);
-    
-    // Save selected quote info
-    const selectedQuoteData = quoteOptions.find(q => q.id === selectedQuote);
-    const orderData = {
-      ...formData,
-      selectedQuote: selectedQuoteData
-    };
-    
-    setTimeout(() => {
-      setIsLoading(false);
-      localStorage.setItem('orderData', JSON.stringify(orderData));
-      router.push('/purchase-label');
-    }, 1000);
+    router.push(`/purchase-label?shipment_id=${shipmentInfo.id}`);
   };
 
-  const getSelectedQuote = () => {
-    return quoteOptions.find(q => q.id === selectedQuote);
-  };
+  // Numeric pricing values, in dollars (the API service layer converts the
+  // server's cent values to dollars before we receive them here).
+  const baseAmount = billing ? Number(billing.subtotal) : 0;
+  const taxAmount = billing ? Number(billing.tax_amount) : 0;
+  const totalAmount = billing ? Number(billing.amount) : 0;
 
-  const calculateTotalCost = () => {
-    const quote = getSelectedQuote();
-    if (!quote || !formData) return 0;
-    
-    let total = quote.price;
-    
-    // Add special handling fees
-    if (formData.fragile) total += 3.00;
-    if (formData.valuable) total += 5.00;
-    if (formData.insurance) total += 8.00;
-    
-    return total;
-  };
+  // Loading screen until either the form data is ready and we have billing,
+  // or until we have an explicit error to surface to the user.
+  if (!formData || (!billing && !prepareError)) {
+    const loadingMessage = !formData
+      ? 'Loading shipment details...'
+      : isPreparing
+        ? 'Creating your shipment and calculating cost...'
+        : 'Preparing your quote...';
 
-  if (!formData || quoteOptions.length === 0) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading shipping quotes...</p>
+          <p className="mt-2 text-gray-600">{loadingMessage}</p>
         </div>
       </div>
     );
@@ -616,9 +622,24 @@ function QuotePreviewPageContent() {
         <div className="space-y-8">
 
           {/* Enhanced Shipment Summary with Shipping Label Preview */}
-          <ShipmentSummary formData={formData} fieldErrors={fieldErrors} />
+          <ShipmentSummary formData={formData} />
 
-          {/* Quote Options */}
+          {/* Profile load error (we can't price a shipment without the sender) */}
+          {profileError && (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="p-4">
+                <div className="flex items-start space-x-3">
+                  <Icon name="AlertCircle" size={20} className="text-red-600 mt-0.5" />
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-red-900 mb-1">Profile Error</h4>
+                    <p className="text-red-700 text-sm">{profileError}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Shipping Service */}
           <Card className="parcego-card parcego-card--quote-options">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -630,58 +651,37 @@ function QuotePreviewPageContent() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Error State */}
-              {quoteError && (
+              {prepareError && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                   <div className="flex items-start space-x-3">
                     <Icon name="AlertCircle" size={20} className="text-red-600 mt-0.5" />
                     <div className="flex-1">
-                      <h4 className="font-semibold text-red-900 mb-1">Quote Error</h4>
-                      <p className="text-red-700 text-sm mb-2">
-                        {quoteError}
-                      </p>
-                      {Object.keys(fieldErrors).length > 0 && (
-                        <ul className="list-disc list-inside text-xs text-red-700 mb-3">
-                          {Object.entries(fieldErrors).map(([field, msg]) => (
-                            <li key={field}><span className="font-medium capitalize">{field}:</span> {msg}</li>
-                          ))}
-                        </ul>
-                      )}
+                      <h4 className="font-semibold text-red-900 mb-1">Unable to Create Shipment</h4>
+                      <p className="text-red-700 text-sm mb-3">{prepareError}</p>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => formData && fetchQuoteEstimate(formData)}
+                        onClick={handleRetryPrepare}
+                        disabled={isPreparing}
                         className="bg-white hover:bg-red-50 border-red-300 text-red-700"
                       >
                         <Icon name="RefreshCw" size={16} className="mr-2" />
-                        Retry Quote
+                        {isPreparing ? 'Retrying...' : 'Retry'}
                       </Button>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Loading State */}
-              {quoteOptions.length === 0 && !quoteError && (
-                <div className="flex items-center justify-center py-8">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Getting shipping quote...</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Quote Options Display */}
-              {quoteOptions.length > 0 && quoteOptions.map((quote) => (
+              {billing && (
                 <div
-                  key={quote.id}
                   className="parcego-quote-option relative p-6 border-2 border-blue-500 bg-blue-50 rounded-lg"
-                  id={`parcego-quote-option-${quote.id}`}
+                  id="parcego-quote-option-standard"
                 >
                   <div className="absolute -top-2 left-4 bg-green-500 text-white text-xs px-2 py-1 rounded">
                     Selected
                   </div>
-                  
+
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-3">
                       <div className="flex-shrink-0">
@@ -697,32 +697,28 @@ function QuotePreviewPageContent() {
                         </svg>
                       </div>
                       <div>
-                        <h3 className="font-medium text-blue-700 text-lg">
-                          {quote.name}
-                        </h3>
-                        <p className="text-sm text-blue-600">
-                          {quote.description}
-                        </p>
+                        <h3 className="font-medium text-blue-700 text-lg">Parcego Standard</h3>
+                        <p className="text-sm text-blue-600">Reliable delivery for everyday shipments</p>
                         <div className="flex items-center space-x-4 mt-2">
                           <div className="flex items-center space-x-1">
                             <Icon name="Clock" size={16} className="text-blue-400" />
-                            <span className="text-sm text-blue-600">{quote.deliveryTime}</span>
+                            <span className="text-sm text-blue-600">3-5 business days</span>
                           </div>
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="text-right">
                       <div className="text-xl font-bold text-blue-700">
-                        ${quote.price.toFixed(2)}
+                        ${baseAmount.toFixed(2)}
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {quote.features.map((feature, index) => (
+                    {['Basic tracking', 'Standard handling', 'Email notifications'].map((feature) => (
                       <span
-                        key={index}
+                        key={feature}
                         className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-700"
                       >
                         <Icon name="CheckCircle" size={12} className="mr-1" />
@@ -731,11 +727,11 @@ function QuotePreviewPageContent() {
                     ))}
                   </div>
                 </div>
-              ))}
+              )}
             </CardContent>
           </Card>
 
-          {/* Cost Breakdown */}
+          {/* Cost Breakdown - driven entirely by the billing record. */}
           <Card className="parcego-card parcego-card--cost-breakdown">
             <CardHeader>
               <CardTitle className="flex items-center space-x-2">
@@ -744,40 +740,32 @@ function QuotePreviewPageContent() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Base shipping cost</span>
-                  <span className="font-medium">${getSelectedQuote()?.price.toFixed(2)}</span>
-                </div>
-                
-                {formData.fragile && (
+              {billing ? (
+                <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Fragile handling</span>
-                    <span className="font-medium">$3.00</span>
+                    <span className="text-gray-600">Base price</span>
+                    <span className="font-medium">${baseAmount.toFixed(2)}</span>
                   </div>
-                )}
-                
-                {formData.valuable && (
+
                   <div className="flex justify-between items-center">
-                    <span className="text-gray-600">High value handling</span>
-                    <span className="font-medium">$5.00</span>
+                    <span className="text-gray-600">Tax</span>
+                    <span className="font-medium">${taxAmount.toFixed(2)}</span>
                   </div>
-                )}
-                
-                {formData.insurance && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Additional insurance</span>
-                    <span className="font-medium">$8.00</span>
-                  </div>
-                )}
-                
-                <div className="border-t pt-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-semibold text-gray-900">Total Cost</span>
-                    <span className="text-xl font-bold text-blue-600">${calculateTotalCost().toFixed(2)}</span>
+
+                  <div className="border-t pt-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-semibold text-gray-900">Total</span>
+                      <span className="text-xl font-bold text-blue-600">${totalAmount.toFixed(2)}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <p className="text-sm text-gray-500">
+                  {prepareError
+                    ? 'Cost breakdown unavailable until the shipment is created.'
+                    : 'Calculating cost...'}
+                </p>
+              )}
             </CardContent>
           </Card>
 
@@ -785,7 +773,7 @@ function QuotePreviewPageContent() {
           <div className="flex justify-end items-center pt-6 border-t border-gray-200">
             <Button
               onClick={handleContinueToPayment}
-              disabled={isLoading}
+              disabled={isLoading || !billing || !shipmentInfo || isPreparing}
               className="parcego-action-btn parcego-action-btn--continue bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 h-12 text-base font-medium transition-all duration-300 ease-out hover:shadow-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
               id="parcego-continue-payment-btn"
             >

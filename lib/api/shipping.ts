@@ -6,6 +6,7 @@
 
 import { apiClient } from './client';
 import { API_ENDPOINTS } from './config';
+import { normalizeBillingMoney, normalizeDetailedShipmentMoney } from './money';
 import type {
   CreateShipmentRequest,
   CreateShipmentResponse,
@@ -49,8 +50,8 @@ export class ShippingService {
         params
       );
 
-      // Return just the shipments array from the paginated response
-      return response.data.shipments;
+      // Server returns billing money fields in cents; convert to dollars at the boundary.
+      return response.data.shipments.map(normalizeDetailedShipmentMoney);
     } catch (error: any) {
       if (error.response?.status === 401) {
         throw new Error('Authentication required');
@@ -112,7 +113,8 @@ export class ShippingService {
         searchParams
       );
 
-      return response.data;
+      // Server returns billing money fields in cents; convert to dollars at the boundary.
+      return response.data.map(normalizeDetailedShipmentMoney);
     } catch (error: any) {
       if (error.response?.status === 401) {
         throw new Error('Authentication required. Please log in to search shipments.');
@@ -253,7 +255,8 @@ export class ShippingService {
       const url = API_ENDPOINTS.SHIPMENTS.GET.replace(':id', shipmentId.toString());
       const response = await apiClient.get<DetailedShipment>(url);
 
-      return response.data;
+      // Server returns billing money fields in cents; convert to dollars at the boundary.
+      return normalizeDetailedShipmentMoney(response.data);
     } catch (error: any) {
       if (error.response?.status === 404) {
         throw new Error('Shipment not found');
@@ -336,7 +339,8 @@ export class ShippingService {
         data
       );
 
-      return response.data;
+      // Server returns money fields in cents; convert to dollars at the boundary.
+      return normalizeBillingMoney(response.data);
     } catch (error: any) {
       if (error.response?.status === 404) {
         throw new Error('Shipment not found');
@@ -393,7 +397,11 @@ export class ShippingService {
         params
       );
 
-      return response.data;
+      // Server returns money fields in cents; convert each item to dollars at the boundary.
+      return {
+        ...response.data,
+        items: response.data.items.map(normalizeBillingMoney),
+      };
     } catch (error: any) {
       if (error.response?.status === 401) {
         throw new Error('Authentication required');
