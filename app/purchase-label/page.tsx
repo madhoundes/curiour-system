@@ -86,6 +86,18 @@ function PurchaseLabelContent() {
     }
   }, []);
 
+  // Once the real shipment record is loaded (after creation or after the
+  // post-payment refresh), prefer its canonical ``tracking_code`` over
+  // the locally-generated placeholder. This is what we render in the
+  // success modal and in the label-preview subtitle, so both surfaces
+  // automatically swap in the real value the moment it's available.
+  useEffect(() => {
+    const realTrackingCode = createdShipment?.shipment?.tracking_code;
+    if (realTrackingCode && realTrackingCode !== trackingNumber) {
+      setTrackingNumber(realTrackingCode);
+    }
+  }, [createdShipment?.shipment?.tracking_code]);
+
   // Load order data from localStorage (only for new shipments)
   useEffect(() => {
     const shipmentIdParam = searchParams?.get('shipment_id');
@@ -925,32 +937,59 @@ function PurchaseLabelContent() {
                   <span className="font-medium text-gray-800">Tracking Number:</span>
                   <p className="text-gray-900 font-mono text-base">{trackingNumber}</p>
                 </div>
-                <div className="space-y-1">
-                  <span className="font-medium text-gray-800">Recipient:</span>
-                  <p className="text-gray-900">{formData?.recipientName || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
-                  <span className="font-medium text-gray-800">Destination:</span>
-                  <p className="text-gray-900">{formData?.recipientCity || 'N/A'}, {formData?.recipientProvince || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
-                  <span className="font-medium text-gray-800">Service:</span>
-                  <p className="text-gray-900 capitalize">{formData?.serviceType || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
-                  <span className="font-medium text-gray-800">Delivery Time:</span>
-                  <p className="text-gray-900">{orderData?.selectedQuote?.deliveryTime || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
-                  <span className="font-medium text-gray-800">Total Paid:</span>
-                  <p className="text-gray-900 font-semibold text-base">
-                    {billingData?.amount 
-                      ? `$${parseFloat(billingData.amount).toFixed(2)}` 
-                      : (orderData?.selectedQuote?.price !== undefined 
-                          ? `$${Number(orderData.selectedQuote.price).toFixed(2)}` 
-                          : '$N/A')}
-                  </p>
-                </div>
+                {(() => {
+                  // After payment, ``/payment-success`` wipes the shipment
+                  // form cache before we ever reach this modal, so reading
+                  // recipient/destination/billing from ``formData`` (the
+                  // wizard cache) falls back to the empty default and
+                  // renders "N/A". The fetched shipment record is the
+                  // source of truth at this point, so prefer it and only
+                  // fall back to the local wizard state when the fetch
+                  // hasn't completed yet.
+                  const shipment = createdShipment?.shipment;
+                  const receiver = shipment?.receiver_address;
+                  const recipientName = receiver?.contact_name || formData?.recipientName || 'N/A';
+                  const recipientCity = receiver?.city || formData?.recipientCity || '';
+                  const recipientProvince = receiver?.province || formData?.recipientProvince || '';
+                  const destination = [recipientCity, recipientProvince]
+                    .filter((part) => part && String(part).trim().length > 0)
+                    .join(', ') || 'N/A';
+                  const serviceType = formData?.serviceType || 'N/A';
+
+                  // ``shippingService.getShipment*`` already converts the
+                  // billing amount from cents to a dollar-denominated
+                  // string at the API boundary, so we can format it
+                  // directly with ``parseFloat`` here. ``billingData``
+                  // mirrors the same field for the existing-shipment
+                  // load path.
+                  const billingAmount = shipment?.billing?.amount ?? billingData?.amount;
+                  const totalPaid = billingAmount !== undefined && billingAmount !== null && billingAmount !== ''
+                    ? `$${parseFloat(String(billingAmount)).toFixed(2)}`
+                    : (orderData?.selectedQuote?.price !== undefined
+                        ? `$${Number(orderData.selectedQuote.price).toFixed(2)}`
+                        : 'N/A');
+
+                  return (
+                    <>
+                      <div className="space-y-1">
+                        <span className="font-medium text-gray-800">Recipient:</span>
+                        <p className="text-gray-900">{recipientName}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="font-medium text-gray-800">Destination:</span>
+                        <p className="text-gray-900">{destination}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="font-medium text-gray-800">Service:</span>
+                        <p className="text-gray-900 capitalize">{serviceType}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <span className="font-medium text-gray-800">Total Paid:</span>
+                        <p className="text-gray-900 font-semibold text-base">{totalPaid}</p>
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             </div>
             
