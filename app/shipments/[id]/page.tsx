@@ -356,6 +356,18 @@ export default function ShipmentDetailPage() {
     );
   }
 
+  // A label is only available once the shipment has been paid for. DRAFT /
+  // PENDING_PAYMENT are pre-payment, CANCELLED is post-cancellation, so in
+  // all three cases we suppress the "Label & Docs" tab entirely. The
+  // backend enforces the same rule – this just avoids dangling a button
+  // in front of users that will only ever 402.
+  const labelBlockedStatuses: ReadonlySet<string> = new Set([
+    "DRAFT",
+    "PENDING_PAYMENT",
+    "CANCELLED",
+  ]);
+  const canDownloadLabel = !labelBlockedStatuses.has(shipment.status);
+
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-5xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
@@ -604,12 +616,14 @@ export default function ShipmentDetailPage() {
             >
               Timeline
             </TabsTrigger>
-            <TabsTrigger 
-              value="docs" 
-              className="h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md flex-shrink-0"
-            >
-              Label & Docs
-            </TabsTrigger>
+            {canDownloadLabel && (
+              <TabsTrigger
+                value="docs"
+                className="h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md flex-shrink-0"
+              >
+                Label & Docs
+              </TabsTrigger>
+            )}
             <TabsTrigger 
               value="payments" 
               className="h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md flex-shrink-0"
@@ -732,6 +746,7 @@ export default function ShipmentDetailPage() {
             </Card>
           </TabsContent>
 
+          {canDownloadLabel && (
           <TabsContent value="docs" className="mt-4">
             <Card>
               <CardHeader>
@@ -847,6 +862,7 @@ export default function ShipmentDetailPage() {
               </CardContent>
             </Card>
           </TabsContent>
+          )}
 
           <TabsContent value="payments" className="mt-4">
             <Card>

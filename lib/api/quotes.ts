@@ -33,9 +33,14 @@ export class QuotesService {
         throw new Error(`The postal code "${request.destination_postal_code}" is not in our service area. Delivery is only available in Downtown Toronto (postal codes starting with M) and Mississauga (postal codes starting with L4T-L5W).`);
       }
 
+      // The estimate endpoint is intentionally public (see
+      // ``quotes/routes.py``) so the unauthenticated landing-page calculator
+      // can call it. Marking ``requiresAuth: false`` prevents the apiClient
+      // from attaching a stale token from a previous session.
       const response = await apiClient.post<QuoteEstimateResponse>(
         API_ENDPOINTS.QUOTES.ESTIMATE,
-        request
+        request,
+        { requiresAuth: false }
       );
 
       // The server returns prices as integer cents (e.g. 5432 for $54.32);

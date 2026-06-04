@@ -31,6 +31,9 @@ export default function ShopifyDashboardPage() {
   // Loading states
   const [isLoadingSummary, setIsLoadingSummary] = useState(true);
   const [isLoadingActivity, setIsLoadingActivity] = useState(true);
+  // Separate flag for "fetching the next page" so the activity feed can keep
+  // showing existing events while the Load More button spins.
+  const [isLoadingMoreActivity, setIsLoadingMoreActivity] = useState(false);
   const [isLoadingAlerts, setIsLoadingAlerts] = useState(true);
   const [isLoadingQuickStats, setIsLoadingQuickStats] = useState(true);
 
@@ -72,12 +75,12 @@ export default function ShopifyDashboardPage() {
     }
   };
 
-  // Load activity feed
-  const loadActivity = async (limit = 20, offset = 0) => {
+  // Load the first page of the activity feed. Replaces whatever is on screen.
+  const loadActivity = async (limit = 20) => {
     try {
       setIsLoadingActivity(true);
       setActivityError(null);
-      const response = await shopifyService.getDashboardActivity({ limit, offset });
+      const response = await shopifyService.getDashboardActivity({ limit, offset: 0 });
       setActivity(response.data);
     } catch (error: any) {
       console.error("Failed to load Shopify activity:", error);
@@ -88,6 +91,39 @@ export default function ShopifyDashboardPage() {
       setActivityError(errorMsg);
     } finally {
       setIsLoadingActivity(false);
+    }
+  };
+
+  // Append the next page of events to the existing list. Previous revision
+  // called the same setter as ``loadActivity`` which clobbered the visible
+  // events with just the next page – Load More made the feed shorter.
+  const loadMoreActivity = async (limit = 20) => {
+    if (!activity || !activity.has_more || isLoadingMoreActivity) {
+      return;
+    }
+    try {
+      setIsLoadingMoreActivity(true);
+      setActivityError(null);
+      const response = await shopifyService.getDashboardActivity({
+        limit,
+        offset: activity.events.length,
+      });
+      setActivity((prev) => {
+        if (!prev) return response.data;
+        return {
+          ...response.data,
+          events: [...prev.events, ...response.data.events],
+        };
+      });
+    } catch (error: any) {
+      console.error("Failed to load more Shopify activity:", error);
+      const errorMsg =
+        error.response?.data?.message ||
+        error.message ||
+        "Failed to load more activity";
+      setActivityError(errorMsg);
+    } finally {
+      setIsLoadingMoreActivity(false);
     }
   };
 
@@ -137,14 +173,20 @@ export default function ShopifyDashboardPage() {
     loadQuickStats();
   }, []);
 
-  // Refresh all data
-  const handleRefresh = async () => {
+  // Reload every dashboard panel. Kept separate from `handleRefresh` so
+  // callers that already surface their own toast (e.g. a successful
+  // sync) can refresh data silently.
+  const reloadAll = async () => {
     await Promise.all([
       loadSummary(),
       loadActivity(),
       loadAlerts(),
       loadQuickStats(),
     ]);
+  };
+
+  const handleRefresh = async () => {
+    await reloadAll();
     toast.success("Dashboard refreshed");
   };
 
@@ -198,18 +240,16 @@ export default function ShopifyDashboardPage() {
               stores={summary?.stores || []}
               isLoading={isLoadingSummary}
               error={summaryError}
+              onSyncComplete={reloadAll}
             />
 
             {/* Activity Feed */}
             <ShopifyActivityFeed
               activity={activity}
               isLoading={isLoadingActivity}
+              isLoadingMore={isLoadingMoreActivity}
               error={activityError}
-              onLoadMore={() => {
-                if (activity && activity.has_more) {
-                  loadActivity(20, activity.events.length);
-                }
-              }}
+              onLoadMore={() => loadMoreActivity(20)}
             />
           </div>
 

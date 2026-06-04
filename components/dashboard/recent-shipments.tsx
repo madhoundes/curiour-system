@@ -93,9 +93,9 @@ export function RecentShipments() {
       
       // Use withReAuth to automatically handle 401 errors and re-authenticate
       const apiShipments = await withReAuth(async () => {
-        return await shippingService.getShipments({ 
-          limit: 5,
-          skip: 0 
+        return await shippingService.getShipments({
+          page: 1,
+          per_page: 5,
         })
       })
       

@@ -385,9 +385,9 @@ export default function LandingTermsPage() {
                 <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
                   <div className="space-y-2">
                     <p className="text-blue-900 font-medium">Parcego Legal Team</p>
-                    <p className="text-blue-800 text-sm">Email: legal@parcego.com</p>
-                    <p className="text-blue-800 text-sm">Phone: 1-800-PARCEGO</p>
-                    <p className="text-blue-800 text-sm">Address: 123 Business Ave, Suite 100, Toronto, ON M5H 2N2</p>
+                    <p className="text-blue-800 text-sm">Email: help@parcego.com</p>
+                    <p className="text-blue-800 text-sm">Phone: 519-619-6759</p>
+                    <p className="text-blue-800 text-sm">Address: 975 Midway Blvd, Unit 13, Mississauga, ON L5T 2J6</p>
                   </div>
                 </div>
               </div>

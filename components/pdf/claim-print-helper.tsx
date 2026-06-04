@@ -192,9 +192,9 @@ export const generatePrintContent = (claim: Claim): string => {
             <div class="title">CLAIM REPORT</div>
           </div>
           <div class="contact-info">
-            <div><strong>Email:</strong> support@parcego.com</div>
+            <div><strong>Email:</strong> help@parcego.com</div>
             <div><strong>Claim ID:</strong> ${claim.id}</div>
-            <div><strong>Phone:</strong> 1-800-PARCEGO</div>
+            <div><strong>Phone:</strong> 519-619-6759</div>
             <div><strong>Shipment ID:</strong> ${claim.shipment_tracking_code}</div>
             <div><strong>Generated:</strong> ${new Date().toLocaleDateString()}</div>
           </div>
@@ -332,7 +332,7 @@ export const generatePrintContent = (claim: Claim): string => {
         <div class="footer">
           <div class="footer-title">IMPORTANT NOTES</div>
           <div>This report contains confidential claim information.</div>
-          <div>For questions about this claim, contact support@parcego.com</div>
+          <div>For questions about this claim, contact help@parcego.com</div>
           <div>Keep this document for your records.</div>
           
           <div class="footer-center">

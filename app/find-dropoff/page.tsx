@@ -11,12 +11,12 @@ import { GoogleMap } from "@/components/ui/google-map";
 const mainDropoffLocation = {
   id: "loc-main",
   name: "Parcego Business Hub",
-  address: "3883 Quartz Road, Unit 3404",
-  city: "Toronto",
+  address: "975 Midway Blvd, Unit 13",
+  city: "Mississauga",
   province: "ON",
-  postalCode: "M4B 2Z8",
-  phone: "(416) 555-SHIP",
-  email: "dropoff@parcego.com",
+  postalCode: "L5T 2J6",
+  phone: "519-619-6759",
+  email: "help@parcego.com",
   distance: "Central Location",
   rating: 5.0,
   hours: {
@@ -87,7 +87,12 @@ export default function FindDropoffPage() {
                         <p className="font-medium text-gray-900">Address</p>
                         <p className="text-gray-600 text-sm">
                           {mainDropoffLocation.address}<br />
-                          {mainDropoffLocation.city}, {mainDropoffLocation.province} {mainDropoffLocation.postalCode}
+                          {[
+                            `${mainDropoffLocation.city}, ${mainDropoffLocation.province}`,
+                            mainDropoffLocation.postalCode,
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
                         </p>
                       </div>
                     </div>

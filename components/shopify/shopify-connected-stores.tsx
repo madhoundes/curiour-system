@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
@@ -9,18 +9,75 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import type { ShopifyAccount } from "@/lib/api/types";
 import Link from "next/link";
+import { toast } from "sonner";
+import { shopifyService } from "@/lib/api/shopify";
 
 interface ShopifyConnectedStoresProps {
   stores: ShopifyAccount[];
   isLoading: boolean;
   error: string | null;
+  /**
+   * Called after a successful manual sync so the parent can refresh the
+   * dashboard cards (last sync time, activity feed, alerts, etc.).
+   */
+  onSyncComplete?: () => void | Promise<void>;
 }
 
 export function ShopifyConnectedStores({
   stores,
   isLoading,
   error,
+  onSyncComplete,
 }: ShopifyConnectedStoresProps) {
+  // Track which store is currently syncing so only that row's button
+  // spins. Using the store id (not a boolean) keeps the other rows
+  // interactive while one sync is in flight.
+  const [syncingStoreId, setSyncingStoreId] = useState<number | null>(null);
+
+  const handleSync = async (store: ShopifyAccount) => {
+    if (syncingStoreId !== null) return;
+    setSyncingStoreId(store.id);
+    try {
+      const response = await shopifyService.syncAccount(store.id);
+      const orders = response.data.orders;
+      const errors = response.data.errors ?? [];
+
+      // Build a one-line summary that surfaces the number of orders
+      // actually pulled in, rather than a generic "synced" toast.
+      let description: string | undefined;
+      if (orders) {
+        const parts = [`${orders.processed} processed`];
+        if (orders.failed > 0) parts.push(`${orders.failed} failed`);
+        if (orders.filtered > 0) parts.push(`${orders.filtered} skipped`);
+        description = `Orders: ${parts.join(", ")}`;
+      }
+
+      if (errors.length > 0) {
+        toast.warning(response.data.message || "Sync completed with errors", {
+          description: description
+            ? `${description}. ${errors[0]}`
+            : errors[0],
+        });
+      } else {
+        toast.success(response.data.message || "Shopify store synced", {
+          description,
+        });
+      }
+
+      await onSyncComplete?.();
+    } catch (err: any) {
+      console.error("Shopify sync failed:", err);
+      const message =
+        err?.response?.data?.detail ||
+        err?.response?.data?.message ||
+        err?.message ||
+        "Failed to sync Shopify store. Please try again.";
+      toast.error(message);
+    } finally {
+      setSyncingStoreId(null);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status.toLowerCase()) {
       case "active":
@@ -33,6 +90,18 @@ export function ShopifyConnectedStores({
         return (
           <Badge variant="destructive" className="bg-red-100 text-red-800 border-red-200">
             Error
+          </Badge>
+        );
+      case "expired":
+        return (
+          <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-200">
+            Reconnect required
+          </Badge>
+        );
+      case "inactive":
+        return (
+          <Badge variant="secondary" className="bg-gray-100 text-gray-700 border-gray-200">
+            Disconnected
           </Badge>
         );
       case "pending":
@@ -128,30 +197,50 @@ export function ShopifyConnectedStores({
                     </AlertDescription>
                   </Alert>
                 )}
-                <div className="flex items-center gap-2 mt-3">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    asChild
-                    id={`parcego-shopify-store-sync-${store.id}`}
-                  >
-                    <Link href={`/profile?tab=api&sync=${store.id}`}>
-                      <Icon name="RefreshCw" size={14} className="mr-1" aria-hidden="true" />
-                      Sync
-                    </Link>
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    asChild
-                    id={`parcego-shopify-store-manage-${store.id}`}
-                  >
-                    <Link href="/profile?tab=api">
-                      <Icon name="Settings" size={14} className="mr-1" aria-hidden="true" />
-                      Manage
-                    </Link>
-                  </Button>
-                </div>
+                {/*
+                  A "disconnected" store is `INACTIVE` on the backend –
+                  the OAuth tokens have been revoked, so there's nothing
+                  useful to do from this card (Sync would 409, and the
+                  Manage page is the same destination used to *connect*
+                  a new store, not to revive this row). We just show the
+                  Disconnected badge above and hide the action row.
+                */}
+                {store.status.toLowerCase() !== "inactive" && (
+                  <div className="flex items-center gap-2 mt-3">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleSync(store)}
+                      disabled={
+                        syncingStoreId !== null ||
+                        store.status.toLowerCase() !== "active"
+                      }
+                      aria-label={`Sync ${store.shop_name || store.shop_domain}`}
+                      id={`parcego-shopify-store-sync-${store.id}`}
+                    >
+                      <Icon
+                        name="RefreshCw"
+                        size={14}
+                        className={`mr-1 ${
+                          syncingStoreId === store.id ? "animate-spin" : ""
+                        }`}
+                        aria-hidden="true"
+                      />
+                      {syncingStoreId === store.id ? "Syncing…" : "Sync"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      asChild
+                      id={`parcego-shopify-store-manage-${store.id}`}
+                    >
+                      <Link href="/profile?tab=api">
+                        <Icon name="Settings" size={14} className="mr-1" aria-hidden="true" />
+                        Manage
+                      </Link>
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

@@ -26,9 +26,15 @@ interface ShipmentGenerationResult {
   labelUrl?: string;
 }
 
-// Statuses that are not eligible for label generation
+// Statuses that are not eligible for label generation.
+//
+// `DRAFT` and `PENDING_PAYMENT` are pre-payment so the backend will refuse
+// the label with HTTP 402. `CANCELLED` and the post-delivery terminal
+// states are ones where printing a label would either be misleading
+// (cancelled) or pointless (already delivered/returned).
 const INELIGIBLE_STATUSES = [
   'DRAFT',
+  'PENDING_PAYMENT',
   'CANCELLED',
   'DELIVERED',
   'UNDELIVERED',
@@ -37,18 +43,16 @@ const INELIGIBLE_STATUSES = [
 
 // Check if a shipment is eligible for label generation
 const isEligibleForLabelGeneration = (shipment: DetailedShipment): boolean => {
-  // Check status
   if (INELIGIBLE_STATUSES.includes(shipment.status as any)) {
     return false;
   }
-  
-  // Additional eligibility checks can be added here (e.g., payment status)
+
   return true;
 };
 
 // Get error message for ineligible shipment
 const getIneligibleReason = (shipment: DetailedShipment): string => {
-  if (shipment.status === 'DRAFT') {
+  if (shipment.status === 'DRAFT' || shipment.status === 'PENDING_PAYMENT') {
     return 'Shipment must be paid before generating a label';
   }
   if (INELIGIBLE_STATUSES.includes(shipment.status as any)) {

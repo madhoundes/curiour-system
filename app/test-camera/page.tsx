@@ -189,7 +189,7 @@ export default function TestCameraPage() {
             {/* Navigation */}
             <div className="flex gap-4">
               <Button 
-                onClick={() => window.location.href = '/courier-login'}
+                onClick={() => window.location.href = '/login'}
                 variant="outline"
               >
                 Go to Courier Login

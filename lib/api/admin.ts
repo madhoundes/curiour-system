@@ -52,15 +52,17 @@ export class AdminService {
   async listUsers(params: AdminListUsersParams = {}): Promise<ApiSuccessResponse<User[]>> {
     try {
       const { skip = 0, limit = 100 } = params;
-      
+
+      // ``apiClient.get`` signature: (url, queryParams, options).
+      // Previously this passed ``{ requiresAuth, params }`` as the
+      // ``queryParams`` arg, which serialized to ``?requiresAuth=true&params=[object+Object]``
+      // and silently dropped pagination.
       const response = await apiClient.get<User[]>(
         API_ENDPOINTS.AUTH.ADMIN_LIST_USERS,
-        { 
-          requiresAuth: true,
-          params: { skip, limit }
-        }
+        { skip, limit },
+        { requiresAuth: true }
       );
-      
+
       return response;
     } catch (error) {
       console.error('Admin list users failed:', error);
@@ -287,13 +289,11 @@ export class AdminService {
        // Replace :driver_id placeholder in the URL
        const url = API_ENDPOINTS.STATS.ADMIN_DRIVER_STATS.replace(':driver_id', driverId.toString());
        
-       const response = await apiClient.get<DriverStatisticsResponse>(
-         url,
-         { 
-           requiresAuth: true,
-           params: params
-         }
-       );
+      const response = await apiClient.get<DriverStatisticsResponse>(
+        url,
+        params,
+        { requiresAuth: true }
+      );
        
        return response;
      } catch (error) {
@@ -313,13 +313,11 @@ export class AdminService {
        // Replace :user_id placeholder in the URL
        const url = API_ENDPOINTS.STATS.ADMIN_USER_STATS.replace(':user_id', userId.toString());
        
-       const response = await apiClient.get<UserStatisticsResponse>(
-         url,
-         { 
-           requiresAuth: true,
-           params: params
-         }
-       );
+      const response = await apiClient.get<UserStatisticsResponse>(
+        url,
+        params,
+        { requiresAuth: true }
+      );
        
        return response;
      } catch (error) {
@@ -335,13 +333,11 @@ export class AdminService {
      params?: AdminStatisticsParams
    ): Promise<ApiSuccessResponse<AdminStatisticsResponse>> {
      try {
-       const response = await apiClient.get<AdminStatisticsResponse>(
-         API_ENDPOINTS.STATS.ADMIN_STATS,
-         { 
-           requiresAuth: true,
-           params: params
-         }
-       );
+      const response = await apiClient.get<AdminStatisticsResponse>(
+        API_ENDPOINTS.STATS.ADMIN_STATS,
+        params,
+        { requiresAuth: true }
+      );
        
        return response;
      } catch (error) {
@@ -370,13 +366,11 @@ export class AdminService {
          }
        }
 
-       const response = await apiClient.get<UserStatisticsResponse>(
-         API_ENDPOINTS.STATS.USER_STATS,
-         { 
-           requiresAuth: true,
-           params: params
-         }
-       );
+      const response = await apiClient.get<UserStatisticsResponse>(
+        API_ENDPOINTS.STATS.USER_STATS,
+        params,
+        { requiresAuth: true }
+      );
        
        return response;
      } catch (error: any) {

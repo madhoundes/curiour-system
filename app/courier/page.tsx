@@ -368,7 +368,7 @@ function CourierDashboard() {
             courier_login_time: loginTime,
             required: 'All three must be present'
           });
-          router.push("/courier-login");
+          router.push("/login");
           return;
         }
 
@@ -388,7 +388,7 @@ function CourierDashboard() {
           document.cookie = "courier_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
           
           const currentPath = window.location.pathname;
-          const redirectUrl = currentPath !== '/courier-login' ? `/courier-login?redirect=${encodeURIComponent(currentPath)}` : '/courier-login';
+          const redirectUrl = currentPath !== '/login' ? `/login?redirect=${encodeURIComponent(currentPath)}` : '/login';
           router.push(redirectUrl);
           return;
         }
@@ -417,7 +417,7 @@ function CourierDashboard() {
             console.error('❌ [DASHBOARD] User does not have courier/driver role:', userResponse.data.role);
             localStorage.removeItem("courier_authenticated");
             localStorage.removeItem("auth_token");
-          router.push("/courier-login");
+          router.push("/login");
             return;
           }
 
@@ -444,13 +444,13 @@ function CourierDashboard() {
           localStorage.removeItem("courier_email");
           localStorage.removeItem("courier_login_time");
           localStorage.removeItem("courier_user");
-          router.push("/courier-login");
+          router.push("/login");
           return;
         }
       } catch (error: any) {
         console.error('❌ [DASHBOARD] Error during authentication check:', error);
         console.error('❌ [DASHBOARD] Error stack:', error.stack);
-        router.push("/courier-login");
+        router.push("/login");
       }
       
       setIsLoading(false);
@@ -586,7 +586,7 @@ function CourierDashboard() {
           <h2 className="text-xl font-semibold text-gray-900">Authentication Required</h2>
           <p className="text-gray-600">Please log in to access the courier dashboard.</p>
           <Button 
-            onClick={() => router.push("/courier-login")}
+            onClick={() => router.push("/login")}
             className="bg-blue-600 hover:bg-blue-700"
           >
             Go to Login
@@ -651,7 +651,7 @@ function CourierDashboard() {
     setIsAuthenticated(false);
     
     // Redirect to login page
-    router.push("/courier-login");
+    router.push("/login");
   };
 
   // Notification functions

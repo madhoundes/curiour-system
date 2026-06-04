@@ -96,19 +96,6 @@ export const mockFAQs: FAQ[] = [
     lastUpdated: '2025-01-14T15:20:00Z',
     relatedArticles: ['article-001', 'article-002']
   },
-  {
-    id: 'faq-003',
-    question: 'How do I verify my account?',
-    answer: 'Account verification is a simple 3-step process: 1) Enter your business information during signup, 2) Verify your email address by clicking the link sent to your inbox, 3) Complete business verification by providing required documents (business license, tax ID, etc.). Verification typically takes 1-2 business days and you\'ll receive email notifications throughout the process.',
-    category: 'getting-started',
-    difficulty: 'beginner',
-    tags: ['verification', 'account-setup', 'business-verification'],
-    helpfulCount: 156,
-    notHelpfulCount: 1,
-    lastUpdated: '2025-01-13T09:15:00Z',
-    relatedArticles: ['article-003']
-  },
-
   // Shipment Management FAQs
   {
     id: 'faq-004',
@@ -148,19 +135,6 @@ export const mockFAQs: FAQ[] = [
     lastUpdated: '2025-01-12T14:45:00Z',
     relatedArticles: ['article-004']
   },
-  {
-    id: 'faq-007',
-    question: 'Can I schedule a pickup for my shipments?',
-    answer: 'Yes! You can schedule pickups in several ways: 1) During shipment creation, select "Schedule Pickup" option, 2) From your dashboard, use the "Schedule Pickup" button, 3) Contact our support team for bulk pickup arrangements. Pickups are available Monday-Friday, 9 AM - 5 PM, and you can specify a 2-hour window. Same-day pickup is available in most areas.',
-    category: 'shipments',
-    difficulty: 'intermediate',
-    tags: ['pickup', 'scheduling', 'bulk-shipping'],
-    helpfulCount: 45,
-    notHelpfulCount: 2,
-    lastUpdated: '2025-01-11T11:30:00Z',
-    relatedArticles: ['article-005']
-  },
-
   // Account & Billing FAQs
   {
     id: 'faq-008',
@@ -173,18 +147,6 @@ export const mockFAQs: FAQ[] = [
     notHelpfulCount: 4,
     lastUpdated: '2025-01-12T14:45:00Z',
     relatedArticles: ['article-004']
-  },
-  {
-    id: 'faq-009',
-    question: 'How do I set up two-factor authentication?',
-    answer: 'To enable 2FA, go to your Profile settings and select "Security". Click "Enable Two-Factor Authentication" and follow the setup wizard. You can use an authenticator app like Google Authenticator or receive SMS codes. We strongly recommend 2FA for enhanced account security. You can also set up backup codes for emergency access.',
-    category: 'account',
-    difficulty: 'intermediate',
-    tags: ['security', '2fa', 'authentication', 'backup-codes'],
-    helpfulCount: 45,
-    notHelpfulCount: 2,
-    lastUpdated: '2025-01-11T11:30:00Z',
-    relatedArticles: ['article-005']
   },
   {
     id: 'faq-010',
@@ -214,11 +176,11 @@ export const mockFAQs: FAQ[] = [
   },
   {
     id: 'faq-012',
-    question: 'How do I integrate with my e-commerce platform?',
-    answer: 'We offer integrations with major e-commerce platforms including Shopify, WooCommerce, Magento, and BigCommerce. To set up: 1) Go to Integrations in your dashboard, 2) Select your platform, 3) Follow the OAuth setup process, 4) Configure your shipping rules and automation. Our API documentation is available for custom integrations.',
+    question: 'How do I connect my Shopify store?',
+    answer: 'Install the Parcego app from your Shopify store\'s admin and follow the on-screen steps to connect it to your Parcego account. Once connected, your Shopify orders will automatically sync into Parcego so you can create shipments and labels without leaving the dashboard.',
     category: 'technical',
-    difficulty: 'advanced',
-    tags: ['integration', 'e-commerce', 'api', 'automation'],
+    difficulty: 'beginner',
+    tags: ['shopify', 'integration', 'ecommerce'],
     helpfulCount: 34,
     notHelpfulCount: 1,
     lastUpdated: '2025-01-08T10:15:00Z',
@@ -226,18 +188,6 @@ export const mockFAQs: FAQ[] = [
   },
 
   // Business Operations FAQs
-  {
-    id: 'faq-013',
-    question: 'How do I generate shipping reports?',
-    answer: 'To generate shipping reports: 1) Go to Analytics in your dashboard, 2) Select "Shipping Reports", 3) Choose your date range and filters, 4) Click "Generate Report". You can export reports in PDF, CSV, or Excel formats. Reports include shipping costs, delivery times, customer locations, and more. Custom reports are available for enterprise accounts.',
-    category: 'business',
-    difficulty: 'intermediate',
-    tags: ['reports', 'analytics', 'export', 'business-intelligence'],
-    helpfulCount: 56,
-    notHelpfulCount: 2,
-    lastUpdated: '2025-01-07T14:30:00Z',
-    relatedArticles: ['article-009']
-  },
   {
     id: 'faq-014',
     question: 'What are the shipping rates and how are they calculated?',

@@ -196,7 +196,7 @@ export default function CourierRouteSimulation() {
         const loginTime = localStorage.getItem("courier_login_time");
 
         if (authenticated !== "true" || !authToken || !loginTime) {
-          router.push("/courier-login");
+          router.push("/login");
           return;
         }
 
@@ -216,7 +216,7 @@ export default function CourierRouteSimulation() {
           document.cookie = "courier_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
           
           const currentPath = window.location.pathname;
-          const redirectUrl = `/courier-login?redirect=${encodeURIComponent(currentPath)}`;
+          const redirectUrl = `/login?redirect=${encodeURIComponent(currentPath)}`;
           router.push(redirectUrl);
           return;
         }
@@ -268,7 +268,7 @@ export default function CourierRouteSimulation() {
         
         if (error.message?.includes('Authentication') || error.response?.status === 401) {
           localStorage.clear();
-          router.push("/courier-login");
+          router.push("/login");
         } else {
           setError("Failed to load assignments: " + (error.message || "Unknown error"));
           setIsLoading(false);

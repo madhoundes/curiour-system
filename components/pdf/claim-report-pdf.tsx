@@ -94,9 +94,9 @@ export const ClaimReportPDF = ({ claim, isPreview = false, userProfile, billingR
           <h1 className="text-lg font-bold text-black">CLAIM REPORT</h1>
         </div>
         <div className="text-right text-xs text-gray-700 space-y-1">
-          <div><strong>Email:</strong> support@parcego.com</div>
+          <div><strong>Email:</strong> help@parcego.com</div>
           <div><strong>Claim ID:</strong> {claim.id}</div>
-          <div><strong>Phone Number:</strong> 1-800-PARCEGO</div>
+          <div><strong>Phone Number:</strong> 519-619-6759</div>
           <div><strong>Shipment ID:</strong> {claim.shipment_tracking_code}</div>
           <div><strong>Date Generated:</strong> {formatUTCDate(new Date())}</div>
         </div>
@@ -235,7 +235,7 @@ export const ClaimReportPDF = ({ claim, isPreview = false, userProfile, billingR
       <div className="mt-8 pt-4 border-t border-gray-200 text-xs text-gray-600 space-y-2">
         <div className="font-bold text-black text-sm">IMPORTANT NOTES</div>
         <div>This report contains confidential claim information.</div>
-        <div>For questions about this claim, contact support@parcego.com</div>
+        <div>For questions about this claim, contact help@parcego.com</div>
         <div>Keep this document for your records.</div>
         
         <div className="text-center mt-4 text-gray-500">

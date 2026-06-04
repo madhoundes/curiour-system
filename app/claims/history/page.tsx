@@ -8,18 +8,16 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { 
-  FileText, 
-  Eye, 
-  Download, 
-  Search, 
-  DollarSign, 
-  Clock, 
-  CheckCircle, 
+import {
+  FileText,
+  Eye,
+  Download,
+  Search,
+  Clock,
+  CheckCircle,
   XCircle,
   AlertTriangle,
   Package,
-  Shield,
   Printer
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -66,15 +64,6 @@ const claimTypeConfig = {
   wrong_address: { label: "Wrong Address", color: "bg-purple-50 text-purple-700", icon: AlertTriangle },
   missing_items: { label: "Missing Items", color: "bg-blue-50 text-blue-700", icon: Package },
   other: { label: "Other", color: "bg-gray-50 text-gray-700", icon: AlertTriangle }
-};
-
-// Format currency
-const formatCurrency = (amount: string | number) => {
-  const numAmount = typeof amount === 'string' ? parseFloat(amount) : amount;
-  return new Intl.NumberFormat('en-CA', {
-    style: 'currency',
-    currency: 'CAD'
-  }).format(numAmount);
 };
 
 // Format date in UTC
@@ -195,12 +184,11 @@ export default function ClaimsHistoryPage() {
     });
   }, [claims, searchQuery, typeFilter]);
 
-  // Calculate summary statistics
-  const totalApproved = claims.filter(claim => claim.status === 'approved').length;
-  const totalPending = claims.filter(claim => claim.status === 'pending').length;
-  const totalAmount = claims
-    .filter(claim => claim.status === 'approved')
-    .reduce((sum, claim) => sum + (claim.billing_id || 0), 0);
+  // These stats are derived from the current page only – the backend doesn't
+  // expose aggregate counts. Labels make that scope explicit so users don't
+  // mistake them for global totals (which would jump around as they paginate).
+  const approvedOnPage = claims.filter(claim => claim.status === 'approved').length;
+  const pendingOnPage = claims.filter(claim => claim.status === 'pending').length;
 
   // Handle claim detail view
   const handleViewClaim = (claim: Claim) => {
@@ -290,34 +278,34 @@ export default function ClaimsHistoryPage() {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Approved</CardTitle>
+            <CardTitle className="text-sm font-medium">Approved (this page)</CardTitle>
             <CheckCircle className="h-4 w-4 text-green-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{totalApproved}</div>
-            <p className="text-xs text-muted-foreground">Claims approved</p>
+            <div className="text-2xl font-bold text-green-600">{approvedOnPage}</div>
+            <p className="text-xs text-muted-foreground">Approved claims on this page</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+            <CardTitle className="text-sm font-medium">Pending (this page)</CardTitle>
             <Clock className="h-4 w-4 text-yellow-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-yellow-600">{totalPending}</div>
-            <p className="text-xs text-muted-foreground">Awaiting review</p>
+            <div className="text-2xl font-bold text-yellow-600">{pendingOnPage}</div>
+            <p className="text-xs text-muted-foreground">Awaiting review on this page</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Payouts</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Current Page</CardTitle>
+            <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatCurrency(totalAmount)}</div>
-            <p className="text-xs text-muted-foreground">Total approved amount</p>
+            <div className="text-2xl font-bold">{currentPage} / {totalPages}</div>
+            <p className="text-xs text-muted-foreground">Use the table footer to navigate</p>
           </CardContent>
         </Card>
       </div>

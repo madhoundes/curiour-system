@@ -122,6 +122,11 @@ export default function ClaimsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Whether the claimant has acknowledged the accuracy attestation on the
+  // review step. Required to submit; gates both the trigger button and
+  // ``handleSubmit`` so the form can't be bypassed by, e.g., re-enabling the
+  // button via devtools.
+  const [hasAttested, setHasAttested] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [shipments, setShipments] = useState<DetailedShipment[]>([]);
@@ -175,20 +180,34 @@ export default function ClaimsPage() {
         setShipmentsLoading(true);
         setShipmentsError(null);
         
-        // Fetch all user shipments (API already filters by current user)
-        const userShipments = await shippingService.getShipments({ 
-          limit: 1000 // Get a large number to show all shipments
-        });
-        
+        // The claims form needs the user's full shipment history so the
+        // dropdown can show every claim-eligible package. The backend caps
+        // ``per_page`` at 100, so page through ``getShipmentsPaginated`` and
+        // collect everything client-side. A bounded loop keeps us safe even
+        // if the response metadata is somehow inconsistent.
+        const PAGE_SIZE = 100;
+        const MAX_PAGES = 50; // 5,000 shipments – more than enough for the UI
+        const collected: DetailedShipment[] = [];
+        for (let pageNum = 1; pageNum <= MAX_PAGES; pageNum += 1) {
+          const response = await shippingService.getShipmentsPaginated({
+            page: pageNum,
+            per_page: PAGE_SIZE,
+          });
+          collected.push(...response.shipments);
+          if (pageNum >= response.total_pages) {
+            break;
+          }
+        }
+
         // Filter to only show shipments with tracking codes and exclude CANCELLED and DRAFT statuses
-        const validShipments = userShipments.filter(
-          shipment => 
-            shipment.tracking_code && 
+        const validShipments = collected.filter(
+          shipment =>
+            shipment.tracking_code &&
             shipment.tracking_code.trim() !== '' &&
             shipment.status !== 'CANCELLED' &&
             shipment.status !== 'DRAFT'
         );
-        
+
         setShipments(validShipments);
       } catch (error) {
         console.error('Failed to load shipments:', error);
@@ -258,8 +277,15 @@ export default function ClaimsPage() {
   const handleSubmit = async () => {
     setIsSubmitting(true);
     setSubmitError(null); // Clear any previous errors
-    
+
     try {
+      // The Submit button is normally disabled until the attestation is
+      // checked, but guard here too in case the button is re-enabled via
+      // devtools or the handler is invoked programmatically in the future.
+      if (!hasAttested) {
+        throw new Error('Please confirm that the information provided is accurate before submitting.');
+      }
+
       // Validate description length
       if (!formData.description || formData.description.trim().length < 10) {
         throw new Error('Description must be at least 10 characters long');
@@ -730,10 +756,19 @@ export default function ClaimsPage() {
               </AlertDescription>
             </Alert>
 
-            <div className="flex items-center space-x-2 text-sm text-gray-600">
-              <input type="checkbox" id="parcego-claims-agreement" className="rounded" />
-              <label htmlFor="parcego-claims-agreement">
+            <div className="flex items-start space-x-2 text-sm text-gray-600">
+              <input
+                type="checkbox"
+                id="parcego-claims-agreement"
+                className="rounded mt-0.5"
+                checked={hasAttested}
+                onChange={(e) => setHasAttested(e.target.checked)}
+                required
+                aria-required="true"
+              />
+              <label htmlFor="parcego-claims-agreement" className="cursor-pointer">
                 I confirm that all information provided is accurate and complete to the best of my knowledge
+                <span className="text-red-500 ml-1" aria-hidden="true">*</span>
               </label>
             </div>
           </div>
@@ -885,15 +920,16 @@ export default function ClaimsPage() {
 
             <div className="flex space-x-3">
               {currentStep === stepperSteps.length - 1 ? (
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button 
-                      disabled={isSubmitting}
-                      className="bg-blue-600 hover:bg-blue-700"
-                    >
-                      {isSubmitting ? "Submitting..." : "Submit Claim"}
-                    </Button>
-                  </AlertDialogTrigger>
+                <div className="flex flex-col items-end gap-1">
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        disabled={isSubmitting || !hasAttested}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        {isSubmitting ? "Submitting..." : "Submit Claim"}
+                      </Button>
+                    </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
                       <AlertDialogTitle>Submit Your Claim</AlertDialogTitle>
@@ -914,16 +950,22 @@ export default function ClaimsPage() {
                     
                     <AlertDialogFooter>
                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                      <AlertDialogAction 
-                        onClick={handleSubmit} 
+                      <AlertDialogAction
+                        onClick={handleSubmit}
                         className="bg-blue-600 hover:bg-blue-700"
-                        disabled={isSubmitting}
+                        disabled={isSubmitting || !hasAttested}
                       >
                         {isSubmitting ? "Submitting..." : "Submit Claim"}
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>
                 </AlertDialog>
+                {!hasAttested && (
+                  <p className="text-xs text-gray-500">
+                    Confirm the accuracy attestation above to submit.
+                  </p>
+                )}
+              </div>
               ) : (
                 <Button 
                   onClick={nextStep}

@@ -39,9 +39,23 @@ export type ShipmentSummary = {
 
 export const formatTrackingNumber = (value: string): string => value.trim().toUpperCase();
 
+/**
+ * Validate that a tracking number matches one of the formats the public
+ * tracking endpoint accepts.
+ *
+ * Supported formats:
+ *   - ``ASH-YYYYMMDD-XXXXXX`` – current Parcego format.
+ *   - ``PCG`` followed by 9+ alphanumerics – legacy/short-code format that
+ *     the backend ``trackingService`` still resolves.
+ *
+ * Anything else is rejected client-side so we don't burn an API round-trip
+ * on obviously malformed input.
+ */
 export const isValidTrackingNumber = (value: string): boolean => {
   const v = formatTrackingNumber(value);
-  return /^ASH-\d{8}-[A-Z0-9]{6}$/.test(v);
+  if (/^ASH-\d{8}-[A-Z0-9]{6}$/.test(v)) return true;
+  if (/^PCG[A-Z0-9]{9,}$/.test(v)) return true;
+  return false;
 };
 
 // Mock data for different tracking statuses

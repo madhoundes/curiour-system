@@ -210,33 +210,6 @@ export default function PackageDetailsPage() {
             </CardContent>
           </Card>
 
-          {/* Package Status */}
-          <Card className="parcego-card parcego-card--package-status">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Icon name="CheckCircle" size={20} className="text-green-600" />
-                <span>Package Details Completed</span>
-              </CardTitle>
-              <CardDescription>
-                Your package specifications have been recorded and will be included in the final shipping label
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-2">
-                  <Icon name="Package" size={16} className="text-green-600" />
-                  <span className="text-sm font-medium text-green-800">
-                    Package Information Saved
-                  </span>
-                </div>
-                <p className="text-sm text-green-700">
-                  All package details including dimensions and weight have been saved. 
-                  The complete shipping label with all information will be available in the next step.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Action Buttons */}
           <div className="flex justify-between items-center pt-6 border-t border-gray-200">
             <Button

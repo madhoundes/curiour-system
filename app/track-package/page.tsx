@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import Icon from "@/components/ui/icon"
 import ProofOfDeliveryGallery from "@/components/tracking/proof-of-delivery-gallery"
 import { trackingService } from "@/lib/api/tracking"
-import type { PublicTrackingResponse, TrackingStatusHistoryItem, ShipmentStatus } from "@/lib/api/types"
+import type { PublicTrackingResponse, TrackingStatusHistoryItem, ShipmentStatus, DeliveryPhoto } from "@/lib/api/types"
 import type { TrackingEvent, ShipmentStatus as MockShipmentStatus } from "@/lib/mock/tracking"
 
 // Helper function to transform API status to mock status format
@@ -31,8 +31,9 @@ const transformStatus = (apiStatus: ShipmentStatus): MockShipmentStatus => {
   return statusMap[apiStatus] || 'LabelCreated'
 }
 
-// Helper function to get event type from status change
-const getEventType = (status: ShipmentStatus, previousStatus: ShipmentStatus): string => {
+// Map an API status code into the UI's event-type vocabulary used by the
+// timeline component (icons + copy).
+const getEventType = (status: ShipmentStatus): string => {
   const eventTypeMap: Record<string, string> = {
     'LABEL_GENERATED': 'LABEL_CREATED',
     'PICKED_UP': 'DROP_OFF_CONFIRMED',
@@ -47,22 +48,23 @@ const getEventType = (status: ShipmentStatus, previousStatus: ShipmentStatus): s
   return eventTypeMap[status] || 'NOTE_ADDED'
 }
 
-// Transform API status history to tracking events
+// Transform API status history into the TrackingEvent shape consumed by
+// ``TrackingTimeline``. The timeline component sorts events newest-first on
+// its own, so we don't need to pre-sort or reverse here.
+//
+// Note: the public tracking endpoint does not expose per-event geographic
+// location (only the destination city/province on the parent payload). We
+// therefore omit ``location`` rather than emitting empty strings; the
+// timeline already guards against it being absent. Filed as a backend gap.
 const transformStatusHistoryToEvents = (statusHistory: TrackingStatusHistoryItem[]): TrackingEvent[] => {
-  return statusHistory.map((item, index) => {
-    const eventType = getEventType(item.status as ShipmentStatus, item.previous_status as ShipmentStatus)
-    const statusAfter = transformStatus(item.status as ShipmentStatus)
-    
-    return {
-      id: `evt-${String(statusHistory.length - index).padStart(3, '0')}`,
-      timestamp: item.timestamp,
-      type: eventType,
-      statusAfter,
-      location: '', // Location not available in public tracking response
-      actor: 'system',
-      details: item.notes || undefined,
-    } as TrackingEvent
-  }).reverse() // Reverse to show oldest first
+  return statusHistory.map((item, index) => ({
+    id: `evt-${String(statusHistory.length - index).padStart(3, '0')}`,
+    timestamp: item.timestamp,
+    type: getEventType(item.status as ShipmentStatus),
+    statusAfter: transformStatus(item.status as ShipmentStatus),
+    actor: 'system',
+    details: item.notes || undefined,
+  } as TrackingEvent))
 }
 
 // Transform API public tracking response to tracking summary
@@ -73,21 +75,52 @@ const transformTrackingResponseToSummary = (trackingResponse: PublicTrackingResp
   destination: string;
   carrier: string;
   lastUpdate: string;
-  hasPOD: boolean;
+  isDelivered: boolean;
+  deliveryPhotos: DeliveryPhoto[];
+  actualDeliveryDate: string;
 } => {
   const currentStatus = transformStatus(trackingResponse.current_status as ShipmentStatus)
-  
+
+  // The public endpoint may omit any of these fields. Fall back to an em
+  // dash rather than the literal placeholder strings "Origin" / "Destination"
+  // which previously leaked into the UI when data was missing.
+  const buildDestination = (): string => {
+    if (trackingResponse.receiver_city && trackingResponse.receiver_province) {
+      return `${trackingResponse.receiver_city}, ${trackingResponse.receiver_province}`
+    }
+    return trackingResponse.receiver_company || '—'
+  }
+
   return {
     status: currentStatus,
     eta: trackingResponse.estimated_delivery_date || '',
-    origin: trackingResponse.sender_company || 'Origin',
-    destination: trackingResponse.receiver_city && trackingResponse.receiver_province 
-      ? `${trackingResponse.receiver_city}, ${trackingResponse.receiver_province}`
-      : trackingResponse.receiver_company || 'Destination',
+    origin: trackingResponse.sender_company || '—',
+    destination: buildDestination(),
     carrier: 'Parcego',
     lastUpdate: trackingResponse.last_updated || trackingResponse.created_at,
-    hasPOD: trackingResponse.current_status === 'DELIVERED' && trackingResponse.delivery_photos.length > 0,
+    isDelivered: trackingResponse.current_status === 'DELIVERED',
+    // Forward the full photo objects so the gallery can render signed S3 URLs
+    // directly instead of relying on a boolean + hard-coded mock images.
+    deliveryPhotos: trackingResponse.delivery_photos ?? [],
+    actualDeliveryDate: trackingResponse.actual_delivery_date || '',
   }
+}
+
+// Format an ISO timestamp using the visitor's locale + timezone. Returns an
+// empty string for missing/invalid dates so callers can fall back gracefully.
+const formatLocal = (
+  iso: string | undefined,
+  opts: Intl.DateTimeFormatOptions = {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }
+): string => {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleString(undefined, opts)
 }
 
 function TrackPackageContent() {
@@ -95,7 +128,9 @@ function TrackPackageContent() {
   const search = useSearchParams()
   const initial = formatTrackingNumber(search.get("tracking") || "")
   const [tracking, setTracking] = React.useState<string>(initial)
-  const [heroTracking, setHeroTracking] = React.useState<string>("")
+  // Initialize the hero input from the URL too so deep links render the
+  // tracking number in the input field instead of an empty placeholder.
+  const [heroTracking, setHeroTracking] = React.useState<string>(initial)
   const [showTimeline, setShowTimeline] = React.useState<boolean>(false)
   const [loading, setLoading] = React.useState<boolean>(false)
   const [error, setError] = React.useState<string | null>(null)
@@ -107,7 +142,9 @@ function TrackPackageContent() {
     destination: string;
     carrier: string;
     lastUpdate: string;
-    hasPOD: boolean;
+    isDelivered: boolean;
+    deliveryPhotos: DeliveryPhoto[];
+    actualDeliveryDate: string;
   }
 
   const [trackingData, setTrackingData] = React.useState<{ events: TrackingEvent[]; summary: TrackingSummary } | null>(null)
@@ -117,7 +154,7 @@ function TrackPackageContent() {
       setLoading(false)
       setTrackingData(null)
       setShowTimeline(false)
-      setError('Invalid tracking number format. Please use format: ASH-YYYYMMDD-XXXXXX')
+      setError('Invalid tracking number format. Use ASH-YYYYMMDD-XXXXXX or a PCG code.')
       return
     }
 
@@ -158,7 +195,7 @@ function TrackPackageContent() {
       } else if (err?.response?.status === 404) {
         errorMessage = 'Tracking number not found. Please verify the tracking number and try again.'
       } else if (err?.response?.status === 422) {
-        errorMessage = 'Invalid tracking number format. Please use format: ASH-YYYYMMDD-XXXXXX'
+        errorMessage = 'Invalid tracking number format. Use ASH-YYYYMMDD-XXXXXX or a PCG code.'
       } else if (err?.message?.includes('Network') || err?.message?.includes('fetch')) {
         errorMessage = 'Network error. Please check your internet connection and try again.'
       }
@@ -174,8 +211,18 @@ function TrackPackageContent() {
     }
   }, [])
 
-  // Only fetch tracking data when manually triggered (button click)
-  // No auto-search on page load or URL change
+  // Auto-fetch on first paint when the page is opened via a shared deep
+  // link (``/track-package?tracking=ASH-...``). After this initial pass we
+  // only fetch on explicit submit so that subsequent ``router.push`` /
+  // browser-back navigations don't trigger duplicate requests.
+  const didAutoFetch = React.useRef(false)
+  React.useEffect(() => {
+    if (didAutoFetch.current) return
+    didAutoFetch.current = true
+    if (initial && isValidTrackingNumber(initial)) {
+      fetchTrackingData(initial)
+    }
+  }, [initial, fetchTrackingData])
 
   const handleSubmit = (tn: string) => {
     const formatted = formatTrackingNumber(tn)
@@ -324,19 +371,19 @@ function TrackPackageContent() {
                   <div className="flex justify-between items-center py-3">
                     <span className="text-sm font-medium text-gray-600">Last Update</span>
                     <span className="text-sm font-semibold text-gray-900">
-                      {new Date(trackingData.summary.lastUpdate).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      })}
+                      {formatLocal(trackingData.summary.lastUpdate) || '—'}
                     </span>
                   </div>
                 </div>
               </div>
               
               {/* Proof of Delivery Gallery */}
-              <ProofOfDeliveryGallery hasPOD={trackingData.summary.hasPOD} />
+              <ProofOfDeliveryGallery
+                photos={trackingData.summary.deliveryPhotos}
+                isDelivered={trackingData.summary.isDelivered}
+                deliveredAt={trackingData.summary.actualDeliveryDate}
+                destination={trackingData.summary.destination}
+              />
             </aside>
           </div>
         </section>

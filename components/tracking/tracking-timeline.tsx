@@ -13,6 +13,25 @@ type TrackingTimelineProps = {
   estimatedDelivery?: string
 }
 
+// Format an ISO timestamp using the visitor's locale + timezone. Returns an
+// empty string for missing/invalid input so callers can fall back gracefully.
+// Previously this component used ``getUTC*`` accessors which displayed times
+// in UTC, confusing users in non-UTC zones.
+const formatLocal = (
+  iso: string | undefined,
+  opts: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }
+): string => {
+  if (!iso) return ""
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ""
+  return d.toLocaleString(undefined, opts)
+}
+
 export const TrackingTimeline: React.FC<TrackingTimelineProps> = ({ id = "parcego-tracking-timeline", events, currentStatus, estimatedDelivery }) => {
   const reducedMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
   const sorted = React.useMemo(() => [...events].sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1)), [events])
@@ -77,13 +96,7 @@ export const TrackingTimeline: React.FC<TrackingTimelineProps> = ({ id = "parceg
             <div aria-label="Estimated delivery" className="text-right">
               <div className="text-xs text-gray-500 uppercase tracking-wider font-medium mb-1">ETA</div>
               <div className="text-sm font-semibold text-gray-900">
-                {(() => {
-                  const date = new Date(estimatedDelivery);
-                  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                  const hours = String(date.getUTCHours()).padStart(2, '0');
-                  const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-                  return `${months[date.getUTCMonth()]} ${date.getUTCDate()}, ${hours}:${minutes}`;
-                })()}
+                {formatLocal(estimatedDelivery)}
               </div>
             </div>
           )}
@@ -92,7 +105,12 @@ export const TrackingTimeline: React.FC<TrackingTimelineProps> = ({ id = "parceg
           {sorted.map((evt, idx) => {
             const isLast = idx === sorted.length - 1
             const iconName = getStatusIcon(evt.type, evt.statusAfter)
-            const isCurrent = evt.statusAfter === currentStatus
+            // Mark only the most recent event as current. Comparing on
+            // ``statusAfter === currentStatus`` previously highlighted every
+            // event that collapsed into the same UI bucket (e.g. DRAFT /
+            // PENDING_PAYMENT / PAID / LABEL_GENERATED all map to
+            // ``LabelCreated``), producing duplicate "current" pulses.
+            const isCurrent = idx === 0
             const iconColor = getStatusIconColor(evt.statusAfter, isCurrent)
             
             return (
@@ -134,13 +152,7 @@ export const TrackingTimeline: React.FC<TrackingTimelineProps> = ({ id = "parceg
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 text-sm text-gray-600">
                     <span className="font-medium">
-                      {(() => {
-                        const date = new Date(evt.timestamp);
-                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                        const hours = String(date.getUTCHours()).padStart(2, '0');
-                        const minutes = String(date.getUTCMinutes()).padStart(2, '0');
-                        return `${months[date.getUTCMonth()]} ${date.getUTCDate()}, ${hours}:${minutes}`;
-                      })()}
+                      {formatLocal(evt.timestamp)}
                     </span>
                     {evt.location && (
                       <>

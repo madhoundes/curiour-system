@@ -216,7 +216,7 @@ export default function CourierPerformance() {
         document.cookie = "courier_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
       }
     } catch (_) {}
-    router.push("/courier-login");
+    router.push("/login");
   };
 
   // Calculate performance data from assignments (primary source)

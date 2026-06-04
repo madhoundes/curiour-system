@@ -68,24 +68,30 @@ export class ClaimsService {
   async getClaims(params: GetClaimsParams = {}): Promise<ClaimsListResponse> {
     try {
       // Set default values
-      const queryParams = {
+      const queryParams: Record<string, string | number> = {
         page: params.page || 1,
         per_page: Math.min(params.per_page || 10, 100), // Enforce max 100 per page
-        ...(params.status && { status: params.status })
       };
+      if (params.status) {
+        queryParams.status = params.status;
+      }
 
       // Validate parameters
-      if (queryParams.page < 1) {
+      if ((queryParams.page as number) < 1) {
         throw new Error('Page number must be at least 1');
       }
 
-      if (queryParams.per_page < 1) {
+      if ((queryParams.per_page as number) < 1) {
         throw new Error('Items per page must be at least 1');
       }
 
+      // ``apiClient.get`` accepts query params as the second positional argument.
+      // Previous revision passed ``{ params: queryParams }`` which serialized
+      // as ``?params=[object+Object]`` and meant the server only ever saw the
+      // default page=1 / no-status filter.
       const response = await apiClient.get<ClaimsListResponse>(
         API_ENDPOINTS.CLAIMS.LIST,
-        { params: queryParams }
+        queryParams
       );
 
       return response.data;
@@ -201,20 +207,20 @@ export class ClaimsService {
   async getAllClaimsAdmin(params: GetAllClaimsAdminParams = {}): Promise<ClaimsListResponse> {
     try {
       // Set default values
-      const queryParams = {
+      const queryParams: Record<string, string | number> = {
         page: params.page || 1,
         per_page: Math.min(params.per_page || 10, 100), // Enforce max 100 per page
-        ...(params.status && { status: params.status }),
-        ...(params.reason && { reason: params.reason }),
-        ...(params.user_id && { user_id: params.user_id })
       };
+      if (params.status) queryParams.status = params.status;
+      if (params.reason) queryParams.reason = params.reason;
+      if (params.user_id) queryParams.user_id = params.user_id;
 
       // Validate parameters
-      if (queryParams.page < 1) {
+      if ((queryParams.page as number) < 1) {
         throw new Error('Page number must be at least 1');
       }
 
-      if (queryParams.per_page < 1) {
+      if ((queryParams.per_page as number) < 1) {
         throw new Error('Items per page must be at least 1');
       }
 
@@ -222,9 +228,10 @@ export class ClaimsService {
         throw new Error('User ID must be a positive number');
       }
 
+      // Pass query params directly – see ``getClaims`` for the bug history.
       const response = await apiClient.get<ClaimsListResponse>(
         API_ENDPOINTS.CLAIMS.ADMIN_LIST_ALL,
-        { params: queryParams }
+        queryParams
       );
 
       return response.data;

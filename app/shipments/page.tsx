@@ -146,13 +146,13 @@ const statusOptions = [
 
 export default function ShipmentsPage() {
   const router = useRouter();
-  
+
   // Data loading state for consistent SSR/CSR
-  const [allShipments, setAllShipments] = useState<DetailedShipment[]>([]);
+  const [shipments, setShipments] = useState<DetailedShipment[]>([]);
   const [isDataLoaded, setIsDataLoaded] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const [query, setQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
   const [showExportDialog, setShowExportDialog] = useState(false);
@@ -165,72 +165,75 @@ export default function ShipmentsPage() {
 
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [pageSize, setPageSize] = useState<number>(25);
-  const [pageIndex, setPageIndex] = useState<number>(0);
-  
+  // 1-indexed to match the backend contract (page=1 is the first page).
+  const [page, setPage] = useState<number>(1);
+  const [totalPages, setTotalPages] = useState<number>(1);
+  const [totalShipments, setTotalShipments] = useState<number>(0);
+  // When the user is searching the page acts as a single-result view; the
+  // backend search endpoint doesn't paginate so we expose a "no pagination"
+  // mode in that case.
+  const [isSearchMode, setIsSearchMode] = useState<boolean>(false);
+
   const shippingService = new ShippingService();
 
-  // Load shipments data from API
+  // Whenever the filters or page size change, snap back to page 1. Without
+  // this, switching from a 5-page result set with status=ALL to status=DRAFT
+  // (one page) would leave ``page`` at 4 and render an empty table.
   React.useEffect(() => {
-    const loadShipments = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        let shipments: DetailedShipment[];
-        
-        if (query.trim()) {
-          const raw = query.trim();
-          const isId = /^\d+$/.test(raw);
-          const isTracking = /^[A-Za-z0-9-]{1,50}$/.test(raw);
-          if (!isId && !isTracking) {
-            const listParams: any = { skip: pageIndex * pageSize, limit: pageSize };
-            if (selectedStatus !== 'ALL') listParams.status = selectedStatus;
-            const listResp = await shippingService.getShipments(listParams);
-            const q = raw.toLowerCase();
-            shipments = listResp.filter(s => s.tracking_code?.toLowerCase().includes(q) || String(s.id).includes(q));
-          } else {
-            // Use search API when there's a search query, with graceful fallback
-            try {
-              shipments = await shippingService.searchShipments(raw, {
-                skip: pageIndex * pageSize,
-                limit: pageSize
-              });
-            } catch (searchErr: any) {
-              console.warn('Search API failed, falling back to list+client filter:', searchErr);
-              const listParams: any = { skip: pageIndex * pageSize, limit: pageSize };
-              if (selectedStatus !== 'ALL') listParams.status = selectedStatus;
-              const listResp = await shippingService.getShipments(listParams);
-              const q = raw.toLowerCase();
-              shipments = listResp.filter(s => s.tracking_code?.toLowerCase().includes(q) || String(s.id).includes(q));
-            }
-          }
-        } else {
-          // Use list API for normal loading
-          const params: any = {
-            skip: pageIndex * pageSize,
-            limit: pageSize
-          };
-          
-          if (selectedStatus !== "ALL") {
-            params.status = selectedStatus;
-          }
-          
-          shipments = await shippingService.getShipments(params);
-        }
-        
-        setAllShipments(shipments);
-        setIsDataLoaded(true);
-      } catch (err: any) {
-        console.error('Failed to load shipments:', err);
-        setError(err.message || 'Failed to load shipments');
-        setAllShipments([]);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    setPage(1);
+    setSelectedIds(new Set());
+  }, [selectedStatus, pageSize, query]);
 
+  const loadShipments = React.useCallback(async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      const trimmed = query.trim();
+
+      if (trimmed) {
+        // Search endpoint returns a single best match keyed off tracking
+        // code or shipment ID. Treat the result as a one-page view.
+        const results = await shippingService.searchShipments(trimmed);
+        const filtered = selectedStatus === 'ALL'
+          ? results
+          : results.filter(s => (s.status?.toUpperCase?.() || s.status) === selectedStatus);
+
+        setShipments(filtered);
+        setTotalShipments(filtered.length);
+        setTotalPages(1);
+        setIsSearchMode(true);
+      } else {
+        const response = await shippingService.getShipmentsPaginated({
+          page,
+          per_page: pageSize,
+          ...(selectedStatus !== 'ALL' ? { status: selectedStatus } : {}),
+        });
+
+        setShipments(response.shipments);
+        setTotalShipments(response.total);
+        setTotalPages(Math.max(1, response.total_pages));
+        setIsSearchMode(false);
+      }
+
+      setIsDataLoaded(true);
+    } catch (err: any) {
+      console.error('Failed to load shipments:', err);
+      setError(err.message || 'Failed to load shipments');
+      setShipments([]);
+      setTotalShipments(0);
+      setTotalPages(1);
+    } finally {
+      setIsLoading(false);
+    }
+    // ``shippingService`` is a fresh instance each render but its methods
+    // are stateless, so it's safe to leave out of the dep array.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, pageSize, selectedStatus, query]);
+
+  React.useEffect(() => {
     loadShipments();
-  }, [query, selectedStatus, pageIndex, pageSize]);
+  }, [loadShipments]);
 
   const handleToggleSelect = (id: number) => {
     setSelectedIds((prev) => {
@@ -256,47 +259,11 @@ export default function ShipmentsPage() {
 
   const handleCancelShipment = async (shipmentId: number) => {
     try {
-      // Use the API to update shipment status to CANCELLED
       await shippingService.updateShipmentStatus(shipmentId, {
         status: "CANCELLED",
         change_reason: "Cancelled by user"
       });
-      
-      // Reload the shipments data to reflect the change
-      const loadShipments = async () => {
-        try {
-          setIsLoading(true);
-          setError(null);
-          
-          let shipments: DetailedShipment[];
-          
-          if (query.trim()) {
-            shipments = await shippingService.searchShipments(query, {
-              skip: pageIndex * pageSize,
-              limit: pageSize
-            });
-          } else {
-            const params: any = {
-              skip: pageIndex * pageSize,
-              limit: pageSize
-            };
-            
-            if (selectedStatus !== "ALL") {
-              params.status = selectedStatus;
-            }
-            
-            shipments = await shippingService.getShipments(params);
-          }
-          
-          setAllShipments(shipments);
-        } catch (err: any) {
-          console.error('Failed to reload shipments:', err);
-          setError(err.message || 'Failed to reload shipments');
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      
+
       await loadShipments();
       alert(`Shipment ${shipmentId} has been cancelled successfully.`);
     } catch (error: any) {
@@ -311,18 +278,12 @@ export default function ShipmentsPage() {
   };
 
   const handleExportCsv = () => {
-    let dataToExport;
-    
-    if (exportType === "selected") {
-      // Export only selected shipments from filtered results (respects current filters)
-      dataToExport = filtered.filter(s => selectedIds.has(s.id));
-      console.log(`Exporting ${dataToExport.length} selected shipments out of ${selectedIds.size} selected IDs`);
-    } else {
-      // Export all filtered shipments (current page + filters)
-      dataToExport = filtered;
-      console.log(`Exporting ${dataToExport.length} filtered shipments`);
-    }
-    
+    // Export operates on what is currently visible (the current page from the
+    // server). The user can adjust ``per_page`` if they want a bigger export.
+    const dataToExport = exportType === "selected"
+      ? shipments.filter(s => selectedIds.has(s.id))
+      : shipments;
+
     // Validate that we have data to export
     if (!dataToExport || dataToExport.length === 0) {
       console.warn("No data to export");
@@ -362,57 +323,26 @@ export default function ShipmentsPage() {
     setShowExportDialog(true);
   };
 
-  const filtered = useMemo(() => {
-    if (!isDataLoaded || !Array.isArray(allShipments) || allShipments.length === 0) return [];
-    
-    let list = allShipments.slice();
-    // Client-side filter fallback to ensure UX even if backend ignores params
-    if (selectedStatus !== 'ALL') {
-      list = list.filter(s => (s.status?.toUpperCase?.() || s.status) === selectedStatus);
-    }
-    if (query.trim()) {
-      const q = query.trim().toLowerCase();
-      list = list.filter(s => s.tracking_code?.toLowerCase().includes(q) || String(s.id).includes(q));
-    }
-    // Sort: most recent first
-    list.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
-    return list;
-  }, [allShipments, isDataLoaded, selectedStatus, query]);
-
-  // Log selection changes for debugging (removed empty effect to prevent warnings)
-  React.useEffect(() => {
-    if (process.env.NODE_ENV === 'development') {
-      console.log('Selection updated:', {
-        selectedCount: selectedIds.size,
-        filteredCount: filtered.length,
-        exportType
-      });
-    }
-  }, [selectedIds, filtered, exportType]);
-
-  const paged = useMemo(() => {
-    const start = pageIndex * pageSize;
-    return filtered.slice(start, start + pageSize);
-  }, [filtered, pageIndex, pageSize]);
-
-  const visibleIds = paged.map((s) => s.id);
+  // The server already filtered, sorted, and paginated this list – the
+  // previous client-side re-slice/sort was both wrong (only operated on the
+  // current page) and contradicted the backend order.
+  const visibleIds = useMemo(() => shipments.map((s) => s.id), [shipments]);
   const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
 
   // Calculate selection counts for real-time display
   const selectedCount = selectedIds.size;
-  const totalFilteredCount = filtered.length;
-  const selectedInFilteredCount = filtered.filter(s => selectedIds.has(s.id)).length;
+  const selectedOnPageCount = shipments.filter(s => selectedIds.has(s.id)).length;
 
-  // Real-time export message calculation
+  // Real-time export message calculation. Export operates on the current page
+  // so the count matches what the user can actually see.
   const getExportMessage = () => {
     if (exportType === "selected") {
-      if (selectedInFilteredCount === 0) {
+      if (selectedOnPageCount === 0) {
         return "⚠️ No shipments are currently selected. Please select shipments first.";
       }
-      return `This will export ${selectedInFilteredCount} selected shipment${selectedInFilteredCount === 1 ? '' : 's'} to a CSV file.`;
-    } else {
-      return `This will export ${filtered.length} filtered shipment${filtered.length === 1 ? '' : 's'} to a CSV file.`;
+      return `This will export ${selectedOnPageCount} selected shipment${selectedOnPageCount === 1 ? '' : 's'} to a CSV file.`;
     }
+    return `This will export ${shipments.length} shipment${shipments.length === 1 ? '' : 's'} from the current page to a CSV file.`;
   };
 
   // Handle payment for a single draft shipment (same flow as creating new shipment)
@@ -420,8 +350,8 @@ export default function ShipmentsPage() {
     setProcessingPaymentForId(shipmentId);
     
     try {
-      // Find the shipment in the list
-      const shipment = allShipments.find(s => s.id === shipmentId);
+      // Find the shipment in the currently rendered page
+      const shipment = shipments.find(s => s.id === shipmentId);
       if (!shipment) {
         throw new Error('Shipment not found');
       }
@@ -544,13 +474,18 @@ export default function ShipmentsPage() {
     }
   };
 
-  // Update table title based on selection state
+  // Update table title based on selection state. ``totalShipments`` reflects
+  // the count the server reports (so the user knows there are more pages),
+  // while ``shipments.length`` is just what's on this page.
   const getTableTitle = () => {
+    const pageInfo = isSearchMode
+      ? `Showing ${shipments.length} search result${shipments.length === 1 ? '' : 's'}`
+      : `Showing ${shipments.length} of ${totalShipments} shipments`;
+
     if (selectedCount === 0) {
-      return `Showing ${paged.length} of ${totalFilteredCount} shipments`;
-    } else {
-      return `Showing ${selectedInFilteredCount} of ${totalFilteredCount} shipments (${selectedCount} selected)`;
+      return pageInfo;
     }
+    return `${pageInfo} (${selectedCount} selected)`;
   };
 
   // Early return for loading state
@@ -716,7 +651,7 @@ export default function ShipmentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {paged.map((s) => {
+                {shipments.map((s) => {
                   const isSelected = selectedIds.has(s.id);
                   return (
                     <tr key={s.id} className="border-t hover:bg-gray-50 transition-colors duration-150">
@@ -865,45 +800,58 @@ export default function ShipmentsPage() {
         </CardContent>
       </Card>
 
-      {/* Pagination */}
-      <div className="mt-4 flex items-center justify-between">
-        <div className="text-sm text-gray-600">Page {pageIndex + 1} of {Math.max(1, Math.ceil(filtered.length / pageSize))}</div>
-        <div className="flex items-center gap-2">
-          <select
-            className="border rounded px-2 py-1 text-sm"
-            aria-label="Results per page"
-            value={pageSize}
-            onChange={(e) => { 
-              setPageIndex(0); 
-              setPageSize(Number(e.target.value)); 
-              // Clear selection when page size changes to avoid confusion
-              setSelectedIds(new Set());
-            }}
-          >
-            <option value={10}>10</option>
-            <option value={25}>25</option>
-            <option value={50}>50</option>
-          </select>
-          <Button variant="outline" size="sm" onClick={() => setPageIndex((v) => Math.max(0, v - 1))} disabled={pageIndex === 0} aria-label="Previous page">
-            Prev
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPageIndex((v) => (v + 1 < Math.ceil(filtered.length / pageSize) ? v + 1 : v))}
-            disabled={pageIndex + 1 >= Math.ceil(filtered.length / pageSize)}
-            aria-label="Next page"
-          >
-            Next
-          </Button>
+      {/* Pagination – hidden in search mode since the backend search returns
+          a single best match without pagination. */}
+      {!isSearchMode && (
+        <div className="mt-4 flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            Page {page} of {totalPages}
+            {totalShipments > 0 && (
+              <span className="ml-2 text-gray-400">({totalShipments} total)</span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <select
+              className="border rounded px-2 py-1 text-sm"
+              aria-label="Results per page"
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+              }}
+              disabled={isLoading}
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((v) => Math.max(1, v - 1))}
+              disabled={page <= 1 || isLoading}
+              aria-label="Previous page"
+            >
+              Prev
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setPage((v) => Math.min(totalPages, v + 1))}
+              disabled={page >= totalPages || isLoading}
+              aria-label="Next page"
+            >
+              Next
+            </Button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Export CSV Confirmation Dialog */}
       <AlertDialog open={showExportDialog} onOpenChange={setShowExportDialog}>
         <AlertDialogContent 
           id="parcego-export-csv-dialog"
-          key={`export-dialog-${selectedInFilteredCount}-${exportType}`}
+          key={`export-dialog-${selectedOnPageCount}-${exportType}`}
         >
           <AlertDialogHeader>
             <AlertDialogTitle>Export Shipments to CSV</AlertDialogTitle>
@@ -919,7 +867,7 @@ export default function ShipmentsPage() {
               onClick={handleExportCsv}
               id="parcego-export-csv-confirm-btn"
               className="bg-blue-600 hover:bg-blue-700 focus:ring-blue-500"
-              disabled={exportType === "selected" && selectedInFilteredCount === 0}
+              disabled={exportType === "selected" && selectedOnPageCount === 0}
             >
               <Icon name="Download" size={16} className="mr-2" />
               Export CSV
@@ -939,7 +887,7 @@ export default function ShipmentsPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel id="parcego-cancel-shipments-cancel-btn">Close</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={async () => {
                 try {
                   setIsLoading(true);
@@ -957,13 +905,7 @@ export default function ShipmentsPage() {
                   }
                   setSelectedIds(new Set());
                   setShowDeleteDialog(false);
-                  // reload current page
-                  const params: any = { skip: pageIndex * pageSize, limit: pageSize };
-                  if (selectedStatus !== 'ALL') params.status = selectedStatus;
-                  const list = query.trim()
-                    ? await shippingService.searchShipments(query, { skip: pageIndex * pageSize, limit: pageSize })
-                    : await shippingService.getShipments(params);
-                  setAllShipments(list);
+                  await loadShipments();
                 } catch (e: any) {
                   alert(e?.message || 'Failed to update shipment status');
                 } finally {
@@ -980,12 +922,14 @@ export default function ShipmentsPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Print Labels Modal */}
+      {/* Print Labels Modal – passes the current page; the modal already
+          fetches full label data per ID, so this is fine even when selection
+          spans pages. */}
       <PrintLabelsModal
         open={showPrintLabelsModal}
         onOpenChange={setShowPrintLabelsModal}
         selectedShipmentIds={Array.from(selectedIds)}
-        shipments={allShipments} // Assuming allShipments is the source of truth for all shipments
+        shipments={shipments}
       />
 
       {/* Cancel Shipment Dialog */}

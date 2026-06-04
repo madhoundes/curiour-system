@@ -18,7 +18,7 @@ import { toast } from "sonner";
 
 // Import types and mock data from the support library
 import type { FAQCategory } from '@/lib/mock/support';
-import { mockFAQs, mockHelpArticles, mockVideoTutorials, helpCategories } from '@/lib/mock/support';
+import { mockFAQs, mockHelpArticles, mockVideoTutorials } from '@/lib/mock/support';
 
 // Import contact API service
 import { contactService } from '@/lib/api/contact';
@@ -30,7 +30,7 @@ export default function SupportHelpCenter() {
   const router = useRouter();
   const [activeCategory, setActiveCategory] = useState<FAQCategory | 'all'>('all');
 
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState('faqs');
   const [showContactForm, setShowContactForm] = useState(false);
   const [contactForm, setContactForm] = useState({
     name: '',
@@ -174,12 +174,6 @@ export default function SupportHelpCenter() {
             className="flex w-full h-auto py-1.5 px-1.5 bg-gray-100 rounded-lg overflow-hidden justify-between"
           >
             <TabsTrigger 
-              value="overview" 
-              className="flex-1 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md"
-            >
-              Overview
-            </TabsTrigger>
-            <TabsTrigger 
               value="faqs"
               className="flex-1 h-7 sm:h-8 text-xs sm:text-sm px-2 sm:px-3 py-1 data-[state=active]:bg-white data-[state=active]:text-gray-900 data-[state=active]:shadow-sm text-gray-600 hover:text-gray-900 transition-all duration-200 rounded-md"
             >
@@ -198,73 +192,6 @@ export default function SupportHelpCenter() {
               Video Tutorials
             </TabsTrigger>
           </TabsList>
-
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            {/* Hero Section */}
-            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl p-4 sm:p-6 text-white">
-              <h2 className="text-2xl font-bold mb-3">Welcome to Your Help Center</h2>
-              <p className="text-blue-100 mb-6 max-w-2xl leading-relaxed">
-                Everything you need to succeed with our courier platform. From getting started to advanced features, 
-                we&apos;ve got you covered with comprehensive guides, tutorials, and support.
-              </p>
-              <div className="flex flex-wrap gap-4">
-                <Button 
-                  variant="outline" 
-                  onClick={() => {
-                    setShowContactForm(true);
-                    loadUserProfile();
-                  }}
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/30 hover:text-white transition-all duration-200"
-                >
-                  Contact Support
-                </Button>
-                <Button 
-                  variant="outline" 
-                  onClick={() => alert('Live chat feature coming soon!')}
-                  className="bg-white/10 border-white/20 text-white hover:bg-white/20 hover:border-white/30 hover:text-white transition-all duration-200"
-                >
-                  Live Chat
-                </Button>
-              </div>
-            </div>
-
-            {/* Category Grid */}
-            <div>
-              <h3 className="text-2xl font-semibold text-gray-900 mb-4">Help Categories</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {helpCategories.map((category) => (
-                  <Card
-                    key={category.id}
-                    id={`parcego-support-category-${category.id}`}
-                    className="hover:shadow-md transition-shadow cursor-pointer border rounded-xl overflow-hidden group"
-                    onClick={() => setActiveTab('faqs')}
-                  >
-                    <CardHeader className="px-4 py-3.5">
-                      <div className="flex items-center space-x-4">
-                        <div className={`w-12 h-12 rounded-xl ${category.color} flex items-center justify-center group-hover:scale-110 transition-transform duration-200`}>
-                          <Icon name={category.icon} className="h-6 w-6 text-white" />
-                        </div>
-                        <div className="flex-1">
-                          <CardTitle className="text-lg mb-1.5">{category.name}</CardTitle>
-                          <CardDescription className="text-sm text-gray-600">{category.count} articles & guides</CardDescription>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="px-4 pb-3.5">
-                      <p className="text-sm text-gray-600 leading-relaxed mb-3">{category.description}</p>
-                      <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                        <span className="text-xs text-gray-500">Click to explore</span>
-                        <Icon name="ArrowRight" className="h-4 w-4 text-gray-400 group-hover:text-blue-600 transition-colors" />
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-
-
-          </TabsContent>
 
           {/* FAQs Tab - Redesigned with Accordion */}
           <TabsContent value="faqs" className="space-y-6">

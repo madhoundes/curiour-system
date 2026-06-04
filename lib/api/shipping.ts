@@ -37,23 +37,51 @@ import type {
 
 export class ShippingService {
   /**
-   * Get list of user shipments with optional pagination
+   * Get list of user shipments with optional pagination.
+   *
+   * The backend uses 1-indexed `page` + `per_page` (≤100). The previous
+   * `skip`/`limit` shape didn't match anything on the server, so callers were
+   * silently always getting page 1.
    */
   async getShipments(params?: {
-    skip?: number;
-    limit?: number;
+    page?: number;
+    per_page?: number;
     status?: string;
   }): Promise<DetailedShipment[]> {
+    const response = await this.getShipmentsPaginated(params);
+    return response.shipments;
+  }
+
+  /**
+   * Same as ``getShipments`` but surfaces the full server response (with
+   * ``total`` / ``total_pages``) so pages can render proper pagination UIs.
+   */
+  async getShipmentsPaginated(params?: {
+    page?: number;
+    per_page?: number;
+    status?: string;
+  }): Promise<ShipmentsListResponse> {
     try {
+      const queryParams: Record<string, string | number> = {};
+      if (params?.page !== undefined) queryParams.page = params.page;
+      if (params?.per_page !== undefined) {
+        // Backend enforces 1 ≤ per_page ≤ 100; clamp on the client too so a
+        // bad caller doesn't trip a 422.
+        queryParams.per_page = Math.min(Math.max(params.per_page, 1), 100);
+      }
+      if (params?.status) queryParams.status = params.status;
+
       const response = await apiClient.get<ShipmentsListResponse>(
         API_ENDPOINTS.SHIPMENTS.LIST,
-        params
+        queryParams
       );
 
-      // Server returns billing money fields in cents; convert to dollars at the boundary.
-      return response.data.shipments.map(normalizeDetailedShipmentMoney);
+      return {
+        ...response.data,
+        shipments: response.data.shipments.map(normalizeDetailedShipmentMoney),
+      };
     } catch (error: any) {
-      if (error.response?.status === 401) {
+      if (error.response?.status === 401 || error.status === 401) {
         throw new Error('Authentication required');
       }
       throw new Error(error.message || 'Failed to get shipments');
@@ -71,9 +99,12 @@ export class ShippingService {
         throw new Error('Session ID is required');
       }
 
+      // ``apiClient.get`` accepts the query params object as the 2nd positional
+      // arg; passing ``{ params: { session_id } }`` previously serialized to
+      // ``?params=[object+Object]`` and the backend never saw ``session_id``.
       const response = await apiClient.get<SessionStatusResponse>(
         API_ENDPOINTS.BILLING.SESSION_STATUS,
-        { params: { session_id } }
+        { session_id }
       );
 
       return response.data;
@@ -92,40 +123,44 @@ export class ShippingService {
   }
 
   /**
-   * Search user shipments by tracking code or ID
+   * Search user shipments by tracking code or ID.
+   *
+   * The backend endpoint accepts a single ``q`` param and returns at most one
+   * best match. We previously forwarded ``skip``/``limit`` which the server
+   * just ignored – dropped to keep the contract honest.
    */
-  async searchShipments(query: string, params?: {
-    skip?: number;
-    limit?: number;
-  }): Promise<DetailedShipment[]> {
+  async searchShipments(query: string): Promise<DetailedShipment[]> {
     try {
       if (!query || query.trim() === '') {
         throw new Error('Search query is required');
       }
 
-      const searchParams = {
-        q: query.trim(),
-        ...params
-      };
-
-      const response = await apiClient.get<DetailedShipment[]>(
+      const response = await apiClient.get<DetailedShipment | DetailedShipment[]>(
         API_ENDPOINTS.SHIPMENTS.SEARCH,
-        searchParams
+        { q: query.trim() }
       );
 
-      // Server returns billing money fields in cents; convert to dollars at the boundary.
-      return response.data.map(normalizeDetailedShipmentMoney);
+      // The endpoint historically returned either a single object or a list;
+      // normalize to an array so callers don't have to branch.
+      const raw = response.data;
+      const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
+      return list.map(normalizeDetailedShipmentMoney);
     } catch (error: any) {
-      if (error.response?.status === 401) {
+      // ``handleError`` flattens the response, so both shapes can show up.
+      const status = error.status ?? error.response?.status;
+
+      // "No results" is not an error – return an empty list so the UI can
+      // render a clean empty state without try/catch gymnastics.
+      if (status === 404) {
+        return [];
+      }
+      if (status === 401) {
         throw new Error('Authentication required. Please log in to search shipments.');
       }
-      if (error.response?.status === 403) {
+      if (status === 403) {
         throw new Error('Access denied. You do not have permission to search shipments.');
       }
-      if (error.response?.status === 404) {
-        throw new Error('No shipments found matching your search.');
-      }
-      if (error.response?.status === 422) {
+      if (status === 422) {
         throw new Error('Invalid search parameters provided.');
       }
       throw new Error(error.message || 'Failed to search shipments. Please try again.');

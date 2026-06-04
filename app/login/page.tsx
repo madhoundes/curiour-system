@@ -23,8 +23,49 @@ import { z } from "zod";
 import { authService, shopifyService } from "@/lib/api";
 import { API_CONFIG } from "@/lib/api/config";
 import { toast } from "sonner";
-import type { ApiErrorResponse } from "@/lib/api/types";
+import type { ApiErrorResponse, User } from "@/lib/api/types";
 import { clearShipmentFormData } from "@/lib/shipment-cache-utils";
+
+/**
+ * Map a user's role to the landing page they should see after a
+ * successful login. We keep this in one place so the consolidated
+ * `/login` page (and any future entry points) stay in sync.
+ *
+ * Note: `'user'` (the merchant role on the backend) keeps the legacy
+ * `/dashboard` landing for backwards compatibility with existing links.
+ */
+const landingPathForRole = (role: User["role"] | undefined): string => {
+  switch (role) {
+    case "admin":
+      return "/admin";
+    case "courier":
+    case "driver":
+      return "/courier";
+    default:
+      return "/dashboard";
+  }
+};
+
+/**
+ * The courier-specific app pages (and the legacy Expo client) still
+ * read these localStorage entries to decide who's logged in and to
+ * populate the profile UI. When a courier or driver authenticates via
+ * the unified login page we need to seed them ourselves – previously
+ * this was done by the now-removed `/courier-login` page.
+ */
+const seedCourierClientState = (user: User, accessToken: string) => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem("courier_authenticated", "true");
+    localStorage.setItem("courier_email", user.email);
+    localStorage.setItem("courier_login_time", Date.now().toString());
+    localStorage.setItem("auth_token", accessToken);
+    localStorage.setItem("courier_user", JSON.stringify(user));
+  } catch (err) {
+    // localStorage can throw in private mode / quota-exceeded; non-fatal.
+    console.warn("Failed to seed courier client state", err);
+  }
+};
 
 const loginFormSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
@@ -160,33 +201,36 @@ const Login03PageContent = () => {
     }
   }, [searchParams]);
 
-  // Function to handle successful authentication and Shopify OAuth flow
-  const handleSuccessfulAuth = async () => {
+  // Function to handle successful authentication and Shopify OAuth flow.
+  //
+  // `landingPath` is the route the user should end up on if no Shopify
+  // OAuth handoff is in flight. Callers compute it from the user's role
+  // (merchant → /dashboard, admin → /admin, courier/driver → /courier).
+  const handleSuccessfulAuth = async (landingPath: string) => {
     try {
       // If Shopify params are present, initiate OAuth flow
       if (shopifyParams?.shop) {
         toast.info("Connecting to Shopify...");
-        
-        const shopParam = encodeURIComponent(shopifyParams.shop);
+
         const authToken = authService.getAuthToken();
-        
+
         if (!authToken) {
           toast.error("Authentication token missing. Please log in again.");
-          router.push("/dashboard");
+          router.push(landingPath);
           return;
         }
-        
+
         try {
           // Use shopifyService which handles the API call properly
           // Backend will return the redirect URL in the response body
-          const response = await shopifyService.installAuthenticated({ 
-            shop: shopifyParams.shop 
+          const response = await shopifyService.installAuthenticated({
+            shop: shopifyParams.shop
           });
-          
+
           // Get the redirect URL from the response body
           // Backend returns: { auth_url: "...", redirect_url: "..." } in response.data
           const redirectUrl = response.data?.auth_url || response.data?.redirect_url;
-          
+
           if (redirectUrl) {
             // Navigate to Shopify authorization page using window.location.href
             // This doesn't have CORS issues since we're navigating to Shopify's domain
@@ -194,34 +238,33 @@ const Login03PageContent = () => {
             return; // Don't continue - redirect is happening
           } else {
             console.error("No redirect URL in response:", response);
-            toast.error("Failed to get Shopify authorization URL. Redirecting to dashboard...");
-            router.push("/dashboard");
+            toast.error("Failed to get Shopify authorization URL.");
+            router.push(landingPath);
           }
         } catch (error: any) {
           console.error("Shopify OAuth error:", error);
           const errorMsg = error.message || "Failed to connect to Shopify";
-          toast.error(`${errorMsg}. Redirecting to dashboard...`);
-          router.push("/dashboard");
+          toast.error(`${errorMsg}.`);
+          router.push(landingPath);
           return;
         }
       } else {
         // No Shopify params - normal login flow
-        console.log("No Shopify params detected, redirecting to dashboard...");
+        console.log(`No Shopify params detected, redirecting to ${landingPath}...`);
         // Use window.location.href for hard reload to clear React state
-        window.location.href = "/dashboard";
+        window.location.href = landingPath;
       }
     } catch (error: any) {
       console.error("Shopify OAuth error:", error);
       const errorMsg = error.message || "Failed to connect to Shopify";
-      
-      // If it's a Shopify OAuth error, show message, otherwise just redirect
+
+      // If it's a Shopify OAuth error, surface it; otherwise just redirect.
       if (shopifyParams?.shop) {
-        toast.error(`${errorMsg}. Redirecting to dashboard...`);
+        toast.error(`${errorMsg}.`);
       }
-      
-      // Always redirect to dashboard on error
-      // Use window.location.href for hard reload to clear React state
-      window.location.href = "/dashboard";
+
+      // Always redirect on error, using the role-aware landing path.
+      window.location.href = landingPath;
     }
   };
 
@@ -238,28 +281,60 @@ const Login03PageContent = () => {
       };
 
       const response = await authService.login(loginData);
-      
+      const accessToken = response.data.access_token;
+
+      // Fetch the current user so we can route by role. `authService.login`
+      // already cached the token, so this call is automatically
+      // authenticated. We don't fail the whole login on this – if the
+      // user lookup is flaky we fall through to the merchant landing as
+      // a safe default.
+      let landingPath = "/dashboard";
+      try {
+        const userResponse = await authService.getCurrentUser();
+        const user = userResponse.data;
+        landingPath = landingPathForRole(user.role);
+
+        // Couriers/drivers need the legacy localStorage entries that the
+        // courier app pages and Expo client still read. The middleware
+        // also accepts the `courier_authenticated` cookie as a fallback.
+        if (user.role === "courier" || user.role === "driver") {
+          seedCourierClientState(user, accessToken);
+        }
+      } catch (roleErr) {
+        // Non-fatal – we still proceed to /dashboard, which is the most
+        // common case (merchant accounts).
+        console.warn("Failed to resolve user role on login:", roleErr);
+      }
+
+      // Honor an explicit ?redirect= override (used by middleware when
+      // a user was bounced from a protected route). We only honor it if
+      // it's a relative path, to avoid open-redirect abuse.
+      const requestedRedirect = searchParams.get("redirect");
+      if (requestedRedirect && requestedRedirect.startsWith("/")) {
+        landingPath = requestedRedirect;
+      }
+
       // Clear entire shipment cache on login to start fresh
       const { clearAllShipmentFormData } = await import('@/lib/shipment-cache-utils');
       clearAllShipmentFormData(); // Clear all user caches
       await clearShipmentFormData(); // Also clear current user cache
-      
+
       // Also clear orderData which is used for quote preview
       if (typeof window !== 'undefined') {
         localStorage.removeItem('orderData');
       }
-      
+
       // Set authentication cookie for middleware to recognize authenticated user
       // This allows access to protected routes
       if (typeof window !== 'undefined') {
         const rememberMe = loginForm.getValues('rememberMe');
-        
+
         // Set cookie expiration based on remember me option
         // 30 days if remember me is checked, 24 hours if not
         const maxAge = rememberMe ? 2592000 : 86400; // 30 days or 24 hours in seconds
-        
+
         document.cookie = `mock-auth=true; path=/; max-age=${maxAge}; SameSite=Lax`;
-        
+
         // Store email in cookie if remember me is checked
         if (rememberMe) {
           setCookie('remembered_email', data.email, 30);
@@ -268,19 +343,19 @@ const Login03PageContent = () => {
           document.cookie = 'remembered_email=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT';
         }
       }
-      
+
       // Show success message
       toast.success("Login successful! Welcome back.");
-      
-      // Redirect to dashboard or handle Shopify OAuth
-      console.log("Login successful - redirecting...");
+
+      // Redirect to the role-appropriate landing page (or kick off Shopify
+      // OAuth if shop params were present).
+      console.log(`Login successful – redirecting to ${landingPath}`);
       try {
-        await handleSuccessfulAuth();
+        await handleSuccessfulAuth(landingPath);
       } catch (redirectError) {
         console.error("Redirect error:", redirectError);
-        // Fallback: always redirect to dashboard even if there's an error
-        // Use window.location.href for hard reload to clear React state
-        window.location.href = "/dashboard";
+        // Fallback: hard navigate to the landing path to clear React state.
+        window.location.href = landingPath;
       }
     } catch (error) {
       console.error("Login failed:", error);

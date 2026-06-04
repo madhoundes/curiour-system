@@ -171,9 +171,10 @@ function PurchaseLabelContent() {
           }
           
           if (shipmentIdToRefresh) {
-            const shipments = await shippingService.getShipments();
-            const updatedShipment = shipments.find(s => s.id === shipmentIdToRefresh);
-            
+            // Fetch the single record we care about instead of paging the
+            // whole list and ``.find``-ing it.
+            const updatedShipment = await shippingService.getShipment(shipmentIdToRefresh);
+
             if (updatedShipment) {
               // Update the created shipment with latest data
               setCreatedShipment({
@@ -476,31 +477,33 @@ function PurchaseLabelContent() {
       // Use existing shipment if available, otherwise create a new one
       let shipmentId: number;
       let shipmentStatus: string | undefined;
-      
+
       // Try to get shipment from state or localStorage
       let existingShipment = createdShipment?.shipment;
       if (!existingShipment) {
         const storedShipmentId = localStorage.getItem('parcego_pending_shipment_id');
         if (storedShipmentId) {
-          // Fetch the shipment from API
-          const shipments = await shippingService.getShipments();
-          existingShipment = shipments.find(s => s.id === parseInt(storedShipmentId));
-          if (existingShipment) {
-            setCreatedShipment({ shipment: existingShipment });
+          // Fetch by ID instead of listing all shipments – see ``getShipment``.
+          try {
+            existingShipment = await shippingService.getShipment(parseInt(storedShipmentId));
+            if (existingShipment) {
+              setCreatedShipment({ shipment: existingShipment });
+            }
+          } catch (error) {
+            console.warn('Failed to fetch stored shipment:', error);
           }
         }
       }
-      
+
       if (existingShipment?.id) {
         // Use existing shipment to prevent duplicates
         shipmentId = existingShipment.id;
         shipmentStatus = existingShipment.status;
-        
+
         // Check if shipment is paid, if not refresh status
         if (shipmentStatus?.toLowerCase() !== 'paid') {
           try {
-            const shipments = await shippingService.getShipments();
-            const updatedShipment = shipments.find(s => s.id === shipmentId);
+            const updatedShipment = await shippingService.getShipment(shipmentId);
             if (updatedShipment) {
               shipmentStatus = updatedShipment.status;
               setCreatedShipment({
@@ -512,7 +515,7 @@ function PurchaseLabelContent() {
             // Error refreshing status, will use existing status
           }
         }
-        
+
         // Verify shipment is paid before generating label
         if (shipmentStatus?.toLowerCase() !== 'paid') {
           throw new Error(`Cannot generate label for shipment with status '${shipmentStatus}'. Shipment must be paid. Please wait a moment and try again.`);
@@ -573,31 +576,33 @@ function PurchaseLabelContent() {
       // Use existing shipment if available, otherwise create a new one
       let shipmentId: number;
       let shipmentStatus: string | undefined;
-      
+
       // Try to get shipment from state or localStorage
       let existingShipment = createdShipment?.shipment;
       if (!existingShipment) {
         const storedShipmentId = localStorage.getItem('parcego_pending_shipment_id');
         if (storedShipmentId) {
-          // Fetch the shipment from API
-          const shipments = await shippingService.getShipments();
-          existingShipment = shipments.find(s => s.id === parseInt(storedShipmentId));
-          if (existingShipment) {
-            setCreatedShipment({ shipment: existingShipment });
+          // Fetch by ID instead of listing all shipments – see ``getShipment``.
+          try {
+            existingShipment = await shippingService.getShipment(parseInt(storedShipmentId));
+            if (existingShipment) {
+              setCreatedShipment({ shipment: existingShipment });
+            }
+          } catch (error) {
+            console.warn('Failed to fetch stored shipment:', error);
           }
         }
       }
-      
+
       if (existingShipment?.id) {
         // Use existing shipment to prevent duplicates
         shipmentId = existingShipment.id;
         shipmentStatus = existingShipment.status;
-        
+
         // Check if shipment is paid, if not refresh status
         if (shipmentStatus?.toLowerCase() !== 'paid') {
           try {
-            const shipments = await shippingService.getShipments();
-            const updatedShipment = shipments.find(s => s.id === shipmentId);
+            const updatedShipment = await shippingService.getShipment(shipmentId);
             if (updatedShipment) {
               shipmentStatus = updatedShipment.status;
               setCreatedShipment({
@@ -609,7 +614,7 @@ function PurchaseLabelContent() {
             // Error refreshing status, will use existing status
           }
         }
-        
+
         // Verify shipment is paid before generating label
         if (shipmentStatus?.toLowerCase() !== 'paid') {
           throw new Error(`Cannot generate label for shipment with status '${shipmentStatus}'. Shipment must be paid. Please wait a moment and try again.`);
@@ -779,10 +784,10 @@ function PurchaseLabelContent() {
                       const checkShipmentStatus = async () => {
                         try {
                           await new Promise(resolve => setTimeout(resolve, 1500));
-                          const shipments = await shippingService.getShipments();
-                          // Use captured shipmentId instead of closure variable
-                          const updatedShipment = shipments.find(s => s.id === shipmentId);
-                          
+                          // Fetch the single shipment we're polling instead
+                          // of paging through the whole list each iteration.
+                          const updatedShipment = await shippingService.getShipment(shipmentId);
+
                           if (updatedShipment && updatedShipment.status?.toLowerCase() === 'paid') {
                             setCreatedShipment({
                               success: true,

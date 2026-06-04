@@ -69,7 +69,7 @@ Payment is due within 30 days of invoice date.
 Late payments may incur additional charges.
 
 Thank you for choosing Parcego!
-For questions, contact support@parcego.com`;
+For questions, contact help@parcego.com`;
 };
 
 
@@ -123,6 +123,8 @@ const transformBillingRecordToInvoice = (billing: BillingRecord): Invoice => {
   }
 }
 
+const DEFAULT_BILLING_PAGE_SIZE = 10
+
 export function BillingPage() {
   const [activeTab, setActiveTab] = useState<string>('payment-history')
   const [payments, setPayments] = useState<Payment[]>([])
@@ -131,42 +133,75 @@ export function BillingPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch user profile and billing data from API
+  // Server-driven pagination state for the billing list. ``page`` is 1-indexed
+  // to mirror the backend contract.
+  const [page, setPage] = useState<number>(1)
+  const [perPage, setPerPage] = useState<number>(DEFAULT_BILLING_PAGE_SIZE)
+  const [totalItems, setTotalItems] = useState<number>(0)
+  const [totalPages, setTotalPages] = useState<number>(1)
+
+  // Profile only needs to be fetched once.
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchProfile = async () => {
+      try {
+        const profileData = await profileService.getProfile()
+        setUserProfile(profileData)
+      } catch (err) {
+        console.error('Failed to fetch profile:', err)
+      }
+    }
+    fetchProfile()
+  }, [])
+
+  // Re-fetch billing records whenever the page or page size changes.
+  useEffect(() => {
+    const fetchBilling = async () => {
       try {
         setIsLoading(true)
         setError(null)
-        
-        // Fetch user profile
-        const profileData = await profileService.getProfile()
-        setUserProfile(profileData)
-        
-        // Fetch billing records
+
         const billingResponse = await shippingService.getBillingRecords({
-          page: 1,
-          per_page: 50
+          page,
+          per_page: perPage,
         })
-        
-        // Transform API data to local types
-        const transformedPayments = billingResponse.items.map(transformBillingRecordToPayment)
-        const transformedInvoices = billingResponse.items.map(transformBillingRecordToInvoice)
-        
-        setPayments(transformedPayments)
-        setInvoices(transformedInvoices)
+
+        setPayments(billingResponse.items.map(transformBillingRecordToPayment))
+        setInvoices(billingResponse.items.map(transformBillingRecordToInvoice))
+        setTotalItems(billingResponse.total)
+        setTotalPages(Math.max(1, billingResponse.pages))
       } catch (err) {
-        console.error('Failed to fetch data:', err)
+        console.error('Failed to fetch billing records:', err)
         setError('Failed to load data')
-        // Keep empty arrays on error - no fallback mock data
         setPayments([])
         setInvoices([])
+        setTotalItems(0)
+        setTotalPages(1)
       } finally {
         setIsLoading(false)
       }
     }
 
-    fetchData()
-  }, [])
+    fetchBilling()
+  }, [page, perPage])
+
+  // Snap back to page 1 when ``perPage`` changes so the user lands on a valid
+  // page instead of an empty one.
+  const handlePerPageChange = (next: number) => {
+    setPage(1)
+    setPerPage(next)
+  }
+
+  const pagination = (
+    <BillingPaginationFooter
+      page={page}
+      totalPages={totalPages}
+      totalItems={totalItems}
+      perPage={perPage}
+      isLoading={isLoading}
+      onPageChange={setPage}
+      onPerPageChange={handlePerPageChange}
+    />
+  )
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -258,7 +293,10 @@ export function BillingPage() {
                 </CardContent>
               </Card>
             ) : (
-              <PaymentHistoryTab payments={payments} />
+              <>
+                <PaymentHistoryTab payments={payments} />
+                {pagination}
+              </>
             )}
           </TabsContent>
 
@@ -289,7 +327,10 @@ export function BillingPage() {
                 </CardContent>
               </Card>
             ) : (
-              <InvoicesTab invoices={invoices} userProfile={userProfile} />
+              <>
+                <InvoicesTab invoices={invoices} userProfile={userProfile} />
+                {pagination}
+              </>
             )}
           </TabsContent>
 
@@ -297,6 +338,78 @@ export function BillingPage() {
             <PreferencesTab />
           </TabsContent>
         </Tabs>
+      </div>
+    </div>
+  )
+}
+
+interface BillingPaginationFooterProps {
+  page: number
+  totalPages: number
+  totalItems: number
+  perPage: number
+  isLoading: boolean
+  onPageChange: (next: number) => void
+  onPerPageChange: (next: number) => void
+}
+
+function BillingPaginationFooter({
+  page,
+  totalPages,
+  totalItems,
+  perPage,
+  isLoading,
+  onPageChange,
+  onPerPageChange,
+}: BillingPaginationFooterProps) {
+  // Don't render the footer at all if everything fits on the first page – the
+  // empty-state messaging inside each tab is friendlier than dead controls.
+  if (totalItems === 0) {
+    return null
+  }
+
+  return (
+    <div
+      id="parcego-billing-pagination"
+      className="mt-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+    >
+      <div className="text-sm text-gray-600">
+        Page {page} of {totalPages}
+        <span className="ml-2 text-gray-400">({totalItems} total)</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <select
+          className="border rounded px-2 py-1 text-sm"
+          aria-label="Records per page"
+          value={perPage}
+          onChange={(e) => onPerPageChange(Number(e.target.value))}
+          disabled={isLoading}
+        >
+          <option value={10}>10</option>
+          <option value={25}>25</option>
+          <option value={50}>50</option>
+          <option value={100}>100</option>
+        </select>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(Math.max(1, page - 1))}
+          disabled={page <= 1 || isLoading}
+          id="parcego-billing-prev-page-btn"
+          aria-label="Previous page"
+        >
+          Prev
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onPageChange(Math.min(totalPages, page + 1))}
+          disabled={page >= totalPages || isLoading}
+          id="parcego-billing-next-page-btn"
+          aria-label="Next page"
+        >
+          Next
+        </Button>
       </div>
     </div>
   )
@@ -509,7 +622,7 @@ Invoice ID: ${payment.invoiceId}
 
 Merchant: Parcego Courier Business Platform
 Address: 123 Business Street, Suite 100, New York, NY 10001
-Email: support@parcego.com
+Email: help@parcego.com
 
 Thank you for your business!
 
@@ -1613,7 +1726,7 @@ function InvoiceDetailsDialog({ invoice, userProfile }: { invoice: Invoice; user
                   <div>123 Business Street</div>
                   <div>Suite 100</div>
                   <div>New York, NY 10001</div>
-                  <div className="break-all">support@parcego.com</div>
+                  <div className="break-all">help@parcego.com</div>
                 </div>
               </div>
               
@@ -1715,7 +1828,7 @@ function InvoiceDetailsDialog({ invoice, userProfile }: { invoice: Invoice; user
               
               <div className="mt-6 text-center text-xs text-gray-500">
                 <p>Thank you for your business!</p>
-                <p className="mt-1 break-words">Questions? Contact us at support@parcego.com</p>
+                <p className="mt-1 break-words">Questions? Contact us at help@parcego.com</p>
               </div>
             </div>
           </div>

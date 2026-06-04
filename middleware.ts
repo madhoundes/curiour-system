@@ -1,98 +1,91 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-// Define protected and public routes
-const protectedRoutes = ['/dashboard', '/shipments', '/create-shipment', '/analytics', '/billing', '/profile', '/support', '/notifications', '/claims', '/courier'];
-const publicRoutes = ['/login', '/courier-login', '/', '/test-camera', '/courier-test', '/verify-email'];
+// Protected routes are any prefix that requires authentication. The
+// middleware doesn't try to encode role-based access here – it just
+// gates on "are you logged in". Role checks happen client-side in each
+// section (e.g. /admin pages do their own role guard) so we only need
+// one cookie scheme.
+const protectedRoutes = [
+  '/dashboard',
+  '/shipments',
+  '/create-shipment',
+  '/analytics',
+  '/billing',
+  '/profile',
+  '/support',
+  '/notifications',
+  '/claims',
+  '/courier',
+  '/admin',
+];
+
+// Public routes that should never bounce, even if the user is logged
+// out. `/admin-login` and `/courier-login` are intentionally absent –
+// those now 307-redirect to `/login` at the route level, so the
+// middleware doesn't need to special-case them.
+const publicRoutes = [
+  '/',
+  '/login',
+  '/test-camera',
+  '/courier-test',
+  '/verify-email',
+];
 
 export default async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
-  
-  // Check if the current route is protected or public
-  const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
-  const isPublicRoute = publicRoutes.includes(pathname);
-  
-  // Enhanced cookie checking for LAN network compatibility
+  const url = new URL(req.url);
+
+  // We accept either the unified `mock-auth` cookie or the legacy
+  // `courier_authenticated` cookie. The legacy cookie is still written
+  // for couriers (so existing courier-app code that reads it keeps
+  // working) but new logins also set `mock-auth`, so either is enough
+  // to satisfy the gate.
   const hasMockAuth = req.cookies.get('mock-auth')?.value === 'true';
   const hasCourierAuth = req.cookies.get('courier_authenticated')?.value === 'true';
-  
-  // Fallback authentication for LAN networks using URL parameters
-  const url = new URL(req.url);
-  const hasTempAuth = url.searchParams.get('auth') === 'temp';
-  const hasCourierEmail = url.searchParams.get('email');
-  const authTime = url.searchParams.get('time');
-  
-  // Check if temp auth is recent (within 5 minutes)
-  const isRecentAuth = authTime && (Date.now() - parseInt(authTime)) < 300000; // 5 minutes
-  const hasValidTempAuth = hasTempAuth && hasCourierEmail && isRecentAuth;
-  
-  // Debug logging for LAN troubleshooting
-  console.log('Middleware - Pathname:', pathname);
-  console.log('Middleware - Has Mock Auth:', hasMockAuth);
-  console.log('Middleware - Has Courier Auth:', hasCourierAuth);
-  console.log('Middleware - Has Valid Temp Auth:', hasValidTempAuth);
-  console.log('Middleware - All Cookies:', req.cookies.getAll().map(c => `${c.name}=${c.value}`));
-  console.log('Middleware - User Agent:', req.headers.get('user-agent'));
-  console.log('Middleware - Host:', req.headers.get('host'));
-  console.log('Middleware - URL Params:', url.searchParams.toString());
-  
-  // If someone tries to access protected routes directly, redirect to login
-  if (isProtectedRoute && pathname !== '/login' && pathname !== '/courier-login') {
-    // For courier routes, check courier authentication
-    if (pathname.startsWith('/courier')) {
-      // Only redirect if there's NO courier authentication at all
-      // Let client-side handle localStorage validation
-      if (!hasCourierAuth && !hasValidTempAuth) {
-        console.log('No courier authentication found, redirecting to login');
-        const response = NextResponse.redirect(new URL('/courier-login', req.url));
-        // Set a temporary courier auth cookie for HTTPS testing
-        if (req.url.includes('https://')) {
-          response.cookies.set('courier_authenticated', 'true', {
-            maxAge: 60 * 60 * 24, // 24 hours
-            httpOnly: true,
-            secure: true,
-            sameSite: 'lax'
-          });
-          console.log('Set temporary courier auth cookie for HTTPS testing');
-        }
-        return response;
-      } else {
-        console.log('Courier cookie exists, allowing access - client-side will validate localStorage');
-      }
-    } else {
-      // For other protected routes, check regular authentication
-      if (!hasMockAuth) {
-        return NextResponse.redirect(new URL('/login', req.url));
-      }
-    }
-  }
-  
-  // If someone tries to access login while authenticated, redirect to dashboard
-  // BUT only if they have BOTH cookie AND localStorage (to prevent redirect loops)
-  if (isPublicRoute && (pathname === '/login' || pathname === '/courier-login')) {
-    // Always disable caching on the login page to ensure query params (Shopify OAuth) are visible to the client
-    const next = NextResponse.next();
-    if (pathname === '/login') {
-      next.headers.set('Cache-Control', 'no-store, max-age=0');
-    }
+  const isAuthenticated = hasMockAuth || hasCourierAuth;
 
-    if (pathname === '/courier-login' && hasCourierAuth) {
-      // Don't redirect if localStorage might be empty (let client-side handle it)
-      console.log('Courier cookie exists, but letting client-side handle localStorage check');
-      return next;
-    } else if (pathname === '/login' && hasMockAuth) {
-      // If Shopify OAuth params exist, DO NOT redirect away; let client-side handle OAuth initiation
-      const hasShopifyParams = !!(url.searchParams.get('shop') || url.searchParams.get('hmac') || url.searchParams.get('host') || url.searchParams.get('timestamp'));
-      if (hasShopifyParams) {
-        console.log('Shopify params detected on /login; bypassing redirect to allow OAuth flow');
-        return next;
-      }
-      console.log('User already authenticated, redirecting to /dashboard');
+  const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
+  const isPublicRoute = publicRoutes.includes(pathname);
+
+  // Gate protected routes. If unauthenticated, bounce to `/login` and
+  // preserve the originally-requested path so the user lands back where
+  // they tried to go after signing in.
+  if (isProtectedRoute && !isAuthenticated) {
+    const loginUrl = new URL('/login', req.url);
+    if (pathname !== '/login') {
+      loginUrl.searchParams.set('redirect', pathname + url.search);
+    }
+    return NextResponse.redirect(loginUrl);
+  }
+
+  // If an already-authenticated user lands on `/login`, send them on to
+  // a sensible default. We *don't* know their role from cookies alone,
+  // so we pick the merchant dashboard – role-aware routing happens on
+  // login submit, not here.
+  //
+  // Important exception: if Shopify OAuth params are in the URL we let
+  // the page render so the client can pick up `?shop=…` and kick off
+  // the OAuth handoff.
+  if (isPublicRoute && pathname === '/login' && isAuthenticated) {
+    const hasShopifyParams = !!(
+      url.searchParams.get('shop') ||
+      url.searchParams.get('hmac') ||
+      url.searchParams.get('host') ||
+      url.searchParams.get('timestamp')
+    );
+    if (!hasShopifyParams) {
       return NextResponse.redirect(new URL('/dashboard', req.url));
     }
+  }
 
+  // Always disable caching on the login page so Shopify OAuth query
+  // params are visible to the client on every render.
+  if (pathname === '/login') {
+    const next = NextResponse.next();
+    next.headers.set('Cache-Control', 'no-store, max-age=0');
     return next;
   }
-  
+
   return NextResponse.next();
 }
 

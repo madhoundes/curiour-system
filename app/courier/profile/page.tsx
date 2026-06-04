@@ -179,7 +179,7 @@ export default function CourierProfilePage() {
 
         if (authenticated !== "true" || !authToken || !loginTime) {
           console.log('❌ [PROFILE] No authentication found, redirecting to login');
-          router.push("/courier-login");
+          router.push("/login");
           return;
         }
 
@@ -189,7 +189,7 @@ export default function CourierProfilePage() {
         if (timeSinceLogin >= twentyFourHours) {
           console.log('❌ [PROFILE] Token expired, redirecting to login');
           localStorage.clear();
-          router.push("/courier-login");
+          router.push("/login");
           return;
         }
 
@@ -237,7 +237,7 @@ export default function CourierProfilePage() {
         if (error.message?.includes('Authentication') || error.response?.status === 401) {
           console.log('❌ [PROFILE] Authentication error, redirecting to login');
           localStorage.clear();
-          router.push("/courier-login");
+          router.push("/login");
         } else {
           setShowToast("Failed to load profile data");
           setIsLoading(false);
@@ -353,12 +353,12 @@ export default function CourierProfilePage() {
       // Add a small delay to ensure state is cleared before navigation
       setTimeout(() => {
         console.log("🔐 [PROFILE] Navigating to courier login");
-        router.push("/courier-login");
+        router.push("/login");
       }, 100);
     } catch (error) {
       console.error("❌ [PROFILE] Logout error:", error);
       // Fallback: still try to navigate even if clearing state fails
-      router.push("/courier-login");
+      router.push("/login");
     }
   }, [router]);
 

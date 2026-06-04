@@ -339,7 +339,7 @@ export const generatePdfInvoice = async (invoiceData: {
     pdfWithAutoTable.text('123 Business Street', 20, currentY + 48);
     pdfWithAutoTable.text('Suite 100', 20, currentY + 54);
     pdfWithAutoTable.text('New York, NY 10001', 20, currentY + 60);
-    pdfWithAutoTable.text('support@parcego.com', 20, currentY + 66);
+    pdfWithAutoTable.text('help@parcego.com', 20, currentY + 66);
     
     // Invoice title and details - top right
     const pageWidth = pdfWithAutoTable.internal.pageSize.width;

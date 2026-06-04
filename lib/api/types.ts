@@ -916,8 +916,22 @@ export interface TrackingStatusHistoryItem {
 }
 
 /**
+ * One proof-of-delivery photo returned by the public tracking endpoint.
+ *
+ * ``photo_url`` is a pre-signed S3 URL (see ``shared/s3/service.py``) with a
+ * default 1-hour TTL, so consumers should fetch it on demand rather than
+ * caching it indefinitely.
+ */
+export interface DeliveryPhoto {
+  id: number;
+  photo_url: string;
+  uploaded_at: string; // ISO 8601 timestamp
+  photo_type?: string | null;
+}
+
+/**
  * Full tracking response from GET /track/{tracking_code}
- * 
+ *
  * Returns complete shipment information including status history,
  * sender/receiver details, delivery dates, and proof of delivery photos.
  */
@@ -931,7 +945,7 @@ export interface PublicTrackingResponse {
   receiver_province?: string;
   estimated_delivery_date?: string; // ISO 8601 timestamp
   actual_delivery_date?: string; // ISO 8601 timestamp
-  delivery_photos: string[]; // Array of photo URLs
+  delivery_photos: DeliveryPhoto[];
   created_at: string; // ISO 8601 timestamp
   last_updated: string; // ISO 8601 timestamp
 }
@@ -1033,10 +1047,27 @@ export interface ShopifyAccountsResponse {
 
 export interface ShopifyAccountDetails extends ShopifyAccount {}
 
+/**
+ * Response returned by ``POST /shopify/accounts/{id}/sync``.
+ *
+ * The backend always returns ``message`` and ``last_sync_at``. The richer
+ * fields (``orders``, ``shop_info_synced``, ``errors``) are only populated
+ * on the happy path; on auth-expiry the route short-circuits with just
+ * ``message``/``last_sync_at``/``status``/``orders_polled``, so everything
+ * except the first two is optional on the client side.
+ */
 export interface ShopifySyncResponse {
-  success: boolean;
   message: string;
   last_sync_at: string;
+  status?: string;
+  shop_info_synced?: boolean;
+  orders?: {
+    found: number;
+    processed: number;
+    failed: number;
+    filtered: number;
+  };
+  errors?: string[];
 }
 
 // Shopify Order Types

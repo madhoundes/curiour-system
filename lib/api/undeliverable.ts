@@ -63,11 +63,13 @@ export class UndeliverableService {
    */
   async getUndeliverablePackages(params: GetUndeliverablePackagesParams = {}): Promise<UndeliverablePackagesResponse> {
     try {
-      // Use the GET /shipments endpoint with status filter
+      // Use the GET /shipments endpoint with status filter. We over-fetch
+      // here so the duration filter has enough candidates to work with –
+      // the backend caps ``per_page`` at 100.
       const shipmentParams = {
         status: 'UNDELIVERED',
-        limit: params.per_page || 100, // Get more to allow for filtering by duration
-        skip: 0
+        page: 1,
+        per_page: Math.min(params.per_page || 100, 100),
       };
 
       // Get undelivered shipments using the shipping service

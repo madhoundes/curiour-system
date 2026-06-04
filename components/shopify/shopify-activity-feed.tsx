@@ -12,6 +12,9 @@ import type { ShopifyActivityResponse } from "@/lib/api/types";
 interface ShopifyActivityFeedProps {
   activity: ShopifyActivityResponse | null;
   isLoading: boolean;
+  // True while the next page is being fetched. The feed keeps existing
+  // events visible and the Load More button shows a spinner.
+  isLoadingMore?: boolean;
   error: string | null;
   onLoadMore?: () => void;
 }
@@ -19,6 +22,7 @@ interface ShopifyActivityFeedProps {
 export function ShopifyActivityFeed({
   activity,
   isLoading,
+  isLoadingMore = false,
   error,
   onLoadMore,
 }: ShopifyActivityFeedProps) {
@@ -176,8 +180,16 @@ export function ShopifyActivityFeed({
                   onClick={onLoadMore}
                   className="w-full"
                   id="parcego-shopify-activity-load-more-btn"
+                  disabled={isLoadingMore}
                 >
-                  Load More
+                  {isLoadingMore ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Icon name="Loader2" size={14} className="animate-spin" />
+                      Loading...
+                    </span>
+                  ) : (
+                    'Load More'
+                  )}
                 </Button>
               </div>
             )}

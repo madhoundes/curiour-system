@@ -345,7 +345,7 @@ export default function SuperAdminDashboard() {
       document.cookie = "admin_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
       
       // Redirect to login
-      router.push("/admin-login");
+      router.push("/login");
     }
   }, [router]);
 
@@ -1016,7 +1016,7 @@ export default function SuperAdminDashboard() {
         if (!adminAuth || adminAuth !== "true") {
           // Get current path for redirect after login
           const currentPath = window.location.pathname;
-          const redirectUrl = currentPath !== '/admin-login' ? `/admin-login?redirect=${encodeURIComponent(currentPath)}` : '/admin-login';
+          const redirectUrl = currentPath !== '/login' ? `/login?redirect=${encodeURIComponent(currentPath)}` : '/login';
           router.push(redirectUrl);
           return;
         }
@@ -1024,7 +1024,7 @@ export default function SuperAdminDashboard() {
         // Check if we have required authentication data
         if (!authToken || !loginTime) {
           const currentPath = window.location.pathname;
-          const redirectUrl = currentPath !== '/admin-login' ? `/admin-login?redirect=${encodeURIComponent(currentPath)}` : '/admin-login';
+          const redirectUrl = currentPath !== '/login' ? `/login?redirect=${encodeURIComponent(currentPath)}` : '/login';
           router.push(redirectUrl);
           return;
         }
@@ -1050,7 +1050,7 @@ export default function SuperAdminDashboard() {
           
           // Get current path for redirect after login
           const currentPath = window.location.pathname;
-          const redirectUrl = `/admin-login?redirect=${encodeURIComponent(currentPath)}`;
+          const redirectUrl = `/login?redirect=${encodeURIComponent(currentPath)}`;
           router.push(redirectUrl);
           return;
         }
@@ -5052,13 +5052,17 @@ export default function SuperAdminDashboard() {
       // Call Shopify sync API
       const response = await shopifyService.syncAccount(shopifyAccountId);
 
+      // `syncAccount` throws on non-2xx, so reaching here means the
+      // backend reported success. Any partial failures show up in the
+      // `errors` array – treat that as an error state in the UI badge.
+      const hadPartialErrors = (response.data.errors?.length ?? 0) > 0;
       const updatedMerchant: MerchantWithShopify = {
         ...merchant,
         shopifyIntegration: {
           ...merchant.shopifyIntegration,
           connected: true,
           lastSync: response.data.last_sync_at || new Date().toISOString(),
-          syncStatus: response.data.success ? 'success' as const : 'error' as const,
+          syncStatus: hadPartialErrors ? 'error' as const : 'success' as const,
           productsSynced: merchant.shopifyIntegration?.productsSynced || 0,
           ordersSynced: merchant.shopifyIntegration?.ordersSynced || 0,
         }
@@ -6579,7 +6583,7 @@ export default function SuperAdminDashboard() {
 
       try {
         setShipmentsLoading(true);
-        const shipments = await shippingService.getShipments({ limit: 100 });
+        const shipments = await shippingService.getShipments({ page: 1, per_page: 100 });
         // Filter for shipments that are ready for assignment (e.g., paid, in warehouse, etc.)
         const readyShipments = shipments.filter(s =>
           s.status === 'PAID' || s.status === 'LABEL_GENERATED' || s.status === 'IN_WAREHOUSE'
@@ -6936,7 +6940,7 @@ export default function SuperAdminDashboard() {
                     document.cookie = "admin_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
 
                     // Redirect to admin login
-                    router.push("/admin-login");
+                    router.push("/login");
                   }}
                 >
                   <Icon name="LogOut" size={16} className="mr-2" />
