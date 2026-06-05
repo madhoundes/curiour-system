@@ -319,6 +319,45 @@ function CourierDashboard() {
 
   // Check authentication and fetch data on component mount
   useEffect(() => {
+    // Centralised redirect-to-login helper. Every auth-failure path
+    // below funnels through this so we always clear the `mock-auth`
+    // and `user_role` cookies (read by the edge middleware) in
+    // addition to the courier-specific localStorage. Without this,
+    // failing redirects would bounce off `/login` straight back to
+    // `/courier`, leaving the page stuck on "Loading Courier
+    // Dashboard…" indefinitely.
+    const redirectToLogin = async (targetPath?: string) => {
+      if (typeof window === 'undefined') return;
+
+      localStorage.removeItem("courier_authenticated");
+      localStorage.removeItem("courier_email");
+      localStorage.removeItem("courier_login_time");
+      localStorage.removeItem("courier_user");
+      localStorage.removeItem("courier_remember_me");
+      // `auth_token` and the auth cookies are cleared by
+      // `authService.logout()` below; we still try/catch around it so
+      // a flaky backend call can never leave us stranded on the
+      // loading screen.
+      try {
+        await authService.logout();
+      } catch (err) {
+        console.warn('Courier dashboard: backend logout failed, clearing local session anyway.', err);
+        // Best-effort fallback for the cookies the middleware reads.
+        const expired = 'expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        document.cookie = `mock-auth=; path=/; ${expired}; SameSite=Lax`;
+        document.cookie = `user_role=; path=/; ${expired}; SameSite=Lax`;
+        document.cookie = `courier_authenticated=; path=/; ${expired}; SameSite=Lax`;
+      }
+
+      // Hard navigation so the next request hits the middleware with
+      // the freshly-cleared cookies (no React Router cache, no stale
+      // component state).
+      const dest = targetPath && targetPath !== '/login'
+        ? `/login?redirect=${encodeURIComponent(targetPath)}`
+        : '/login';
+      window.location.href = dest;
+    };
+
     const checkAuthenticationAndFetchData = async () => {
       // Only run on client side to prevent hydration mismatch
       if (typeof window === 'undefined') {
@@ -368,7 +407,7 @@ function CourierDashboard() {
             courier_login_time: loginTime,
             required: 'All three must be present'
           });
-          router.push("/login");
+          await redirectToLogin(window.location.pathname);
           return;
         }
 
@@ -378,18 +417,7 @@ function CourierDashboard() {
         const expirationTime = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000; // 30 days or 24 hours
 
         if (timeSinceLogin >= expirationTime) {
-          // Session expired, clear storage and redirect
-          localStorage.removeItem("courier_authenticated");
-          localStorage.removeItem("courier_email");
-          localStorage.removeItem("courier_login_time");
-          localStorage.removeItem("auth_token");
-          localStorage.removeItem("courier_user");
-          localStorage.removeItem("courier_remember_me");
-          document.cookie = "courier_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-          
-          const currentPath = window.location.pathname;
-          const redirectUrl = currentPath !== '/login' ? `/login?redirect=${encodeURIComponent(currentPath)}` : '/login';
-          router.push(redirectUrl);
+          await redirectToLogin(window.location.pathname);
           return;
         }
 
@@ -415,9 +443,7 @@ function CourierDashboard() {
           // Check if user has courier/driver role
           if (userResponse.data.role !== 'courier' && userResponse.data.role !== 'driver') {
             console.error('❌ [DASHBOARD] User does not have courier/driver role:', userResponse.data.role);
-            localStorage.removeItem("courier_authenticated");
-            localStorage.removeItem("auth_token");
-          router.push("/login");
+            await redirectToLogin();
             return;
           }
 
@@ -439,18 +465,14 @@ function CourierDashboard() {
           
           // Token might be invalid, redirect to login
           console.log('❌ [DASHBOARD] Token appears invalid, clearing storage and redirecting...');
-          localStorage.removeItem("courier_authenticated");
-          localStorage.removeItem("auth_token");
-          localStorage.removeItem("courier_email");
-          localStorage.removeItem("courier_login_time");
-          localStorage.removeItem("courier_user");
-          router.push("/login");
+          await redirectToLogin();
           return;
         }
       } catch (error: any) {
         console.error('❌ [DASHBOARD] Error during authentication check:', error);
         console.error('❌ [DASHBOARD] Error stack:', error.stack);
-        router.push("/login");
+        await redirectToLogin();
+        return;
       }
       
       setIsLoading(false);
