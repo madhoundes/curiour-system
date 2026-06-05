@@ -70,6 +70,7 @@ import { useToast, ToastContainer } from "@/components/ui/toast";
 import NotificationDropdown from "@/components/admin/NotificationDropdown";
 import CourierCreationModal from "@/components/admin/CourierCreationModal";
 import { adminService } from "@/lib/api/admin";
+import { authService } from "@/lib/api/auth";
 import { shopifyService } from "@/lib/api/shopify";
 import { shippingService } from "@/lib/api/shipping";
 import { claimsService } from "@/lib/api/claims";
@@ -329,25 +330,45 @@ export default function SuperAdminDashboard() {
   // Merchant search functionality
   const [filteredMerchants, setFilteredMerchants] = useState<MerchantWithShopify[]>([]);
 
-  // Helper function to logout admin and redirect to login
-  // Must be defined before useEffect hooks that use it
-  const logoutAdmin = useCallback(() => {
-    if (typeof window !== 'undefined') {
-      // Clear all admin authentication data
-      localStorage.removeItem("admin_authenticated");
-      localStorage.removeItem("admin_email");
-      localStorage.removeItem("admin_login_time");
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("admin_user");
-      localStorage.removeItem("admin_remember_me");
-      
-      // Clear admin cookie
-      document.cookie = "admin_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-      
-      // Redirect to login
-      router.push("/login");
+  // Helper function to logout admin and redirect to login.
+  // Must be defined before useEffect hooks that use it.
+  //
+  // We delegate the heavy lifting to `authService.logout()` so the
+  // `mock-auth`, `user_role`, and `courier_authenticated` cookies that
+  // the edge middleware reads are actually cleared – without that, the
+  // middleware sees the user as still authenticated when they land on
+  // `/login` and bounces them straight back to `/admin`, which is the
+  // bug the dropdown logout button was hitting.
+  const logoutAdmin = useCallback(async () => {
+    if (typeof window === 'undefined') return;
+
+    // Clear admin-specific localStorage entries seeded by the login page.
+    localStorage.removeItem("admin_authenticated");
+    localStorage.removeItem("admin_email");
+    localStorage.removeItem("admin_login_time");
+    localStorage.removeItem("admin_remember_me");
+    localStorage.removeItem("admin_user");
+    localStorage.removeItem("admin_name");
+    localStorage.removeItem("admin_role");
+    localStorage.removeItem("admin_user_id");
+
+    // Clear the admin-only cookie we set alongside `mock-auth`.
+    document.cookie = "admin_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+
+    // Clears `auth_token`, the `mock-auth` / `user_role` /
+    // `courier_authenticated` cookies, and any cached profile/shipment
+    // data. We always continue with the local redirect even if the
+    // backend logout call fails.
+    try {
+      await authService.logout();
+    } catch (err) {
+      console.warn('Admin logout API call failed; clearing local session anyway.', err);
     }
-  }, [router]);
+
+    // Hard navigation so React state is dropped and the middleware sees
+    // the freshly-cleared cookies on the next request.
+    window.location.href = "/login";
+  }, []);
 
   // Load merchants from API
   useEffect(() => {
@@ -6933,14 +6954,7 @@ export default function SuperAdminDashboard() {
                 <DropdownMenuItem
                   className="cursor-pointer text-red-600 focus:text-red-600"
                   onClick={() => {
-                    // Clear admin authentication
-                    localStorage.removeItem("admin_authenticated");
-                    localStorage.removeItem("admin_email");
-                    localStorage.removeItem("admin_login_time");
-                    document.cookie = "admin_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-
-                    // Redirect to admin login
-                    router.push("/login");
+                    void logoutAdmin();
                   }}
                 >
                   <Icon name="LogOut" size={16} className="mr-2" />
