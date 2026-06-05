@@ -54,6 +54,47 @@ const seedCourierClientState = (user: User, accessToken: string) => {
   }
 };
 
+/**
+ * The admin page (`/app/admin/page.tsx`) gates its UI on a handful of
+ * legacy `admin_*` localStorage entries that pre-date the unified login
+ * page. Without these keys the page is stuck on its
+ * "Verifying admin access…" loading state because the auth check
+ * triggers a redirect to `/login`, which the middleware immediately
+ * bounces back to `/admin` (the cookies say the user is signed in),
+ * resulting in a loop with the loading state always showing.
+ */
+const seedAdminClientState = (
+  user: User,
+  accessToken: string,
+  rememberMe: boolean,
+) => {
+  if (typeof window === "undefined") return;
+  try {
+    localStorage.setItem("admin_authenticated", "true");
+    localStorage.setItem("admin_email", user.email);
+    localStorage.setItem("admin_login_time", Date.now().toString());
+    localStorage.setItem("admin_remember_me", rememberMe ? "true" : "false");
+    localStorage.setItem("auth_token", accessToken);
+    localStorage.setItem("admin_role", user.role);
+    localStorage.setItem("admin_user_id", String(user.id));
+    const fullName = [user.first_name, user.last_name]
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+    if (fullName) {
+      localStorage.setItem("admin_name", fullName);
+    }
+
+    // The admin page also looks for an `admin_authenticated=true` cookie
+    // as a secondary signal. Set it with the same lifetime as the
+    // unified `mock-auth` cookie so the two stay in sync.
+    const maxAge = rememberMe ? 2592000 : 86400;
+    document.cookie = `admin_authenticated=true; path=/; max-age=${maxAge}; SameSite=Lax`;
+  } catch (err) {
+    console.warn("Failed to seed admin client state", err);
+  }
+};
+
 const loginFormSchema = z.object({
   email: z.string().email("Please enter a valid email address"),
   password: z.string().min(8, "Password must be at least 8 characters long"),
@@ -300,6 +341,17 @@ const Login03PageContent = () => {
       // also accepts the `courier_authenticated` cookie as a fallback.
       if (user.role === "courier" || user.role === "driver") {
         seedCourierClientState(user, accessToken);
+      }
+
+      // Admins likewise need their own legacy `admin_*` localStorage
+      // entries seeded; otherwise `/admin` gets stuck on its
+      // "Verifying admin access…" loading state.
+      if (user.role === "admin") {
+        seedAdminClientState(
+          user,
+          accessToken,
+          loginForm.getValues("rememberMe"),
+        );
       }
 
       // Honor an explicit ?redirect= override (used by middleware when
