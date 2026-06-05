@@ -644,9 +644,13 @@ function CourierDashboard() {
     localStorage.removeItem("auth_token");
     localStorage.removeItem("courier_user");
     
-    // Clear authentication cookie with proper attributes
+    // Clear authentication cookies with proper attributes. Also clear
+    // `user_role` and `mock-auth` so the edge middleware doesn't keep
+    // routing this browser as an authenticated courier after sign-out.
     document.cookie = "courier_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
-    
+    document.cookie = "mock-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+    document.cookie = "user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+
     // Reset authentication state
     setIsAuthenticated(false);
     

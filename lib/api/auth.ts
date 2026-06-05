@@ -98,6 +98,18 @@ export class AuthService {
       // Drop any cached profile so the next user starts with a clean slate.
       profileService.invalidateProfileCache();
 
+      // Clear all auth-related cookies so the edge middleware doesn't
+      // think the session is still alive and so the next login can
+      // freshly seed the role cookie. We clear `mock-auth`,
+      // `courier_authenticated`, and `user_role` here because all of
+      // them feed routing decisions in `middleware.ts`.
+      if (typeof document !== 'undefined') {
+        const expired = 'expires=Thu, 01 Jan 1970 00:00:00 GMT';
+        document.cookie = `mock-auth=; path=/; ${expired}; SameSite=Lax`;
+        document.cookie = `courier_authenticated=; path=/; ${expired}; SameSite=Lax`;
+        document.cookie = `user_role=; path=/; ${expired}; SameSite=Lax`;
+      }
+
       // Clear shipment form data cache on logout
       if (typeof window !== 'undefined') {
         try {

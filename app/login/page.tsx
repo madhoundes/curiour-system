@@ -25,26 +25,13 @@ import { API_CONFIG } from "@/lib/api/config";
 import { toast } from "sonner";
 import type { ApiErrorResponse, User } from "@/lib/api/types";
 import { clearShipmentFormData } from "@/lib/shipment-cache-utils";
-
-/**
- * Map a user's role to the landing page they should see after a
- * successful login. We keep this in one place so the consolidated
- * `/login` page (and any future entry points) stay in sync.
- *
- * Note: `'user'` (the merchant role on the backend) keeps the legacy
- * `/dashboard` landing for backwards compatibility with existing links.
- */
-const landingPathForRole = (role: User["role"] | undefined): string => {
-  switch (role) {
-    case "admin":
-      return "/admin";
-    case "courier":
-    case "driver":
-      return "/courier";
-    default:
-      return "/dashboard";
-  }
-};
+import {
+  ROLE_COOKIE_NAME,
+  isAuthRole,
+  isPathAllowedForRole,
+  landingPathForRole,
+  type AuthRole,
+} from "@/lib/auth/role-routing";
 
 /**
  * The courier-specific app pages (and the legacy Expo client) still
@@ -285,32 +272,48 @@ const Login03PageContent = () => {
 
       // Fetch the current user so we can route by role. `authService.login`
       // already cached the token, so this call is automatically
-      // authenticated. We don't fail the whole login on this – if the
-      // user lookup is flaky we fall through to the merchant landing as
-      // a safe default.
-      let landingPath = "/dashboard";
+      // authenticated. We must NOT silently fall back to /dashboard
+      // here – doing so was sending drivers to the merchant dashboard
+      // whenever the /me call failed (network blip, slow response,
+      // etc.). If we can't determine the role we abort the login and
+      // ask the user to retry.
+      let user: User;
       try {
         const userResponse = await authService.getCurrentUser();
-        const user = userResponse.data;
-        landingPath = landingPathForRole(user.role);
-
-        // Couriers/drivers need the legacy localStorage entries that the
-        // courier app pages and Expo client still read. The middleware
-        // also accepts the `courier_authenticated` cookie as a fallback.
-        if (user.role === "courier" || user.role === "driver") {
-          seedCourierClientState(user, accessToken);
-        }
+        user = userResponse.data;
       } catch (roleErr) {
-        // Non-fatal – we still proceed to /dashboard, which is the most
-        // common case (merchant accounts).
-        console.warn("Failed to resolve user role on login:", roleErr);
+        console.error("Failed to resolve user role on login:", roleErr);
+        try {
+          await authService.logout();
+        } catch {
+          // best-effort cleanup; ignore
+        }
+        toast.error("Couldn't verify your account. Please try signing in again.");
+        return;
+      }
+
+      const role = isAuthRole(user.role) ? (user.role as AuthRole) : undefined;
+      let landingPath = landingPathForRole(role);
+
+      // Couriers/drivers need the legacy localStorage entries that the
+      // courier app pages and Expo client still read. The middleware
+      // also accepts the `courier_authenticated` cookie as a fallback.
+      if (user.role === "courier" || user.role === "driver") {
+        seedCourierClientState(user, accessToken);
       }
 
       // Honor an explicit ?redirect= override (used by middleware when
-      // a user was bounced from a protected route). We only honor it if
-      // it's a relative path, to avoid open-redirect abuse.
+      // a user was bounced from a protected route), but only if:
+      //   1. It's a relative path (open-redirect protection).
+      //   2. The user's role is actually allowed in that section –
+      //      otherwise a driver bounced from /dashboard would be sent
+      //      right back there after login.
       const requestedRedirect = searchParams.get("redirect");
-      if (requestedRedirect && requestedRedirect.startsWith("/")) {
+      if (
+        requestedRedirect &&
+        requestedRedirect.startsWith("/") &&
+        isPathAllowedForRole(requestedRedirect, role)
+      ) {
         landingPath = requestedRedirect;
       }
 
@@ -334,6 +337,15 @@ const Login03PageContent = () => {
         const maxAge = rememberMe ? 2592000 : 86400; // 30 days or 24 hours in seconds
 
         document.cookie = `mock-auth=true; path=/; max-age=${maxAge}; SameSite=Lax`;
+
+        // Persist the role so the edge middleware can route subsequent
+        // visits (e.g. revisiting /login while still authenticated) to
+        // the correct dashboard without having to call /me. Without
+        // this, drivers were occasionally being redirected to the
+        // merchant /dashboard.
+        if (role) {
+          document.cookie = `${ROLE_COOKIE_NAME}=${role}; path=/; max-age=${maxAge}; SameSite=Lax`;
+        }
 
         // Store email in cookie if remember me is checked
         if (rememberMe) {

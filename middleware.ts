@@ -1,10 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
+import {
+  ROLE_COOKIE_NAME,
+  isAuthRole,
+  isPathAllowedForRole,
+  landingPathForRole,
+} from '@/lib/auth/role-routing';
 
 // Protected routes are any prefix that requires authentication. The
-// middleware doesn't try to encode role-based access here – it just
-// gates on "are you logged in". Role checks happen client-side in each
-// section (e.g. /admin pages do their own role guard) so we only need
-// one cookie scheme.
+// middleware doesn't try to encode role-based access here – that's
+// handled separately via the `user_role` cookie below.
 const protectedRoutes = [
   '/dashboard',
   '/shipments',
@@ -44,6 +48,12 @@ export default async function middleware(req: NextRequest) {
   const hasCourierAuth = req.cookies.get('courier_authenticated')?.value === 'true';
   const isAuthenticated = hasMockAuth || hasCourierAuth;
 
+  // Role cookie is set by the login page after a successful `/me`
+  // lookup. Sessions that pre-date the cookie (older logins) just
+  // fall through to the page-level guards.
+  const rawRole = req.cookies.get(ROLE_COOKIE_NAME)?.value;
+  const role = isAuthRole(rawRole) ? rawRole : undefined;
+
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
   const isPublicRoute = publicRoutes.includes(pathname);
 
@@ -58,15 +68,26 @@ export default async function middleware(req: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  // If an already-authenticated user lands on `/login`, send them on to
-  // a sensible default. We *don't* know their role from cookies alone,
-  // so we pick the merchant dashboard – role-aware routing happens on
-  // login submit, not here.
+  // Role-based section enforcement. Keeps drivers off the merchant
+  // dashboard (and vice-versa) when we know the role from the cookie.
+  // Only enforced when the role cookie is present so older sessions
+  // keep working until they next re-authenticate.
+  if (isProtectedRoute && isAuthenticated && role) {
+    if (!isPathAllowedForRole(pathname, role)) {
+      return NextResponse.redirect(new URL(landingPathForRole(role), req.url));
+    }
+  }
+
+  // If an already-authenticated user lands on `/login`, route them by
+  // role rather than always sending them to `/dashboard`. We only
+  // auto-redirect when the role cookie tells us where to go; sessions
+  // without a role cookie just render the login page so the user can
+  // re-authenticate and seed the cookie.
   //
   // Important exception: if Shopify OAuth params are in the URL we let
   // the page render so the client can pick up `?shop=…` and kick off
   // the OAuth handoff.
-  if (isPublicRoute && pathname === '/login' && isAuthenticated) {
+  if (isPublicRoute && pathname === '/login' && isAuthenticated && role) {
     const hasShopifyParams = !!(
       url.searchParams.get('shop') ||
       url.searchParams.get('hmac') ||
@@ -74,7 +95,7 @@ export default async function middleware(req: NextRequest) {
       url.searchParams.get('timestamp')
     );
     if (!hasShopifyParams) {
-      return NextResponse.redirect(new URL('/dashboard', req.url));
+      return NextResponse.redirect(new URL(landingPathForRole(role), req.url));
     }
   }
 

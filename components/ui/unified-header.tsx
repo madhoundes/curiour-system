@@ -63,9 +63,12 @@ export function UnifiedHeader({ onSidebarToggle }: UnifiedHeaderProps) {
     : 'JD'
 
   const handleLogout = async () => {
-    // Clear the mock authentication cookie
-    document.cookie = "mock-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-    
+    // Clear the mock authentication cookies. We also clear `user_role`
+    // here so the edge middleware doesn't keep routing this browser
+    // based on a stale role after sign-out.
+    document.cookie = "mock-auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+    document.cookie = "user_role=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
+
     // Clear shipment form data cache on logout
     if (typeof window !== 'undefined') {
       try {
