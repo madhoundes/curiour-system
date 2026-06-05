@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { authService, driverService, profileService } from "@/lib/api";
+import { redirectToLogin } from "@/lib/auth/client-session";
 import type { User, UserProfile, DriverStatisticsResponse, UpdateProfileRequest, ChangePasswordRequest } from "@/lib/api/types";
 import { Card, CardAction, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -179,7 +180,10 @@ export default function CourierProfilePage() {
 
         if (authenticated !== "true" || !authToken || !loginTime) {
           console.log('❌ [PROFILE] No authentication found, redirecting to login');
-          router.push("/login");
+          await redirectToLogin({
+            redirectPath: window.location.pathname,
+            callBackendLogout: false,
+          });
           return;
         }
 
@@ -188,8 +192,7 @@ export default function CourierProfilePage() {
         const timeSinceLogin = Date.now() - parseInt(loginTime);
         if (timeSinceLogin >= twentyFourHours) {
           console.log('❌ [PROFILE] Token expired, redirecting to login');
-          localStorage.clear();
-          router.push("/login");
+          await redirectToLogin({ redirectPath: window.location.pathname });
           return;
         }
 
@@ -236,8 +239,8 @@ export default function CourierProfilePage() {
         
         if (error.message?.includes('Authentication') || error.response?.status === 401) {
           console.log('❌ [PROFILE] Authentication error, redirecting to login');
-          localStorage.clear();
-          router.push("/login");
+          await redirectToLogin();
+          return;
         } else {
           setShowToast("Failed to load profile data");
           setIsLoading(false);
@@ -322,45 +325,10 @@ export default function CourierProfilePage() {
   }, [router]);
 
   const handleLogout = useCallback(async () => {
-    try {
-      console.log("🔐 [PROFILE] Logout initiated");
-      
-      // Call API logout endpoint to invalidate session on backend
-      try {
-        await authService.logout();
-        console.log("✅ [PROFILE] API logout successful");
-      } catch (logoutError) {
-        console.error("❌ [PROFILE] API logout failed:", logoutError);
-        // Continue with client-side cleanup even if API call fails
-      }
-      
-      // Clear all authentication data from client
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem("courier_authenticated");
-        localStorage.removeItem("courier_email");
-        localStorage.removeItem("courier_login_time");
-        localStorage.removeItem("auth_token");
-        localStorage.removeItem("courier_user");
-        
-        // Clear authentication cookie with proper attributes
-        document.cookie = "courier_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
-        console.log("✅ [PROFILE] Authentication data cleared");
-      }
-      
-      // Close the logout confirm dialog
-      setShowLogoutConfirm(false);
-      
-      // Add a small delay to ensure state is cleared before navigation
-      setTimeout(() => {
-        console.log("🔐 [PROFILE] Navigating to courier login");
-        router.push("/login");
-      }, 100);
-    } catch (error) {
-      console.error("❌ [PROFILE] Logout error:", error);
-      // Fallback: still try to navigate even if clearing state fails
-      router.push("/login");
-    }
-  }, [router]);
+    console.log("🔐 [PROFILE] Logout initiated");
+    setShowLogoutConfirm(false);
+    await redirectToLogin();
+  }, []);
 
   const handleAvatarBrowse = useCallback(() => {
     fileInputRef.current?.click();

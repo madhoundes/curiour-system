@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useRouter, useParams } from "next/navigation";
 import Image from "next/image";
 import { authService, driverService, routeOptimizationService } from "@/lib/api";
+import { redirectToLogin } from "@/lib/auth/client-session";
 import type { DriverAssignment, DriverShipment, DriverAssignmentsResponse } from "@/lib/api/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -196,7 +197,10 @@ export default function CourierRouteSimulation() {
         const loginTime = localStorage.getItem("courier_login_time");
 
         if (authenticated !== "true" || !authToken || !loginTime) {
-          router.push("/login");
+          await redirectToLogin({
+            redirectPath: window.location.pathname,
+            callBackendLogout: false,
+          });
           return;
         }
 
@@ -204,20 +208,9 @@ export default function CourierRouteSimulation() {
         const rememberMe = localStorage.getItem("courier_remember_me") === "true";
         const timeSinceLogin = Date.now() - parseInt(loginTime);
         const expirationTime = rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000; // 30 days or 24 hours
-        
+
         if (timeSinceLogin >= expirationTime) {
-          // Token expired, clear storage and redirect
-          localStorage.removeItem("courier_authenticated");
-          localStorage.removeItem("courier_email");
-          localStorage.removeItem("courier_login_time");
-          localStorage.removeItem("auth_token");
-          localStorage.removeItem("courier_user");
-          localStorage.removeItem("courier_remember_me");
-          document.cookie = "courier_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT";
-          
-          const currentPath = window.location.pathname;
-          const redirectUrl = `/login?redirect=${encodeURIComponent(currentPath)}`;
-          router.push(redirectUrl);
+          await redirectToLogin({ redirectPath: window.location.pathname });
           return;
         }
 
@@ -267,8 +260,8 @@ export default function CourierRouteSimulation() {
         console.error('❌ [ROUTE] Error fetching assignments data:', error);
         
         if (error.message?.includes('Authentication') || error.response?.status === 401) {
-          localStorage.clear();
-          router.push("/login");
+          await redirectToLogin();
+          return;
         } else {
           setError("Failed to load assignments: " + (error.message || "Unknown error"));
           setIsLoading(false);

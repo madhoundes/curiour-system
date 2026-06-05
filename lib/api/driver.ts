@@ -372,7 +372,7 @@ export class DriverService {
         throw new Error('Authentication required. Please log in again.');
       }
       if (status === 403) {
-        throw new Error('Driver role required');
+        throw new Error(errorMessage || 'Access denied');
       }
       if (status === 404) {
         throw new Error('Shipment not found');

@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { driverService, authService } from "@/lib/api";
+import { redirectToLogin } from "@/lib/auth/client-session";
 import type { DriverStatisticsResponse, User } from "@/lib/api/types";
 
 type Period = "today" | "weekly" | "monthly" | "last7" | "last30" | "last90" | "custom";
@@ -208,15 +209,7 @@ export default function CourierPerformance() {
   };
 
   const handleLogout = () => {
-    try {
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem("courier_authenticated");
-        localStorage.removeItem("courier_email");
-        localStorage.removeItem("courier_login_time");
-        document.cookie = "courier_authenticated=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Lax";
-      }
-    } catch (_) {}
-    router.push("/login");
+    void redirectToLogin();
   };
 
   // Calculate performance data from assignments (primary source)
