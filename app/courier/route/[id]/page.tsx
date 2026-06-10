@@ -2262,8 +2262,8 @@ export default function CourierRouteSimulation() {
           setIsRetrying(false);
         }
       }}>
-        <DialogContent className="max-w-lg bg-white max-h-[90vh] flex flex-col overflow-hidden sm:max-w-lg sm:max-h-[90vh] sm:flex sm:flex-col sm:overflow-hidden max-[430px]:w-screen max-[430px]:h-[100dvh] max-[430px]:max-w-none max-[430px]:max-h-[100dvh] max-[430px]:rounded-none max-[430px]:border-none max-[430px]:fixed max-[430px]:inset-0 max-[430px]:top-0 max-[430px]:left-0 max-[430px]:right-0 max-[430px]:bottom-0 max-[430px]:translate-x-0 max-[430px]:translate-y-0">
-          <DialogHeader className="flex-shrink-0 pb-4 max-[430px]:px-6 max-[430px]:py-4 max-[430px]:bg-white max-[430px]:border-b">
+        <DialogContent className="max-w-lg bg-white max-h-[90dvh] flex flex-col overflow-hidden sm:max-w-lg sm:max-h-[90dvh] sm:flex sm:flex-col sm:overflow-hidden phone:w-screen phone:h-[100dvh] phone:max-w-none phone:max-h-[100dvh] phone:rounded-none phone:border-none phone:fixed phone:inset-0 phone:top-0 phone:left-0 phone:right-0 phone:bottom-0 phone:translate-x-0 phone:translate-y-0">
+          <DialogHeader className="flex-shrink-0 pb-4 phone:px-6 phone:py-4 phone:bg-white phone:border-b">
             <DialogTitle className="flex items-center space-x-2">
               <Icon name="Camera" size={20} className="text-purple-600" />
               <span className="font-bold">Scan Package Barcode</span>
@@ -2272,12 +2272,12 @@ export default function CourierRouteSimulation() {
               Scan QR codes or 1D barcodes (Code 128, EAN-13, UPC-A, etc.) to verify package
             </DialogDescription>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto px-1 max-[430px]:flex-1 max-[430px]:overflow-y-auto">
-            <div className="space-y-4 max-[430px]:p-6 max-[430px]:space-y-4">
+          <div className="flex-1 overflow-y-auto px-1 phone:flex-1 phone:overflow-y-auto">
+            <div className="space-y-4 phone:p-6 phone:space-y-4">
             {/* Camera Scanner Interface */}
             <div className="relative">
               {!isCameraActive ? (
-                <div className="bg-gray-900 rounded-lg h-92 flex items-center justify-center relative max-[430px]:h-full max-[430px]:rounded-none">
+                <div className="bg-gray-900 rounded-lg h-92 flex items-center justify-center relative phone:h-full phone:rounded-none">
                   <div className="text-center text-white">
                     <Icon name="Camera" size={48} className="mx-auto mb-2" />
                     <p className="text-sm font-semibold mb-2">Click to start camera scanning</p>
@@ -2299,7 +2299,7 @@ export default function CourierRouteSimulation() {
                   </div>
                 </div>
               ) : (
-                <div className="relative bg-gray-900 rounded-lg h-92 overflow-hidden max-[430px]:h-full max-[430px]:rounded-none">
+                <div className="relative bg-gray-900 rounded-lg h-92 overflow-hidden phone:h-full phone:rounded-none">
                   <div ref={scannerRef} className="w-full h-full">
                     <Scanner
                       onScan={handleBarcodeDetected}
@@ -2498,7 +2498,7 @@ export default function CourierRouteSimulation() {
             
             {/* Action buttons */}
             <div
-              className="flex space-x-2 pt-4 max-[430px]:px-6 max-[430px]:py-4 max-[430px]:bg-white max-[430px]:border-t"
+              className="flex space-x-2 pt-4 phone:px-6 phone:py-4 phone:bg-white phone:border-t"
               style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
             >
               <Button
@@ -2562,7 +2562,7 @@ export default function CourierRouteSimulation() {
           }
         }
       }}>
-        <DialogContent className="max-w-2xl p-0 max-h-[95vh] flex flex-col overflow-hidden sm:max-w-2xl sm:max-h-[95vh] sm:flex sm:flex-col sm:overflow-hidden max-[430px]:w-screen max-[430px]:h-[100dvh] max-[430px]:max-w-none max-[430px]:max-h-[100dvh] max-[430px]:rounded-none max-[430px]:border-none max-[430px]:fixed max-[430px]:inset-0 max-[430px]:top-0 max-[430px]:left-0 max-[430px]:right-0 max-[430px]:bottom-0 max-[430px]:translate-x-0 max-[430px]:translate-y-0">
+        <DialogContent className="max-w-2xl p-0 h-[640px] max-h-[95dvh] flex flex-col overflow-hidden sm:max-w-2xl sm:h-[640px] sm:max-h-[95dvh] sm:flex sm:flex-col sm:overflow-hidden phone:w-screen phone:h-[100dvh] phone:max-w-none phone:max-h-[100dvh] phone:rounded-none phone:border-none phone:fixed phone:inset-0 phone:top-0 phone:left-0 phone:right-0 phone:bottom-0 phone:translate-x-0 phone:translate-y-0">
           {/* Modal Header - Matches Scan Modal Style */}
           <div className="px-6 py-4 border-b flex-shrink-0">
             <DialogTitle className="text-lg font-semibold">
@@ -2577,12 +2577,12 @@ export default function CourierRouteSimulation() {
           </div>
           
           {/* Scrollable Content Area */}
-          <div className="flex-1 flex flex-col overflow-hidden max-[430px]:flex-1 max-[430px]:bg-black">
+          <div className="flex-1 flex flex-col overflow-hidden min-h-0 phone:bg-black">
             {/* Camera/Photo Viewport */}
-            <div className="relative flex-shrink-0 max-[430px]:flex-1 max-[430px]:relative">
+            <div className="relative flex-1 min-h-0">
             {!cameraActive && !cameraError && capturedPhotos.length === 0 && (
               // Initial State - Request Camera Access
-              <div className="bg-gray-900 h-96 flex items-center justify-center max-[430px]:h-full">
+              <div className="bg-gray-900 h-full flex items-center justify-center">
                 <div className="text-center text-white">
                   <Icon name="Camera" size={64} className="mx-auto mb-3" />
                   <p className="text-sm mb-4">Position the package and location in frame</p>
@@ -2605,7 +2605,7 @@ export default function CourierRouteSimulation() {
             
             {cameraActive && !cameraError && (
               // Camera Active State
-              <div className="relative h-96 bg-black max-[430px]:h-full">
+              <div className="relative h-full bg-black">
                 <video
                   ref={videoRef}
                   autoPlay
@@ -2693,7 +2693,7 @@ export default function CourierRouteSimulation() {
             
             {/* Camera Error State */}
             {cameraError && (
-              <div className="bg-gray-900 h-96 flex items-center justify-center max-[430px]:h-full">
+              <div className="bg-gray-900 h-full flex items-center justify-center">
                 <div className="text-center text-white px-6">
                   <Icon name="AlertTriangle" size={48} className="mx-auto mb-3 text-yellow-500" />
                   <p className="text-sm font-medium mb-2">Camera Access Required</p>
@@ -2737,7 +2737,7 @@ export default function CourierRouteSimulation() {
             
             {/* Photo Preview State */}
             {capturedPhotos.length > 0 && !cameraActive && !cameraError && (
-              <div className="bg-gray-100 h-96 p-4 max-[430px]:h-full">
+              <div className="bg-gray-100 h-full p-4">
                 <div className="h-full flex items-center justify-center">
                   {capturedPhotos.length === 1 ? (
                     <img
@@ -2762,8 +2762,8 @@ export default function CourierRouteSimulation() {
             )}
           </div>
           
-          {/* Scrollable Bottom Section */}
-          <div className="flex-1 overflow-y-auto max-[430px]:flex-shrink-0 max-[430px]:bg-white">
+          {/* Bottom Section (always anchored, never clipped) */}
+          <div className="flex-shrink-0 overflow-y-auto bg-white max-h-[40dvh]">
             {/* Photo Thumbnails */}
             {capturedPhotos.length > 0 && (
               <div className="px-6 py-3 border-t bg-gray-50">
@@ -2813,7 +2813,7 @@ export default function CourierRouteSimulation() {
           
             {/* Action Buttons */}
             <div
-              className="px-6 py-4 border-t bg-white max-[430px]:px-6 max-[430px]:py-4 max-[430px]:border-t max-[430px]:bg-white"
+              className="px-6 py-4 border-t bg-white phone:px-6 phone:py-4 phone:border-t phone:bg-white"
               style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
             >
             <div className="flex space-x-2">
@@ -2879,7 +2879,7 @@ export default function CourierRouteSimulation() {
           
             {/* Low Light Warning */}
             {lowLightDetected && (
-              <div className="px-6 pb-4 max-[430px]:px-6 max-[430px]:pb-4">
+              <div className="px-6 pb-4 phone:px-6 phone:pb-4">
                 <Alert className="bg-yellow-50 border-yellow-200">
                   <Icon name="Lightbulb" size={16} className="text-yellow-600" />
                   <AlertDescription className="text-yellow-800">

@@ -1,6 +1,21 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 
+/*
+  Custom Tailwind variant: `phone:`
+  Targets devices that should use the fullscreen camera-modal layout:
+  - any viewport narrower than 430px (portrait phones), OR
+  - any landscape orientation with height <= 500px (phones held sideways).
+  This lets the photo / barcode capture dialogs go fullscreen on iPhone
+  in BOTH orientations so the shutter button never gets clipped by the
+  centered popup's max-height.
+*/
+@custom-variant phone {
+  @media (max-width: 430px), (orientation: landscape) and (max-height: 500px) {
+    @slot;
+  }
+}
+
 /* Glass Blur Effect Variables */
 :root {
   /* Glass effect variables for notification banners */
