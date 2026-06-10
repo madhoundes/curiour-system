@@ -62,6 +62,13 @@ const getUTCDate = () => {
   return new Date(new Date().toISOString());
 };
 
+// Eastern Time helpers (assignments are scheduled and stored using Eastern date on the backend)
+const EASTERN_TIMEZONE = 'America/New_York';
+
+const formatDateEST = (date: Date, formatStr: string) => {
+  return formatInTimeZone(date, EASTERN_TIMEZONE, formatStr);
+};
+
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -74,7 +81,7 @@ import { authService } from "@/lib/api/auth";
 import { shopifyService } from "@/lib/api/shopify";
 import { shippingService } from "@/lib/api/shipping";
 import { claimsService } from "@/lib/api/claims";
-import type { User, UserStatisticsResponse, Claim } from "@/lib/api/types";
+import type { AdminPaidShipment, User, UserStatisticsResponse, Claim } from "@/lib/api/types";
 
 // Extended User type with Shopify integration
 interface ShopifyIntegration {
@@ -198,12 +205,24 @@ export default function SuperAdminDashboard() {
     notes: ''
   });
 
+  // Reassign assignment form state
+  const [reassignForm, setReassignForm] = useState({
+    driverId: '',
+    notes: ''
+  });
+
   // Available shipments for manual assignment
   const [availableShipments, setAvailableShipments] = useState<any[]>([]);
   const [shipmentsLoading, setShipmentsLoading] = useState(false);
 
-  // Warehouse state
-  const [isMovingToWarehouse, setIsMovingToWarehouse] = useState(false);
+  // Warehouse state.
+  // Per-shipment warehouse intake state. Track which shipment IDs are
+  // currently mid-flight so we can disable their row buttons without
+  // freezing the entire list when several requests overlap.
+  const [paidShipments, setPaidShipments] = useState<AdminPaidShipment[]>([]);
+  const [paidShipmentsLoading, setPaidShipmentsLoading] = useState(false);
+  const [paidShipmentsError, setPaidShipmentsError] = useState<string | null>(null);
+  const [movingShipmentIds, setMovingShipmentIds] = useState<Set<number>>(new Set());
   const [isRunningAutomation, setIsRunningAutomation] = useState(false);
   const [isClearingAssignments, setIsClearingAssignments] = useState(false);
 
@@ -502,7 +521,7 @@ export default function SuperAdminDashboard() {
 
       try {
         setAssignmentsLoading(true);
-        const dateStr = formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd');
+        const dateStr = formatDateEST(selectedAssignmentDate, 'yyyy-MM-dd');
 
         // Fetch assignments for the selected date
         const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
@@ -904,14 +923,14 @@ export default function SuperAdminDashboard() {
   };
 
   // Warehouse operations
-  const handleMoveToWarehouse = async () => {
+
+  // Refresh the admin shipment counters so the cards on the warehouse
+  // page stay in sync with the list after a single intake. Pulled into
+  // its own helper because both list-load and per-row move paths need
+  // it, and we don't want a failure here to bubble up and obscure the
+  // primary action's success/error toast.
+  const refreshAdminStats = async () => {
     try {
-      setIsMovingToWarehouse(true);
-      await adminService.moveShipmentsToWarehouse();
-
-      showSuccessToast("Paid shipments successfully moved to warehouse!");
-
-      // Reload admin stats to reflect changes
       const response = await adminService.getAdminStatistics();
       setAdminStats({
         totalShipments: response.data.total_shipments,
@@ -921,13 +940,68 @@ export default function SuperAdminDashboard() {
         cancelledShipments: response.data.cancelled_shipments,
         undeliveredShipments: response.data.undelivered_shipments,
         draftShipments: response.data.draft_shipments,
-        paidShipments: response.data.paid_shipments
+        paidShipments: response.data.paid_shipments,
       });
     } catch (error) {
-      console.error('Failed to move shipments to warehouse:', error);
-      showErrorToast("Failed to move shipments to warehouse. Please try again.");
+      console.error('Failed to refresh admin stats:', error);
+    }
+  };
+
+  const loadPaidShipments = useCallback(async () => {
+    try {
+      setPaidShipmentsLoading(true);
+      setPaidShipmentsError(null);
+      // Page size is intentionally large here – the warehouse intake
+      // list is reviewed end-to-end by an operator and the backlog is
+      // usually small. If this ever grows we'll add pagination
+      // controls, but ``per_page`` is capped at 100 server-side so
+      // this won't blow up the response.
+      const response = await adminService.listPaidShipments({ page: 1, per_page: 100 });
+      setPaidShipments(response.data.shipments);
+    } catch (error) {
+      console.error('Failed to load paid shipments:', error);
+      setPaidShipments([]);
+      setPaidShipmentsError('Failed to load paid shipments. Please try again.');
     } finally {
-      setIsMovingToWarehouse(false);
+      setPaidShipmentsLoading(false);
+    }
+  }, []);
+
+  const handleMoveSingleShipmentToWarehouse = async (shipment: AdminPaidShipment) => {
+    // Guard against double-clicks racing each other – the per-row
+    // button is disabled while ``movingShipmentIds`` contains this id.
+    if (movingShipmentIds.has(shipment.id)) return;
+
+    setMovingShipmentIds((prev) => {
+      const next = new Set(prev);
+      next.add(shipment.id);
+      return next;
+    });
+
+    try {
+      await adminService.moveSingleShipmentToWarehouse(shipment.id);
+
+      // Optimistically drop the shipment from the visible list so the
+      // operator gets immediate feedback. Stats are refreshed in the
+      // background to reconcile the counter cards.
+      setPaidShipments((prev) => prev.filter((row) => row.id !== shipment.id));
+
+      showSuccessToast(
+        `Shipment ${shipment.tracking_code} moved to warehouse.`
+      );
+
+      await refreshAdminStats();
+    } catch (error) {
+      console.error('Failed to move shipment to warehouse:', error);
+      showErrorToast(
+        `Failed to move shipment ${shipment.tracking_code} to warehouse. Please try again.`
+      );
+    } finally {
+      setMovingShipmentIds((prev) => {
+        const next = new Set(prev);
+        next.delete(shipment.id);
+        return next;
+      });
     }
   };
 
@@ -936,7 +1010,7 @@ export default function SuperAdminDashboard() {
     if (!selectedAssignmentDate) return;
     try {
       setIsRunningAutomation(true);
-      const dateStr = formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd');
+      const dateStr = formatDateEST(selectedAssignmentDate, 'yyyy-MM-dd');
 
       await adminService.runAutomatedAssignment({ assignment_date: dateStr });
 
@@ -953,7 +1027,7 @@ export default function SuperAdminDashboard() {
 
       // Check if the error is about existing assignments
       const errorMessage = error?.details || error?.message || '';
-      const currentDateStr = selectedAssignmentDate ? formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd') : '';
+      const currentDateStr = selectedAssignmentDate ? formatDateEST(selectedAssignmentDate, 'yyyy-MM-dd') : '';
       if (errorMessage.includes('already exist')) {
         showErrorToast(
           `Assignments already exist for ${currentDateStr}. Please manually click 'Clear All Assignments' first, wait for the success message, then try 'Run Automation' again.`,
@@ -983,7 +1057,7 @@ export default function SuperAdminDashboard() {
 
       // Reload assignments to show updated data
       if (!selectedAssignmentDate) return;
-      const dateStr = formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd');
+      const dateStr = formatDateEST(selectedAssignmentDate, 'yyyy-MM-dd');
       const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
       setAssignments(assignmentsResponse.data.assignments || []);
 
@@ -1014,7 +1088,7 @@ export default function SuperAdminDashboard() {
 
       // Reload assignments
       if (!selectedAssignmentDate) return;
-      const dateStr = formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd');
+      const dateStr = formatDateEST(selectedAssignmentDate, 'yyyy-MM-dd');
       const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
       setAssignments(assignmentsResponse.data.assignments || []);
     } catch (error) {
@@ -1208,6 +1282,16 @@ export default function SuperAdminDashboard() {
 
     loadClaims();
   }, [isAuthenticated, activeSection, claimsPage, claimsStatusFilter, claimsReasonFilter, claimsUserIdFilter, logoutAdmin]);
+
+  // Load paid shipments whenever the admin opens the warehouse tab.
+  // Scoped to ``activeSection === 'warehouse'`` so we don't pay the
+  // request cost on every section change, and re-fetches on auth flips
+  // so a token-refresh navigation lands on a fresh list instead of the
+  // previous user's snapshot.
+  useEffect(() => {
+    if (!isAuthenticated || activeSection !== 'warehouse') return;
+    loadPaidShipments();
+  }, [isAuthenticated, activeSection, loadPaidShipments]);
 
   // Calculate delivery counts from assignments and statistics
   useEffect(() => {
@@ -2603,7 +2687,7 @@ export default function SuperAdminDashboard() {
               <PopoverTrigger asChild>
                 <Button variant="outline" size="sm" className="touch-manipulation">
                   <Icon name="Calendar" size={16} className="mr-2" />
-                  {selectedAssignmentDate ? formatDateUTC(selectedAssignmentDate, 'MMM dd, yyyy') : 'Select Date'}
+                  {selectedAssignmentDate ? formatDateEST(selectedAssignmentDate, 'MMM dd, yyyy') : 'Select Date'}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="end">
@@ -2705,7 +2789,7 @@ export default function SuperAdminDashboard() {
         {/* Assignments List */}
         <Card>
           <CardHeader>
-            <CardTitle>Assignments for {selectedAssignmentDate ? formatDateUTC(selectedAssignmentDate, 'MMMM dd, yyyy') : 'Selected Date'}</CardTitle>
+            <CardTitle>Assignments for {selectedAssignmentDate ? formatDateEST(selectedAssignmentDate, 'MMMM dd, yyyy') : 'Selected Date'}</CardTitle>
           </CardHeader>
           <CardContent>
             {assignmentsLoading ? (
@@ -2793,14 +2877,32 @@ export default function SuperAdminDashboard() {
   };
 
   const renderWarehouse = () => {
+    const hasPaidShipments = paidShipments.length > 0;
+
     return (
       <div className="space-y-4 xl:space-y-6" id="parcego-admin-warehouse-section">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h2 className="text-xl font-bold">Warehouse Operations</h2>
-            <p className="text-sm text-gray-600 mt-1">Manage shipment warehouse operations</p>
+            <p className="text-sm text-gray-600 mt-1">
+              Review paid shipments and move them into the warehouse individually
+            </p>
           </div>
+          <Button
+            variant="outline"
+            onClick={loadPaidShipments}
+            disabled={paidShipmentsLoading}
+            id="parcego-admin-warehouse-refresh-btn"
+            className="w-full sm:w-auto"
+          >
+            <Icon
+              name={paidShipmentsLoading ? "Loader" : "RefreshCw"}
+              size={16}
+              className={cn("mr-2", paidShipmentsLoading && "animate-spin")}
+            />
+            Refresh
+          </Button>
         </div>
 
         {/* Warehouse Stats */}
@@ -2840,61 +2942,173 @@ export default function SuperAdminDashboard() {
           </Card>
         </div>
 
-        {/* Warehouse Actions */}
-        <Card>
+        {/* Paid Shipments Intake List */}
+        <Card id="parcego-admin-warehouse-paid-list-card">
           <CardHeader>
-            <CardTitle>Warehouse Actions</CardTitle>
+            <CardTitle>Paid Shipments Awaiting Intake</CardTitle>
+            <CardDescription>
+              Click <span className="font-medium">Move to Warehouse</span> on each
+              shipment you want to intake. Shipments are sorted oldest first.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Alert>
-              <Icon name="Info" size={16} className="mr-2" />
-              <AlertDescription>
-                This action will move all paid shipments to the warehouse, making them available for driver assignment.
-              </AlertDescription>
-            </Alert>
+            {paidShipmentsError && (
+              <Alert variant="destructive">
+                <Icon name="AlertTriangle" size={16} className="mr-2" />
+                <AlertDescription>{paidShipmentsError}</AlertDescription>
+              </Alert>
+            )}
 
-            <Button
-              size="lg"
-              onClick={handleMoveToWarehouse}
-              disabled={isMovingToWarehouse || (adminStats?.paidShipments || 0) === 0}
-              className="w-full sm:w-auto"
-            >
-              {isMovingToWarehouse ? (
-                <>
-                  <Icon name="Loader" size={20} className="mr-2 animate-spin" />
-                  Moving to Warehouse...
-                </>
-              ) : (
-                <>
-                  <Icon name="Warehouse" size={20} className="mr-2" />
-                  Move {adminStats?.paidShipments || 0} Paid Shipments to Warehouse
-                </>
-              )}
-            </Button>
+            {paidShipmentsLoading && !hasPaidShipments ? (
+              <div className="space-y-2" id="parcego-admin-warehouse-loading">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : !hasPaidShipments ? (
+              <div
+                className="flex flex-col items-center justify-center py-12 text-center"
+                id="parcego-admin-warehouse-empty-state"
+              >
+                <Icon name="PackageCheck" size={40} className="text-gray-400 mb-3" />
+                <p className="text-sm font-medium text-gray-700">
+                  No paid shipments awaiting warehouse intake.
+                </p>
+                <p className="text-xs text-gray-500 mt-1">
+                  New paid shipments will appear here as they come in.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table id="parcego-admin-warehouse-paid-table">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Tracking</TableHead>
+                      <TableHead>Merchant</TableHead>
+                      <TableHead>Sender</TableHead>
+                      <TableHead>Receiver</TableHead>
+                      <TableHead>Package</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead className="text-right">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {paidShipments.map((shipment) => {
+                      const isMoving = movingShipmentIds.has(shipment.id);
+                      const merchantLabel =
+                        shipment.user_name || shipment.user_email || `User #${shipment.user_id}`;
+                      const senderLocation = `${shipment.sender_city}, ${shipment.sender_province}`;
+                      const receiverLocation = `${shipment.receiver_city}, ${shipment.receiver_province}`;
+                      const createdLabel = (() => {
+                        try {
+                          return format(new Date(shipment.created_at), "MMM d, yyyy");
+                        } catch {
+                          return shipment.created_at;
+                        }
+                      })();
 
-            <div className="mt-6 pt-6 border-t">
-              <h3 className="font-semibold mb-4">Warehouse Statistics</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Total Shipments:</span>
-                  <span className="font-semibold">{adminStats?.totalShipments || 0}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Delivered:</span>
-                  <span className="font-semibold text-green-600">{adminStats?.deliveredShipments || 0}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">In Transit:</span>
-                  <span className="font-semibold text-blue-600">{adminStats?.inTransitShipments || 0}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Undelivered:</span>
-                  <span className="font-semibold text-red-600">{adminStats?.undeliveredShipments || 0}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">Cancelled:</span>
-                  <span className="font-semibold text-gray-600">{adminStats?.cancelledShipments || 0}</span>
-                </div>
+                      return (
+                        <TableRow
+                          key={shipment.id}
+                          id={`parcego-admin-warehouse-row-${shipment.id}`}
+                        >
+                          <TableCell className="font-medium">
+                            <div className="flex flex-col">
+                              <span>{shipment.tracking_code}</span>
+                              <Badge variant="outline" className="w-fit mt-1 text-[10px]">
+                                {shipment.status}
+                              </Badge>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="text-sm">{merchantLabel}</span>
+                              {shipment.user_email && shipment.user_name && (
+                                <span className="text-xs text-gray-500">
+                                  {shipment.user_email}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="text-sm">{shipment.sender_name}</span>
+                              <span className="text-xs text-gray-500">{senderLocation}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="text-sm">{shipment.receiver_name}</span>
+                              <span className="text-xs text-gray-500">{receiverLocation}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col">
+                              <span className="text-sm capitalize">{shipment.package_type}</span>
+                              <span className="text-xs text-gray-500">
+                                {shipment.weight} kg
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm text-gray-600">
+                            {createdLabel}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Button
+                              size="sm"
+                              onClick={() => handleMoveSingleShipmentToWarehouse(shipment)}
+                              disabled={isMoving}
+                              id={`parcego-admin-warehouse-move-btn-${shipment.id}`}
+                            >
+                              {isMoving ? (
+                                <>
+                                  <Icon name="Loader" size={14} className="mr-2 animate-spin" />
+                                  Moving...
+                                </>
+                              ) : (
+                                <>
+                                  <Icon name="Warehouse" size={14} className="mr-2" />
+                                  Move to Warehouse
+                                </>
+                              )}
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Warehouse Statistics */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Warehouse Statistics</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Total Shipments:</span>
+                <span className="font-semibold">{adminStats?.totalShipments || 0}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Delivered:</span>
+                <span className="font-semibold text-green-600">{adminStats?.deliveredShipments || 0}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">In Transit:</span>
+                <span className="font-semibold text-blue-600">{adminStats?.inTransitShipments || 0}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Undelivered:</span>
+                <span className="font-semibold text-red-600">{adminStats?.undeliveredShipments || 0}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Cancelled:</span>
+                <span className="font-semibold text-gray-600">{adminStats?.cancelledShipments || 0}</span>
               </div>
             </div>
           </CardContent>
@@ -6745,7 +6959,7 @@ export default function SuperAdminDashboard() {
 
                 // Reload assignments
                 if (!selectedAssignmentDate) return;
-                const dateStr = formatDateUTC(selectedAssignmentDate, 'yyyy-MM-dd');
+                const dateStr = formatDateEST(selectedAssignmentDate, 'yyyy-MM-dd');
                 const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
                 setAssignments(assignmentsResponse.data.assignments || []);
               } catch (error) {
@@ -6765,8 +6979,21 @@ export default function SuperAdminDashboard() {
   const renderReassignModal = () => {
     if (!isReassignModalOpen || !selectedAssignment) return null;
 
+    // Filter to active couriers and exclude the currently assigned driver
+    const currentDriverId = selectedAssignment?.driver_id ?? selectedAssignment?.driver?.id;
+    const availableDrivers = couriers.filter(
+      (c) => c.is_active && c.id !== currentDriverId
+    );
+
+    const handleReassignDialogChange = (open: boolean) => {
+      setIsReassignModalOpen(open);
+      if (!open) {
+        setReassignForm({ driverId: '', notes: '' });
+      }
+    };
+
     return (
-      <Dialog open={isReassignModalOpen} onOpenChange={setIsReassignModalOpen}>
+      <Dialog open={isReassignModalOpen} onOpenChange={handleReassignDialogChange}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>
             <DialogTitle>Reassign Assignment</DialogTitle>
@@ -6776,15 +7003,37 @@ export default function SuperAdminDashboard() {
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="new_driver_id" className="text-right">
-                New Driver ID
+              <Label htmlFor="reassign_driver_id" className="text-right">
+                New Driver
               </Label>
-              <Input
-                id="new_driver_id"
-                type="number"
-                placeholder="Enter new driver ID"
-                className="col-span-3"
-              />
+              <Select
+                value={reassignForm.driverId}
+                onValueChange={(value) => setReassignForm((prev) => ({ ...prev, driverId: value }))}
+                disabled={couriersLoading}
+              >
+                <SelectTrigger id="reassign_driver_id" className="col-span-3">
+                  <SelectValue
+                    placeholder={couriersLoading ? 'Loading drivers...' : 'Select a driver'}
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {couriersLoading ? (
+                    <SelectItem value="loading" disabled>
+                      Loading...
+                    </SelectItem>
+                  ) : availableDrivers.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      No active drivers available
+                    </SelectItem>
+                  ) : (
+                    availableDrivers.map((driver) => (
+                      <SelectItem key={driver.id} value={driver.id.toString()}>
+                        {driver.first_name} {driver.last_name} (ID: {driver.id})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-4 items-center gap-4">
               <Label htmlFor="reassign_notes" className="text-right">
@@ -6793,41 +7042,45 @@ export default function SuperAdminDashboard() {
               <Textarea
                 id="reassign_notes"
                 placeholder="Reassignment notes (required)"
+                value={reassignForm.notes}
+                onChange={(e) => setReassignForm((prev) => ({ ...prev, notes: e.target.value }))}
                 className="col-span-3"
                 required
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsReassignModalOpen(false)}>
+            <Button variant="outline" onClick={() => handleReassignDialogChange(false)}>
               Cancel
             </Button>
-            <Button onClick={async () => {
-              const newDriverId = (document.getElementById('new_driver_id') as HTMLInputElement)?.value;
-              const notes = (document.getElementById('reassign_notes') as HTMLTextAreaElement)?.value;
+            <Button
+              onClick={async () => {
+                const { driverId, notes } = reassignForm;
 
-              if (!newDriverId) {
-                showErrorToast('Please enter a new driver ID');
-                return;
-              }
+                if (!driverId) {
+                  showErrorToast('Please select a new driver');
+                  return;
+                }
 
-              if (!notes || notes.trim() === '') {
-                showErrorToast('Please provide reassignment notes');
-                return;
-              }
+                if (!notes || notes.trim() === '') {
+                  showErrorToast('Please provide reassignment notes');
+                  return;
+                }
 
-              if (!selectedAssignment) {
-                showErrorToast('No assignment selected');
-                return;
-              }
+                if (!selectedAssignment) {
+                  showErrorToast('No assignment selected');
+                  return;
+                }
 
-              try {
-                await handleReassignAssignment(parseInt(newDriverId), notes.trim());
-              } catch (error) {
-                console.error('Failed to reassign assignment:', error);
-                showErrorToast('Failed to reassign assignment. Please try again.');
-              }
-            }}>
+                try {
+                  await handleReassignAssignment(parseInt(driverId), notes.trim());
+                  setReassignForm({ driverId: '', notes: '' });
+                } catch (error) {
+                  console.error('Failed to reassign assignment:', error);
+                  showErrorToast('Failed to reassign assignment. Please try again.');
+                }
+              }}
+            >
               Reassign
             </Button>
           </DialogFooter>

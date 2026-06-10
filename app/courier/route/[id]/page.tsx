@@ -2262,7 +2262,7 @@ export default function CourierRouteSimulation() {
           setIsRetrying(false);
         }
       }}>
-        <DialogContent className="max-w-lg bg-white max-h-[90vh] flex flex-col overflow-hidden sm:max-w-lg sm:max-h-[90vh] sm:flex sm:flex-col sm:overflow-hidden max-[430px]:w-screen max-[430px]:h-screen max-[430px]:max-w-none max-[430px]:max-h-none max-[430px]:rounded-none max-[430px]:border-none max-[430px]:fixed max-[430px]:inset-0 max-[430px]:top-0 max-[430px]:left-0 max-[430px]:right-0 max-[430px]:bottom-0 max-[430px]:translate-x-0 max-[430px]:translate-y-0">
+        <DialogContent className="max-w-lg bg-white max-h-[90vh] flex flex-col overflow-hidden sm:max-w-lg sm:max-h-[90vh] sm:flex sm:flex-col sm:overflow-hidden max-[430px]:w-screen max-[430px]:h-[100dvh] max-[430px]:max-w-none max-[430px]:max-h-[100dvh] max-[430px]:rounded-none max-[430px]:border-none max-[430px]:fixed max-[430px]:inset-0 max-[430px]:top-0 max-[430px]:left-0 max-[430px]:right-0 max-[430px]:bottom-0 max-[430px]:translate-x-0 max-[430px]:translate-y-0">
           <DialogHeader className="flex-shrink-0 pb-4 max-[430px]:px-6 max-[430px]:py-4 max-[430px]:bg-white max-[430px]:border-b">
             <DialogTitle className="flex items-center space-x-2">
               <Icon name="Camera" size={20} className="text-purple-600" />
@@ -2497,7 +2497,10 @@ export default function CourierRouteSimulation() {
             </div>
             
             {/* Action buttons */}
-            <div className="flex space-x-2 pt-4 max-[430px]:px-6 max-[430px]:py-4 max-[430px]:bg-white max-[430px]:border-t">
+            <div
+              className="flex space-x-2 pt-4 max-[430px]:px-6 max-[430px]:py-4 max-[430px]:bg-white max-[430px]:border-t"
+              style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
+            >
               <Button
                 variant="outline"
                 onClick={() => {
@@ -2559,7 +2562,7 @@ export default function CourierRouteSimulation() {
           }
         }
       }}>
-        <DialogContent className="max-w-2xl p-0 max-h-[95vh] flex flex-col overflow-hidden sm:max-w-2xl sm:max-h-[95vh] sm:flex sm:flex-col sm:overflow-hidden max-[430px]:w-screen max-[430px]:h-screen max-[430px]:max-w-none max-[430px]:max-h-none max-[430px]:rounded-none max-[430px]:border-none max-[430px]:fixed max-[430px]:inset-0 max-[430px]:top-0 max-[430px]:left-0 max-[430px]:right-0 max-[430px]:bottom-0 max-[430px]:translate-x-0 max-[430px]:translate-y-0">
+        <DialogContent className="max-w-2xl p-0 max-h-[95vh] flex flex-col overflow-hidden sm:max-w-2xl sm:max-h-[95vh] sm:flex sm:flex-col sm:overflow-hidden max-[430px]:w-screen max-[430px]:h-[100dvh] max-[430px]:max-w-none max-[430px]:max-h-[100dvh] max-[430px]:rounded-none max-[430px]:border-none max-[430px]:fixed max-[430px]:inset-0 max-[430px]:top-0 max-[430px]:left-0 max-[430px]:right-0 max-[430px]:bottom-0 max-[430px]:translate-x-0 max-[430px]:translate-y-0">
           {/* Modal Header - Matches Scan Modal Style */}
           <div className="px-6 py-4 border-b flex-shrink-0">
             <DialogTitle className="text-lg font-semibold">
@@ -2629,7 +2632,10 @@ export default function CourierRouteSimulation() {
                 )}
                 
                 {/* Camera Controls Overlay */}
-                <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent">
+                <div
+                  className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/70 to-transparent"
+                  style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
+                >
                   <div className="flex items-center justify-between">
                     {/* Flash Toggle Button */}
                     <Button
@@ -2806,7 +2812,10 @@ export default function CourierRouteSimulation() {
           )}
           
             {/* Action Buttons */}
-            <div className="px-6 py-4 border-t bg-white max-[430px]:px-6 max-[430px]:py-4 max-[430px]:border-t max-[430px]:bg-white">
+            <div
+              className="px-6 py-4 border-t bg-white max-[430px]:px-6 max-[430px]:py-4 max-[430px]:border-t max-[430px]:bg-white"
+              style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
+            >
             <div className="flex space-x-2">
               {capturedPhotos.length > 0 && !photoUploaded && (
                 <>

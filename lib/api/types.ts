@@ -752,6 +752,53 @@ export interface MoveToWarehouseResponse {
   success: boolean;
 }
 
+export interface AdminPaidShipment {
+  id: number;
+  user_id: number;
+  user_email: string | null;
+  user_name: string | null;
+  tracking_code: string;
+  status: string;
+  sender_name: string;
+  sender_company: string | null;
+  sender_city: string;
+  sender_province: string;
+  sender_postal_code: string;
+  receiver_name: string;
+  receiver_company: string | null;
+  receiver_city: string;
+  receiver_province: string;
+  receiver_postal_code: string;
+  package_type: string;
+  weight: number;
+  special_instructions: string | null;
+  created_at: string;
+  updated_at: string | null;
+}
+
+export interface AdminPaidShipmentsResponse {
+  shipments: AdminPaidShipment[];
+  total: number;
+  page: number;
+  per_page: number;
+  total_pages: number;
+}
+
+export interface AdminListPaidShipmentsParams {
+  page?: number;
+  per_page?: number;
+}
+
+export interface AdminMoveSingleToWarehouseResponse {
+  success: boolean;
+  message: string;
+  shipment_id: number;
+  tracking_code: string;
+  previous_status: string;
+  new_status: string;
+  notification_sent: boolean;
+}
+
 // Statistics Types
 export interface StatisticsParams {
   date_start?: string;

@@ -10,6 +10,9 @@ import type {
   AdminCreateUserRequest,
   AdminCreateUserResponse,
   AdminListUsersParams,
+  AdminListPaidShipmentsParams,
+  AdminMoveSingleToWarehouseResponse,
+  AdminPaidShipmentsResponse,
   AdminUpdateUserRoleParams,
   User,
   AssignmentsResponse,
@@ -274,6 +277,57 @@ export class AdminService {
        return response;
      } catch (error) {
        console.error('Admin move shipments to warehouse failed:', error);
+       throw error;
+     }
+   }
+
+   /**
+    * List paid shipments awaiting warehouse intake (admin only).
+    *
+    * Backs the admin warehouse page so an operator can review and
+    * promote each paid shipment individually instead of using the bulk
+    * ``moveShipmentsToWarehouse`` action.
+    */
+   async listPaidShipments(
+     params: AdminListPaidShipmentsParams = {}
+   ): Promise<ApiSuccessResponse<AdminPaidShipmentsResponse>> {
+     try {
+       const { page = 1, per_page = 25 } = params;
+
+       const response = await apiClient.get<AdminPaidShipmentsResponse>(
+         API_ENDPOINTS.SHIPMENTS.ADMIN_LIST_PAID,
+         { page, per_page },
+         { requiresAuth: true }
+       );
+
+       return response;
+     } catch (error) {
+       console.error('Admin list paid shipments failed:', error);
+       throw error;
+     }
+   }
+
+   /**
+    * Move a single paid shipment to warehouse by ID (admin only).
+    */
+   async moveSingleShipmentToWarehouse(
+     shipmentId: number
+   ): Promise<ApiSuccessResponse<AdminMoveSingleToWarehouseResponse>> {
+     try {
+       const url = API_ENDPOINTS.SHIPMENTS.ADMIN_MOVE_SINGLE_TO_WAREHOUSE.replace(
+         ':shipment_id',
+         shipmentId.toString()
+       );
+
+       const response = await apiClient.post<AdminMoveSingleToWarehouseResponse>(
+         url,
+         {},
+         { requiresAuth: true }
+       );
+
+       return response;
+     } catch (error) {
+       console.error('Admin move single shipment to warehouse failed:', error);
        throw error;
      }
    }

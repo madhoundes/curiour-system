@@ -45,7 +45,7 @@ export default function RootLayout({
       >
       <head>
         {/* Mobile viewport meta tag for proper responsive scaling */}
-        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+        <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
         {/* Prevent iOS from auto-linking phone numbers/dates to avoid hydration diffs */}
         <meta
           name="format-detection"
