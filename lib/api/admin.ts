@@ -14,6 +14,7 @@ import type {
   AdminMoveSingleToWarehouseResponse,
   AdminPaidShipmentsResponse,
   AdminUpdateUserRoleParams,
+  AdminImpersonateResponse,
   User,
   AssignmentsResponse,
   AssignmentStatisticsResponse,
@@ -95,6 +96,29 @@ export class AdminService {
       return response;
     } catch (error) {
       console.error('Admin update user role failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Issue a short-lived merchant session token (admin only)
+   */
+  async impersonateUser(userId: number): Promise<ApiSuccessResponse<AdminImpersonateResponse>> {
+    try {
+      const url = API_ENDPOINTS.AUTH.ADMIN_IMPERSONATE_USER.replace(
+        ':user_id',
+        userId.toString(),
+      );
+
+      const response = await apiClient.post<AdminImpersonateResponse>(
+        url,
+        {},
+        { requiresAuth: true },
+      );
+
+      return response;
+    } catch (error) {
+      console.error('Admin impersonate user failed:', error);
       throw error;
     }
   }

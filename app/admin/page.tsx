@@ -78,6 +78,7 @@ import NotificationDropdown from "@/components/admin/NotificationDropdown";
 import CourierCreationModal from "@/components/admin/CourierCreationModal";
 import { adminService } from "@/lib/api/admin";
 import { authService } from "@/lib/api/auth";
+import { startMerchantImpersonation } from "@/lib/auth/impersonation";
 import { shopifyService } from "@/lib/api/shopify";
 import { shippingService } from "@/lib/api/shipping";
 import { claimsService } from "@/lib/api/claims";
@@ -167,6 +168,7 @@ export default function SuperAdminDashboard() {
   const [isMerchantSearchLoading, setIsMerchantSearchLoading] = useState(false);
   const [merchants, setMerchants] = useState<MerchantWithShopify[]>([]);
   const [merchantsLoading, setMerchantsLoading] = useState(false);
+  const [impersonatingMerchantId, setImpersonatingMerchantId] = useState<number | null>(null);
   const [selectedMerchant, setSelectedMerchant] = useState<MerchantWithShopify | null>(null);
   const [merchantStats, setMerchantStats] = useState<{
     totalShipments: number;
@@ -718,6 +720,27 @@ export default function SuperAdminDashboard() {
     setMerchantSearchQuery("");
     setFilteredMerchants(merchants);
   };
+
+  const handleImpersonateMerchant = useCallback(async (merchant: User) => {
+    if (!merchant.is_active) {
+      showErrorToast("Cannot view dashboard for a suspended merchant account.");
+      return;
+    }
+
+    try {
+      setImpersonatingMerchantId(merchant.id);
+      const response = await adminService.impersonateUser(merchant.id);
+      const { access_token, user, impersonated_by } = response.data;
+      const adminEmail =
+        (typeof window !== "undefined" && localStorage.getItem("admin_email")) ||
+        impersonated_by;
+      startMerchantImpersonation(user, access_token, adminEmail);
+    } catch (error) {
+      console.error("Failed to impersonate merchant:", error);
+      showErrorToast("Unable to open merchant dashboard. Please try again.");
+      setImpersonatingMerchantId(null);
+    }
+  }, [showErrorToast]);
 
   // Clear courier search functionality
   const handleClearCourierSearch = () => {
@@ -2020,6 +2043,38 @@ export default function SuperAdminDashboard() {
   };
 
   const renderMerchants = () => {
+    const MerchantImpersonateButton = ({
+      merchant,
+      compact = false,
+    }: {
+      merchant: User;
+      compact?: boolean;
+    }) => (
+      <Button
+        variant="outline"
+        size="sm"
+        id={`parcego-merchant-impersonate-${merchant.id}`}
+        onClick={() => handleImpersonateMerchant(merchant)}
+        disabled={!merchant.is_active || impersonatingMerchantId === merchant.id}
+        className={cn("h-8 touch-manipulation", compact && "w-8 p-0")}
+        aria-label={`View dashboard as ${getMerchantProperty(merchant, "businessName")}`}
+        title={
+          merchant.is_active
+            ? "View as merchant"
+            : "Suspended accounts cannot be impersonated"
+        }
+      >
+        {impersonatingMerchantId === merchant.id ? (
+          <Icon name="Loader2" size={14} className="animate-spin" />
+        ) : (
+          <>
+            <Icon name="Eye" size={14} className={compact ? undefined : "sm:mr-1.5"} />
+            {!compact && <span className="hidden sm:inline">View as</span>}
+          </>
+        )}
+      </Button>
+    );
+
     // Mobile Card Component
     const MerchantCard = ({ merchant }: { merchant: typeof merchants[0] }) => {
       const [isExpanded, setIsExpanded] = useState(false);
@@ -2070,7 +2125,8 @@ export default function SuperAdminDashboard() {
 
                 {/* Action Buttons - Only visible when expanded */}
                 <div className="pt-1.5 border-t border-gray-100">
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-end gap-2">
+                    <MerchantImpersonateButton merchant={merchant} />
                   </div>
                 </div>
               </div>
@@ -2235,6 +2291,7 @@ export default function SuperAdminDashboard() {
                           </td>
                           <td className="p-3">
                             <div className="flex items-center gap-1">
+                              <MerchantImpersonateButton merchant={merchant} compact />
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -2315,6 +2372,7 @@ export default function SuperAdminDashboard() {
                           <td className="p-4">{getMerchantProperty(merchant, 'totalShipments').toLocaleString()}</td>
                           <td className="p-4">
                             <div className="flex items-center gap-2">
+                              <MerchantImpersonateButton merchant={merchant} compact />
                               <Button
                                 variant="outline"
                                 size="sm"

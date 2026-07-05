@@ -27,6 +27,7 @@ export const API_ENDPOINTS = {
     ADMIN_CREATE_USER: '/auth/admin/create-user',
     ADMIN_LIST_USERS: '/auth/admin/users',
     ADMIN_UPDATE_USER_ROLE: '/auth/admin/users/:user_id/role',
+    ADMIN_IMPERSONATE_USER: '/auth/admin/users/:user_id/impersonate',
     ADMIN_ASSIGNMENTS_TODAY: '/admin/assignments/today',
     ADMIN_ASSIGNMENTS_BY_DATE: '/admin/assignments/:assignment_date',
     ADMIN_ASSIGNMENT_STATISTICS: '/admin/assignments/statistics/:assignment_date',

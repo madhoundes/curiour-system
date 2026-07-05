@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
 import { UnifiedHeader } from "@/components/ui/unified-header";
+import { ImpersonationBanner } from "@/components/admin/impersonation-banner";
 import { cn } from "@/lib/utils";
 
 // Navigation section type
@@ -231,6 +232,9 @@ export function MerchantDashboardLayout({ children }: MerchantDashboardLayoutPro
           id="parcego-dashboard-main-container"
         >
           <main className="p-6">
+            <div className="-mx-6 -mt-6 mb-6">
+              <ImpersonationBanner />
+            </div>
             {children}
           </main>
         </div>

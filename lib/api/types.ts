@@ -138,6 +138,13 @@ export interface AdminUpdateUserRoleParams {
   new_role: 'user' | 'driver' | 'admin';
 }
 
+export interface AdminImpersonateResponse {
+  access_token: string;
+  token_type: string;
+  user: User;
+  impersonated_by: string;
+}
+
 // Quotes Types
 export interface QuoteEstimateRequest {
   package_size: 'small' | 'medium' | 'large';
