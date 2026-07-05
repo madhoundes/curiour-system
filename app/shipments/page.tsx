@@ -303,6 +303,7 @@ function ShipmentsPageContent() {
       shopifyOrderNumber: s.shopify_order_number ?? '',
       date: s.created_at,
       recipient: s.receiver_address.contact_name,
+      city: s.receiver_address.city,
       service: 'Standard', // Default service since it's not in DetailedShipment
       courier: "Parcego",
       weight: s.package.weight,
@@ -636,6 +637,7 @@ function ShipmentsPageContent() {
                   <th className="px-3 py-2 text-left">Shopify Order</th>
                   <th className="px-3 py-2 text-left">Date</th>
                   <th className="px-3 py-2 text-left">Recipient</th>
+                  <th className="px-3 py-2 text-left">City</th>
                   <th className="px-3 py-2 text-left">Service</th>
                   <th className="px-3 py-2 text-left">Courier</th>
                   <th className="px-3 py-2 text-left">Weight</th>
@@ -664,6 +666,9 @@ function ShipmentsPageContent() {
                       </td>
                       <td className="px-3 py-2">{new Date(s.created_at).toLocaleDateString()}</td>
                       <td className="px-3 py-2">{s.receiver_address.contact_name}</td>
+                      <td className="px-3 py-2 text-gray-700">
+                        {s.receiver_address.city || "—"}
+                      </td>
                       <td className="px-3 py-2">Standard</td>
                       <td className="px-3 py-2">Parcego</td>
                       <td className="px-3 py-2">{s.package.weight.toFixed(2)} kg</td>
@@ -855,7 +860,7 @@ function ShipmentsPageContent() {
             <AlertDialogDescription>
               {getExportMessage()}
               <br /><br />
-              The file will include shipment ID, tracking number, date, recipient, service, courier, weight, cost, and status.
+              The file will include shipment ID, tracking number, Shopify order, date, recipient, city, service, courier, weight, cost, and status.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
