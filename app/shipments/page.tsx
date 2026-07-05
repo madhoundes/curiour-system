@@ -141,6 +141,7 @@ function ShipmentsPageContent() {
   const [error, setError] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportType, setExportType] = useState<"all" | "selected">("all");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -161,31 +162,43 @@ function ShipmentsPageContent() {
   const [isSearchMode, setIsSearchMode] = useState<boolean>(false);
 
   const shippingService = new ShippingService();
+  const loadRequestIdRef = React.useRef(0);
 
   useEffect(() => {
     const urlQuery = searchParams.get("q");
     if (urlQuery) {
       setQuery(urlQuery);
+      setDebouncedQuery(urlQuery.trim());
     }
   }, [searchParams]);
 
-  // Whenever the search query or page size changes, snap back to page 1.
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setDebouncedQuery(query.trim());
+    }, query.trim() ? 350 : 0);
+
+    return () => window.clearTimeout(timer);
+  }, [query]);
+
+  // Whenever the debounced search or page size changes, snap back to page 1.
   React.useEffect(() => {
     setPage(1);
     setSelectedIds(new Set());
-  }, [pageSize, query]);
+  }, [pageSize, debouncedQuery]);
 
   const loadShipments = React.useCallback(async () => {
+    const requestId = ++loadRequestIdRef.current;
+
     try {
       setIsLoading(true);
       setError(null);
 
-      const trimmed = query.trim();
-
-      if (trimmed) {
+      if (debouncedQuery) {
         // Search endpoint returns all matches for tracking code, shipment ID,
         // or Shopify order name/ID. Treat the result as a one-page view.
-        const results = await shippingService.searchShipments(trimmed);
+        const results = await shippingService.searchShipments(debouncedQuery);
+
+        if (requestId !== loadRequestIdRef.current) return;
 
         setShipments(results);
         setTotalShipments(results.length);
@@ -197,6 +210,8 @@ function ShipmentsPageContent() {
           per_page: pageSize,
         });
 
+        if (requestId !== loadRequestIdRef.current) return;
+
         setShipments(response.shipments);
         setTotalShipments(response.total);
         setTotalPages(Math.max(1, response.total_pages));
@@ -205,18 +220,22 @@ function ShipmentsPageContent() {
 
       setIsDataLoaded(true);
     } catch (err: any) {
+      if (requestId !== loadRequestIdRef.current) return;
+
       console.error('Failed to load shipments:', err);
       setError(err.message || 'Failed to load shipments');
       setShipments([]);
       setTotalShipments(0);
       setTotalPages(1);
     } finally {
-      setIsLoading(false);
+      if (requestId === loadRequestIdRef.current) {
+        setIsLoading(false);
+      }
     }
     // ``shippingService`` is a fresh instance each render but its methods
     // are stateless, so it's safe to leave out of the dep array.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, query]);
+  }, [page, pageSize, debouncedQuery]);
 
   React.useEffect(() => {
     loadShipments();
@@ -462,6 +481,8 @@ function ShipmentsPageContent() {
     }
   };
 
+  const isSearchPending = query.trim() !== debouncedQuery;
+
   // Update table title based on selection state. ``totalShipments`` reflects
   // the count the server reports (so the user knows there are more pages),
   // while ``shipments.length`` is just what's on this page.
@@ -543,9 +564,8 @@ function ShipmentsPageContent() {
               className="w-full"
               id="parcego-shipments-search-input"
               aria-label="Search shipments by tracking code, shipment ID, or Shopify order"
-              disabled={isLoading}
             />
-            {isLoading && (
+            {(isLoading || isSearchPending) && (
               <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
                 <Icon name="Loader2" className="h-4 w-4 animate-spin text-gray-400" />
               </div>
