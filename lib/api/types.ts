@@ -392,6 +392,42 @@ export interface DetailedShipment {
   actual_delivery_date?: string;
   created_at: string;
   updated_at: string;
+  shopify_order_number?: string | null;
+}
+
+/** Flat row returned by GET /shipments/search */
+export interface ShipmentSearchResult {
+  id: number;
+  tracking_code: string;
+  status: string;
+  shopify_order_number?: string | null;
+  sender_name: string;
+  sender_company?: string | null;
+  sender_address: string;
+  sender_city: string;
+  sender_province: string;
+  sender_postal_code: string;
+  receiver_name: string;
+  receiver_company?: string | null;
+  receiver_address: string;
+  receiver_city: string;
+  receiver_province: string;
+  receiver_postal_code: string;
+  package_type: string;
+  weight: number;
+  billing_amount?: number | null;
+  billing_status?: string | null;
+  special_instructions?: string | null;
+  delivery_notes?: string | null;
+  estimated_delivery_date?: string | null;
+  actual_delivery_date?: string | null;
+  created_at: string;
+}
+
+export interface ShipmentSearchListResponse {
+  shipments: ShipmentSearchResult[];
+  total: number;
+  query: string;
 }
 
 export interface ShipmentsListResponse {

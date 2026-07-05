@@ -1,7 +1,7 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { useMemo, useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -146,6 +146,7 @@ const statusOptions = [
 
 export default function ShipmentsPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Data loading state for consistent SSR/CSR
   const [shipments, setShipments] = useState<DetailedShipment[]>([]);
@@ -169,12 +170,19 @@ export default function ShipmentsPage() {
   const [page, setPage] = useState<number>(1);
   const [totalPages, setTotalPages] = useState<number>(1);
   const [totalShipments, setTotalShipments] = useState<number>(0);
-  // When the user is searching the page acts as a single-result view; the
+  // When the user is searching the page acts as a filtered results view; the
   // backend search endpoint doesn't paginate so we expose a "no pagination"
   // mode in that case.
   const [isSearchMode, setIsSearchMode] = useState<boolean>(false);
 
   const shippingService = new ShippingService();
+
+  useEffect(() => {
+    const urlQuery = searchParams.get("q");
+    if (urlQuery) {
+      setQuery(urlQuery);
+    }
+  }, [searchParams]);
 
   // Whenever the filters or page size change, snap back to page 1. Without
   // this, switching from a 5-page result set with status=ALL to status=DRAFT
@@ -192,8 +200,8 @@ export default function ShipmentsPage() {
       const trimmed = query.trim();
 
       if (trimmed) {
-        // Search endpoint returns a single best match keyed off tracking
-        // code or shipment ID. Treat the result as a one-page view.
+        // Search endpoint returns all matches for tracking code, shipment ID,
+        // or Shopify order name/ID. Treat the result as a one-page view.
         const results = await shippingService.searchShipments(trimmed);
         const filtered = selectedStatus === 'ALL'
           ? results
@@ -294,6 +302,7 @@ export default function ShipmentsPage() {
     const rows = dataToExport.map((s) => ({
       id: s.id,
       trackingNumber: s.tracking_code,
+      shopifyOrderNumber: s.shopify_order_number ?? '',
       date: s.created_at,
       recipient: s.receiver_address.contact_name,
       service: 'Standard', // Default service since it's not in DetailedShipment
@@ -550,11 +559,12 @@ export default function ShipmentsPage() {
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1 relative">
               <Input
-                placeholder="Search by tracking code or shipment ID..."
+                placeholder="Search by tracking code, shipment ID, or Shopify order..."
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 className="w-full"
                 id="parcego-shipments-search-input"
+                aria-label="Search shipments by tracking code, shipment ID, or Shopify order"
                 disabled={isLoading}
               />
               {isLoading && (
@@ -640,6 +650,7 @@ export default function ShipmentsPage() {
                     />
                   </th>
                   <th className="px-3 py-2 text-left">Shipment ID</th>
+                  <th className="px-3 py-2 text-left">Shopify Order</th>
                   <th className="px-3 py-2 text-left">Date</th>
                   <th className="px-3 py-2 text-left">Recipient</th>
                   <th className="px-3 py-2 text-left">Service</th>
@@ -665,6 +676,9 @@ export default function ShipmentsPage() {
                         />
                       </td>
                       <td className="px-3 py-2 font-medium text-gray-900">{s.id}</td>
+                      <td className="px-3 py-2 text-gray-700">
+                        {s.shopify_order_number ?? "—"}
+                      </td>
                       <td className="px-3 py-2">{new Date(s.created_at).toLocaleDateString()}</td>
                       <td className="px-3 py-2">{s.receiver_address.contact_name}</td>
                       <td className="px-3 py-2">Standard</td>

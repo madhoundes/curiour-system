@@ -33,7 +33,76 @@ import type {
   BillingRecordsListResponse,
   GenerateBillingReportRequest,
   GenerateBillingReportResponse,
+  ShipmentSearchListResponse,
+  ShipmentSearchResult,
 } from './types';
+
+const mapSearchResultToDetailedShipment = (
+  row: ShipmentSearchResult,
+): DetailedShipment => ({
+  id: row.id,
+  user_id: 0,
+  tracking_code: row.tracking_code,
+  status: row.status,
+  shopify_order_number: row.shopify_order_number ?? null,
+  sender_address: {
+    contact_name: row.sender_name,
+    company_name: row.sender_company ?? undefined,
+    street_address: row.sender_address,
+    city: row.sender_city,
+    province: row.sender_province,
+    postal_code: row.sender_postal_code,
+    country: 'Canada',
+    phone_number: '',
+    email: '',
+    updated_at: row.created_at,
+  },
+  receiver_address: {
+    contact_name: row.receiver_name,
+    company_name: row.receiver_company ?? undefined,
+    street_address: row.receiver_address,
+    city: row.receiver_city,
+    province: row.receiver_province,
+    postal_code: row.receiver_postal_code,
+    country: 'Canada',
+    phone_number: '',
+    email: '',
+    updated_at: row.created_at,
+  },
+  package: {
+    package_type: (row.package_type as DetailedShipment['package']['package_type']) || 'box',
+    weight: row.weight,
+    length: 0,
+    width: 0,
+    height: 0,
+    declared_value: 0,
+    contents_description: '',
+    fragile: false,
+    requires_signature: false,
+    special_instructions: row.special_instructions ?? undefined,
+    updated_at: row.created_at,
+  },
+  billing: row.billing_amount != null
+    ? {
+        id: 0,
+        subtotal: String(row.billing_amount),
+        tax_amount: '0',
+        tax_rate: '0',
+        amount: String(row.billing_amount),
+        currency: 'CAD',
+        payment_method: '',
+        payment_status: row.billing_status ?? 'pending',
+        created_at: row.created_at,
+        updated_at: row.created_at,
+      }
+    : null,
+  special_instructions: row.special_instructions ?? undefined,
+  delivery_notes: row.delivery_notes ?? undefined,
+  estimated_delivery_date: row.estimated_delivery_date ?? undefined,
+  actual_delivery_date: row.actual_delivery_date ?? undefined,
+  created_at: row.created_at,
+  updated_at: row.created_at,
+});
 
 export class ShippingService {
   /**
@@ -123,11 +192,7 @@ export class ShippingService {
   }
 
   /**
-   * Search user shipments by tracking code or ID.
-   *
-   * The backend endpoint accepts a single ``q`` param and returns at most one
-   * best match. We previously forwarded ``skip``/``limit`` which the server
-   * just ignored – dropped to keep the contract honest.
+   * Search user shipments by tracking code, shipment ID, or Shopify order.
    */
   async searchShipments(query: string): Promise<DetailedShipment[]> {
     try {
@@ -135,16 +200,14 @@ export class ShippingService {
         throw new Error('Search query is required');
       }
 
-      const response = await apiClient.get<DetailedShipment | DetailedShipment[]>(
+      const response = await apiClient.get<ShipmentSearchListResponse>(
         API_ENDPOINTS.SHIPMENTS.SEARCH,
         { q: query.trim() }
       );
 
-      // The endpoint historically returned either a single object or a list;
-      // normalize to an array so callers don't have to branch.
-      const raw = response.data;
-      const list = Array.isArray(raw) ? raw : raw ? [raw] : [];
-      return list.map(normalizeDetailedShipmentMoney);
+      return response.data.shipments
+        .map(mapSearchResultToDetailedShipment)
+        .map(normalizeDetailedShipmentMoney);
     } catch (error: any) {
       // ``handleError`` flattens the response, so both shapes can show up.
       const status = error.status ?? error.response?.status;
