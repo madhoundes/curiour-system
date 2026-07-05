@@ -130,20 +130,6 @@ const getStatusBadge = (status: ShipmentStatus) => {
   return statusConfig[status] || statusConfig.LABEL_CREATED;
 };
 
-// Status options for the select dropdown
-const statusOptions = [
-  { value: "ALL", label: "All Statuses" },
-  { value: "DELIVERED", label: "Delivered" },
-  { value: "IN_TRANSIT", label: "In Transit" },
-  { value: "LABEL_CREATED", label: "Label Created" },
-  { value: "SCANNED", label: "Scanned" },
-  { value: "OUT_FOR_DELIVERY", label: "Out for Delivery" },
-  { value: "FAILED", label: "Failed" },
-  { value: "CANCELLED", label: "Cancelled" },
-  { value: "DRAFT", label: "Draft" },
-  { value: "PAID", label: "Paid" },
-];
-
 export default function ShipmentsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -155,7 +141,6 @@ export default function ShipmentsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const [query, setQuery] = useState("");
-  const [selectedStatus, setSelectedStatus] = useState<string>("ALL");
   const [showExportDialog, setShowExportDialog] = useState(false);
   const [exportType, setExportType] = useState<"all" | "selected">("all");
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -184,13 +169,11 @@ export default function ShipmentsPage() {
     }
   }, [searchParams]);
 
-  // Whenever the filters or page size change, snap back to page 1. Without
-  // this, switching from a 5-page result set with status=ALL to status=DRAFT
-  // (one page) would leave ``page`` at 4 and render an empty table.
+  // Whenever the search query or page size changes, snap back to page 1.
   React.useEffect(() => {
     setPage(1);
     setSelectedIds(new Set());
-  }, [selectedStatus, pageSize, query]);
+  }, [pageSize, query]);
 
   const loadShipments = React.useCallback(async () => {
     try {
@@ -203,19 +186,15 @@ export default function ShipmentsPage() {
         // Search endpoint returns all matches for tracking code, shipment ID,
         // or Shopify order name/ID. Treat the result as a one-page view.
         const results = await shippingService.searchShipments(trimmed);
-        const filtered = selectedStatus === 'ALL'
-          ? results
-          : results.filter(s => (s.status?.toUpperCase?.() || s.status) === selectedStatus);
 
-        setShipments(filtered);
-        setTotalShipments(filtered.length);
+        setShipments(results);
+        setTotalShipments(results.length);
         setTotalPages(1);
         setIsSearchMode(true);
       } else {
         const response = await shippingService.getShipmentsPaginated({
           page,
           per_page: pageSize,
-          ...(selectedStatus !== 'ALL' ? { status: selectedStatus } : {}),
         });
 
         setShipments(response.shipments);
@@ -237,7 +216,7 @@ export default function ShipmentsPage() {
     // ``shippingService`` is a fresh instance each render but its methods
     // are stateless, so it's safe to leave out of the dep array.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize, selectedStatus, query]);
+  }, [page, pageSize, query]);
 
   React.useEffect(() => {
     loadShipments();
@@ -550,43 +529,27 @@ export default function ShipmentsPage() {
         description="Manage and track all your shipments in one place"
       />
 
-      {/* Search and Filters */}
+      {/* Search */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg font-semibold">Search & Filter</CardTitle>
+          <CardTitle className="text-lg font-semibold">Search</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Input
-                placeholder="Search by tracking code, shipment ID, or Shopify order..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                className="w-full"
-                id="parcego-shipments-search-input"
-                aria-label="Search shipments by tracking code, shipment ID, or Shopify order"
-                disabled={isLoading}
-              />
-              {isLoading && (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <Icon name="Loader2" className="h-4 w-4 animate-spin text-gray-400" />
-                </div>
-              )}
-            </div>
-            <div className="w-full sm:w-48">
-              <Select value={selectedStatus} onValueChange={setSelectedStatus} disabled={isLoading}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Filter by status" />
-                </SelectTrigger>
-                <SelectContent>
-                  {statusOptions.map((status) => (
-                    <SelectItem key={status.value} value={status.value}>
-                      {status.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="relative">
+            <Input
+              placeholder="Search by tracking code, shipment ID, or Shopify order..."
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full"
+              id="parcego-shipments-search-input"
+              aria-label="Search shipments by tracking code, shipment ID, or Shopify order"
+              disabled={isLoading}
+            />
+            {isLoading && (
+              <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                <Icon name="Loader2" className="h-4 w-4 animate-spin text-gray-400" />
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>
