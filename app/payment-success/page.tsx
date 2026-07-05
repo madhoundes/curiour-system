@@ -297,7 +297,7 @@ function PaymentSuccessContent() {
                   className="w-full justify-start h-12"
                 >
                   <Icon name="Package" size={18} className="mr-2" />
-                  View All Shipments
+                  View Orders
                 </Button>
                 
                 <Button 

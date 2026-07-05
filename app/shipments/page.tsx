@@ -498,7 +498,7 @@ export default function ShipmentsPage() {
     return (
       <div className="space-y-6">
         <PageHeader
-          title="Shipments"
+          title="Orders"
           description="Manage and track all your shipments in one place"
         />
         <Card>
@@ -525,7 +525,7 @@ export default function ShipmentsPage() {
     <div className="space-y-6">
       {/* Page Header */}
       <PageHeader
-        title="Shipments"
+        title="Orders"
         description="Manage and track all your shipments in one place"
       />
 

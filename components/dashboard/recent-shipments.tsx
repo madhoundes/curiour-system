@@ -328,7 +328,7 @@ Generated automatically for your records`
                   className="w-full"
                   onClick={() => window.location.href = '/shipments'}
                 >
-                  View All Shipments
+                  View Orders
                 </Button>
               </div>
             </>

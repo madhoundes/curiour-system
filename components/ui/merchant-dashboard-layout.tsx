@@ -30,7 +30,7 @@ const navigationSections: NavigationSection[] = [
     items: [
       { id: "dashboard", label: "Dashboard", href: "/dashboard", icon: "Home", description: "Overview and quick actions" },
       { id: "create-shipment", label: "Create Shipment", href: "/create-shipment", icon: "Plus", description: "Ship new packages" },
-      { id: "shipments", label: "All Shipments", href: "/shipments", icon: "Package", description: "View shipment history" },
+      { id: "shipments", label: "Orders", href: "/shipments", icon: "Package", description: "View order history" },
       { id: "find-dropoff", label: "Drop-off Locations", href: "/find-dropoff", icon: "MapPin", description: "Find nearby locations" }
     ]
   },
