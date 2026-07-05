@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { Suspense, useMemo, useState, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -130,7 +130,7 @@ const getStatusBadge = (status: ShipmentStatus) => {
   return statusConfig[status] || statusConfig.LABEL_CREATED;
 };
 
-export default function ShipmentsPage() {
+function ShipmentsPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -924,4 +924,20 @@ export default function ShipmentsPage() {
   );
 }
 
+export default function ShipmentsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[40vh] flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-600">Loading orders...</p>
+          </div>
+        </div>
+      }
+    >
+      <ShipmentsPageContent />
+    </Suspense>
+  );
+}
 
