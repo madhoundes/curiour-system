@@ -6,6 +6,8 @@ import { Box, ChevronDown, Check, Layers, Loader2, AlertCircle } from 'lucide-re
 import { LandingButton } from './LandingButton';
 import { motion, AnimatePresence } from 'framer-motion';
 import { quotesService } from '@/lib/api/quotes';
+import type { QuoteOptionItem } from '@/lib/api/types';
+import { buildQuoteOptionsFromPostal, getDeliverySpeedLabel } from '@/lib/zone-pricing';
 
 // UI-facing package labels mapped to the backend's ``PackageSize`` enum.
 // Envelope -> small, Box -> medium, Pallet -> large.
@@ -16,9 +18,9 @@ const PACKAGE_TYPE_TO_API_SIZE: Record<string, 'small' | 'medium' | 'large'> = {
 };
 
 interface EstimateResult {
-  cost: string;
   destinationPostalCode: string;
-  serviceArea: string;
+  options: QuoteOptionItem[];
+  inSpecialZone: boolean;
 }
 
 const validateWeight = (val: string): number | null => {
@@ -79,7 +81,6 @@ const LandingRateCalculator: React.FC = () => {
   const handleCalculate = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validate weight
     const w = validateWeight(weight);
     if (w === null) {
       setWeightError('Please enter a valid weight (0.1 – 50 kg)');
@@ -87,7 +88,6 @@ const LandingRateCalculator: React.FC = () => {
     }
     setWeightError('');
 
-    // Validate destination postal code (origin isn't used by the backend yet)
     const trimmedDest = dest.trim();
     if (!trimmedDest) {
       setDestError('Destination postal code required');
@@ -95,6 +95,10 @@ const LandingRateCalculator: React.FC = () => {
     }
     if (!quotesService.isValidPostalCode(trimmedDest)) {
       setDestError('Use Canadian format: A1A 1A1');
+      return;
+    }
+    if (!quotesService.isPostalCodeInServiceArea(trimmedDest)) {
+      setDestError('Service area: Downtown Toronto or Mississauga only');
       return;
     }
     setDestError('');
@@ -105,28 +109,30 @@ const LandingRateCalculator: React.FC = () => {
 
     try {
       const apiSize = PACKAGE_TYPE_TO_API_SIZE[packageType] ?? 'medium';
-      const response = await quotesService.getEstimate({
-        package_size: apiSize,
-        weight: w,
-        destination_postal_code: trimmedDest,
-      });
+      const response = await quotesService.getOptions(
+        buildQuoteOptionsFromPostal(apiSize, w, trimmedDest),
+      );
 
-      // The service already converts cents -> dollars at the boundary.
       setEstimate({
-        cost: response.estimated_price.toFixed(2),
-        destinationPostalCode: response.destination_postal_code,
-        serviceArea: response.service_area,
+        destinationPostalCode: trimmedDest.toUpperCase(),
+        options: response.options,
+        inSpecialZone: response.in_special_zone,
       });
       setHasCalculated(true);
-    } catch (err: any) {
+    } catch (err: unknown) {
       const message =
-        err?.message ||
-        'Unable to estimate right now. Please try again in a moment.';
+        err instanceof Error
+          ? err.message
+          : 'Unable to estimate right now. Please try again in a moment.';
       setApiError(message);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const lowestPrice = estimate
+    ? Math.min(...estimate.options.map((option) => option.estimated_price))
+    : null;
 
   return (
     <section id="calculator" className="py-24 bg-slate-50">
@@ -160,8 +166,10 @@ const LandingRateCalculator: React.FC = () => {
                   <Layers />
                 </div>
                 <div>
-                  <h4 className="font-bold text-slate-900">Compare Carriers</h4>
-                  <p className="text-sm text-slate-500">Instantly compare rates across multiple services to find the best value for your timeline.</p>
+                  <h4 className="font-bold text-slate-900">Zone-Based Pricing</h4>
+                  <p className="text-sm text-slate-500">
+                    Downtown Toronto deliveries get flat next-day and 2–3 day rates. Other areas use size and weight pricing.
+                  </p>
                 </div>
               </div>
             </div>
@@ -318,23 +326,49 @@ const LandingRateCalculator: React.FC = () => {
                 >
                   <div className="absolute top-0 right-0 w-32 h-32 bg-brand-100 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none opacity-60" />
 
-                  <div className="flex justify-between items-end mb-6 relative z-10">
-                    <div>
-                      <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Estimated Cost</p>
-                      <p className="text-5xl font-bold text-brand-600 tracking-tight leading-none">
-                        ${estimate.cost}
-                      </p>
+                  {estimate.inSpecialZone && estimate.options.length > 1 ? (
+                    <div className="relative z-10 space-y-4">
+                      <div>
+                        <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">
+                          Downtown Zone Rates
+                        </p>
+                        <p className="text-sm text-brand-800">
+                          Flat rates from ${lowestPrice?.toFixed(2)} before tax
+                        </p>
+                      </div>
+                      {estimate.options.map((option) => (
+                        <div
+                          key={option.delivery_speed}
+                          className="flex justify-between items-center py-3 border-b border-brand-200/60 last:border-0"
+                        >
+                          <div>
+                            <p className="font-semibold text-slate-900">
+                              {getDeliverySpeedLabel(option.delivery_speed)}
+                            </p>
+                            <p className="text-xs text-slate-600">{option.eta}</p>
+                          </div>
+                          <p className="text-2xl font-bold text-brand-600">
+                            ${option.estimated_price.toFixed(2)}
+                          </p>
+                        </div>
+                      ))}
                     </div>
-                    <div className="text-right pb-1">
-                      <p className="text-brand-600 font-bold text-sm uppercase tracking-wide">
-                        Parcego
-                      </p>
-                      <p className="text-sm text-slate-600 leading-tight mt-1">
-                        {estimate.serviceArea}
-                      </p>
+                  ) : (
+                    <div className="flex justify-between items-end mb-6 relative z-10">
+                      <div>
+                        <p className="text-slate-500 text-xs font-bold uppercase tracking-wider mb-1">Estimated Cost</p>
+                        <p className="text-5xl font-bold text-brand-600 tracking-tight leading-none">
+                          ${estimate.options[0]?.estimated_price.toFixed(2)}
+                        </p>
+                      </div>
+                      <div className="text-right pb-1">
+                        <p className="text-brand-600 font-bold text-sm uppercase tracking-wide">Parcego</p>
+                        <p className="text-sm text-slate-600 leading-tight mt-1">Size &amp; weight pricing</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="pt-4 border-t border-brand-200/60 relative z-10">
+                  )}
+
+                  <div className="pt-4 border-t border-brand-200/60 relative z-10 mt-4">
                     <p className="text-slate-500 text-xs flex justify-between">
                       <span>Based on {weight}kg {packageType} to {estimate.destinationPostalCode}</span>
                       <span className="italic">Taxes calculated at checkout</span>

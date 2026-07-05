@@ -154,6 +154,32 @@ export interface QuoteEstimateResponse {
   weight: number;
 }
 
+export interface QuoteOptionsRequest {
+  package_size: 'small' | 'medium' | 'large';
+  weight: number;
+  destination_postal_code: string;
+  destination_street_address?: string;
+  destination_city?: string;
+  destination_province?: string;
+  destination_country?: string;
+  destination_latitude?: number;
+  destination_longitude?: number;
+}
+
+export interface QuoteOptionItem {
+  delivery_speed: 'next_day' | 'standard_2_3' | 'legacy';
+  estimated_price: number;
+  eta: string;
+}
+
+export interface QuoteOptionsResponse {
+  in_special_zone: boolean;
+  options: QuoteOptionItem[];
+  destination_latitude?: number | null;
+  destination_longitude?: number | null;
+  currency: string;
+}
+
 export interface QuoteErrorResponse {
   error: string;
   message: string;
@@ -220,6 +246,8 @@ export interface Address {
   country: string;
   phone_number: string;
   email: string;
+  latitude?: number;
+  longitude?: number;
   created_at?: string;
 }
 
@@ -244,6 +272,7 @@ export interface CreateShipmentRequest {
   package: Omit<Package, 'id' | 'created_at'>;
   special_instructions?: string;
   delivery_notes?: string;
+  delivery_speed?: 'next_day' | 'standard_2_3' | 'legacy';
 }
 
 export interface UpdateShipmentRequest {

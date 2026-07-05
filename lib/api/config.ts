@@ -87,6 +87,7 @@ export const API_ENDPOINTS = {
   },
   QUOTES: {
     ESTIMATE: '/quotes/estimate',
+    OPTIONS: '/quotes/options',
   },
   BILLING: {
     CREATE: '/billing',

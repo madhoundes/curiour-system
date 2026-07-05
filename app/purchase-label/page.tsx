@@ -959,7 +959,13 @@ function PurchaseLabelContent() {
                   const destination = [recipientCity, recipientProvince]
                     .filter((part) => part && String(part).trim().length > 0)
                     .join(', ') || 'N/A';
-                  const serviceType = formData?.serviceType || 'N/A';
+                  const serviceType = formData?.deliverySpeed
+                    ? (formData.deliverySpeed === 'next_day'
+                        ? 'Next Day Delivery'
+                        : formData.deliverySpeed === 'standard_2_3'
+                          ? '2–3 Day Delivery'
+                          : 'Parcego Standard')
+                    : (formData?.serviceType || 'N/A');
 
                   // ``shippingService.getShipment*`` already converts the
                   // billing amount from cents to a dollar-denominated
