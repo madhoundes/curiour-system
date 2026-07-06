@@ -11,6 +11,7 @@ import type {
   AdminCreateUserResponse,
   AdminListUsersParams,
   AdminListPaidShipmentsParams,
+  AdminAssignableShipmentsResponse,
   AdminMoveSingleToWarehouseResponse,
   AdminPaidShipmentsResponse,
   AdminUpdateUserRoleParams,
@@ -327,6 +328,25 @@ export class AdminService {
        return response;
      } catch (error) {
        console.error('Admin list paid shipments failed:', error);
+       throw error;
+     }
+   }
+
+   /**
+    * List IN_WAREHOUSE shipments without a driver assignment (admin only).
+    * Backs the manual assignment dropdown (up to 100 results).
+    */
+   async listAssignableShipments(): Promise<ApiSuccessResponse<AdminAssignableShipmentsResponse>> {
+     try {
+       const response = await apiClient.get<AdminAssignableShipmentsResponse>(
+         API_ENDPOINTS.SHIPMENTS.ADMIN_LIST_ASSIGNABLE,
+         {},
+         { requiresAuth: true }
+       );
+
+       return response;
+     } catch (error) {
+       console.error('Admin list assignable shipments failed:', error);
        throw error;
      }
    }

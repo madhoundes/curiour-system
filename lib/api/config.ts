@@ -57,6 +57,7 @@ export const API_ENDPOINTS = {
     INITIALIZE_STATUS_TRACKING: '/shipments/initialize-status-tracking',
     ADMIN_MOVE_TO_WAREHOUSE: '/admin/shipments/move-to-warehouse',
     ADMIN_LIST_PAID: '/admin/shipments/paid',
+    ADMIN_LIST_ASSIGNABLE: '/admin/shipments/assignable',
     ADMIN_MOVE_SINGLE_TO_WAREHOUSE: '/admin/shipments/:shipment_id/move-to-warehouse',
   },
   TRACKING: {

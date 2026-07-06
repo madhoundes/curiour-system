@@ -711,15 +711,22 @@ export interface Assignment {
   id: number;
   driver_id: number;
   driver_name: string;
+  driver_email?: string;
   shipment_id: number;
-  tracking_number: string;
-  status: 'assigned' | 'in_progress' | 'completed' | 'cancelled';
-  assigned_at: string;
+  tracking_number?: string;
+  tracking_code?: string;
+  status: string;
+  assignment_status?: string;
+  assigned_at?: string;
+  assigned_date?: string;
   completed_at?: string;
-  pickup_address: string;
-  delivery_address: string;
-  estimated_delivery: string;
-  priority: 'low' | 'normal' | 'high' | 'urgent';
+  pickup_address?: string;
+  delivery_address?: string;
+  estimated_delivery?: string;
+  priority?: 'low' | 'normal' | 'high' | 'urgent';
+  receiver_name?: string;
+  receiver_city?: string;
+  sender_name?: string;
 }
 
 export interface AssignmentsResponse {
@@ -825,6 +832,11 @@ export interface AdminPaidShipmentsResponse {
   page: number;
   per_page: number;
   total_pages: number;
+}
+
+export interface AdminAssignableShipmentsResponse {
+  shipments: AdminPaidShipment[];
+  total: number;
 }
 
 export interface AdminListPaidShipmentsParams {

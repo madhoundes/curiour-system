@@ -80,7 +80,6 @@ import { adminService } from "@/lib/api/admin";
 import { authService } from "@/lib/api/auth";
 import { startMerchantImpersonation } from "@/lib/auth/impersonation";
 import { shopifyService } from "@/lib/api/shopify";
-import { shippingService } from "@/lib/api/shipping";
 import { claimsService } from "@/lib/api/claims";
 import type { AdminPaidShipment, User, UserStatisticsResponse, Claim } from "@/lib/api/types";
 
@@ -214,7 +213,7 @@ export default function SuperAdminDashboard() {
   });
 
   // Available shipments for manual assignment
-  const [availableShipments, setAvailableShipments] = useState<any[]>([]);
+  const [availableShipments, setAvailableShipments] = useState<AdminPaidShipment[]>([]);
   const [shipmentsLoading, setShipmentsLoading] = useState(false);
 
   // Warehouse state.
@@ -2876,6 +2875,7 @@ export default function SuperAdminDashboard() {
                     <tr>
                       <th className="text-left p-4 font-semibold">Driver</th>
                       <th className="text-left p-4 font-semibold">Shipment</th>
+                      <th className="text-left p-4 font-semibold">Customer</th>
                       <th className="text-left p-4 font-semibold">Status</th>
                       <th className="text-left p-4 font-semibold">Priority</th>
                       <th className="text-right p-4 font-semibold">Actions</th>
@@ -2893,6 +2893,12 @@ export default function SuperAdminDashboard() {
                           <div className="text-sm text-gray-500">
                             {assignment.shipment_tracking_number || assignment.tracking_code || 'No tracking'}
                           </div>
+                        </td>
+                        <td className="p-4">
+                          <div className="font-medium">{assignment.receiver_name || '—'}</div>
+                          {assignment.receiver_city && (
+                            <div className="text-sm text-gray-500">{assignment.receiver_city}</div>
+                          )}
                         </td>
                         <td className="p-4">
                           <Badge variant={
@@ -6876,12 +6882,8 @@ export default function SuperAdminDashboard() {
 
       try {
         setShipmentsLoading(true);
-        const shipments = await shippingService.getShipments({ page: 1, per_page: 100 });
-        // Filter for shipments that are ready for assignment (e.g., paid, in warehouse, etc.)
-        const readyShipments = shipments.filter(s =>
-          s.status === 'PAID' || s.status === 'LABEL_GENERATED' || s.status === 'IN_WAREHOUSE'
-        );
-        setAvailableShipments(readyShipments);
+        const response = await adminService.listAssignableShipments();
+        setAvailableShipments(response.data.shipments);
       } catch (error) {
         console.error('Failed to load shipments:', error);
       } finally {
@@ -6939,7 +6941,7 @@ export default function SuperAdminDashboard() {
                   ) : (
                     availableShipments.map((shipment) => (
                       <SelectItem key={shipment.id} value={shipment.id.toString()}>
-                        ID: {shipment.id} - {shipment.tracking_code} - {shipment.receiver_address.contact_name} ({shipment.status})
+                        ID: {shipment.id} - {shipment.tracking_code} - {shipment.receiver_name} ({shipment.receiver_city})
                       </SelectItem>
                     ))
                   )}
