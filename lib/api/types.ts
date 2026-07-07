@@ -180,6 +180,17 @@ export interface QuoteOptionsResponse {
   currency: string;
 }
 
+export interface SelectDeliverySpeedRequest {
+  delivery_speed?: 'next_day' | 'standard_2_3' | 'legacy';
+}
+
+export interface SelectDeliverySpeedResponse {
+  message: string;
+  in_special_zone: boolean;
+  shipment: Shipment;
+  billing: BillingRecord;
+}
+
 export interface QuoteErrorResponse {
   error: string;
   message: string;
@@ -298,6 +309,7 @@ export interface Shipment {
   package: Package;
   special_instructions?: string;
   delivery_notes?: string;
+  delivery_speed?: 'next_day' | 'standard_2_3' | 'legacy';
   estimated_delivery_date?: string;
   created_at: string;
   updated_at?: string;
@@ -417,6 +429,7 @@ export interface DetailedShipment {
   } | null;
   special_instructions?: string;
   delivery_notes?: string;
+  delivery_speed?: 'next_day' | 'standard_2_3' | 'legacy';
   estimated_delivery_date?: string;
   actual_delivery_date?: string;
   created_at: string;

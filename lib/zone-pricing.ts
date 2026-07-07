@@ -3,6 +3,17 @@ import type { QuoteOptionsRequest } from '@/lib/api/types';
 
 export type ApiPackageSize = 'small' | 'medium' | 'large';
 
+export const resolvePackageSizeFromType = (packageType: string): ApiPackageSize => {
+  switch (packageType?.toLowerCase()) {
+    case 'envelope':
+      return 'small';
+    case 'pallet':
+      return 'large';
+    default:
+      return 'medium';
+  }
+};
+
 export const resolvePackageSize = (formData: Pick<ShipmentFormData, 'packageType'>): ApiPackageSize => {
   switch (formData.packageType) {
     case 'envelope':

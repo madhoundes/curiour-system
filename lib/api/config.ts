@@ -46,6 +46,7 @@ export const API_ENDPOINTS = {
     SEARCH: '/shipments/search',
     GET: '/shipments/:id',
     UPDATE: '/shipments/:id',
+    DELIVERY_SPEED: '/shipments/:id/delivery-speed',
     DELETE: '/shipments/:id',
     TRACK: '/shipments/:id/track',
     LABEL: '/shipments/:id/label',

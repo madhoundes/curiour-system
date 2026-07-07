@@ -33,6 +33,8 @@ import type {
   BillingRecordsListResponse,
   GenerateBillingReportRequest,
   GenerateBillingReportResponse,
+  SelectDeliverySpeedRequest,
+  SelectDeliverySpeedResponse,
 } from './types';
 
 export class ShippingService {
@@ -278,6 +280,47 @@ export class ShippingService {
         throw new Error('Validation error');
       }
       throw new Error(error.message || 'Failed to update shipment');
+    }
+  }
+
+  /**
+   * Select delivery speed for a draft shipment and sync pending billing.
+   */
+  async selectDeliverySpeed(
+    shipmentId: number,
+    data: SelectDeliverySpeedRequest,
+  ): Promise<SelectDeliverySpeedResponse> {
+    try {
+      const url = API_ENDPOINTS.SHIPMENTS.DELIVERY_SPEED.replace(':id', shipmentId.toString());
+      const response = await apiClient.post<SelectDeliverySpeedResponse>(url, data);
+      const billing = normalizeBillingMoney(response.data.billing);
+      const shipment = normalizeDetailedShipmentMoney({
+        ...response.data.shipment,
+        billing,
+      } as DetailedShipment);
+      return {
+        ...response.data,
+        billing,
+        shipment,
+      };
+    } catch (error: any) {
+      if (error.response?.status === 400) {
+        const detail = error.response?.data?.detail;
+        if (typeof detail === 'object' && detail?.message) {
+          throw new Error(detail.message);
+        }
+        throw new Error('Invalid delivery speed or zone validation failed');
+      }
+      if (error.response?.status === 403) {
+        throw new Error('Cannot update delivery speed for this shipment');
+      }
+      if (error.response?.status === 404) {
+        throw new Error('Shipment not found');
+      }
+      if (error.response?.status === 409) {
+        throw new Error('Billing has already been paid for this shipment');
+      }
+      throw new Error(error.message || 'Failed to select delivery speed');
     }
   }
 
