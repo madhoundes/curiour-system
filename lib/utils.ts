@@ -5,6 +5,21 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/** Normalize a raw QR/barcode scan into a tracking code. */
+export const normalizeTrackingCode = (raw: string): string => {
+  const trimmed = raw.trim();
+  if (!trimmed.startsWith('http://') && !trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  try {
+    const url = new URL(trimmed);
+    const pathParts = url.pathname.split('/').filter(Boolean);
+    return pathParts[pathParts.length - 1] || trimmed;
+  } catch {
+    return trimmed;
+  }
+};
+
 /**
  * Loads the Parcego logo for PDF generation
  * Uses the original Parcego Master logo from the public folder

@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Scanner } from "@yudiel/react-qr-scanner";
 import { create } from "zustand";
 import confetti from 'canvas-confetti';
+import { normalizeTrackingCode } from "@/lib/utils";
 
 // Navigation state store for active tab management
 interface NavigationState {
@@ -387,87 +388,44 @@ export default function CourierRouteSimulation() {
   const [isTestingSuccess, setIsTestingSuccess] = useState(false);
   const scannerRef = useRef<HTMLDivElement>(null);
 
-  // Local storage database for barcode validation
-  const initializeBarcodeDatabase = () => {
-    if (typeof window !== 'undefined') {
-      const existingData = localStorage.getItem('parcego_barcode_database');
-      if (!existingData) {
-        // Initialize with sample valid barcodes for testing
-        const sampleBarcodes = [
-          { code: 'PCG789123456SCAN', type: 'code_128', valid: true, description: 'Package PCG789123456' },
-          { code: 'PCG789123457SCAN', type: 'code_128', valid: true, description: 'Package PCG789123457' },
-          { code: 'PCG789123458SCAN', type: 'code_128', valid: true, description: 'Package PCG789123458' },
-          { code: 'QR123456789', type: 'qr_code', valid: true, description: 'QR Code Package 123456789' },
-          { code: 'QR987654321', type: 'qr_code', valid: true, description: 'QR Code Package 987654321' },
-          { code: '1234567890123', type: 'ean_13', valid: true, description: 'EAN-13 Package 1234567890123' },
-          { code: '12345678', type: 'ean_8', valid: true, description: 'EAN-8 Package 12345678' },
-          { code: '123456789012', type: 'upc_a', valid: true, description: 'UPC-A Package 123456789012' },
-          { code: '1234567', type: 'upc_e', valid: true, description: 'UPC-E Package 1234567' },
-          { code: 'ABC123', type: 'code_39', valid: true, description: 'Code 39 Package ABC123' },
-          { code: 'DEF456', type: 'code_93', valid: true, description: 'Code 93 Package DEF456' },
-          { code: '12345-67890', type: 'codabar', valid: true, description: 'Codabar Package 12345-67890' },
-          { code: '1234567890', type: 'itf', valid: true, description: 'ITF Package 1234567890' }
-        ];
-        localStorage.setItem('parcego_barcode_database', JSON.stringify(sampleBarcodes));
-      }
+  const validateBarcodeFormat = (barcode: string): { valid: boolean; message: string } => {
+    const code = normalizeTrackingCode(barcode);
+    if (!code) {
+      return { valid: false, message: "" };
     }
+    if (code.length < 6) {
+      return {
+        valid: false,
+        message: "Tracking code too short (minimum 6 characters)",
+      };
+    }
+    return { valid: true, message: "Valid tracking code format" };
   };
 
-  // Validate barcode against local database
-  const validateBarcode = (barcode: string, type: string): { valid: boolean; message: string; description?: string } => {
-    if (typeof window === 'undefined') {
-      return { valid: false, message: 'Validation not available' };
+  const verifyBarcodeWithApi = async (
+    barcode: string
+  ): Promise<{ valid: boolean; message: string }> => {
+    if (!currentAssignment) {
+      return { valid: false, message: "No active delivery assignment" };
     }
-    
+
+    const code = normalizeTrackingCode(barcode);
     try {
-      const database = JSON.parse(localStorage.getItem('parcego_barcode_database') || '[]');
-      
-      // For manual input, try to find by code only (ignore type)
-      if (type === 'manual_input') {
-        const foundBarcode = database.find((item: { code: string; valid: boolean }) => 
-          item.code === barcode && item.valid === true
-        );
-        
-        if (foundBarcode) {
-          return { 
-            valid: true, 
-            message: 'Barcode verified successfully!', 
-            description: foundBarcode.description 
-          };
-        } else {
-          return { 
-            valid: false, 
-            message: 'Barcode not found in database' 
-          };
-        }
-      }
-      
-      // For scanned barcodes, match both code and type
-      const foundBarcode = database.find((item: { code: string; type: string; valid: boolean }) => 
-        item.code === barcode && item.type === type && item.valid === true
+      const searchResponse = await driverService.searchShipments(code);
+      const foundShipment = searchResponse.shipments.find(
+        (shipment) => shipment.tracking_code === currentAssignment.tracking_code
       );
-      
-      if (foundBarcode) {
-        return { 
-          valid: true, 
-          message: 'Barcode verified successfully!', 
-          description: foundBarcode.description 
-        };
-      } else {
-        return { 
-          valid: false, 
-          message: 'Barcode not found in database or invalid format' 
-        };
+
+      if (foundShipment) {
+        return { valid: true, message: "Package verified successfully!" };
       }
-    } catch (error) {
-      return { valid: false, message: 'Database error occurred' };
+
+      return { valid: false, message: "Barcode does not match this delivery" };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : "Failed to verify barcode";
+      return { valid: false, message };
     }
   };
-
-  // Initialize database on component mount
-  useEffect(() => {
-    initializeBarcodeDatabase();
-  }, []);
 
   // Initialize audio context for shutter sound
   useEffect(() => {
@@ -762,15 +720,14 @@ export default function CourierRouteSimulation() {
   };
 
   const handleBarcodeSubmit = async () => {
-    if (!barcodeInput || !currentAssignment) {
+    const code = normalizeTrackingCode(barcodeInput);
+    if (!code || !currentAssignment) {
       setBarcodeError("Please enter a barcode");
       return;
     }
 
     try {
-      
-      // Search for shipment using the barcode
-      const searchResponse = await driverService.searchShipments(barcodeInput);
+      const searchResponse = await driverService.searchShipments(code);
       
       if (searchResponse.shipments.length === 0) {
         setBarcodeError("No shipment found with this tracking code");
@@ -1517,7 +1474,7 @@ export default function CourierRouteSimulation() {
     setIsScanning(false);
   };
 
-  const handleBarcodeDetected = (result: unknown) => {
+  const handleBarcodeDetected = async (result: unknown) => {
     try {
       // Handle different result formats from @yudiel/react-qr-scanner
       // The library can return: array of results, single result object, or string
@@ -1542,32 +1499,39 @@ export default function CourierRouteSimulation() {
         detectedType = 'unknown';
       }
       
+      const normalizedCode = normalizeTrackingCode(detectedCode);
+
       // Only process if we have a valid code
-      if (!detectedCode || detectedCode.trim().length === 0) {
+      if (!normalizedCode) {
         console.warn('⚠️ [SCAN] Empty barcode detected');
         return;
       }
       
-      console.log('✅ [SCAN] Barcode detected:', { code: detectedCode, type: detectedType });
+      console.log('✅ [SCAN] Barcode detected:', { code: normalizedCode, type: detectedType });
       
-      setBarcodeInput(detectedCode);
+      setBarcodeInput(normalizedCode);
       setScannedBarcodeType(detectedType);
       setBarcodeError("");
       setIsScanning(false);
       
-      // Validate the barcode
-      const validation = validateBarcode(detectedCode, detectedType);
-      setIsBarcodeValid(validation.valid);
-      setBarcodeValidationMessage(validation.message);
+      const formatValidation = validateBarcodeFormat(normalizedCode);
+      if (!formatValidation.valid) {
+        setIsBarcodeValid(false);
+        setBarcodeValidationMessage(formatValidation.message);
+        return;
+      }
+
+      const apiValidation = await verifyBarcodeWithApi(normalizedCode);
+      setIsBarcodeValid(apiValidation.valid);
+      setBarcodeValidationMessage(apiValidation.message);
       
       // Show success feedback with validation status
       const successOverlay = document.createElement('div');
       successOverlay.className = `absolute inset-0 flex items-center justify-center rounded-lg ${
-        validation.valid ? 'bg-green-500/20' : 'bg-orange-500/20'
+        apiValidation.valid ? 'bg-green-500/20' : 'bg-orange-500/20'
       }`;
       
-      const iconColor = validation.valid ? 'text-green-500' : 'text-orange-500';
-      const bgColor = validation.valid ? 'bg-green-500' : 'bg-orange-500';
+      const bgColor = apiValidation.valid ? 'bg-green-500' : 'bg-orange-500';
       
       successOverlay.innerHTML = `
         <div class="${bgColor} text-white px-4 py-3 rounded-lg flex items-center space-x-2 shadow-lg">
@@ -1576,7 +1540,7 @@ export default function CourierRouteSimulation() {
           </svg>
           <div class="text-center">
             <div class="font-semibold">${detectedType.toUpperCase()} Detected!</div>
-            <div class="text-xs opacity-90">${validation.valid ? 'Valid barcode' : 'Invalid barcode'}</div>
+            <div class="text-xs opacity-90">${apiValidation.valid ? 'Valid barcode' : 'Invalid barcode'}</div>
           </div>
         </div>
       `;
@@ -1591,7 +1555,7 @@ export default function CourierRouteSimulation() {
       }
       
       // Auto-submit only if barcode is valid
-      if (validation.valid) {
+      if (apiValidation.valid) {
         setTimeout(() => {
           handleBarcodeSubmit();
         }, 1000);
@@ -1614,15 +1578,13 @@ export default function CourierRouteSimulation() {
     setBarcodeError("");
     
     // Simulate successful scan with visual feedback
-    const mockBarcodeData = "PCC517463RII";
+    const mockBarcodeData = currentAssignment?.tracking_code || "PCC517463RII";
     const mockBarcodeType = "CODE_128";
     
     // Set the input and validation
     setBarcodeInput(mockBarcodeData);
     setScannedBarcodeType(mockBarcodeType);
     
-    // Simulate validation success
-    const validation = validateBarcode(mockBarcodeData, mockBarcodeType);
     setIsBarcodeValid(true);
     setBarcodeValidationMessage("Barcode Verified Successfully");
     
@@ -2431,15 +2393,12 @@ export default function CourierRouteSimulation() {
                   setBarcodeInput(value);
                   setBarcodeError("");
                   
-                  // Auto-validate as user types (with debounce)
                   if (value.trim().length > 0) {
-                    // Simple validation for common barcode patterns
-                    const validation = validateBarcode(value, 'manual_input');
+                    const validation = validateBarcodeFormat(value);
                     setIsBarcodeValid(validation.valid);
                     setBarcodeValidationMessage(validation.message);
                     setScannedBarcodeType('manual_input');
                   } else {
-                    // Reset validation when input is empty
                     setIsBarcodeValid(false);
                     setBarcodeValidationMessage("");
                     setScannedBarcodeType("");
