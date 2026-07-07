@@ -17,6 +17,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NotificationBanner } from "@/components/ui/notification-banner";
 import { authService, driverService } from "@/lib/api";
 import type { User, DriverAssignment } from "@/lib/api";
+import { normalizeTrackingCode } from "@/lib/utils";
 
 // Mock data removed - using real API data only
 
@@ -930,22 +931,24 @@ function CourierDashboard() {
   };
   
   const handleBarcodeDetected = async (detectedCode: string) => {
-    console.log("📱 Barcode detected:", detectedCode);
+    const normalizedCode = normalizeTrackingCode(detectedCode);
+    console.log("📱 Barcode detected:", normalizedCode);
     
     // Stop scanning after successful detection
     setIsScanning(false);
+    setScanError("");
     
     // Set scan input and validate
-    setScanInput(detectedCode);
-    const validation = validateScan(detectedCode);
+    setScanInput(normalizedCode);
+    const validation = validateScan(normalizedCode);
     setIsScanValid(validation.valid);
     setScanValidationMessage(validation.message);
     
     if (validation.valid) {
       // Automatically process successful scan with API
       try {
-        console.log('🔍 Auto-searching for shipment:', detectedCode);
-        const searchResponse = await driverService.searchShipments(detectedCode);
+        console.log('🔍 Auto-searching for shipment:', normalizedCode);
+        const searchResponse = await driverService.searchShipments(normalizedCode);
         console.log('✅ Auto-search results:', searchResponse);
 
         if (searchResponse.shipments && searchResponse.shipments.length > 0) {
@@ -1000,7 +1003,8 @@ function CourierDashboard() {
   // Scan package functions will be defined after handleCameraStop
 
   const handleScanSubmit = async () => {
-    if (!scanInput || scanInput.trim().length === 0) {
+    const code = normalizeTrackingCode(scanInput);
+    if (!code) {
       setScanError("Please enter or scan a barcode");
       return;
     }
@@ -1011,8 +1015,8 @@ function CourierDashboard() {
       setScanError("");
 
       // Search for the shipment using the API
-      console.log('🔍 Searching for shipment:', scanInput.trim());
-      const searchResponse = await driverService.searchShipments(scanInput.trim());
+      console.log('🔍 Searching for shipment:', code);
+      const searchResponse = await driverService.searchShipments(code);
       console.log('✅ Shipment search results:', searchResponse);
 
       // Check if any shipments were found

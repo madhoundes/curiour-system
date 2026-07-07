@@ -49,13 +49,17 @@ export class DriverService {
 
       return response.data;
     } catch (error: any) {
-      if (error.response?.status === 401) {
+      const status = error.status || error.response?.status;
+      if (status === 401) {
         throw new Error('Authentication required');
       }
-      if (error.response?.status === 403) {
+      if (status === 403) {
         throw new Error('Driver role required');
       }
-      if (error.response?.status === 422) {
+      if (status === 404) {
+        throw new Error('Package not found. Please check the tracking number.');
+      }
+      if (status === 422) {
         throw new Error('Validation error - invalid search query');
       }
       throw new Error(error.message || 'Failed to search shipments');
