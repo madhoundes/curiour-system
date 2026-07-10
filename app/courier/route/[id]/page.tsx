@@ -659,6 +659,15 @@ export default function CourierRouteSimulation() {
     );
   }
 
+  const canReopenNavigation =
+    routeStatus !== "assigned" &&
+    routeStatus !== "delivered" &&
+    routeStatus !== "failed";
+
+  const handleOpenNavigation = () => {
+    setIsMapModalOpen(true);
+  };
+
   const handleStartRoute = async () => {
     if (!currentAssignment) {
       console.error('❌ [ROUTE] No current assignment available');
@@ -1928,31 +1937,56 @@ export default function CourierRouteSimulation() {
                     </p>
                     <p className="text-sm text-gray-500">{step.description}</p>
                   </div>
-                  {step.status === "current" && (
+                  {(step.status === "current" ||
+                    (step.id === "start_route" && step.status === "completed" && canReopenNavigation)) && (
                     <div className="flex-shrink-0">
-                        {step.id === "start_route" && routeStatus === "assigned" && (
-                          <div className="flex items-center space-x-2">
-                            <Button
-                              onClick={handleStartRoute}
-                              size="sm"
-                              id="parcego-route-start-btn"
-                            >
-                              <Icon name="Navigation" size={16} className="mr-2" />
-                              Start
-                            </Button>
-                          </div>
-                        )}
-                      {step.id === "arrive_location" && routeStatus === "route_started" && (
+                      {step.id === "start_route" && step.status === "completed" && canReopenNavigation && (
                         <Button
-                          onClick={handleArriveAtLocation}
+                          onClick={handleOpenNavigation}
+                          variant="outline"
                           size="sm"
-                          id="parcego-route-arrive-btn"
+                          id="parcego-route-reopen-nav-btn"
+                          aria-label="Open navigation apps"
                         >
-                          <Icon name="MapPin" size={16} className="mr-2" />
-                          Arrive
+                          <Icon name="Navigation" size={16} className="mr-2" />
+                          Navigate
                         </Button>
                       )}
-                      {step.id === "scan_barcode" && routeStatus === "arrived" && (
+                      {step.status === "current" && step.id === "start_route" && routeStatus === "assigned" && (
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            onClick={handleStartRoute}
+                            size="sm"
+                            id="parcego-route-start-btn"
+                          >
+                            <Icon name="Navigation" size={16} className="mr-2" />
+                            Start
+                          </Button>
+                        </div>
+                      )}
+                      {step.status === "current" && step.id === "arrive_location" && routeStatus === "route_started" && (
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            onClick={handleOpenNavigation}
+                            variant="outline"
+                            size="sm"
+                            id="parcego-route-navigate-btn"
+                            aria-label="Open navigation apps"
+                          >
+                            <Icon name="Navigation" size={16} className="mr-2" />
+                            Navigate
+                          </Button>
+                          <Button
+                            onClick={handleArriveAtLocation}
+                            size="sm"
+                            id="parcego-route-arrive-btn"
+                          >
+                            <Icon name="MapPin" size={16} className="mr-2" />
+                            Arrive
+                          </Button>
+                        </div>
+                      )}
+                      {step.status === "current" && step.id === "scan_barcode" && routeStatus === "arrived" && (
                         <Button
                           onClick={() => setIsBarcodeModalOpen(true)}
                           size="sm"
@@ -1962,7 +1996,7 @@ export default function CourierRouteSimulation() {
                           Scan
                         </Button>
                       )}
-                      {step.id === "take_photo" && routeStatus === "scanned" && (
+                      {step.status === "current" && step.id === "take_photo" && routeStatus === "scanned" && (
                         <Button
                           onClick={() => setIsPhotoModalOpen(true)}
                           size="sm"
@@ -1972,7 +2006,7 @@ export default function CourierRouteSimulation() {
                           Photo
                         </Button>
                       )}
-                      {step.id === "confirm_delivery" && routeStatus === "photo_taken" && (
+                      {step.status === "current" && step.id === "confirm_delivery" && routeStatus === "photo_taken" && (
                         <Button
                             onClick={() => setIsConfirmModalOpen(true)}
                             size="sm"
