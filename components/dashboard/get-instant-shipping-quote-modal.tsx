@@ -8,9 +8,8 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Icon } from "@/components/ui/icon"
 import { api } from "@/lib/api"
-import type { QuoteEstimateRequest } from "@/lib/api/types"
-import { useShipment } from "@/lib/shipment-context"
-import { toast } from "sonner"
+import type { QuoteOptionItem } from "@/lib/api/types"
+import { buildQuoteOptionsFromPostal, getDeliverySpeedLabel } from "@/lib/zone-pricing"
 
 interface GetInstantShippingQuoteModalProps {
   open: boolean
@@ -43,7 +42,9 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
   })
   const [isGenerating, setIsGenerating] = useState(false)
   const [quoteGenerated, setQuoteGenerated] = useState(false)
-  const [estimatedCost, setEstimatedCost] = useState<string>("")
+  const [quoteOptions, setQuoteOptions] = useState<QuoteOptionItem[]>([])
+  const [inSpecialZone, setInSpecialZone] = useState(false)
+  const [selectedDeliverySpeed, setSelectedDeliverySpeed] = useState<string>("")
   const [quoteError, setQuoteError] = useState<string>("")
   const [postalCodeError, setPostalCodeError] = useState<string>("")
 
@@ -116,7 +117,9 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
     setQuoteError("")
     setPostalCodeError("")
     setQuoteGenerated(false)
-    setEstimatedCost("")
+    setQuoteOptions([])
+    setInSpecialZone(false)
+    setSelectedDeliverySpeed("")
 
     // Validate all required fields
     if (!formData.packageSize) {
@@ -157,82 +160,48 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
     setIsGenerating(true)
     
     try {
-      const quoteRequest: QuoteEstimateRequest = {
-        package_size: formData.packageSize as 'small' | 'medium' | 'large',
-        weight: weight,
-        destination_postal_code: formData.destinationPostalCode.trim().toUpperCase()
-      }
+      const quoteRequest = buildQuoteOptionsFromPostal(
+        formData.packageSize as 'small' | 'medium' | 'large',
+        weight,
+        formData.destinationPostalCode,
+      )
 
-      console.log('Requesting quote with:', quoteRequest)
-      const response = await api.quotes.getEstimate(quoteRequest)
-      
-      if (!response || typeof response.estimated_price !== 'number') {
+      const response = await api.quotes.getOptions(quoteRequest)
+
+      if (!response?.options?.length) {
         throw new Error('Invalid response from server')
       }
 
-      if (response.estimated_price <= 0) {
-        throw new Error('Invalid price calculation')
-      }
-      
-      setEstimatedCost(response.estimated_price.toFixed(2))
+      setQuoteOptions(response.options)
+      setInSpecialZone(response.in_special_zone)
+      setSelectedDeliverySpeed(response.options[0].delivery_speed)
       setQuoteGenerated(true)
-      console.log('Quote generated successfully:', response)
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Quote generation failed:', error)
-      
-      // Extract error message from different error formats
+
       let errorMessage = 'Failed to generate quote. Please try again.'
-      
-      if (error?.message) {
+
+      if (error instanceof Error && error.message) {
         errorMessage = error.message
-      } else if (error?.error) {
-        errorMessage = error.error
-      } else if (error?.details) {
-        if (typeof error.details === 'string') {
-          errorMessage = error.details
-        } else if (Array.isArray(error.details) && error.details.length > 0) {
-          errorMessage = error.details[0]?.message || error.details[0]?.msg || String(error.details[0])
+      } else if (typeof error === 'object' && error !== null) {
+        const err = error as { message?: string; error?: string; details?: unknown }
+        if (err.message) {
+          errorMessage = err.message
+        } else if (err.error) {
+          errorMessage = err.error
+        } else if (Array.isArray(err.details) && err.details.length > 0) {
+          const first = err.details[0] as { message?: string; msg?: string }
+          errorMessage = first?.message || first?.msg || String(err.details[0])
         }
       }
 
-      // Check for specific error types
       if (errorMessage.toLowerCase().includes('network') || errorMessage.toLowerCase().includes('fetch')) {
         errorMessage = 'Network error. Please check your internet connection and try again.'
       } else if (errorMessage.toLowerCase().includes('timeout')) {
         errorMessage = 'Request timed out. Please try again.'
-      } else if (errorMessage.toLowerCase().includes('service area') || 
-                 errorMessage.toLowerCase().includes('not in our service area') ||
-                 errorMessage.toLowerCase().includes('not supported')) {
-        // Service area error - don't fallback to mock calculation
-        setQuoteError(errorMessage)
-        return;
-      } else if (errorMessage.toLowerCase().includes('validation')) {
-        // Validation error from API
-        setQuoteError(errorMessage)
-        return;
       }
-      
-      // For other errors, show error but provide fallback calculation
-      setQuoteError(`${errorMessage} (Showing estimated price)`)
-      
-      // Fallback to mock calculation for non-service-area errors
-      try {
-        const baseRate = 15.99
-        const weightMultiplier = weight * 2.5
-        const sizeMultiplier = formData.packageSize === 'large' ? 1.3 : formData.packageSize === 'medium' ? 1.15 : 1.0
-        const distanceFactor = 1.2
-        const total = (baseRate + weightMultiplier) * sizeMultiplier * distanceFactor
-        
-        if (total > 0 && total < 10000) { // Sanity check
-          setEstimatedCost(total.toFixed(2))
-          setQuoteGenerated(true)
-        } else {
-          throw new Error('Invalid calculation result')
-        }
-      } catch (calcError) {
-        console.error('Fallback calculation failed:', calcError)
-        setQuoteError('Unable to calculate shipping cost. Please try again or contact support.')
-      }
+
+      setQuoteError(errorMessage)
     } finally {
       setIsGenerating(false)
     }
@@ -245,7 +214,9 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
       destinationPostalCode: ""
     })
     setQuoteGenerated(false)
-    setEstimatedCost("")
+    setQuoteOptions([])
+    setInSpecialZone(false)
+    setSelectedDeliverySpeed("")
     setQuoteError("")
   }
 
@@ -254,8 +225,11 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
     const queryParams = new URLSearchParams({
       packageSize: formData.packageSize,
       weight: formData.weight,
-      destinationPostalCode: formData.destinationPostalCode
+      destinationPostalCode: formData.destinationPostalCode,
     })
+    if (selectedDeliverySpeed) {
+      queryParams.set('deliverySpeed', selectedDeliverySpeed)
+    }
     window.location.href = `/create-shipment?${queryParams.toString()}`
   }
 
@@ -416,23 +390,45 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
           )}
 
           {/* Estimated Cost Display */}
-          {quoteGenerated && estimatedCost && !isGenerating && (
-            <div className="bg-gradient-to-br from-green-50 to-emerald-50 border-2 border-green-300 rounded-lg p-5 shadow-sm">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center space-x-2">
-                  <Icon name="CheckCircle" size={20} className="text-green-600" />
-                  <span className="text-sm font-semibold text-green-900">Estimated Shipping Cost</span>
-                </div>
-                <span className="text-3xl font-extrabold text-green-700">${estimatedCost}</span>
-              </div>
-              <div className="space-y-1">
-                <p className="text-xs font-medium text-green-800">
-                  ✓ Price includes base rate, weight surcharge, and distance factor
+          {quoteGenerated && quoteOptions.length > 0 && !isGenerating && (
+            <div className="space-y-3">
+              {inSpecialZone && (
+                <p className="text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg p-3">
+                  Downtown delivery zone — flat rates apply. HST is added at checkout.
                 </p>
-                <p className="text-xs text-green-700">
-                  📦 {packageSizeOptions.find(opt => opt.value === formData.packageSize)?.label} package • {formData.weight} kg • {formData.destinationPostalCode}
-                </p>
-              </div>
+              )}
+              {quoteOptions.map((option) => {
+                const isSelected = selectedDeliverySpeed === option.delivery_speed
+                return (
+                  <button
+                    key={option.delivery_speed}
+                    type="button"
+                    onClick={() => setSelectedDeliverySpeed(option.delivery_speed)}
+                    className={`w-full text-left p-4 border-2 rounded-lg transition-all ${
+                      isSelected
+                        ? 'border-green-400 bg-green-50'
+                        : 'border-gray-200 bg-white hover:border-green-300'
+                    }`}
+                    aria-pressed={isSelected}
+                    aria-label={`${getDeliverySpeedLabel(option.delivery_speed)} — $${option.estimated_price.toFixed(2)} before tax`}
+                  >
+                    <div className="flex items-center justify-between gap-4">
+                      <div>
+                        <p className="text-sm font-semibold text-green-900">
+                          {getDeliverySpeedLabel(option.delivery_speed)}
+                        </p>
+                        <p className="text-xs text-green-700 mt-0.5">{option.eta}</p>
+                      </div>
+                      <span className="text-2xl font-extrabold text-green-700">
+                        ${option.estimated_price.toFixed(2)}
+                      </span>
+                    </div>
+                  </button>
+                )
+              })}
+              <p className="text-xs text-green-700">
+                📦 {packageSizeOptions.find(opt => opt.value === formData.packageSize)?.label} package • {formData.weight} kg • {formData.destinationPostalCode}
+              </p>
             </div>
           )}
         </div>

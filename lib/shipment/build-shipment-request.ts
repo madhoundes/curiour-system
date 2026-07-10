@@ -179,6 +179,8 @@ export const buildCreateShipmentRequest = (
       country: 'Canada',
       phone_number: formData.recipientPhone,
       email: formData.recipientEmail,
+      latitude: formData.recipientLatitude,
+      longitude: formData.recipientLongitude,
     },
     package: {
       package_type: formData.packageType as 'box' | 'envelope' | 'tube' | 'pallet',
@@ -194,5 +196,6 @@ export const buildCreateShipmentRequest = (
     },
     special_instructions: formData.specialInstructions || '',
     delivery_notes: formData.specialInstructions || 'Standard delivery',
+    delivery_speed: formData.deliverySpeed,
   };
 };

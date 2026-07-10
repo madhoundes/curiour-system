@@ -34,6 +34,7 @@ import {
 
 import { formatCurrency } from "@/lib/mock/shipments";
 import { ShippingService } from "@/lib/api/shipping";
+import { ensureDraftShipmentCheckoutReady } from "@/lib/shipping/ensure-draft-checkout";
 import type { DetailedShipment, ShipmentStatus } from "@/lib/api/types";
 import PrintLabelsModal from "./print-labels-modal";
 import CancelShipmentDialog from "./cancel-shipment-dialog";
@@ -369,78 +370,20 @@ function ShipmentsPageContent() {
       }
 
       console.log('Processing payment for draft shipment:', shipment.id);
-      
-      // Step 1: Get or create billing record
-      let billingId: number;
-      
-      // First, reload shipment data to get updated billing info (in case billing was created in previous attempt)
-      try {
-        const updatedShipment = await shippingService.getShipment(shipment.id);
-        if (updatedShipment.billing && updatedShipment.billing.id) {
-          billingId = updatedShipment.billing.id;
-          console.log('Using existing billing ID from shipment:', billingId);
-        } else {
-          // Billing doesn't exist, create it
-          console.log('Creating new billing record for shipment:', shipment.id);
-          try {
-            const billing = await shippingService.createBilling({
-              shipment_id: shipment.id
-            });
-            billingId = billing.id;
-            console.log('Created billing with ID:', billingId);
-          } catch (createErr: any) {
-            // If billing creation fails because it already exists, fetch it
-            const errorMessage = createErr.message || createErr.details || '';
-            const isAlreadyExists = errorMessage.includes('already exists') || 
-                                   createErr.response?.status === 400 ||
-                                   createErr.status === 400;
-            
-            if (isAlreadyExists) {
-              console.log('Billing already exists, fetching billing records...');
 
-              // Re-check shipment details first; backend may have attached billing after create attempt.
-              const refreshedShipment = await shippingService.getShipment(shipment.id);
-              if (refreshedShipment.billing?.id) {
-                billingId = refreshedShipment.billing.id;
-                console.log('Found existing billing ID from refreshed shipment:', billingId);
-              } else {
-                // Fallback: paginate billing records until we find the shipment billing record.
-                let currentPage = 1;
-                let foundBillingId: number | null = null;
+      const updatedShipment = await shippingService.getShipment(shipment.id);
+      const prep = await ensureDraftShipmentCheckoutReady(updatedShipment);
 
-                while (!foundBillingId && currentPage <= 50) {
-                  const billingRecords = await shippingService.getBillingRecords({ page: currentPage, per_page: 100 });
-                  const existingBilling = billingRecords.items?.find((b) => b.shipment_id === shipment.id);
-
-                  if (existingBilling) {
-                    foundBillingId = existingBilling.id;
-                    break;
-                  }
-
-                  if (!billingRecords.has_next || currentPage >= billingRecords.pages) {
-                    break;
-                  }
-                  currentPage += 1;
-                }
-
-                if (foundBillingId) {
-                  billingId = foundBillingId;
-                  console.log('Found existing billing ID via paginated lookup:', billingId);
-                } else {
-                  throw new Error('Billing exists but could not be found');
-                }
-              }
-            } else {
-              throw createErr;
-            }
-          }
-        }
-      } catch (err: any) {
-        console.error('Error handling billing:', err);
-        throw new Error(`Failed to get or create billing: ${err.message || 'Unknown error'}`);
+      if (prep.status === 'needs_speed_selection') {
+        router.push(`/shipments/${shipment.id}`);
+        return;
       }
-      
-      // Step 2: Create checkout session (same as new shipment flow)
+
+      if (prep.status === 'error') {
+        throw new Error(prep.message);
+      }
+
+      const billingId = prep.billing.id;
       console.log('Creating checkout session for billing ID:', billingId);
       const checkoutSession = await shippingService.createCheckoutSession(billingId);
       console.log('Checkout session created:', checkoutSession);

@@ -27,6 +27,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DeliverySpeedPicker } from "@/components/shipping/delivery-speed-picker";
+import { getDeliverySpeedLabel } from "@/lib/zone-pricing";
 
 // Map backend status values to labels and icons for display
 const statusMeta: Record<string, { label: string; icon: string }> = {
@@ -65,6 +67,7 @@ export default function ShipmentDetailPage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [isUpdatingShipment, setIsUpdatingShipment] = useState(false);
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [isCheckoutReady, setIsCheckoutReady] = useState(false);
 
   const shippingService = new ShippingService();
   const trackingService = new TrackingService();
@@ -231,6 +234,27 @@ export default function ShipmentDetailPage() {
     loadShipment();
   }, [id]);
 
+  useEffect(() => {
+    if (!shipment || shipment.status !== 'DRAFT') {
+      setIsCheckoutReady(false);
+      return;
+    }
+    const hasSpeed = Boolean(shipment.delivery_speed);
+    const hasPendingBilling =
+      billingRecord?.payment_status === 'pending' && Boolean(billingRecord?.id);
+    setIsCheckoutReady(hasSpeed && hasPendingBilling);
+  }, [shipment, billingRecord]);
+
+  const handleDeliverySpeedSelected = (
+    speed: string,
+    billing: BillingRecord,
+    updatedShipment: DetailedShipment,
+  ) => {
+    setShipment({ ...updatedShipment, delivery_speed: speed as DetailedShipment['delivery_speed'] });
+    setBillingRecord(billing);
+    setIsCheckoutReady(true);
+  };
+
   // Handle shipment update
   const handleUpdateShipment = async (updateData: UpdateShipmentRequest) => {
     if (!shipment) return;
@@ -252,11 +276,16 @@ export default function ShipmentDetailPage() {
   // Handle payment
   const handlePayment = async () => {
     if (!shipment || !billingRecord) {
-      toast.error('No billing information available');
+      toast.error('Please select a delivery speed before paying');
       return;
     }
 
-    if (billingRecord.payment_status === 'paid') {
+    if (!isCheckoutReady) {
+      toast.error('Please select a delivery speed before paying');
+      return;
+    }
+
+    if (billingRecord.payment_status === 'paid' || billingRecord.payment_status === 'completed') {
       toast.info('This shipment has already been paid');
       return;
     }
@@ -450,7 +479,7 @@ export default function ShipmentDetailPage() {
                 <Button 
                   variant="default" 
                   onClick={handlePayment}
-                  disabled={isProcessingPayment}
+                  disabled={isProcessingPayment || !isCheckoutReady}
                   aria-label="Pay for shipment"
                   className="hidden sm:flex items-center bg-green-600 hover:bg-green-700"
                 >
@@ -499,7 +528,7 @@ export default function ShipmentDetailPage() {
                 <Button 
                   variant="default" 
                   onClick={handlePayment}
-                  disabled={isProcessingPayment}
+                  disabled={isProcessingPayment || !isCheckoutReady}
                   aria-label="Pay for shipment"
                   className="sm:hidden p-2 bg-green-600 hover:bg-green-700"
                   size="sm"
@@ -602,6 +631,26 @@ export default function ShipmentDetailPage() {
           </div>
         </div>
 
+        {shipment.status === 'DRAFT' && (
+          <div className="mb-6">
+            <DeliverySpeedPicker
+              shipment={shipment}
+              selectedSpeed={shipment.delivery_speed}
+              billingSubtotal={
+                billingRecord?.subtotal != null
+                  ? parseFloat(String(billingRecord.subtotal))
+                  : null
+              }
+              onSpeedSelected={handleDeliverySpeedSelected}
+            />
+            {shipment.delivery_speed && (
+              <p className="text-sm text-gray-600 mt-2">
+                Selected: {getDeliverySpeedLabel(shipment.delivery_speed)}
+              </p>
+            )}
+          </div>
+        )}
+
         <Tabs defaultValue="overview">
           <TabsList className="flex w-full h-9 sm:h-10 p-1 bg-gray-100 rounded-lg overflow-hidden justify-start" style={{ padding: '1.68rem .75rem' }}>
             <TabsTrigger 
@@ -654,7 +703,11 @@ export default function ShipmentDetailPage() {
                 <CardHeader>
                   <CardTitle>Service</CardTitle>
                 </CardHeader>
-                <CardContent className="text-sm text-gray-700">Standard Delivery</CardContent>
+                <CardContent className="text-sm text-gray-700">
+                  {shipment.delivery_speed
+                    ? getDeliverySpeedLabel(shipment.delivery_speed)
+                    : 'Select delivery speed to continue'}
+                </CardContent>
               </Card>
               <Card>
                 <CardHeader>

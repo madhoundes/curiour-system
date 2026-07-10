@@ -9,6 +9,8 @@ import { centsToDollarsNumber } from './money';
 import type {
   QuoteEstimateRequest,
   QuoteEstimateResponse,
+  QuoteOptionsRequest,
+  QuoteOptionsResponse,
   QuoteErrorResponse,
   ApiSuccessResponse,
   ApiErrorResponse,
@@ -89,6 +91,40 @@ export class QuotesService {
       
       throw new Error(errorMessage || 'Failed to get quote estimate');
     }
+  }
+
+  /**
+   * Get delivery speed options for quick quotes and the shipment wizard.
+   */
+  async getOptions(
+    request: QuoteOptionsRequest,
+    options: { requiresAuth?: boolean } = {},
+  ): Promise<QuoteOptionsResponse> {
+    const { requiresAuth = false } = options;
+
+    if (!this.isValidPostalCode(request.destination_postal_code)) {
+      throw new Error('Invalid postal code format. Please use format A1A 1A1');
+    }
+
+    if (!this.isPostalCodeInServiceArea(request.destination_postal_code)) {
+      throw new Error(
+        `The postal code "${request.destination_postal_code}" is not in our service area. Delivery is only available in Downtown Toronto (postal codes starting with M) and Mississauga (postal codes starting with L4T-L5W).`,
+      );
+    }
+
+    const response = await apiClient.post<QuoteOptionsResponse>(
+      API_ENDPOINTS.QUOTES.OPTIONS,
+      request,
+      { requiresAuth },
+    );
+
+    return {
+      ...response.data,
+      options: response.data.options.map((option) => ({
+        ...option,
+        estimated_price: centsToDollarsNumber(option.estimated_price),
+      })),
+    };
   }
 
   /**

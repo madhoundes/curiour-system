@@ -15,10 +15,13 @@ export interface ShipmentFormData {
   recipientPostalCode: string;
   recipientPhone: string;
   recipientEmail: string;
+  recipientLatitude?: number;
+  recipientLongitude?: number;
   
   // Package basics
   packageType: string;
   serviceType: string;
+  deliverySpeed?: 'next_day' | 'standard_2_3' | 'legacy';
   specialInstructions: string;
   
   // Package details
