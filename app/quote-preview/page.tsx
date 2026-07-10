@@ -662,20 +662,21 @@ function QuotePreviewPageContent() {
   const taxAmount = billing ? Number(billing.tax_amount) : 0;
   const totalAmount = billing ? Number(billing.amount) : 0;
 
-  // Loading screen until options are loaded and billing is ready (or error shown).
+  // Loading screen until options are loaded; after that, show the picker even when
+  // the merchant still needs to choose a downtown delivery speed. Only block on
+  // the full-page spinner while a selected speed is being turned into billing.
   if (
     !formData ||
     optionsLoading ||
-    (!selectedDeliverySpeed && !optionsError) ||
     (selectedDeliverySpeed && !billing && !prepareError && !optionsError)
   ) {
     const loadingMessage = !formData
       ? 'Loading shipment details...'
       : optionsLoading
         ? 'Checking delivery zone and loading options...'
-      : isPreparing
-        ? 'Creating your shipment and calculating cost...'
-        : 'Preparing your quote...';
+        : isPreparing
+          ? 'Creating your shipment and calculating cost...'
+          : 'Preparing your quote...';
 
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -855,7 +856,9 @@ function QuotePreviewPageContent() {
                 <p className="text-sm text-gray-500">
                   {prepareError
                     ? 'Cost breakdown unavailable until the shipment is created.'
-                    : 'Calculating cost...'}
+                    : selectedDeliverySpeed
+                      ? 'Calculating cost...'
+                      : 'Select a delivery speed above to calculate your quote.'}
                 </p>
               )}
             </CardContent>
