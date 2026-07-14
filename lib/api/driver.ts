@@ -396,16 +396,23 @@ export class DriverService {
   }
 
   /**
-   * Helper method to format date to YYYY-MM-DD in UTC
-   * 
+   * Helper method to format date to YYYY-MM-DD in Eastern Time
+   *
+   * Uses the America/Toronto time zone so the calendar date matches the
+   * courier's local day (DST-aware: EST in winter, EDT in summer). Using UTC
+   * here caused the date to roll over a day early in the evening.
+   *
    * @param date - Date object
-   * @returns Formatted date string in UTC
+   * @returns Formatted date string in Eastern Time
    */
   formatDate(date: Date): string {
-    const year = date.getUTCFullYear();
-    const month = String(date.getUTCMonth() + 1).padStart(2, '0');
-    const day = String(date.getUTCDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    // en-CA formats as YYYY-MM-DD
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'America/Toronto',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(date);
   }
 
   /**

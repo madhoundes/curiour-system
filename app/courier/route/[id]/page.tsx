@@ -281,7 +281,7 @@ export default function CourierRouteSimulation() {
       try {
         setIsLoadingRoute(true);
         
-        const today = new Date().toISOString().split('T')[0];
+        const today = driverService.getTodayDate();
         const routeUrl = await routeOptimizationService.getGoogleMapsRoute(currentUser.id, { date: today });
         
         setOptimizedRouteUrl(routeUrl);
