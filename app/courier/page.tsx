@@ -15,7 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NotificationBanner } from "@/components/ui/notification-banner";
-import { authService, driverService } from "@/lib/api";
+import { authService, driverService, routeOptimizationService } from "@/lib/api";
 import type { User, DriverAssignment } from "@/lib/api";
 import { normalizeTrackingCode } from "@/lib/utils";
 
@@ -100,8 +100,9 @@ function CourierDashboard() {
     message: "Loading your assignments...",
   });
   
-  // Deliveries & Stats state (sequential by priority) - now based on API data
+  // Deliveries & Stats state (sequential by optimized route order, priority fallback)
   const [deliveries, setDeliveries] = useState<any[]>([]);
+  const [optimizedOrder, setOptimizedOrder] = useState<string[]>([]);
   const [stats, setStats] = useState({
     deliveriesToday: 0,
     completed: 0,
@@ -111,17 +112,47 @@ function CourierDashboard() {
     onTimeRate: 0
   });
   const priorityOrder = React.useMemo(() => ({ high: 3, medium: 2, low: 1 } as const), []);
+  const optimizedOrderIndex = React.useMemo(() => {
+    const indexMap = new Map<string, number>();
+    optimizedOrder.forEach((trackingCode, index) => {
+      indexMap.set(trackingCode, index);
+    });
+    return indexMap;
+  }, [optimizedOrder]);
   const activeDeliveryId = React.useMemo(() => {
     const pending = deliveries.filter(d => d.status !== 'delivered');
     if (pending.length === 0) return null;
+    if (optimizedOrder.length > 0) {
+      const ordered = [...pending].sort((a, b) => {
+        const aIndex = optimizedOrderIndex.has(a.trackingNumber)
+          ? optimizedOrderIndex.get(a.trackingNumber)!
+          : Number.MAX_SAFE_INTEGER;
+        const bIndex = optimizedOrderIndex.has(b.trackingNumber)
+          ? optimizedOrderIndex.get(b.trackingNumber)!
+          : Number.MAX_SAFE_INTEGER;
+        return aIndex - bIndex;
+      });
+      return ordered[0]?.id ?? null;
+    }
     const next = [...pending].sort((a, b) => (priorityOrder[b.priority as keyof typeof priorityOrder] - priorityOrder[a.priority as keyof typeof priorityOrder]))[0];
     return next.id;
-  }, [deliveries, priorityOrder]);
+  }, [deliveries, optimizedOrder, optimizedOrderIndex, priorityOrder]);
   const sortedDeliveries = React.useMemo(() => {
     const list = [...deliveries].sort((a, b) => {
       const aDelivered = a.status === 'delivered' ? 1 : 0;
       const bDelivered = b.status === 'delivered' ? 1 : 0;
       if (aDelivered !== bDelivered) return aDelivered - bDelivered; // delivered last
+
+      if (optimizedOrder.length > 0) {
+        const aIndex = optimizedOrderIndex.has(a.trackingNumber)
+          ? optimizedOrderIndex.get(a.trackingNumber)!
+          : Number.MAX_SAFE_INTEGER;
+        const bIndex = optimizedOrderIndex.has(b.trackingNumber)
+          ? optimizedOrderIndex.get(b.trackingNumber)!
+          : Number.MAX_SAFE_INTEGER;
+        if (aIndex !== bIndex) return aIndex - bIndex;
+      }
+
       return (priorityOrder[b.priority as keyof typeof priorityOrder] - priorityOrder[a.priority as keyof typeof priorityOrder]);
     });
     if (activeDeliveryId) {
@@ -132,7 +163,7 @@ function CourierDashboard() {
       }
     }
     return list;
-  }, [deliveries, activeDeliveryId, priorityOrder]);
+  }, [deliveries, activeDeliveryId, optimizedOrder, optimizedOrderIndex, priorityOrder]);
 
   // Calculate delivery progress from route status stored in localStorage
   const deliveryProgress = React.useMemo(() => {
@@ -282,6 +313,25 @@ function CourierDashboard() {
       } else {
         setDeliveries([]);
         mappedDeliveries = [];
+      }
+
+      // Fetch Google-optimized stop order (non-blocking fallback on failure)
+      try {
+        if (userData?.id && mappedDeliveries.length > 0) {
+          const optimizedRoute = await routeOptimizationService.getOptimizedRoute(
+            userData.id,
+            { date: driverService.getTodayDate() }
+          );
+          const orderedTrackingCodes = (optimizedRoute.optimized_stops || [])
+            .map((stop) => stop.tracking_code)
+            .filter(Boolean);
+          setOptimizedOrder(orderedTrackingCodes);
+        } else {
+          setOptimizedOrder([]);
+        }
+      } catch (routeError) {
+        console.warn('⚠️ [DASHBOARD] Optimized route unavailable, using priority order:', routeError);
+        setOptimizedOrder([]);
       }
 
       // Calculate stats from assignments (primary source)
@@ -1323,8 +1373,21 @@ function CourierDashboard() {
                 id="parcego-courier-deliveries-list"
               >
                 <CardHeader className="pb-2">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-bold text-gray-900">Today&apos;s Deliveries</CardTitle>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center flex-wrap gap-2">
+                      <CardTitle className="text-lg font-bold text-gray-900">Today&apos;s Deliveries</CardTitle>
+                      {optimizedOrder.length > 0 && (
+                        <Badge
+                          variant="outline"
+                          className="parcego-badge parcego-badge--optimized border-emerald-200 bg-emerald-50 text-emerald-700 font-medium"
+                          id="parcego-courier-optimized-order-badge"
+                          aria-label="Deliveries shown in Google-optimized route order"
+                        >
+                          <Icon name="Route" size={12} className="mr-1" />
+                          Optimized order
+                        </Badge>
+                      )}
+                    </div>
                     <Badge 
                       variant="secondary"
                       className="parcego-badge parcego-badge--remaining bg-blue-100 text-blue-700 font-medium"
@@ -1335,7 +1398,12 @@ function CourierDashboard() {
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-5 pt-2">
-                  {sortedDeliveries.map((delivery, index) => (
+                  {sortedDeliveries.map((delivery, index) => {
+                    const routeSequence = optimizedOrderIndex.has(delivery.trackingNumber)
+                      ? (optimizedOrderIndex.get(delivery.trackingNumber)! + 1)
+                      : null;
+
+                    return (
                     <div
                       key={delivery.id}
                       className={`border rounded-lg p-4 parcego-delivery-card ${
@@ -1348,9 +1416,25 @@ function CourierDashboard() {
                       aria-disabled={delivery.status !== 'delivered' && delivery.id !== activeDeliveryId}
                     >
                       <div className="flex items-start space-x-3 mb-3">
-                        {/* Refined Status Indicator */}
-                        <div className="flex-shrink-0 mt-1">
-                          <div className={`w-2 h-2 rounded-full ${getStatusColor(delivery.status)} ring-2 ring-opacity-30 ${getStatusColor(delivery.status).replace('bg-', 'ring-')}`}></div>
+                        {/* Route sequence or status indicator */}
+                        <div className="flex-shrink-0 mt-0.5">
+                          {routeSequence !== null ? (
+                            <div
+                              className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold text-white shadow-sm ${
+                                delivery.status === 'delivered'
+                                  ? 'bg-emerald-600'
+                                  : index === 0
+                                    ? 'bg-blue-600 ring-2 ring-blue-200'
+                                    : 'bg-slate-500'
+                              }`}
+                              id={`parcego-delivery-sequence-${delivery.id}`}
+                              aria-label={`Stop ${routeSequence} in optimized route`}
+                            >
+                              {routeSequence}
+                            </div>
+                          ) : (
+                            <div className={`w-2 h-2 rounded-full mt-1.5 ${getStatusColor(delivery.status)} ring-2 ring-opacity-30 ${getStatusColor(delivery.status).replace('bg-', 'ring-')}`}></div>
+                          )}
                         </div>
                         
                         <div className="flex-1 min-w-0">
@@ -1441,7 +1525,8 @@ function CourierDashboard() {
                         )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </CardContent>
               </Card>
             </div>

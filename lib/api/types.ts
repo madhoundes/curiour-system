@@ -1143,6 +1143,18 @@ export interface RouteOptimizationResponse {
   google_maps_url: string;
 }
 
+export interface OptimizedStop {
+  shipment_id: number;
+  tracking_code: string;
+  address: string;
+  sequence: number;
+}
+
+export interface OptimizedRouteResponse {
+  google_maps_url: string;
+  optimized_stops: OptimizedStop[];
+}
+
 // Shopify OAuth Types
 export interface ShopifyInstallParams {
   shop: string; // Shop domain (e.g., 'mystore' or 'mystore.myshopify.com')

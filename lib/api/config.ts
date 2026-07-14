@@ -129,6 +129,7 @@ export const API_ENDPOINTS = {
   },
   ROUTE_OPTIMIZATION: {
     GOOGLE_MAPS_ROUTE: '/route-optimization/driver/:driver_id/google-maps-route',
+    OPTIMIZED_ROUTE: '/route-optimization/driver/:driver_id/optimized-route',
   },
   SHOPIFY: {
     // OAuth Endpoints
