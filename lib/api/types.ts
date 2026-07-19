@@ -832,6 +832,29 @@ export interface ManualAssignmentResponse {
   tracking_code: string;
 }
 
+export interface BulkManualAssignmentRequest {
+  driver_id: number;
+  notes?: string;
+  shipment_ids: number[];
+}
+
+export interface BulkManualAssignmentItem {
+  assignment_id: number;
+  shipment_id: number;
+  tracking_code: string;
+}
+
+export interface BulkManualAssignmentResponse {
+  assigned_count: number;
+  assigned_date: string;
+  assignments: BulkManualAssignmentItem[];
+  driver_id: number;
+  driver_name: string;
+  message: string;
+  notes?: string | null;
+  success: boolean;
+}
+
 // Automated Assignment Types
 export interface AutomatedAssignmentParams {
   assignment_date?: string;

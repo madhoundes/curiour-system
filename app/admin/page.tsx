@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Icon } from "@/components/ui/icon";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import Image from "next/image";
@@ -201,10 +202,12 @@ export default function SuperAdminDashboard() {
 
   // Manual assignment form state
   const [manualAssignmentForm, setManualAssignmentForm] = useState({
-    shipmentId: '',
+    shipmentIds: [] as string[],
     driverId: '',
     notes: ''
   });
+  const [shipmentSearchQuery, setShipmentSearchQuery] = useState('');
+  const [isManualAssignmentSubmitting, setIsManualAssignmentSubmitting] = useState(false);
 
   // Reassign assignment form state
   const [reassignForm, setReassignForm] = useState({
@@ -6900,63 +6903,243 @@ export default function SuperAdminDashboard() {
 
     // Filter available drivers (active couriers)
     const availableDrivers = couriers.filter(c => c.is_active);
+    const searchTerm = shipmentSearchQuery.trim().toLowerCase();
+    const filteredShipments = searchTerm
+      ? availableShipments.filter((shipment) => {
+          const haystack = [
+            shipment.id.toString(),
+            shipment.tracking_code,
+            shipment.receiver_name,
+            shipment.receiver_city,
+            shipment.receiver_postal_code,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+          return haystack.includes(searchTerm);
+        })
+      : availableShipments;
+
+    const selectedCount = manualAssignmentForm.shipmentIds.length;
+    const allFilteredSelected =
+      filteredShipments.length > 0 &&
+      filteredShipments.every((shipment) =>
+        manualAssignmentForm.shipmentIds.includes(shipment.id.toString())
+      );
+
+    const handleResetManualAssignmentForm = () => {
+      setManualAssignmentForm({ shipmentIds: [], driverId: '', notes: '' });
+      setShipmentSearchQuery('');
+      setIsManualAssignmentSubmitting(false);
+    };
+
+    const handleToggleShipment = (shipmentId: string, checked: boolean) => {
+      setManualAssignmentForm((prev) => {
+        if (checked) {
+          if (prev.shipmentIds.includes(shipmentId)) return prev;
+          return { ...prev, shipmentIds: [...prev.shipmentIds, shipmentId] };
+        }
+        return {
+          ...prev,
+          shipmentIds: prev.shipmentIds.filter((id) => id !== shipmentId),
+        };
+      });
+    };
+
+    const handleToggleSelectAllFiltered = (checked: boolean) => {
+      const filteredIds = filteredShipments.map((shipment) => shipment.id.toString());
+      setManualAssignmentForm((prev) => {
+        if (checked) {
+          const merged = new Set([...prev.shipmentIds, ...filteredIds]);
+          return { ...prev, shipmentIds: Array.from(merged) };
+        }
+        const filteredIdSet = new Set(filteredIds);
+        return {
+          ...prev,
+          shipmentIds: prev.shipmentIds.filter((id) => !filteredIdSet.has(id)),
+        };
+      });
+    };
+
+    const handleCreateBulkAssignment = async () => {
+      const { shipmentIds, driverId, notes } = manualAssignmentForm;
+
+      if (shipmentIds.length === 0 || !driverId) {
+        showErrorToast('Please select at least one shipment and a driver');
+        return;
+      }
+
+      if (!notes || notes.trim() === '') {
+        showErrorToast('Please provide assignment notes');
+        return;
+      }
+
+      try {
+        setIsManualAssignmentSubmitting(true);
+        const driverIdNum = parseInt(driverId, 10);
+        const shipmentIdNums = shipmentIds.map((id) => parseInt(id, 10));
+
+        const response = await adminService.createBulkManualAssignment({
+          shipment_ids: shipmentIdNums,
+          driver_id: driverIdNum,
+          notes: notes.trim(),
+        });
+
+        const assignedCount = response.data.assigned_count ?? shipmentIdNums.length;
+        showSuccessToast(
+          assignedCount === 1
+            ? '1 package assigned successfully!'
+            : `${assignedCount} packages assigned successfully!`
+        );
+        setIsManualAssignmentOpen(false);
+        handleResetManualAssignmentForm();
+
+        if (!selectedAssignmentDate) return;
+        const dateStr = formatDateEST(selectedAssignmentDate, 'yyyy-MM-dd');
+        const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
+        setAssignments(assignmentsResponse.data.assignments || []);
+
+        const statsResponse = await adminService.getAssignmentStatistics(dateStr);
+        setAssignmentStats(statsResponse.data);
+      } catch (error: any) {
+        console.error('Failed to create bulk manual assignment:', error);
+        const errorMessage =
+          (typeof error?.details === 'string' && error.details) ||
+          (typeof error?.message === 'string' && error.message) ||
+          'Failed to create assignment. Please try again.';
+        showErrorToast(errorMessage);
+      } finally {
+        setIsManualAssignmentSubmitting(false);
+      }
+    };
 
     return (
       <Dialog open={isManualAssignmentOpen} onOpenChange={(open) => {
         setIsManualAssignmentOpen(open);
         if (!open) {
-          // Reset form when closing
-          setManualAssignmentForm({ shipmentId: '', driverId: '', notes: '' });
+          handleResetManualAssignmentForm();
         }
       }}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="sm:max-w-[560px]">
           <DialogHeader>
             <DialogTitle>Create Manual Assignment</DialogTitle>
             <DialogDescription>
-              Assign a shipment to a driver manually.
+              Assign one or more warehouse shipments to a driver.
             </DialogDescription>
           </DialogHeader>
-          <div className="grid gap-4 py-4">
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="shipment_id" className="text-right">
-                Shipment
-              </Label>
-              <Select
-                value={manualAssignmentForm.shipmentId}
-                onValueChange={(value) => setManualAssignmentForm(prev => ({ ...prev, shipmentId: value }))}
-                disabled={shipmentsLoading}
-              >
-                <SelectTrigger className="col-span-3">
-                  <SelectValue
-                    placeholder={shipmentsLoading ? "Loading shipments..." : "Select a shipment"}
-                  >
-                    {manualAssignmentForm.shipmentId ? `Shipment ${manualAssignmentForm.shipmentId}` : null}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {shipmentsLoading ? (
-                    <SelectItem value="loading" disabled>Loading...</SelectItem>
-                  ) : availableShipments.length === 0 ? (
-                    <SelectItem value="none" disabled>No shipments available</SelectItem>
-                  ) : (
-                    availableShipments.map((shipment) => (
-                      <SelectItem key={shipment.id} value={shipment.id.toString()}>
-                        ID: {shipment.id} - {shipment.tracking_code} - {shipment.receiver_name} ({shipment.receiver_city})
-                      </SelectItem>
-                    ))
+          <div className="grid gap-4 py-2">
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="parcego-manual-assign-shipment-search">
+                  Shipments
+                </Label>
+                <span className="text-xs text-muted-foreground">
+                  {selectedCount} selected
+                  {availableShipments.length > 0 ? ` of ${availableShipments.length}` : ''}
+                </span>
+              </div>
+              <Input
+                id="parcego-manual-assign-shipment-search"
+                placeholder="Search by tracking, recipient, city, or ID..."
+                value={shipmentSearchQuery}
+                onChange={(e) => setShipmentSearchQuery(e.target.value)}
+                disabled={shipmentsLoading || availableShipments.length === 0}
+                aria-label="Search assignable shipments"
+              />
+              <div className="rounded-md border">
+                <div className="flex items-center justify-between gap-2 border-b px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="parcego-manual-assign-select-all"
+                      checked={allFilteredSelected}
+                      onCheckedChange={(checked) =>
+                        handleToggleSelectAllFiltered(checked === true)
+                      }
+                      disabled={shipmentsLoading || filteredShipments.length === 0}
+                      aria-label="Select all filtered shipments"
+                    />
+                    <Label
+                      htmlFor="parcego-manual-assign-select-all"
+                      className="text-sm font-normal cursor-pointer"
+                    >
+                      Select all{searchTerm ? ' matching' : ''}
+                    </Label>
+                  </div>
+                  {selectedCount > 0 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2 text-xs"
+                      onClick={() =>
+                        setManualAssignmentForm((prev) => ({ ...prev, shipmentIds: [] }))
+                      }
+                    >
+                      Clear
+                    </Button>
                   )}
-                </SelectContent>
-              </Select>
+                </div>
+                <div className="max-h-56 overflow-y-auto">
+                  {shipmentsLoading ? (
+                    <div className="px-3 py-6 text-sm text-muted-foreground text-center">
+                      Loading shipments...
+                    </div>
+                  ) : availableShipments.length === 0 ? (
+                    <div className="px-3 py-6 text-sm text-muted-foreground text-center">
+                      No shipments available for assignment
+                    </div>
+                  ) : filteredShipments.length === 0 ? (
+                    <div className="px-3 py-6 text-sm text-muted-foreground text-center">
+                      No shipments match your search
+                    </div>
+                  ) : (
+                    <ul className="divide-y" role="listbox" aria-multiselectable="true">
+                      {filteredShipments.map((shipment) => {
+                        const shipmentId = shipment.id.toString();
+                        const isSelected = manualAssignmentForm.shipmentIds.includes(shipmentId);
+                        return (
+                          <li key={shipment.id}>
+                            <label
+                              htmlFor={`parcego-manual-assign-shipment-${shipment.id}`}
+                              className={cn(
+                                "flex items-start gap-3 px-3 py-2.5 cursor-pointer transition-colors duration-[var(--transition-quick)] ease-[var(--easing-smooth)]",
+                                isSelected ? "bg-muted/60" : "hover:bg-muted/40"
+                              )}
+                            >
+                              <Checkbox
+                                id={`parcego-manual-assign-shipment-${shipment.id}`}
+                                checked={isSelected}
+                                onCheckedChange={(checked) =>
+                                  handleToggleShipment(shipmentId, checked === true)
+                                }
+                                className="mt-0.5"
+                                aria-label={`Select shipment ${shipment.tracking_code}`}
+                              />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium truncate">
+                                  {shipment.tracking_code}
+                                </p>
+                                <p className="text-xs text-muted-foreground truncate">
+                                  ID {shipment.id} · {shipment.receiver_name} · {shipment.receiver_city}
+                                </p>
+                              </div>
+                            </label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </div>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="driver_id" className="text-right">
-                Driver
-              </Label>
+
+            <div className="space-y-2">
+              <Label htmlFor="driver_id">Driver</Label>
               <Select
                 value={manualAssignmentForm.driverId}
                 onValueChange={(value) => setManualAssignmentForm(prev => ({ ...prev, driverId: value }))}
               >
-                <SelectTrigger className="col-span-3">
+                <SelectTrigger id="driver_id" aria-label="Select a driver">
                   <SelectValue placeholder="Select a driver" />
                 </SelectTrigger>
                 <SelectContent>
@@ -6972,62 +7155,35 @@ export default function SuperAdminDashboard() {
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-4 items-center gap-4">
-              <Label htmlFor="notes" className="text-right">
-                Notes *
-              </Label>
+
+            <div className="space-y-2">
+              <Label htmlFor="notes">Notes *</Label>
               <Textarea
                 id="notes"
                 placeholder="Assignment notes (required)"
                 value={manualAssignmentForm.notes}
                 onChange={(e) => setManualAssignmentForm(prev => ({ ...prev, notes: e.target.value }))}
-                className="col-span-3"
                 required
               />
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setIsManualAssignmentOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setIsManualAssignmentOpen(false)}
+              disabled={isManualAssignmentSubmitting}
+            >
               Cancel
             </Button>
-            <Button onClick={async () => {
-              const { shipmentId, driverId, notes } = manualAssignmentForm;
-
-              if (!shipmentId || !driverId) {
-                showErrorToast('Please fill in all required fields');
-                return;
-              }
-
-              if (!notes || notes.trim() === '') {
-                showErrorToast('Please provide assignment notes');
-                return;
-              }
-
-              try {
-                const shipmentIdNum = parseInt(shipmentId);
-                const driverIdNum = parseInt(driverId);
-
-                await adminService.createManualAssignment({
-                  shipment_id: shipmentIdNum,
-                  driver_id: driverIdNum,
-                  notes: notes.trim()
-                });
-
-                showSuccessToast('Manual assignment created successfully!');
-                setIsManualAssignmentOpen(false);
-                setManualAssignmentForm({ shipmentId: '', driverId: '', notes: '' });
-
-                // Reload assignments
-                if (!selectedAssignmentDate) return;
-                const dateStr = formatDateEST(selectedAssignmentDate, 'yyyy-MM-dd');
-                const assignmentsResponse = await adminService.getAssignmentsByDate(dateStr);
-                setAssignments(assignmentsResponse.data.assignments || []);
-              } catch (error) {
-                console.error('Failed to create manual assignment:', error);
-                showErrorToast('Failed to create assignment. Please try again.');
-              }
-            }}>
-              Create Assignment
+            <Button
+              onClick={handleCreateBulkAssignment}
+              disabled={isManualAssignmentSubmitting || selectedCount === 0}
+            >
+              {isManualAssignmentSubmitting
+                ? 'Assigning...'
+                : selectedCount <= 1
+                  ? 'Create Assignment'
+                  : `Assign ${selectedCount} Packages`}
             </Button>
           </DialogFooter>
         </DialogContent>

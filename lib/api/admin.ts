@@ -23,6 +23,8 @@ import type {
   ReassignAssignmentResponse,
   ManualAssignmentRequest,
   ManualAssignmentResponse,
+  BulkManualAssignmentRequest,
+  BulkManualAssignmentResponse,
   AutomatedAssignmentParams,
   MoveToWarehouseResponse,
   StatisticsParams,
@@ -239,6 +241,26 @@ export class AdminService {
        return response;
      } catch (error) {
        console.error('Admin create manual assignment failed:', error);
+       throw error;
+     }
+   }
+
+   /**
+    * Create bulk manual assignments for one driver (admin only)
+    */
+   async createBulkManualAssignment(
+     assignmentData: BulkManualAssignmentRequest
+   ): Promise<ApiSuccessResponse<BulkManualAssignmentResponse>> {
+     try {
+       const response = await apiClient.post<BulkManualAssignmentResponse>(
+         API_ENDPOINTS.AUTH.ADMIN_BULK_MANUAL_ASSIGNMENT,
+         assignmentData,
+         { requiresAuth: true }
+       );
+
+       return response;
+     } catch (error) {
+       console.error('Admin create bulk manual assignment failed:', error);
        throw error;
      }
    }

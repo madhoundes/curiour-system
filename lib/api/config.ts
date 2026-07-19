@@ -33,6 +33,7 @@ export const API_ENDPOINTS = {
     ADMIN_ASSIGNMENT_STATISTICS: '/admin/assignments/statistics/:assignment_date',
     ADMIN_REASSIGN_ASSIGNMENT: '/admin/assignments/:assignment_id/reassign',
     ADMIN_MANUAL_ASSIGNMENT: '/admin/assignments/manual',
+    ADMIN_BULK_MANUAL_ASSIGNMENT: '/admin/assignments/manual/bulk',
     ADMIN_RUN_AUTOMATED_ASSIGNMENT: '/admin/assignments/run-automated',
     ADMIN_CLEAR_ALL_ASSIGNMENTS: '/admin/assignments/clear-all',
   },
