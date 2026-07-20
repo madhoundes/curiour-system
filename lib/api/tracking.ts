@@ -96,7 +96,7 @@ export class TrackingService {
             throw new Error(details || 'Tracking code not found. Please verify the tracking number and try again.');
           }
           if (status === 422) {
-            throw new Error(details || 'Invalid tracking code format. Please use format: ASH-YYYYMMDD-XXXXXX');
+            throw new Error(details || 'Invalid tracking code format. Use a 6+ character code (e.g. OKGK8R).');
           }
           
           // Return the details or message from the API response
@@ -124,7 +124,7 @@ export class TrackingService {
             throw new Error(details || 'Tracking code not found. Please verify the tracking number and try again.');
           }
           if (status === 422) {
-            throw new Error(details || 'Invalid tracking code format. Please use format: ASH-YYYYMMDD-XXXXXX');
+            throw new Error(details || 'Invalid tracking code format. Use a 6+ character code (e.g. OKGK8R).');
           }
         }
       }
@@ -193,7 +193,7 @@ export class TrackingService {
             throw new Error(details || 'Tracking code not found. Please verify the tracking number and try again.');
           }
           if (status === 422) {
-            throw new Error(details || 'Invalid tracking code format. Please use format: ASH-YYYYMMDD-XXXXXX');
+            throw new Error(details || 'Invalid tracking code format. Use a 6+ character code (e.g. OKGK8R).');
           }
           
           // Return the details or message from the API response
@@ -210,7 +210,7 @@ export class TrackingService {
             throw new Error(details || 'Tracking code not found. Please verify the tracking number and try again.');
           }
           if (status === 422) {
-            throw new Error(details || 'Invalid tracking code format. Please use format: ASH-YYYYMMDD-XXXXXX');
+            throw new Error(details || 'Invalid tracking code format. Use a 6+ character code (e.g. OKGK8R).');
           }
         }
       }

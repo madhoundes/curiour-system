@@ -44,17 +44,17 @@ export const formatTrackingNumber = (value: string): string => value.trim().toUp
  * tracking endpoint accepts.
  *
  * Supported formats:
- *   - ``ASH-YYYYMMDD-XXXXXX`` – current Parcego format.
- *   - ``PCG`` followed by 9+ alphanumerics – legacy/short-code format that
- *     the backend ``trackingService`` still resolves.
+ *   - 6–50 alphanumeric chars – current Parcego codes (e.g. ``OKGK8R``).
+ *   - ``ASH-YYYYMMDD-XXXXXX`` – legacy hyphenated format.
+ *   - ``PCG`` + alphanumeric – covered by the alphanumeric rule above.
  *
  * Anything else is rejected client-side so we don't burn an API round-trip
- * on obviously malformed input.
+ * on obviously malformed input. Aligns with ``TrackingService.isValidTrackingCode``.
  */
 export const isValidTrackingNumber = (value: string): boolean => {
   const v = formatTrackingNumber(value);
   if (/^ASH-\d{8}-[A-Z0-9]{6}$/.test(v)) return true;
-  if (/^PCG[A-Z0-9]{9,}$/.test(v)) return true;
+  if (/^[A-Z0-9]{6,50}$/.test(v)) return true;
   return false;
 };
 

@@ -154,7 +154,7 @@ function TrackPackageContent() {
       setLoading(false)
       setTrackingData(null)
       setShowTimeline(false)
-      setError('Invalid tracking number format. Use ASH-YYYYMMDD-XXXXXX or a PCG code.')
+      setError('Invalid tracking number format. Use a 6+ character code (e.g. OKGK8R).')
       return
     }
 
@@ -195,7 +195,7 @@ function TrackPackageContent() {
       } else if (err?.response?.status === 404) {
         errorMessage = 'Tracking number not found. Please verify the tracking number and try again.'
       } else if (err?.response?.status === 422) {
-        errorMessage = 'Invalid tracking number format. Use ASH-YYYYMMDD-XXXXXX or a PCG code.'
+        errorMessage = 'Invalid tracking number format. Use a 6+ character code (e.g. OKGK8R).'
       } else if (err?.message?.includes('Network') || err?.message?.includes('fetch')) {
         errorMessage = 'Network error. Please check your internet connection and try again.'
       }
@@ -278,7 +278,7 @@ function TrackPackageContent() {
                   value={heroTracking}
                   onChange={(e) => setHeroTracking(e.target.value)}
                   onKeyDown={handleHeroKeyDown}
-                  placeholder="ASH-20250910-ABC123"
+                  placeholder="OKGK8R"
                   className="h-12 text-base bg-white border-0 shadow-lg text-gray-900 placeholder:text-gray-500"
                 />
               </div>

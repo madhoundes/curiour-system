@@ -28,7 +28,7 @@ export const TrackingInputCard: React.FC<TrackingInputCardProps> = ({ id = "parc
       return
     }
     if (!isValidTrackingNumber(v)) {
-      setError("Invalid format. Use ASH-YYYYMMDD-XXXXXX")
+      setError("Invalid format. Use a 6+ character code (e.g. OKGK8R)")
       inputRef.current?.focus()
       return
     }
