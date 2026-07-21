@@ -30,34 +30,15 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { PageHeader } from "@/components/ui/page-header";
-
-// Postal code validation helpers
-const isTorontoPostalCode = (postalCode: string): boolean => {
-  const normalized = postalCode.trim().toUpperCase().replace(/\s+/g, '');
-  if (!normalized.startsWith('M')) {
-    return false;
-  }
-  const digit1 = parseInt(normalized.charAt(1));
-  return digit1 >= 1 && digit1 <= 9;
-};
-
-const isMississaugaPostalCode = (postalCode: string): boolean => {
-  const normalized = postalCode.trim().toUpperCase().replace(/\s+/g, '');
-  if (!normalized.startsWith('L')) {
-    return false;
-  }
-  const fsa = normalized.substring(0, 3);
-  const digit1 = parseInt(fsa.charAt(1));
-  const letter2 = fsa.charAt(2);
-  
-  if (digit1 === 4) {
-    return ['T', 'W', 'X', 'Y', 'Z'].includes(letter2);
-  }
-  if (digit1 === 5) {
-    return ['A', 'B', 'C', 'E', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'V', 'W'].includes(letter2);
-  }
-  return false;
-};
+import {
+  isPostalCodeInServiceArea,
+  parseServiceAreaCity,
+  postalMatchesCity,
+  SERVICE_AREA_CITIES,
+  SERVICE_AREA_LABEL_SHORT,
+  serviceAreaPostalHint,
+  type ServiceAreaCity,
+} from "@/lib/service-area";
 
 const BusinessInfoSchema = z.object({
   business_name: z.string().min(2, "Business name is required"),
@@ -66,8 +47,8 @@ const BusinessInfoSchema = z.object({
   phone: z.string().regex(/^\d{10,}$/, "Phone number must have at least 10 digits"),
   addressLine1: z.string().min(2, "Address is required"),
   addressLine2: z.string().optional(),
-  city: z.enum(["Toronto", "Mississauga"], {
-    message: "City must be Toronto or Mississauga"
+  city: z.enum(SERVICE_AREA_CITIES, {
+    message: `City must be ${SERVICE_AREA_LABEL_SHORT}`
   }),
   state: z.string().min(2, "State is required"),
   zip: z.string()
@@ -80,28 +61,12 @@ const BusinessInfoSchema = z.object({
     }, {
       message: "Invalid postal code format. Use Canadian format: A1A 1A1 (e.g., M5V 3A8 or L4T 1A1)"
     })
-    .refine((postalCode) => {
-      const normalized = postalCode.trim().toUpperCase().replace(/\s+/g, '').replace(/-/g, '');
-      return isTorontoPostalCode(normalized) || isMississaugaPostalCode(normalized);
-    }, {
-      message: "Postal code must be in Downtown Toronto (M prefix) or Mississauga (L4T-L5W prefix)"
+    .refine((postalCode) => isPostalCodeInServiceArea(postalCode), {
+      message: `Postal code must be in ${serviceAreaPostalHint}`
     }),
   country: z.string().min(2, "Country is required"),
-}).refine((data) => {
-  // Normalize postal code: remove spaces and dashes, convert to uppercase
-  const normalized = data.zip.trim().toUpperCase().replace(/[\s-]/g, '');
-  
-  if (data.city === "Toronto" && !isTorontoPostalCode(normalized)) {
-    return false;
-  }
-  
-  if (data.city === "Mississauga" && !isMississaugaPostalCode(normalized)) {
-    return false;
-  }
-  
-  return true;
-}, {
-  message: "Postal code does not match the selected city. Toronto postal codes start with M, Mississauga postal codes start with L4T-L5W",
+}).refine((data) => postalMatchesCity(data.zip, data.city), {
+  message: `Postal code does not match the selected city. Use a postal code in ${serviceAreaPostalHint}`,
   path: ["zip"]
 });
 
@@ -263,36 +228,29 @@ function ProfileAccountPageContent() {
         const profileData = await profileService.getProfile();
         
         // Map API response to form data
-        // Normalize city to match schema enum (Toronto or Mississauga)
-        let normalizedCity = profileData.city || "";
-        const originalCity = normalizedCity;
-        
-        if (normalizedCity.toLowerCase().includes('toronto') || normalizedCity.toLowerCase().includes('downtown')) {
-          normalizedCity = "Toronto";
-        } else if (normalizedCity.toLowerCase() === 'mississauga') {
-          normalizedCity = "Mississauga";
-        } else if (!normalizedCity) {
-          normalizedCity = "Toronto"; // Default to Toronto if empty
-        } else {
-          // City is not in service area - set to Toronto as default but show warning
-          normalizedCity = "Toronto";
-          if (originalCity) {
-            setProfileError(`Your current address city "${originalCity}" is not in our service area. Please update it to Toronto or Mississauga.`);
-          }
+        // Normalize city to match schema enum
+        let normalizedCity: ServiceAreaCity = "Toronto";
+        const originalCity = profileData.city || "";
+        const parsedCity = parseServiceAreaCity(originalCity);
+
+        if (parsedCity) {
+          normalizedCity = parsedCity;
+        } else if (originalCity) {
+          setProfileError(
+            `Your current address city "${originalCity}" is not in our service area. Please update it to ${SERVICE_AREA_LABEL_SHORT}.`,
+          );
         }
-        
+
         // Validate postal code if present
         if (profileData.postal_code) {
-          const postalCode = profileData.postal_code.trim().toUpperCase().replace(/\s+/g, '');
-          const isValidToronto = isTorontoPostalCode(postalCode);
-          const isValidMississauga = isMississaugaPostalCode(postalCode);
-          
-          if (!isValidToronto && !isValidMississauga) {
-            setProfileError(`Your current postal code "${profileData.postal_code}" is not in our service area. Please update it to a Toronto (M prefix) or Mississauga (L4T-L5W prefix) postal code.`);
-          } else if (normalizedCity === "Toronto" && !isValidToronto) {
-            setProfileError(`Your postal code "${profileData.postal_code}" does not match Toronto. Please update your address.`);
-          } else if (normalizedCity === "Mississauga" && !isValidMississauga) {
-            setProfileError(`Your postal code "${profileData.postal_code}" does not match Mississauga. Please update your address.`);
+          if (!isPostalCodeInServiceArea(profileData.postal_code)) {
+            setProfileError(
+              `Your current postal code "${profileData.postal_code}" is not in our service area. Please update it to a postal code in ${serviceAreaPostalHint}.`,
+            );
+          } else if (!postalMatchesCity(profileData.postal_code, normalizedCity)) {
+            setProfileError(
+              `Your postal code "${profileData.postal_code}" does not match ${normalizedCity}. Please update your address.`,
+            );
           }
         }
         
@@ -306,7 +264,7 @@ function ProfileAccountPageContent() {
           phone: profileData.phone_number || "",
           addressLine1: profileData.street_address || "",
           addressLine2: profileData.street_address_2 || "",
-          city: normalizedCity as "Toronto" | "Mississauga",
+          city: normalizedCity,
           state: normalizedProvince,
           zip: profileData.postal_code || "",
           country: profileData.country || "Canada",
@@ -831,7 +789,7 @@ function ProfileAccountPageContent() {
                                 Service Area Restriction
                               </p>
                               <p className="text-sm text-blue-700">
-                                Your business address must be in <strong>Downtown Toronto</strong> or <strong>Mississauga</strong>, Ontario. This is required for pickup service availability.
+                                Your business address must be in <strong>{SERVICE_AREA_LABEL_SHORT}</strong>, Ontario. This is required for pickup service availability.
                               </p>
                             </div>
                           </div>
@@ -861,8 +819,9 @@ function ProfileAccountPageContent() {
                                   <SelectValue placeholder="Select city" />
                                 </SelectTrigger>
                                 <SelectContent>
-                                  <SelectItem value="Toronto">Toronto</SelectItem>
-                                  <SelectItem value="Mississauga">Mississauga</SelectItem>
+                                  {SERVICE_AREA_CITIES.map((city) => (
+                                    <SelectItem key={city} value={city}>{city}</SelectItem>
+                                  ))}
                                 </SelectContent>
                               </Select>
                             </FormControl>
@@ -906,7 +865,13 @@ function ProfileAccountPageContent() {
                             <FormLabel>Postal Code <span className="text-red-500">*</span></FormLabel>
                             <FormControl>
                               <Input 
-                                placeholder={businessForm.watch("city") === "Toronto" ? "M5V 3A8" : businessForm.watch("city") === "Mississauga" ? "L5A 1B2" : "A1A 1A1"} 
+                                placeholder={
+                                  businessForm.watch("city") === "Mississauga" ? "L5A 1B2"
+                                    : businessForm.watch("city") === "Brampton" ? "L6P 1A1"
+                                    : businessForm.watch("city") === "Oakville" ? "L6H 1A1"
+                                    : businessForm.watch("city") === "Etobicoke" ? "M9A 1A1"
+                                    : "M5V 3A8"
+                                } 
                                 {...field}
                                 onChange={(e) => {
                                   const value = e.target.value;
@@ -924,11 +889,7 @@ function ProfileAccountPageContent() {
                               />
                             </FormControl>
                             <FormDescription>
-                              {businessForm.watch("city") === "Toronto" 
-                                ? "Enter a Toronto postal code (starts with M)"
-                                : businessForm.watch("city") === "Mississauga"
-                                ? "Enter a Mississauga postal code (starts with L4T-L5W)"
-                                : "Enter a postal code in Toronto (M prefix) or Mississauga (L4T-L5W prefix)"}
+                              Enter a postal code in {serviceAreaPostalHint}
                             </FormDescription>
                             <FormMessage />
                           </FormItem>

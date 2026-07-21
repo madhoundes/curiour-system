@@ -16,6 +16,16 @@ import { profileService } from "@/lib/api/profile";
 import { shippingService } from "@/lib/api/shipping";
 import type { UserProfile } from "@/lib/api/types";
 import { buildFullAddress, geocodeAddress } from "@/lib/geocoding";
+import {
+  inferCityFromPostalCode,
+  isAllowedServiceCity,
+  isPostalCodeInServiceArea,
+  parseServiceAreaCity,
+  postalMatchesCity,
+  SERVICE_AREA_CITIES,
+  SERVICE_AREA_LABEL_SHORT,
+  serviceAreaPostalHint,
+} from "@/lib/service-area";
 
 // Default fallback data if profile loading fails
 const defaultSenderData = {
@@ -49,64 +59,23 @@ function CreateShipmentContent() {
   const [senderAddressError, setSenderAddressError] = useState<string | null>(null);
   const [hasInitialized, setHasInitialized] = useState(false);
 
-  // Postal code validation functions (reused for sender validation)
-  const isTorontoPostalCode = (postalCode: string): boolean => {
-    const normalized = postalCode.trim().toUpperCase().replace(/\s+/g, '');
-    if (!normalized.startsWith('M')) {
-      return false;
-    }
-    const digit1 = parseInt(normalized.charAt(1));
-    return digit1 >= 1 && digit1 <= 9;
-  };
-
-  const isMississaugaPostalCode = (postalCode: string): boolean => {
-    const normalized = postalCode.trim().toUpperCase().replace(/\s+/g, '');
-    if (!normalized.startsWith('L')) {
-      return false;
-    }
-    const fsa = normalized.substring(0, 3);
-    const digit1 = parseInt(fsa.charAt(1));
-    const letter2 = fsa.charAt(2);
-    
-    if (digit1 === 4) {
-      return ['T', 'W', 'X', 'Y', 'Z'].includes(letter2);
-    }
-    if (digit1 === 5) {
-      return ['A', 'B', 'C', 'E', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'V', 'W'].includes(letter2);
-    }
-    return false;
-  };
-
-  const isPostalCodeInServiceArea = (postalCode: string): boolean => {
-    return isTorontoPostalCode(postalCode) || isMississaugaPostalCode(postalCode);
-  };
-
   const validateSenderAddress = (city: string, postalCode: string): string | null => {
     if (!city || !postalCode) {
-      return null; // Don't validate if data is missing
+      return null;
     }
 
-    const normalizedCity = city.trim().toLowerCase();
-    const normalizedPostalCode = postalCode.trim().toUpperCase().replace(/\s+/g, '');
-    
-    const isToronto = normalizedCity === 'toronto' || normalizedCity.includes('downtown');
-    const isMississauga = normalizedCity === 'mississauga';
-    const isValidPostalCode = isPostalCodeInServiceArea(normalizedPostalCode);
+    const parsedCity = parseServiceAreaCity(city);
 
-    if (!isToronto && !isMississauga) {
-      return `Your pickup location (sender address) must be in Downtown Toronto or Mississauga. Currently set to "${city}". Please update your profile address.`;
+    if (!parsedCity || !isAllowedServiceCity(city)) {
+      return `Your pickup location (sender address) must be in ${SERVICE_AREA_LABEL_SHORT}. Currently set to "${city}". Please update your profile address.`;
     }
 
-    if (!isValidPostalCode) {
-      return `Your pickup location postal code "${postalCode}" is not in our service area. Pickup is only available in Downtown Toronto (M prefix) and Mississauga (L4T-L5W prefix). Please update your profile address.`;
+    if (!isPostalCodeInServiceArea(postalCode)) {
+      return `Your pickup location postal code "${postalCode}" is not in our service area. Pickup is only available in ${serviceAreaPostalHint}. Please update your profile address.`;
     }
 
-    if (isToronto && !isTorontoPostalCode(normalizedPostalCode)) {
-      return `Your pickup location postal code "${postalCode}" does not belong to Toronto. Please update your profile address.`;
-    }
-
-    if (isMississauga && !isMississaugaPostalCode(normalizedPostalCode)) {
-      return `Your pickup location postal code "${postalCode}" does not belong to Mississauga. Please update your profile address.`;
+    if (!postalMatchesCity(postalCode, city)) {
+      return `Your pickup location postal code "${postalCode}" does not belong to ${parsedCity}. Please update your profile address.`;
     }
 
     return null;
@@ -185,12 +154,10 @@ function CreateShipmentContent() {
       
       if (postalCode) {
         updateFormField('recipientPostalCode', postalCode);
-        
+
         // Auto-detect city from postal code
-        if (isTorontoPostalCode(postalCode)) {
-          updateFormField('recipientCity', 'Toronto');
-        } else if (isMississaugaPostalCode(postalCode)) {
-          updateFormField('recipientCity', 'Mississauga');
+        if (isPostalCodeInServiceArea(postalCode)) {
+          updateFormField('recipientCity', inferCityFromPostalCode(postalCode));
         }
       }
 
@@ -229,25 +196,17 @@ function CreateShipmentContent() {
       return 'Invalid postal code format. Please use format A1A 1A1';
     }
 
-    // Check if postal code is in service area
     if (!isPostalCodeInServiceArea(postalCode)) {
-      return 'This postal code is not in our service area. Delivery is only available in Downtown Toronto (M prefix) and Mississauga (L4T-L5W prefix).';
+      return `This postal code is not in our service area. Delivery is only available in ${serviceAreaPostalHint}.`;
     }
 
-    // Check if postal code matches selected city
-    if (city === 'Toronto' && !isTorontoPostalCode(postalCode)) {
-      return 'This postal code does not belong to Toronto. Toronto postal codes start with M.';
+    if (city && !postalMatchesCity(postalCode, city)) {
+      const parsedCity = parseServiceAreaCity(city);
+      return `This postal code does not belong to ${parsedCity ?? city}.`;
     }
 
-    if (city === 'Mississauga' && !isMississaugaPostalCode(postalCode)) {
-      return 'This postal code does not belong to Mississauga. Mississauga postal codes start with L4T-L5W.';
-    }
-
-    // Auto-detect city from postal code if city is not selected
-    if (!city && isTorontoPostalCode(postalCode)) {
-      updateFormField('recipientCity', 'Toronto');
-    } else if (!city && isMississaugaPostalCode(postalCode)) {
-      updateFormField('recipientCity', 'Mississauga');
+    if (!city && isPostalCodeInServiceArea(postalCode)) {
+      updateFormField('recipientCity', inferCityFromPostalCode(postalCode));
     }
 
     return null;
@@ -312,8 +271,8 @@ function CreateShipmentContent() {
       });
     }
     
-    // Auto-set province to "ON" when city is selected (both cities are in Ontario)
-    if (field === 'recipientCity' && (value === 'Toronto' || value === 'Mississauga')) {
+    // Auto-set province to "ON" when a service-area city is selected
+    if (field === 'recipientCity' && typeof value === 'string' && isAllowedServiceCity(value)) {
       updateFormField('recipientProvince', 'ON');
       // Re-validate postal code when city changes
       if (formData.recipientPostalCode) {
@@ -807,7 +766,7 @@ function CreateShipmentContent() {
                       Service Area Restriction
                     </p>
                     <p className="text-sm text-blue-700">
-                      Both <strong>pickup</strong> (sender) and <strong>delivery</strong> (recipient) addresses must be in <strong>Downtown Toronto</strong> or <strong>Mississauga</strong>, Ontario. Please ensure both addresses are in one of these areas.
+                      Both <strong>pickup</strong> (sender) and <strong>delivery</strong> (recipient) addresses must be in <strong>{SERVICE_AREA_LABEL_SHORT}</strong>, Ontario. Please ensure both addresses are in one of these areas.
                     </p>
                   </div>
                 </div>
@@ -887,8 +846,9 @@ function CreateShipmentContent() {
                       <SelectValue placeholder="Select city" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Toronto">Toronto</SelectItem>
-                      <SelectItem value="Mississauga">Mississauga</SelectItem>
+                      {SERVICE_AREA_CITIES.map((city) => (
+                        <SelectItem key={city} value={city}>{city}</SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   {fieldErrors.recipientCity ? (
@@ -897,7 +857,7 @@ function CreateShipmentContent() {
                     </p>
                   ) : (
                     <p className="text-xs text-gray-500 mt-1">
-                      💡 Delivery is only available in Downtown Toronto and Mississauga
+                      Delivery is available in {SERVICE_AREA_LABEL_SHORT}
                     </p>
                   )}
                 </div>
@@ -923,7 +883,13 @@ function CreateShipmentContent() {
                   </Label>
                   <Input
                     id="parcego-recipient-postal-code"
-                    placeholder={formData.recipientCity === 'Toronto' ? 'M5V 3A8' : formData.recipientCity === 'Mississauga' ? 'L5A 1B2' : 'M5V 3A8 or L5A 1B2'}
+                    placeholder={
+                      formData.recipientCity === 'Mississauga' ? 'L5A 1B2'
+                        : formData.recipientCity === 'Brampton' ? 'L6P 1A1'
+                        : formData.recipientCity === 'Oakville' ? 'L6H 1A1'
+                        : formData.recipientCity === 'Etobicoke' ? 'M9A 1A1'
+                        : 'M5V 3A8'
+                    }
                     value={formData.recipientPostalCode}
                     onChange={(e) => handleInputChange('recipientPostalCode', e.target.value)}
                     className={`parcego-form__input ${(postalCodeError || fieldErrors.recipientPostalCode) ? 'border-red-500 focus-visible:ring-red-200' : ''}`}
@@ -943,7 +909,7 @@ function CreateShipmentContent() {
                   )}
                   {!postalCodeError && !fieldErrors.recipientPostalCode && !formData.recipientPostalCode && (
                     <p className="text-xs text-gray-500 mt-1">
-                      Enter a postal code in Downtown Toronto (M prefix) or Mississauga (L4T-L5W prefix). Both pickup and delivery must be in the service area.
+                      Enter a postal code in {serviceAreaPostalHint}. Both pickup and delivery must be in the service area.
                     </p>
                   )}
                 </div>

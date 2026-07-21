@@ -10,6 +10,14 @@
 
 import type { ShipmentFormData } from '@/lib/shipment-context';
 import type { CreateShipmentRequest, UserProfile } from '@/lib/api/types';
+import {
+  isAllowedServiceCity,
+  isPostalCodeInServiceArea,
+  parseServiceAreaCity,
+  postalMatchesCity,
+  SERVICE_AREA_LABEL_SHORT,
+  serviceAreaPostalHint,
+} from '@/lib/service-area';
 
 const REQUIRED_SENDER_FIELDS: Array<keyof UserProfile> = [
   'email',
@@ -30,27 +38,7 @@ const REQUIRED_RECIPIENT_FIELDS: Array<{ field: keyof ShipmentFormData; label: s
   { field: 'recipientEmail', label: 'recipient email' },
 ];
 
-const isTorontoPostalCode = (postal: string): boolean => {
-  if (!postal.startsWith('M')) return false;
-  const digit1 = parseInt(postal.charAt(1), 10);
-  return digit1 >= 1 && digit1 <= 9;
-};
-
-const isMississaugaPostalCode = (postal: string): boolean => {
-  if (!postal.startsWith('L')) return false;
-  const fsa = postal.substring(0, 3);
-  const digit1 = parseInt(fsa.charAt(1), 10);
-  const letter2 = fsa.charAt(2);
-  if (digit1 === 4) {
-    return ['T', 'W', 'X', 'Y', 'Z'].includes(letter2);
-  }
-  if (digit1 === 5) {
-    return ['A', 'B', 'C', 'E', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'V', 'W'].includes(letter2);
-  }
-  return false;
-};
-
-const normalizePostalCode = (code: string): string => {
+const formatPostalCode = (code: string): string => {
   if (!code) return '';
   const cleaned = code.trim().replace(/[\s-]/g, '').toUpperCase();
   if (cleaned.length === 6) {
@@ -86,62 +74,45 @@ export const buildCreateShipmentRequest = (
   }
 
   // Sender service area
-  const senderCity = (senderData.city || '').trim().toLowerCase();
-  const senderPostal = (senderData.postal_code || '').trim().toUpperCase().replace(/\s+/g, '');
-  const senderIsToronto = senderCity === 'toronto' || senderCity.includes('downtown');
-  const senderIsMississauga = senderCity === 'mississauga';
-  const senderIsTorontoPostal = isTorontoPostalCode(senderPostal);
-  const senderIsMississaugaPostal = isMississaugaPostalCode(senderPostal);
+  const senderCity = senderData.city || '';
+  const senderPostal = senderData.postal_code || '';
+  const senderParsedCity = parseServiceAreaCity(senderCity);
 
-  if (!senderIsToronto && !senderIsMississauga) {
+  if (!senderParsedCity || !isAllowedServiceCity(senderCity)) {
     throw new Error(
-      `Pickup location (sender address) must be in Downtown Toronto or Mississauga. Your profile address city "${senderData.city}" is not in our service area. Please update your profile address.`,
+      `Pickup location (sender address) must be in ${SERVICE_AREA_LABEL_SHORT}. Your profile address city "${senderData.city}" is not in our service area. Please update your profile address.`,
     );
   }
-  if (!senderIsTorontoPostal && !senderIsMississaugaPostal) {
+  if (!isPostalCodeInServiceArea(senderPostal)) {
     throw new Error(
-      `Pickup location postal code "${senderData.postal_code}" is not in our service area. Pickup is only available in Downtown Toronto (M prefix) and Mississauga (L4T-L5W prefix). Please update your profile address.`,
+      `Pickup location postal code "${senderData.postal_code}" is not in our service area. Pickup is only available in ${serviceAreaPostalHint}. Please update your profile address.`,
     );
   }
-  if (senderIsToronto && !senderIsTorontoPostal) {
+  if (!postalMatchesCity(senderPostal, senderCity)) {
     throw new Error(
-      `Pickup location postal code "${senderData.postal_code}" does not belong to Toronto. Please update your profile address.`,
-    );
-  }
-  if (senderIsMississauga && !senderIsMississaugaPostal) {
-    throw new Error(
-      `Pickup location postal code "${senderData.postal_code}" does not belong to Mississauga. Please update your profile address.`,
+      `Pickup location postal code "${senderData.postal_code}" does not belong to ${senderParsedCity}. Please update your profile address.`,
     );
   }
 
   // Recipient service area
-  const recipientCity = formData.recipientCity.trim().toLowerCase();
-  const isToronto = recipientCity === 'toronto' || recipientCity.includes('downtown toronto');
-  const isMississauga = recipientCity === 'mississauga';
+  const recipientCity = formData.recipientCity;
+  const recipientParsedCity = parseServiceAreaCity(recipientCity);
 
-  if (!isToronto && !isMississauga) {
+  if (!recipientParsedCity || !isAllowedServiceCity(recipientCity)) {
     throw new Error(
-      `Delivery is only supported in Downtown Toronto and Mississauga. Your selected city "${formData.recipientCity}" is not in our service area.`,
+      `Delivery is only supported in ${SERVICE_AREA_LABEL_SHORT}. Your selected city "${formData.recipientCity}" is not in our service area.`,
     );
   }
 
-  const recipientPostal = formData.recipientPostalCode.trim().toUpperCase().replace(/\s+/g, '');
-  const recipientIsTorontoPostal = isTorontoPostalCode(recipientPostal);
-  const recipientIsMississaugaPostal = isMississaugaPostalCode(recipientPostal);
-
-  if (!recipientIsTorontoPostal && !recipientIsMississaugaPostal) {
+  const recipientPostal = formData.recipientPostalCode;
+  if (!isPostalCodeInServiceArea(recipientPostal)) {
     throw new Error(
-      `The postal code "${formData.recipientPostalCode}" is not in our service area. Delivery is only available in Downtown Toronto (postal codes starting with M) and Mississauga (postal codes starting with L4T-L5W).`,
+      `The postal code "${formData.recipientPostalCode}" is not in our service area. Delivery is only available in ${serviceAreaPostalHint}.`,
     );
   }
-  if (isToronto && !recipientIsTorontoPostal) {
+  if (!postalMatchesCity(recipientPostal, recipientCity)) {
     throw new Error(
-      `The postal code "${formData.recipientPostalCode}" does not belong to Toronto. Toronto postal codes start with M.`,
-    );
-  }
-  if (isMississauga && !recipientIsMississaugaPostal) {
-    throw new Error(
-      `The postal code "${formData.recipientPostalCode}" does not belong to Mississauga. Mississauga postal codes start with L4T-L5W.`,
+      `The postal code "${formData.recipientPostalCode}" does not belong to ${recipientParsedCity}.`,
     );
   }
 
@@ -161,9 +132,9 @@ export const buildCreateShipmentRequest = (
       company_name: senderData.business_name || '',
       street_address: senderData.street_address || '',
       street_address_2: senderData.street_address_2 || 'N/A',
-      city: senderData.city || '',
+      city: senderParsedCity,
       province: senderData.province || '',
-      postal_code: normalizePostalCode(senderData.postal_code || ''),
+      postal_code: formatPostalCode(senderData.postal_code || ''),
       country: senderData.country || 'Canada',
       phone_number: senderData.phone_number || '',
       email: senderData.email || '',
@@ -173,9 +144,9 @@ export const buildCreateShipmentRequest = (
       company_name: formData.recipientCompany || '',
       street_address: formData.recipientAddress,
       street_address_2: 'N/A',
-      city: formData.recipientCity,
+      city: recipientParsedCity,
       province: formData.recipientProvince,
-      postal_code: normalizePostalCode(formData.recipientPostalCode),
+      postal_code: formatPostalCode(formData.recipientPostalCode),
       country: 'Canada',
       phone_number: formData.recipientPhone,
       email: formData.recipientEmail,

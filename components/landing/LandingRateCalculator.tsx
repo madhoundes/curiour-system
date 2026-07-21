@@ -8,6 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { quotesService } from '@/lib/api/quotes';
 import type { QuoteOptionItem } from '@/lib/api/types';
 import { buildQuoteOptionsFromPostal, getDeliverySpeedLabel } from '@/lib/zone-pricing';
+import { SERVICE_AREA_LABEL_SHORT } from '@/lib/service-area';
 
 // UI-facing package labels mapped to the backend's ``PackageSize`` enum.
 // Envelope -> small, Box -> medium, Pallet -> large.
@@ -98,7 +99,7 @@ const LandingRateCalculator: React.FC = () => {
       return;
     }
     if (!quotesService.isPostalCodeInServiceArea(trimmedDest)) {
-      setDestError('Service area: Downtown Toronto or Mississauga only');
+      setDestError(`Service area: ${SERVICE_AREA_LABEL_SHORT} only`);
       return;
     }
     setDestError('');
@@ -168,7 +169,7 @@ const LandingRateCalculator: React.FC = () => {
                 <div>
                   <h4 className="font-bold text-slate-900">Zone-Based Pricing</h4>
                   <p className="text-sm text-slate-500">
-                    Downtown Toronto deliveries get flat next-day and 2–3 day rates. Other areas use size and weight pricing.
+                    Downtown Toronto deliveries get flat next-day and 2–3 day rates. {SERVICE_AREA_LABEL_SHORT} (outside downtown) use size and weight pricing.
                   </p>
                 </div>
               </div>

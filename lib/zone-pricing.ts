@@ -1,5 +1,6 @@
 import type { ShipmentFormData } from '@/lib/shipment-context';
 import type { QuoteOptionsRequest } from '@/lib/api/types';
+import { inferCityFromPostalCode } from '@/lib/service-area';
 
 export type ApiPackageSize = 'small' | 'medium' | 'large';
 
@@ -25,13 +26,7 @@ export const resolvePackageSize = (formData: Pick<ShipmentFormData, 'packageType
   }
 };
 
-export const inferCityFromPostalCode = (postalCode: string): string => {
-  const normalized = postalCode.trim().toUpperCase();
-  if (normalized.startsWith('L')) {
-    return 'Mississauga';
-  }
-  return 'Toronto';
-};
+export { inferCityFromPostalCode };
 
 export const buildQuoteOptionsFromPostal = (
   packageSize: ApiPackageSize,

@@ -10,6 +10,11 @@ import { Icon } from "@/components/ui/icon"
 import { api } from "@/lib/api"
 import type { QuoteOptionItem } from "@/lib/api/types"
 import { buildQuoteOptionsFromPostal, getDeliverySpeedLabel } from "@/lib/zone-pricing"
+import {
+  isPostalCodeInServiceArea,
+  SERVICE_AREA_LABEL_SHORT,
+  serviceAreaPostalHint,
+} from "@/lib/service-area"
 
 interface GetInstantShippingQuoteModalProps {
   open: boolean
@@ -48,38 +53,6 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
   const [quoteError, setQuoteError] = useState<string>("")
   const [postalCodeError, setPostalCodeError] = useState<string>("")
 
-  // Postal code validation functions
-  const isTorontoPostalCode = (postalCode: string): boolean => {
-    const normalized = postalCode.trim().toUpperCase().replace(/\s+/g, '');
-    if (!normalized.startsWith('M')) {
-      return false;
-    }
-    const digit1 = parseInt(normalized.charAt(1));
-    return digit1 >= 1 && digit1 <= 9;
-  };
-
-  const isMississaugaPostalCode = (postalCode: string): boolean => {
-    const normalized = postalCode.trim().toUpperCase().replace(/\s+/g, '');
-    if (!normalized.startsWith('L')) {
-      return false;
-    }
-    const fsa = normalized.substring(0, 3);
-    const digit1 = parseInt(fsa.charAt(1));
-    const letter2 = fsa.charAt(2);
-    
-    if (digit1 === 4) {
-      return ['T', 'W', 'X', 'Y', 'Z'].includes(letter2);
-    }
-    if (digit1 === 5) {
-      return ['A', 'B', 'C', 'E', 'G', 'H', 'J', 'K', 'L', 'M', 'N', 'P', 'R', 'S', 'T', 'V', 'W'].includes(letter2);
-    }
-    return false;
-  };
-
-  const isPostalCodeInServiceArea = (postalCode: string): boolean => {
-    return isTorontoPostalCode(postalCode) || isMississaugaPostalCode(postalCode);
-  };
-
   const validatePostalCode = (postalCode: string): string | null => {
     if (!postalCode || postalCode.trim() === '') {
       return 'Postal code is required';
@@ -91,9 +64,8 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
       return 'Invalid postal code format. Please use format A1A 1A1';
     }
 
-    // Check if postal code is in service area
     if (!isPostalCodeInServiceArea(postalCode)) {
-      return 'This postal code is not in our service area. Delivery is only available in Downtown Toronto (M prefix) and Mississauga (L4T-L5W prefix).';
+      return `This postal code is not in our service area. Delivery is only available in ${serviceAreaPostalHint}.`;
     }
 
     return null;
@@ -254,7 +226,7 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
             <div className="flex items-start space-x-2">
               <Icon name="Info" size={16} className="text-blue-600 mt-0.5 flex-shrink-0" />
               <p className="text-xs text-blue-700">
-                <strong>Service Area:</strong> Both <strong>pickup</strong> and <strong>delivery</strong> must be in <strong>Downtown Toronto</strong> or <strong>Mississauga</strong>, Ontario.
+                <strong>Service Area:</strong> Both <strong>pickup</strong> and <strong>delivery</strong> must be in <strong>{SERVICE_AREA_LABEL_SHORT}</strong>, Ontario.
               </p>
             </div>
           </div>
@@ -322,7 +294,7 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
             <Label htmlFor="parcego-destination-postal">Destination Postal Code</Label>
             <Input
               id="parcego-destination-postal"
-              placeholder="M5V 3A8 (Toronto) or L5A 1B2 (Mississauga)"
+              placeholder="M5V 3A8, L5A 1B2, L6P 1A1, or L6H 1A1"
               value={formData.destinationPostalCode}
               onChange={(e) => handleInputChange("destinationPostalCode", e.target.value)}
               className={postalCodeError ? 'border-red-500 focus-visible:ring-red-200' : ''}
@@ -341,7 +313,7 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
             )}
             {!postalCodeError && !formData.destinationPostalCode && (
               <p className="text-xs text-gray-500">
-                Enter a postal code in Downtown Toronto (M prefix) or Mississauga (L4T-L5W prefix)
+                Enter a postal code in {serviceAreaPostalHint}
               </p>
             )}
           </div>
@@ -368,7 +340,7 @@ export function GetInstantShippingQuoteModal({ open, onOpenChange }: GetInstantS
                   <p className="text-sm text-red-700 leading-relaxed">{quoteError}</p>
                   {quoteError.toLowerCase().includes('service area') && (
                     <p className="text-xs text-red-600 mt-2">
-                      💡 Tip: Make sure both pickup and delivery addresses are in Downtown Toronto or Mississauga.
+                      Tip: Make sure both pickup and delivery addresses are in {SERVICE_AREA_LABEL_SHORT}.
                     </p>
                   )}
                 </div>
