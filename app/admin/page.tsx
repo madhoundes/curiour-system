@@ -508,7 +508,7 @@ export default function SuperAdminDashboard() {
     };
 
     loadFreeMerchants();
-  }, [isAuthenticated, activeSection, logoutAdmin, showErrorToast]);
+  }, [isAuthenticated, activeSection, logoutAdmin]);
 
   // Load admin statistics from API
   useEffect(() => {
