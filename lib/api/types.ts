@@ -69,6 +69,7 @@ export interface User {
   role: 'user' | 'admin' | 'courier' | 'driver';
   is_active: boolean;
   is_verified: boolean;
+  is_free?: boolean;
   created_at: string;
   updated_at?: string;
 }
@@ -225,6 +226,7 @@ export interface UserProfile {
   role: 'user' | 'admin' | 'courier' | 'driver';
   is_active: boolean;
   is_verified: boolean;
+  is_free?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -354,8 +356,14 @@ export interface CreateCheckoutSessionRequest {
 }
 
 export interface CreateCheckoutSessionResponse {
-  checkout_session_id: string;
-  client_secret: string;
+  checkout_session_id?: string;
+  client_secret?: string;
+  free_checkout?: boolean;
+  billing_id?: number;
+  shipment_id?: number;
+  payment_status?: string;
+  amount?: number;
+  currency?: string;
 }
 
 // Session status types

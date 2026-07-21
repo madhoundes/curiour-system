@@ -395,6 +395,12 @@ function ShipmentsPageContent() {
         throw new Error('Failed to create checkout session - no response received');
       }
 
+      if (checkoutSession.free_checkout) {
+        localStorage.setItem('parcego_pending_shipment_id', String(shipment.id));
+        router.push(`/purchase-label?shipment_id=${shipment.id}&paid=1`);
+        return;
+      }
+
       if (checkoutSession.client_secret) {
         console.log('Using client_secret, redirecting to purchase-label page');
         // Handle Stripe Elements payment form if needed

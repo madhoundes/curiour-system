@@ -294,6 +294,13 @@ export default function ShipmentDetailPage() {
       setIsProcessingPayment(true);
       // Create checkout session
       const checkoutSession = await shippingService.createCheckoutSession(billingRecord.id);
+      // Free merchant: payment waived
+      if (checkoutSession.free_checkout) {
+        localStorage.setItem('parcego_pending_shipment_id', String(shipment.id));
+        toast.success('Payment waived — shipment marked as paid');
+        router.push(`/purchase-label?shipment_id=${shipment.id}&paid=1`);
+        return;
+      }
       // Embedded checkout flow (primary path for this backend)
       if (checkoutSession.client_secret) {
         sessionStorage.setItem('parcego_checkout_session', JSON.stringify(checkoutSession));

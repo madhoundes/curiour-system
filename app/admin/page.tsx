@@ -177,6 +177,15 @@ export default function SuperAdminDashboard() {
     inWarehouse: number;
   } | null>(null);
 
+  // Free merchants (payment waived)
+  const [freeMerchants, setFreeMerchants] = useState<User[]>([]);
+  const [freeMerchantsLoading, setFreeMerchantsLoading] = useState(false);
+  const [freeMerchantSearchQuery, setFreeMerchantSearchQuery] = useState("");
+  const [isAddFreeMerchantOpen, setIsAddFreeMerchantOpen] = useState(false);
+  const [addFreeMerchantSearch, setAddFreeMerchantSearch] = useState("");
+  const [addingFreeMerchantId, setAddingFreeMerchantId] = useState<number | null>(null);
+  const [removingFreeMerchantId, setRemovingFreeMerchantId] = useState<number | null>(null);
+
   // Admin statistics from API
   const [adminStats, setAdminStats] = useState<{
     totalShipments: number;
@@ -470,6 +479,36 @@ export default function SuperAdminDashboard() {
 
     loadMerchants();
   }, [isAuthenticated, logoutAdmin]);
+
+  // Load free merchants when section is active
+  useEffect(() => {
+    const loadFreeMerchants = async () => {
+      if (!isAuthenticated || activeSection !== "free-merchants") return;
+
+      try {
+        setFreeMerchantsLoading(true);
+        const response = await adminService.listFreeMerchants();
+        setFreeMerchants(response.data || []);
+      } catch (error: any) {
+        console.error("Failed to load free merchants:", error);
+        const isAuthError =
+          error?.status === 401 ||
+          error?.status === 403 ||
+          error?.response?.status === 401 ||
+          error?.response?.status === 403;
+        if (isAuthError) {
+          showErrorToast("Session expired. Please log in again.");
+          logoutAdmin();
+          return;
+        }
+        showErrorToast("Unable to fetch free merchants. Please try again.");
+      } finally {
+        setFreeMerchantsLoading(false);
+      }
+    };
+
+    loadFreeMerchants();
+  }, [isAuthenticated, activeSection, logoutAdmin, showErrorToast]);
 
   // Load admin statistics from API
   useEffect(() => {
@@ -1798,6 +1837,7 @@ export default function SuperAdminDashboard() {
       title: "Users",
       items: [
         { id: "merchants", label: "Merchants", icon: "Users", description: "Manage merchant accounts" },
+        { id: "free-merchants", label: "Free Merchants", icon: "Gift", description: "Merchants with waived payment" },
         { id: "couriers", label: "Drivers", icon: "Truck", description: "Manage driver accounts" },
       ]
     },
@@ -1855,6 +1895,258 @@ export default function SuperAdminDashboard() {
       event.preventDefault();
       handleNavigate(id);
     }
+  };
+
+  const handleAddFreeMerchant = async (userId: number) => {
+    try {
+      setAddingFreeMerchantId(userId);
+      await adminService.addFreeMerchant(userId);
+      const response = await adminService.listFreeMerchants();
+      setFreeMerchants(response.data || []);
+      showSuccessToast("Merchant added to free list");
+      setIsAddFreeMerchantOpen(false);
+      setAddFreeMerchantSearch("");
+    } catch (error: any) {
+      console.error("Failed to add free merchant:", error);
+      showErrorToast(error?.message || "Failed to add free merchant");
+    } finally {
+      setAddingFreeMerchantId(null);
+    }
+  };
+
+  const handleRemoveFreeMerchant = async (userId: number, label: string) => {
+    if (!confirm(`Remove ${label} from the free merchants list? They will need to pay for orders again.`)) {
+      return;
+    }
+    try {
+      setRemovingFreeMerchantId(userId);
+      await adminService.removeFreeMerchant(userId);
+      setFreeMerchants((prev) => prev.filter((m) => m.id !== userId));
+      showSuccessToast("Merchant removed from free list");
+    } catch (error: any) {
+      console.error("Failed to remove free merchant:", error);
+      showErrorToast(error?.message || "Failed to remove free merchant");
+    } finally {
+      setRemovingFreeMerchantId(null);
+    }
+  };
+
+  const renderFreeMerchants = () => {
+    const query = freeMerchantSearchQuery.trim().toLowerCase();
+    const filtered = freeMerchants.filter((m) => {
+      if (!query) return true;
+      const haystack = [
+        m.business_name,
+        m.email,
+        m.first_name,
+        m.last_name,
+        String(m.id),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(query);
+    });
+
+    const freeIds = new Set(freeMerchants.map((m) => m.id));
+    const addQuery = addFreeMerchantSearch.trim().toLowerCase();
+    const candidates = merchants.filter((m) => {
+      if (freeIds.has(m.id)) return false;
+      if (!addQuery) return true;
+      const haystack = [
+        m.business_name,
+        m.email,
+        m.first_name,
+        m.last_name,
+        String(m.id),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return haystack.includes(addQuery);
+    });
+
+    return (
+      <div className="space-y-6" id="parcego-admin-free-merchants-section">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900" id="parcego-admin-free-merchants-title">
+              Free Merchants
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Merchants on this list skip payment — orders move straight to paid.
+            </p>
+          </div>
+          <Button
+            id="parcego-admin-free-merchants-add-btn"
+            onClick={() => setIsAddFreeMerchantOpen(true)}
+            className="touch-manipulation"
+            aria-label="Add free merchant"
+          >
+            <Icon name="Plus" size={16} className="mr-2" />
+            Add Merchant
+          </Button>
+        </div>
+
+        <div className="relative max-w-md">
+          <Icon
+            name="Search"
+            size={16}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+          />
+          <Input
+            id="parcego-admin-free-merchants-search"
+            value={freeMerchantSearchQuery}
+            onChange={(e) => setFreeMerchantSearchQuery(e.target.value)}
+            placeholder="Search free merchants..."
+            className="pl-9"
+            aria-label="Search free merchants"
+          />
+        </div>
+
+        {freeMerchantsLoading ? (
+          <div className="space-y-3" id="parcego-admin-free-merchants-loading">
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+            <Skeleton className="h-12 w-full" />
+          </div>
+        ) : filtered.length === 0 ? (
+          <Card id="parcego-admin-free-merchants-empty">
+            <CardContent className="py-12 text-center">
+              <Icon name="Gift" size={40} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-700 font-medium">No free merchants yet</p>
+              <p className="text-sm text-gray-500 mt-1">
+                Add a merchant to waive payment on their orders.
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="p-0">
+              <Table id="parcego-admin-free-merchants-table">
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Business</TableHead>
+                    <TableHead>Contact</TableHead>
+                    <TableHead>Email</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filtered.map((merchant) => {
+                    const label =
+                      merchant.business_name ||
+                      `${merchant.first_name} ${merchant.last_name}`.trim() ||
+                      merchant.email;
+                    return (
+                      <TableRow
+                        key={merchant.id}
+                        id={`parcego-admin-free-merchant-row-${merchant.id}`}
+                      >
+                        <TableCell className="font-medium">{label}</TableCell>
+                        <TableCell>
+                          {merchant.first_name} {merchant.last_name}
+                        </TableCell>
+                        <TableCell>{merchant.email}</TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            id={`parcego-admin-free-merchant-remove-${merchant.id}`}
+                            onClick={() => handleRemoveFreeMerchant(merchant.id, label)}
+                            disabled={removingFreeMerchantId === merchant.id}
+                            aria-label={`Remove ${label} from free list`}
+                          >
+                            {removingFreeMerchantId === merchant.id ? (
+                              <Icon name="Loader2" size={14} className="animate-spin" />
+                            ) : (
+                              <>
+                                <Icon name="Trash2" size={14} className="mr-1.5" />
+                                Remove
+                              </>
+                            )}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+
+        <Dialog open={isAddFreeMerchantOpen} onOpenChange={setIsAddFreeMerchantOpen}>
+          <DialogContent
+            id="parcego-admin-free-merchants-add-dialog"
+            className="max-w-lg max-h-[80vh] overflow-hidden flex flex-col"
+          >
+            <DialogHeader>
+              <DialogTitle>Add Free Merchant</DialogTitle>
+              <DialogDescription>
+                Select a merchant to waive payment on their orders.
+              </DialogDescription>
+            </DialogHeader>
+            <Input
+              id="parcego-admin-free-merchants-add-search"
+              value={addFreeMerchantSearch}
+              onChange={(e) => setAddFreeMerchantSearch(e.target.value)}
+              placeholder="Search merchants by name or email..."
+              aria-label="Search merchants to add"
+            />
+            <div className="overflow-y-auto flex-1 min-h-0 space-y-2 mt-2">
+              {candidates.length === 0 ? (
+                <p className="text-sm text-gray-500 py-6 text-center">
+                  No matching merchants available to add.
+                </p>
+              ) : (
+                candidates.slice(0, 50).map((merchant) => {
+                  const label =
+                    merchant.business_name ||
+                    `${merchant.first_name} ${merchant.last_name}`.trim() ||
+                    merchant.email;
+                  return (
+                    <div
+                      key={merchant.id}
+                      className="flex items-center justify-between gap-3 rounded-md border border-gray-200 px-3 py-2"
+                      id={`parcego-admin-free-merchant-candidate-${merchant.id}`}
+                    >
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm truncate">{label}</p>
+                        <p className="text-xs text-gray-500 truncate">{merchant.email}</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        onClick={() => handleAddFreeMerchant(merchant.id)}
+                        disabled={addingFreeMerchantId === merchant.id}
+                        aria-label={`Add ${label} as free merchant`}
+                      >
+                        {addingFreeMerchantId === merchant.id ? (
+                          <Icon name="Loader2" size={14} className="animate-spin" />
+                        ) : (
+                          "Add"
+                        )}
+                      </Button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsAddFreeMerchantOpen(false);
+                  setAddFreeMerchantSearch("");
+                }}
+              >
+                Close
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+    );
   };
 
   const renderOverview = () => {
@@ -7521,6 +7813,7 @@ export default function SuperAdminDashboard() {
           <main className="p-4 xl:p-6" id="parcego-admin-main-content">
             {activeSection === "overview" && renderOverview()}
             {activeSection === "merchants" && renderMerchants()}
+            {activeSection === "free-merchants" && renderFreeMerchants()}
             {activeSection === "couriers" && renderCouriers()}
             {activeSection === "assignments" && renderAssignments()}
             {activeSection === "warehouse" && renderWarehouse()}

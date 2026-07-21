@@ -127,6 +127,51 @@ export class AdminService {
   }
 
   /**
+   * List merchants marked as free (payment waived)
+   */
+  async listFreeMerchants(): Promise<ApiSuccessResponse<User[]>> {
+    try {
+      const response = await apiClient.get<User[]>(
+        API_ENDPOINTS.AUTH.ADMIN_FREE_MERCHANTS,
+        {},
+        { requiresAuth: true }
+      );
+      return response;
+    } catch (error) {
+      console.error('Admin list free merchants failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Mark a merchant as free (skip payment)
+   */
+  async addFreeMerchant(userId: number): Promise<ApiSuccessResponse<User>> {
+    try {
+      const url = API_ENDPOINTS.AUTH.ADMIN_FREE_MERCHANT.replace(':user_id', userId.toString());
+      const response = await apiClient.post<User>(url, {}, { requiresAuth: true });
+      return response;
+    } catch (error) {
+      console.error('Admin add free merchant failed:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Remove a merchant from the free list
+   */
+  async removeFreeMerchant(userId: number): Promise<ApiSuccessResponse<User>> {
+    try {
+      const url = API_ENDPOINTS.AUTH.ADMIN_FREE_MERCHANT.replace(':user_id', userId.toString());
+      const response = await apiClient.delete<User>(url, { requiresAuth: true });
+      return response;
+    } catch (error) {
+      console.error('Admin remove free merchant failed:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Get user by ID (admin only)
    */
   async getUserById(userId: number): Promise<ApiSuccessResponse<User>> {

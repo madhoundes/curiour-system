@@ -519,6 +519,19 @@ export class ShippingService {
       // Normalize embedded checkout response
       const nested = raw?.data as Record<string, unknown> | undefined;
       const sessionId = (raw?.session_id ?? nested?.session_id ?? raw?.checkout_session_id ?? nested?.checkout_session_id) as string | undefined;
+      const freeCheckout = Boolean(raw?.free_checkout ?? nested?.free_checkout);
+
+      if (freeCheckout) {
+        return {
+          free_checkout: true,
+          billing_id: (raw?.billing_id ?? nested?.billing_id) as number | undefined,
+          shipment_id: (raw?.shipment_id ?? nested?.shipment_id) as number | undefined,
+          payment_status: (raw?.payment_status ?? nested?.payment_status) as string | undefined,
+          amount: (raw?.amount ?? nested?.amount) as number | undefined,
+          currency: (raw?.currency ?? nested?.currency) as string | undefined,
+        };
+      }
+
       return {
         checkout_session_id: sessionId ?? '',
         client_secret: (raw?.client_secret ?? nested?.client_secret ?? '') as string,

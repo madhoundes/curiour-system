@@ -150,15 +150,18 @@ function PurchaseLabelContent() {
   }, [searchParams]);
 
   // Handle redirect back from Stripe return page after successful payment
+  // Also used for free-merchant checkout (paid=1 without session_id)
   useEffect(() => {
     const paid = searchParams?.get('paid');
     const sessionId = searchParams?.get('session_id');
-    if (paid === '1' && sessionId) {
+    if (paid === '1') {
       // Refresh shipment status after payment
       const refreshShipmentStatus = async () => {
         try {
-          // Wait a bit for backend to process payment
-          await new Promise(resolve => setTimeout(resolve, 2000));
+          // Wait a bit for backend to process payment (Stripe webhook path)
+          if (sessionId) {
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
           
           // Try to get shipment ID from localStorage (persists across redirects)
           const storedShipmentId = localStorage.getItem('parcego_pending_shipment_id');
@@ -168,6 +171,11 @@ function PurchaseLabelContent() {
             shipmentIdToRefresh = parseInt(storedShipmentId);
           } else if (createdShipment?.shipment?.id) {
             shipmentIdToRefresh = createdShipment.shipment.id;
+          } else {
+            const shipmentIdParam = searchParams?.get('shipment_id');
+            if (shipmentIdParam) {
+              shipmentIdToRefresh = parseInt(shipmentIdParam, 10);
+            }
           }
           
           if (shipmentIdToRefresh) {
@@ -269,6 +277,30 @@ function PurchaseLabelContent() {
             localStorage.setItem('parcego_pending_shipment_id', String(existingShipmentId));
             
             // Use the stored checkout session
+            if (checkoutSessionData.free_checkout) {
+              const updatedShipment = await shippingService.getShipment(existingShipmentId);
+              setCreatedShipment({
+                success: true,
+                shipment: updatedShipment,
+                tracking_number: updatedShipment.tracking_code || '',
+                checkout_session: null
+              });
+              if (shipment.billing) {
+                setBillingData({
+                  subtotal: shipment.billing.subtotal || '0',
+                  tax_rate: shipment.billing.tax_rate || '0',
+                  tax_amount: shipment.billing.tax_amount || '0',
+                  amount: shipment.billing.amount || '0'
+                });
+              }
+              setShowStripePayment(false);
+              setShowConfirmation(true);
+              sessionStorage.removeItem('parcego_checkout_session');
+              sessionStorage.removeItem('parcego_payment_shipment_id');
+              setIsProcessing(false);
+              return;
+            }
+
             if (checkoutSessionData.client_secret) {
               let clientSecret = checkoutSessionData.client_secret;
               
@@ -362,6 +394,21 @@ function PurchaseLabelContent() {
             amount: shipment.billing.amount || '0'
           });
         }
+
+        // Free merchant: payment waived, mark as paid immediately
+        if (checkoutSession.free_checkout) {
+          const updatedShipment = await shippingService.getShipment(existingShipmentId);
+          setCreatedShipment({
+            success: true,
+            shipment: updatedShipment,
+            tracking_number: updatedShipment.tracking_code || '',
+            checkout_session: null
+          });
+          setShowStripePayment(false);
+          setShowConfirmation(true);
+          setIsProcessing(false);
+          return;
+        }
         
         // Handle Stripe checkout session
         if (checkoutSession.client_secret) {
@@ -411,6 +458,23 @@ function PurchaseLabelContent() {
 
       // Store billing data from shipping flow
       setBillingData(shippingFlow.billing);
+
+      // Free merchant: payment waived, mark as paid immediately
+      if (shippingFlow.checkoutSession?.free_checkout) {
+        const shipmentId = shippingFlow.shipment?.shipment?.id;
+        if (shipmentId) {
+          const updatedShipment = await shippingService.getShipment(shipmentId);
+          setCreatedShipment({
+            success: true,
+            shipment: updatedShipment,
+            tracking_number: updatedShipment.tracking_code || '',
+            checkout_session: null
+          });
+        }
+        setShowStripePayment(false);
+        setShowConfirmation(true);
+        return;
+      }
 
       // Handle Stripe checkout session with client_secret
       if (shippingFlow.checkoutSession?.client_secret) {

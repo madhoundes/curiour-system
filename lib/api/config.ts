@@ -36,6 +36,8 @@ export const API_ENDPOINTS = {
     ADMIN_BULK_MANUAL_ASSIGNMENT: '/admin/assignments/manual/bulk',
     ADMIN_RUN_AUTOMATED_ASSIGNMENT: '/admin/assignments/run-automated',
     ADMIN_CLEAR_ALL_ASSIGNMENTS: '/admin/assignments/clear-all',
+    ADMIN_FREE_MERCHANTS: '/admin/free-merchants',
+    ADMIN_FREE_MERCHANT: '/admin/free-merchants/:user_id',
   },
   USERS: {
     PROFILE: '/profile',
