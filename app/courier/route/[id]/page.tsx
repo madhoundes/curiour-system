@@ -386,7 +386,23 @@ export default function CourierRouteSimulation() {
   // Development testing states
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
   const [isTestingSuccess, setIsTestingSuccess] = useState(false);
+  const [isAddressConfirmOpen, setIsAddressConfirmOpen] = useState(false);
   const scannerRef = useRef<HTMLDivElement>(null);
+
+  const getDeliveryAddressLabel = (assignment: DriverAssignment): string => {
+    return [
+      assignment.receiver_address,
+      assignment.receiver_city,
+      assignment.receiver_province,
+      assignment.receiver_postal_code,
+    ]
+      .filter(Boolean)
+      .join(", ");
+  };
+
+  const handleOpenAddressConfirm = () => {
+    setIsAddressConfirmOpen(true);
+  };
 
   const validateBarcodeFormat = (barcode: string): { valid: boolean; message: string } => {
     const code = normalizeTrackingCode(barcode);
@@ -723,6 +739,7 @@ export default function CourierRouteSimulation() {
       setIsBarcodeValid(false);
       setBarcodeValidationMessage("");
       setScannedBarcodeType("");
+      handleOpenAddressConfirm();
     } catch (error: any) {
       console.error('❌ [ROUTE] Error bypassing scan:', error);
     }
@@ -762,6 +779,7 @@ export default function CourierRouteSimulation() {
       setIsBarcodeValid(false);
       setBarcodeValidationMessage("");
       setScannedBarcodeType("");
+      handleOpenAddressConfirm();
       
     } catch (error: any) {
       console.error('❌ [ROUTE] Error scanning barcode:', error);
@@ -1441,15 +1459,15 @@ export default function CourierRouteSimulation() {
 
       
       // Show alert and redirect back to dashboard
-      alert('Delivery problem reported. You will be redirected to the dashboard.');
+      alert('Delivery marked as undeliverable. You will be redirected to the dashboard.');
       
       // Redirect to courier dashboard with force refresh
       router.push('/courier');
       router.refresh();
       
     } catch (error: any) {
-      console.error('❌ [ROUTE] Error reporting problem:', error);
-      alert('Failed to report problem: ' + (error.message || 'Unknown error'));
+      console.error('❌ [ROUTE] Error skipping delivery:', error);
+      alert('Failed to skip delivery: ' + (error.message || 'Unknown error'));
     }
   };
 
@@ -1903,16 +1921,28 @@ export default function CourierRouteSimulation() {
                     (step.id === "start_route" && step.status === "completed" && canReopenNavigation)) && (
                     <div className="flex-shrink-0">
                       {step.id === "start_route" && step.status === "completed" && canReopenNavigation && (
-                        <Button
-                          onClick={handleOpenNavigation}
-                          variant="outline"
-                          size="sm"
-                          id="parcego-route-reopen-nav-btn"
-                          aria-label="Open navigation apps"
-                        >
-                          <Icon name="Navigation" size={16} className="mr-2" />
-                          Navigate
-                        </Button>
+                        <div className="flex items-center space-x-2">
+                          <Button
+                            onClick={handleOpenNavigation}
+                            variant="outline"
+                            size="sm"
+                            id="parcego-route-reopen-nav-btn"
+                            aria-label="Open navigation apps"
+                          >
+                            <Icon name="Navigation" size={16} className="mr-2" />
+                            Navigate
+                          </Button>
+                          <Button
+                            onClick={() => setIsProblemModalOpen(true)}
+                            variant="destructive"
+                            size="sm"
+                            id="parcego-route-skip-reopen-btn"
+                            aria-label="Skip delivery and mark as undeliverable"
+                          >
+                            <Icon name="XCircle" size={16} className="mr-2" />
+                            Skip
+                          </Button>
+                        </div>
                       )}
                       {step.status === "current" && step.id === "start_route" && routeStatus === "assigned" && (
                         <div className="flex items-center space-x-2">
@@ -1923,6 +1953,16 @@ export default function CourierRouteSimulation() {
                           >
                             <Icon name="Navigation" size={16} className="mr-2" />
                             Start
+                          </Button>
+                          <Button
+                            onClick={() => setIsProblemModalOpen(true)}
+                            variant="destructive"
+                            size="sm"
+                            id="parcego-route-skip-start-btn"
+                            aria-label="Skip delivery and mark as undeliverable"
+                          >
+                            <Icon name="XCircle" size={16} className="mr-2" />
+                            Skip
                           </Button>
                         </div>
                       )}
@@ -1945,6 +1985,16 @@ export default function CourierRouteSimulation() {
                           >
                             <Icon name="MapPin" size={16} className="mr-2" />
                             Arrive
+                          </Button>
+                          <Button
+                            onClick={() => setIsProblemModalOpen(true)}
+                            variant="destructive"
+                            size="sm"
+                            id="parcego-route-skip-arrive-btn"
+                            aria-label="Skip delivery and mark as undeliverable"
+                          >
+                            <Icon name="XCircle" size={16} className="mr-2" />
+                            Skip
                           </Button>
                         </div>
                       )}
@@ -1987,19 +2037,47 @@ export default function CourierRouteSimulation() {
           </CardContent>
         </Card>
 
-        {/* Problem Reporting Section */}
+        {/* Address confirmation after successful scan */}
+        {routeStatus === "scanned" && currentAssignment && (
+          <Alert
+            id="parcego-route-address-confirm-alert"
+            className="border-amber-300 bg-amber-50"
+            role="status"
+            aria-live="polite"
+          >
+            <Icon name="MapPin" size={18} className="text-amber-700" />
+            <div className="space-y-2">
+              <p className="text-sm font-semibold text-amber-950">
+                Confirm you are at the delivery address
+              </p>
+              <AlertDescription className="text-amber-900">
+                <span className="block font-medium text-amber-950">
+                  {currentAssignment.receiver_name}
+                </span>
+                <span className="mt-1 block">
+                  {getDeliveryAddressLabel(currentAssignment)}
+                </span>
+                <span className="mt-2 block text-amber-800">
+                  Before taking a photo, confirm this address matches your current location.
+                </span>
+              </AlertDescription>
+            </div>
+          </Alert>
+        )}
+
+        {/* Skip / Undeliverable Section */}
         {routeStatus !== "delivered" && routeStatus !== "failed" && (
           <Card className="bg-red-50 border-red-200">
             <CardContent className="p-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3">
                   <div className="p-2 bg-red-100 rounded-full">
-                    <Icon name="AlertTriangle" size={20} className="text-red-600" />
+                    <Icon name="XCircle" size={20} className="text-red-600" />
                   </div>
                   <div>
-                    <h3 className="font-medium text-red-900">Having Issues?</h3>
+                    <h3 className="font-medium text-red-900">Can&apos;t Deliver?</h3>
                     <p className="text-sm text-red-700">
-                      Report any delivery problems or issues
+                      Skip this stop and mark the package as undeliverable
                     </p>
                   </div>
                 </div>
@@ -2008,9 +2086,10 @@ export default function CourierRouteSimulation() {
                   size="sm"
                   onClick={() => setIsProblemModalOpen(true)}
                   id="parcego-route-report-problem-btn"
+                  aria-label="Skip delivery and mark as undeliverable"
                 >
-                  <Icon name="AlertTriangle" size={16} className="mr-2" />
-                  Report Problem
+                  <Icon name="XCircle" size={16} className="mr-2" />
+                  Skip Delivery
                 </Button>
               </div>
             </CardContent>
@@ -2246,6 +2325,59 @@ export default function CourierRouteSimulation() {
             </Button>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Address confirmation after scan */}
+      <Dialog
+        open={isAddressConfirmOpen}
+        onOpenChange={setIsAddressConfirmOpen}
+      >
+        <DialogContent
+          id="parcego-route-address-confirm-modal"
+          className="max-w-md bg-white"
+          aria-describedby="parcego-route-address-confirm-description"
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
+              <Icon name="MapPin" size={20} className="text-amber-600" />
+              <span>Confirm Delivery Address</span>
+            </DialogTitle>
+            <DialogDescription id="parcego-route-address-confirm-description">
+              Package verified. Confirm this address matches your current location before continuing.
+            </DialogDescription>
+          </DialogHeader>
+
+          {currentAssignment && (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <p className="text-sm font-semibold text-amber-950">
+                  {currentAssignment.receiver_name}
+                </p>
+                <p className="mt-2 text-sm text-amber-900 flex items-start">
+                  <Icon name="MapPin" size={16} className="mr-2 mt-0.5 flex-shrink-0 text-amber-700" />
+                  <span>{getDeliveryAddressLabel(currentAssignment)}</span>
+                </p>
+              </div>
+
+              <Alert className="border-amber-300 bg-white">
+                <Icon name="Info" size={16} className="text-amber-700" />
+                <AlertDescription className="text-amber-900">
+                  Look around and make sure you are at this address before taking the proof-of-delivery photo.
+                </AlertDescription>
+              </Alert>
+
+              <Button
+                className="w-full bg-amber-600 hover:bg-amber-700 text-white"
+                onClick={() => setIsAddressConfirmOpen(false)}
+                id="parcego-route-address-confirm-btn"
+                aria-label="Confirm address matches current location and continue"
+              >
+                <Icon name="CheckCircle" size={16} className="mr-2" />
+                Address matches — continue
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -2942,23 +3074,23 @@ export default function CourierRouteSimulation() {
         </DialogContent>
       </Dialog>
 
-      {/* Problem Reporting Modal */}
+      {/* Skip / Undeliverable Modal */}
       <Dialog open={isProblemModalOpen} onOpenChange={setIsProblemModalOpen}>
         <DialogContent className="max-w-md max-h-[90vh] bg-white flex flex-col overflow-hidden">
           <DialogHeader className="flex-shrink-0 pb-4">
             <DialogTitle className="flex items-center space-x-2">
-              <Icon name="AlertTriangle" size={20} className="text-red-600" />
-              <span>Report Delivery Problem</span>
+              <Icon name="XCircle" size={20} className="text-red-600" />
+              <span>Skip Delivery</span>
             </DialogTitle>
             <DialogDescription>
-              Please describe the issue that prevented successful delivery
+              Mark this package as undeliverable and move on to the next stop
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto px-1">
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="undelivered-reason" className="text-sm font-medium">
-                  Reason for Undelivered *
+                  Reason *
                 </Label>
                 <Select value={undeliveredReason} onValueChange={(value: any) => setUndeliveredReason(value)}>
                   <SelectTrigger id="undelivered-reason" className="w-full">
@@ -3013,9 +3145,10 @@ export default function CourierRouteSimulation() {
                 onClick={handleReportProblem}
                 className="flex-1"
                 disabled={!undeliveredReason || (undeliveredReason === 'other' && !problemNote.trim())}
+                id="parcego-route-confirm-skip-btn"
               >
-                <Icon name="AlertTriangle" size={16} className="mr-2" />
-                Report Problem
+                <Icon name="XCircle" size={16} className="mr-2" />
+                Mark Undeliverable
               </Button>
             </div>
           </div>

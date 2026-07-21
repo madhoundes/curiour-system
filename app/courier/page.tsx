@@ -11,8 +11,10 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Icon } from "@/components/ui/icon";
 import { Separator } from "@/components/ui/separator";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-// import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { NotificationBanner } from "@/components/ui/notification-banner";
 import { authService, driverService, routeOptimizationService } from "@/lib/api";
@@ -87,6 +89,11 @@ function CourierDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
   const [isScanPackageModalOpen, setIsScanPackageModalOpen] = useState(false);
+  const [isSkipModalOpen, setIsSkipModalOpen] = useState(false);
+  const [skipDelivery, setSkipDelivery] = useState<{ id: string; shipmentId: number; customerName: string } | null>(null);
+  const [undeliveredReason, setUndeliveredReason] = useState<'customer_not_available' | 'incorrect_address' | 'access_denied' | 'customer_refused' | 'damaged_package' | 'other'>('customer_not_available');
+  const [skipNote, setSkipNote] = useState("");
+  const [isSkipping, setIsSkipping] = useState(false);
   
   // API Data state
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -296,6 +303,7 @@ function CourierDashboard() {
 
             return {
               id: `PCG-DEL-${assignment.id}`,
+              shipmentId: assignment.shipment_id,
               trackingNumber: assignment.tracking_code,
               customerName: assignment.receiver_name,
               address: `${assignment.receiver_address}, ${assignment.receiver_city}`,
@@ -693,6 +701,50 @@ function CourierDashboard() {
 
   const handleStartRoute = (deliveryId: string) => {
     router.push(`/courier/route/${deliveryId}`);
+  };
+
+  const handleOpenSkipModal = (delivery: { id: string; shipmentId: number; customerName: string }) => {
+    setSkipDelivery(delivery);
+    setUndeliveredReason('customer_not_available');
+    setSkipNote('');
+    setIsSkipModalOpen(true);
+  };
+
+  const handleSkipDelivery = async () => {
+    if (!skipDelivery?.shipmentId) return;
+
+    if (undeliveredReason === 'other' && !skipNote.trim()) {
+      alert('Please provide additional details for "Other" reason.');
+      return;
+    }
+
+    setIsSkipping(true);
+    try {
+      await driverService.updateShipmentStatus(skipDelivery.shipmentId, {
+        status: 'UNDELIVERED',
+        undelivered_reason: undeliveredReason,
+        notes: skipNote.trim() || undefined,
+      });
+
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(`parcego_route_status_${skipDelivery.id}`);
+        localStorage.removeItem(`parcego_assignment_${skipDelivery.id}`);
+      }
+
+      setIsSkipModalOpen(false);
+      setSkipDelivery(null);
+      setSkipNote('');
+      setUndeliveredReason('customer_not_available');
+
+      if (currentUser) {
+        await fetchDashboardData(currentUser);
+      }
+    } catch (error: any) {
+      console.error('❌ [DASHBOARD] Error skipping delivery:', error);
+      alert('Failed to skip delivery: ' + (error.message || 'Unknown error'));
+    } finally {
+      setIsSkipping(false);
+    }
   };
 
 
@@ -1502,7 +1554,7 @@ function CourierDashboard() {
 
                       <Separator className="my-3" />
 
-                      <div className="flex justify-center">
+                      <div className="flex justify-center gap-2">
                         {delivery.status === 'delivered' ? (
                           <div className="flex-1 flex items-center justify-center h-11 bg-emerald-50 border-2 border-emerald-200 rounded-md">
                             <div className="flex items-center text-emerald-700 font-medium">
@@ -1511,17 +1563,36 @@ function CourierDashboard() {
                             </div>
                           </div>
                         ) : (
-                          <Button
-                            size="default"
-                            onClick={() => handleStartRoute(delivery.id)}
-                            className={`w-full h-11 parcego-delivery-action-btn ${delivery.id === activeDeliveryId ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-200 text-gray-500'} `}
-                            id={`parcego-route-btn-${delivery.id}`}
-                            disabled={delivery.id !== activeDeliveryId}
-                            aria-disabled={delivery.id !== activeDeliveryId}
-                          >
-                            <Icon name="Route" size={16} className="mr-2" />
-                            Navigate
-                          </Button>
+                          <>
+                            <Button
+                              size="default"
+                              onClick={() => handleStartRoute(delivery.id)}
+                              className={`flex-1 h-11 parcego-delivery-action-btn ${delivery.id === activeDeliveryId ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-200 text-gray-500'} `}
+                              id={`parcego-route-btn-${delivery.id}`}
+                              disabled={delivery.id !== activeDeliveryId}
+                              aria-disabled={delivery.id !== activeDeliveryId}
+                            >
+                              <Icon name="Route" size={16} className="mr-2" />
+                              Navigate
+                            </Button>
+                            <Button
+                              size="default"
+                              variant="destructive"
+                              onClick={() => handleOpenSkipModal({
+                                id: delivery.id,
+                                shipmentId: delivery.shipmentId,
+                                customerName: delivery.customerName,
+                              })}
+                              className="h-11 px-4"
+                              id={`parcego-skip-btn-${delivery.id}`}
+                              disabled={delivery.id !== activeDeliveryId}
+                              aria-disabled={delivery.id !== activeDeliveryId}
+                              aria-label={`Skip delivery to ${delivery.customerName} and mark as undeliverable`}
+                            >
+                              <Icon name="XCircle" size={16} className="mr-2" />
+                              Skip
+                            </Button>
+                          </>
                         )}
                       </div>
                     </div>
@@ -2256,6 +2327,98 @@ function CourierDashboard() {
           </div>
         </>
       )}
+
+      {/* Skip / Undeliverable Modal */}
+      <Dialog open={isSkipModalOpen} onOpenChange={(open) => {
+        setIsSkipModalOpen(open);
+        if (!open) {
+          setSkipDelivery(null);
+          setSkipNote('');
+          setUndeliveredReason('customer_not_available');
+        }
+      }}>
+        <DialogContent className="max-w-md max-h-[90vh] bg-white flex flex-col overflow-hidden">
+          <DialogHeader className="flex-shrink-0 pb-4">
+            <DialogTitle className="flex items-center space-x-2">
+              <Icon name="XCircle" size={20} className="text-red-600" />
+              <span>Skip Delivery</span>
+            </DialogTitle>
+            <DialogDescription>
+              {skipDelivery
+                ? `Mark the delivery to ${skipDelivery.customerName} as undeliverable`
+                : 'Mark this package as undeliverable and move on to the next stop'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto px-1">
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="parcego-dashboard-undelivered-reason" className="text-sm font-medium">
+                  Reason *
+                </Label>
+                <Select value={undeliveredReason} onValueChange={(value: any) => setUndeliveredReason(value)}>
+                  <SelectTrigger id="parcego-dashboard-undelivered-reason" className="w-full">
+                    <SelectValue placeholder="Select a reason" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="customer_not_available">Customer Not Available</SelectItem>
+                    <SelectItem value="incorrect_address">Incorrect Address</SelectItem>
+                    <SelectItem value="access_denied">Access Denied</SelectItem>
+                    <SelectItem value="customer_refused">Customer Refused</SelectItem>
+                    <SelectItem value="damaged_package">Damaged Package</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {(undeliveredReason === 'other' || undeliveredReason === 'damaged_package') && (
+                <div className="space-y-2">
+                  <Label htmlFor="parcego-dashboard-skip-note" className="text-sm font-medium">
+                    Additional Details {undeliveredReason === 'other' ? '*' : ''}
+                  </Label>
+                  <textarea
+                    id="parcego-dashboard-skip-note"
+                    placeholder={undeliveredReason === 'other' ? "Please provide additional details..." : "Describe the damage..."}
+                    value={skipNote}
+                    onChange={(e) => setSkipNote(e.target.value)}
+                    className="w-full min-h-[100px] px-3 py-2 border border-gray-300 rounded-md resize-none focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    maxLength={500}
+                  />
+                  <div className="text-xs text-gray-500 text-right">
+                    {skipNote.length}/500 characters
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="flex-shrink-0 pt-4 border-t border-gray-200">
+            <div className="flex space-x-3">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setIsSkipModalOpen(false);
+                  setSkipDelivery(null);
+                  setSkipNote('');
+                  setUndeliveredReason('customer_not_available');
+                }}
+                className="flex-1"
+                disabled={isSkipping}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleSkipDelivery}
+                className="flex-1"
+                disabled={isSkipping || !undeliveredReason || (undeliveredReason === 'other' && !skipNote.trim())}
+                id="parcego-dashboard-confirm-skip-btn"
+              >
+                <Icon name="XCircle" size={16} className="mr-2" />
+                {isSkipping ? 'Skipping...' : 'Mark Undeliverable'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
     </div>
   );
