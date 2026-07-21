@@ -326,9 +326,10 @@ function CourierDashboard() {
       // Fetch Google-optimized stop order (non-blocking fallback on failure)
       try {
         if (userData?.id && mappedDeliveries.length > 0) {
+          const originParams = await routeOptimizationService.getOriginParams();
           const optimizedRoute = await routeOptimizationService.getOptimizedRoute(
             userData.id,
-            { date: driverService.getTodayDate() }
+            { date: driverService.getTodayDate(), ...originParams }
           );
           const orderedTrackingCodes = (optimizedRoute.optimized_stops || [])
             .map((stop) => stop.tracking_code)

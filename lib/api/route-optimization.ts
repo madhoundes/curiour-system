@@ -5,6 +5,7 @@
 
 import { apiClient } from './client';
 import { API_ENDPOINTS } from './config';
+import { locationsService } from './locations';
 import type {
   RouteOptimizationParams,
   OptimizedRouteResponse,
@@ -12,10 +13,24 @@ import type {
 
 export class RouteOptimizationService {
   /**
+   * Best-effort courier GPS for route origin. Falls back to undefined
+   * (backend uses warehouse) if permission is denied or geolocation fails.
+   */
+  async getOriginParams(): Promise<Pick<RouteOptimizationParams, 'origin_lat' | 'origin_lng'>> {
+    try {
+      const { latitude, longitude } = await locationsService.getCurrentLocation();
+      return { origin_lat: latitude, origin_lng: longitude };
+    } catch (error) {
+      console.warn('⚠️ [ROUTE] Current location unavailable; using warehouse origin:', error);
+      return {};
+    }
+  }
+
+  /**
    * Get optimized Google Maps route URL for a driver's assignments
    * 
    * @param driverId - The driver ID
-   * @param params - Optional parameters including date
+   * @param params - Optional parameters including date and origin lat/lng
    * @returns Google Maps URL string
    */
   async getGoogleMapsRoute(driverId: number, params?: RouteOptimizationParams): Promise<string> {
@@ -51,7 +66,7 @@ export class RouteOptimizationService {
    * Get optimized route with stop order for a driver's assignments
    *
    * @param driverId - The driver ID
-   * @param params - Optional parameters including date
+   * @param params - Optional parameters including date and origin lat/lng
    * @returns Optimized route URL and ordered stops
    */
   async getOptimizedRoute(

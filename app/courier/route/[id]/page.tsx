@@ -146,6 +146,50 @@ interface RouteStep {
   required: boolean;
 }
 
+/** Matches dashboard Deliveries tab: completed / undelivered are not pending. */
+const isAssignmentPending = (assignment: DriverAssignment): boolean => {
+  const status = assignment.status?.toUpperCase();
+  const assignmentStatus = assignment.assignment_status?.toLowerCase();
+  if (status === "UNDELIVERED") return false;
+  if (assignmentStatus === "completed" || status === "DELIVERED") return false;
+  return true;
+};
+
+/**
+ * Next stop after the current assignment, using the same ordering as the
+ * courier Deliveries tab (optimized route order, pending first).
+ */
+const resolveNextAssignment = (
+  current: DriverAssignment,
+  allAssignments: DriverAssignment[],
+  optimizedTrackingCodes: string[]
+): DriverAssignment | null => {
+  const others = allAssignments.filter((a) => a.id !== current.id);
+  const optimizedIndex = new Map(
+    optimizedTrackingCodes.map((trackingCode, index) => [trackingCode, index])
+  );
+
+  const sorted = [...others].sort((a, b) => {
+    const aPending = isAssignmentPending(a) ? 0 : 1;
+    const bPending = isAssignmentPending(b) ? 0 : 1;
+    if (aPending !== bPending) return aPending - bPending;
+
+    if (optimizedIndex.size > 0) {
+      const aIndex = optimizedIndex.has(a.tracking_code)
+        ? optimizedIndex.get(a.tracking_code)!
+        : Number.MAX_SAFE_INTEGER;
+      const bIndex = optimizedIndex.has(b.tracking_code)
+        ? optimizedIndex.get(b.tracking_code)!
+        : Number.MAX_SAFE_INTEGER;
+      if (aIndex !== bIndex) return aIndex - bIndex;
+    }
+
+    return 0;
+  });
+
+  return sorted.find(isAssignmentPending) ?? null;
+};
+
 export default function CourierRouteSimulation() {
   const router = useRouter();
   const params = useParams();
@@ -246,10 +290,25 @@ export default function CourierRouteSimulation() {
           }
           
           setCurrentAssignment(current);
-          // Find next assignment
-          const currentIndex = assignmentsResponse.assignments.findIndex(a => a.id === current.id);
-          const next = assignmentsResponse.assignments[currentIndex + 1] || null;
-          setNextAssignment(next);
+
+          // Resolve next stop using optimized order when available (same as Deliveries tab)
+          let orderedTrackingCodes: string[] = [];
+          try {
+            const originParams = await routeOptimizationService.getOriginParams();
+            const optimizedRoute = await routeOptimizationService.getOptimizedRoute(
+              userResponse.data.id,
+              { date: driverService.getTodayDate(), ...originParams }
+            );
+            orderedTrackingCodes = (optimizedRoute.optimized_stops || [])
+              .map((stop) => stop.tracking_code)
+              .filter(Boolean);
+          } catch (routeError) {
+            console.warn('⚠️ [ROUTE] Optimized stop order unavailable, falling back to assignment order:', routeError);
+          }
+
+          setNextAssignment(
+            resolveNextAssignment(current, assignmentsResponse.assignments, orderedTrackingCodes)
+          );
         } else {
           console.error('❌ [ROUTE] Assignment not found for deliveryId:', deliveryId);
           setError(`Assignment not found for ID: ${deliveryId}`);
@@ -273,7 +332,7 @@ export default function CourierRouteSimulation() {
     fetchAssignmentsData();
   }, [deliveryId, router]);
 
-  // Fetch optimized route when user data is available
+  // Fetch Google Maps route URL when user data is available
   useEffect(() => {
     const fetchOptimizedRoute = async () => {
       if (!currentUser?.id) return;
@@ -282,7 +341,11 @@ export default function CourierRouteSimulation() {
         setIsLoadingRoute(true);
         
         const today = driverService.getTodayDate();
-        const routeUrl = await routeOptimizationService.getGoogleMapsRoute(currentUser.id, { date: today });
+        const originParams = await routeOptimizationService.getOriginParams();
+        const routeUrl = await routeOptimizationService.getGoogleMapsRoute(currentUser.id, {
+          date: today,
+          ...originParams,
+        });
         
         setOptimizedRouteUrl(routeUrl);
       } catch (error: any) {

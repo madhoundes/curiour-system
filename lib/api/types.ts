@@ -1168,6 +1168,10 @@ export interface NotificationStatusResponse {
 // Route Optimization Types
 export interface RouteOptimizationParams {
   date?: string; // Optional date parameter
+  /** Courier GPS latitude — used as route start when both lat/lng are set */
+  origin_lat?: number;
+  /** Courier GPS longitude — used as route start when both lat/lng are set */
+  origin_lng?: number;
 }
 
 export interface RouteOptimizationResponse {
