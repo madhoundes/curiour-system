@@ -3208,16 +3208,14 @@ export default function SuperAdminDashboard() {
                           )}
                         </td>
                         <td className="p-4">
-                          <div className="flex flex-col gap-1">
-                            <Badge variant={
-                              assignmentStatus === 'completed' ? 'default' :
-                                assignmentStatus === 'in_progress' ? 'secondary' :
+                          <Badge variant={
+                            shipmentStatus === 'DELIVERED' || assignmentStatus === 'completed' ? 'default' :
+                              shipmentStatus === 'IN_TRANSIT' || assignmentStatus === 'in_progress' ? 'secondary' :
+                                shipmentStatus === 'UNDELIVERED' ? 'destructive' :
                                   'outline'
-                            }>
-                              {assignmentStatus}
-                            </Badge>
-                            <span className="text-xs text-gray-500">{shipmentStatus}</span>
-                          </div>
+                          }>
+                            {shipmentStatus}
+                          </Badge>
                         </td>
                         <td className="p-4">
                           <Badge variant={assignment.priority === 'high' ? 'destructive' : 'outline'}>
