@@ -1365,10 +1365,11 @@ export default function SuperAdminDashboard() {
     const counts: Record<number, number> = {};
     
     assignments.forEach(assignment => {
-      // Check if assignment is completed
-      const isCompleted = assignment.status === 'completed' || 
-                         assignment.shipment_status === 'DELIVERED' ||
-                         (assignment.status && assignment.status.toLowerCase().includes('delivered'));
+      // Check if assignment is completed (prefer assignment_status; status is shipment status)
+      const assignmentStatus = assignment.assignment_status || assignment.status;
+      const isCompleted = assignmentStatus === 'completed' || 
+                         assignment.status === 'DELIVERED' ||
+                         assignment.shipment_status === 'DELIVERED';
       
       if (isCompleted && assignment.driver_id) {
         counts[assignment.driver_id] = (counts[assignment.driver_id] || 0) + 1;
@@ -1562,9 +1563,10 @@ export default function SuperAdminDashboard() {
         const counts: Record<number, number> = {};
         
         allAssignmentsData.forEach(assignment => {
-          const isCompleted = assignment.status === 'completed' || 
-                             assignment.shipment_status === 'DELIVERED' ||
-                             (assignment.status && assignment.status.toLowerCase().includes('delivered'));
+          const assignmentStatus = assignment.assignment_status || assignment.status;
+          const isCompleted = assignmentStatus === 'completed' || 
+                             assignment.status === 'DELIVERED' ||
+                             assignment.shipment_status === 'DELIVERED';
           
           if (isCompleted && assignment.driver_id) {
             counts[assignment.driver_id] = (counts[assignment.driver_id] || 0) + 1;
@@ -3102,10 +3104,14 @@ export default function SuperAdminDashboard() {
         {/* Statistics Cards */}
         {assignments.length > 0 && (() => {
           const inProgress = assignments.filter((a: any) =>
-            a.shipment_status === 'IN_TRANSIT' || a.status === 'in_progress'
+            a.assignment_status === 'in_progress' ||
+            a.status === 'IN_TRANSIT' ||
+            a.shipment_status === 'IN_TRANSIT'
           ).length;
           const completed = assignments.filter((a: any) =>
-            a.shipment_status === 'DELIVERED' || a.status === 'completed'
+            a.assignment_status === 'completed' ||
+            a.status === 'DELIVERED' ||
+            a.shipment_status === 'DELIVERED'
           ).length;
 
           return (
@@ -3177,7 +3183,13 @@ export default function SuperAdminDashboard() {
                     </tr>
                   </thead>
                   <tbody>
-                    {assignments.map((assignment: any) => (
+                    {assignments.map((assignment: any) => {
+                      const assignmentStatus = assignment.assignment_status || 'assigned';
+                      const shipmentStatus = assignment.status || assignment.shipment_status || '—';
+                      const canReassign =
+                        assignmentStatus !== 'completed' || shipmentStatus === 'UNDELIVERED';
+
+                      return (
                       <tr key={assignment.id} className="border-b hover:bg-gray-50">
                         <td className="p-4">
                           <div className="font-medium">{assignment.driver_name || 'Unassigned'}</div>
@@ -3196,13 +3208,16 @@ export default function SuperAdminDashboard() {
                           )}
                         </td>
                         <td className="p-4">
-                          <Badge variant={
-                            assignment.status === 'completed' ? 'default' :
-                              assignment.status === 'in_progress' ? 'secondary' :
-                                'outline'
-                          }>
-                            {assignment.status}
-                          </Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant={
+                              assignmentStatus === 'completed' ? 'default' :
+                                assignmentStatus === 'in_progress' ? 'secondary' :
+                                  'outline'
+                            }>
+                              {assignmentStatus}
+                            </Badge>
+                            <span className="text-xs text-gray-500">{shipmentStatus}</span>
+                          </div>
                         </td>
                         <td className="p-4">
                           <Badge variant={assignment.priority === 'high' ? 'destructive' : 'outline'}>
@@ -3210,7 +3225,7 @@ export default function SuperAdminDashboard() {
                           </Badge>
                         </td>
                         <td className="p-4 text-right">
-                          {assignment.status !== 'completed' && (
+                          {canReassign && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -3224,7 +3239,8 @@ export default function SuperAdminDashboard() {
                           )}
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
