@@ -701,6 +701,9 @@ export default function CourierRouteSimulation() {
     routeStatus !== "delivered" &&
     routeStatus !== "failed";
 
+  const canOpenNavigation =
+    routeStatus !== "delivered" && routeStatus !== "failed";
+
   const handleOpenNavigation = () => {
     setIsMapModalOpen(true);
   };
@@ -1913,6 +1916,19 @@ export default function CourierRouteSimulation() {
                 </span>
               </div>
             </div>
+
+            {canOpenNavigation && (
+              <Button
+                type="button"
+                onClick={handleOpenNavigation}
+                className="w-full h-11 text-base font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-all duration-200 active:scale-[0.98]"
+                id="parcego-route-top-navigate-btn"
+                aria-label="Open navigation apps for this delivery"
+              >
+                <Icon name="Navigation" size={18} className="mr-2" />
+                {isLoadingRoute ? 'Loading route…' : 'Open in Maps'}
+              </Button>
+            )}
             
             {currentAssignment.special_instructions && (
               <Alert className="border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 ">

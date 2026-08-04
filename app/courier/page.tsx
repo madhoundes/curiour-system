@@ -110,6 +110,7 @@ function CourierDashboard() {
   // Deliveries & Stats state (sequential by optimized route order, priority fallback)
   const [deliveries, setDeliveries] = useState<any[]>([]);
   const [optimizedOrder, setOptimizedOrder] = useState<string[]>([]);
+  const [googleMapsRouteUrl, setGoogleMapsRouteUrl] = useState<string | null>(null);
   const [stats, setStats] = useState({
     deliveriesToday: 0,
     completed: 0,
@@ -323,7 +324,7 @@ function CourierDashboard() {
         mappedDeliveries = [];
       }
 
-      // Fetch Google-optimized stop order (non-blocking fallback on failure)
+      // Fetch Google-optimized stop order + maps URL (non-blocking fallback on failure)
       try {
         if (userData?.id && mappedDeliveries.length > 0) {
           const originParams = await routeOptimizationService.getOriginParams();
@@ -335,12 +336,15 @@ function CourierDashboard() {
             .map((stop) => stop.tracking_code)
             .filter(Boolean);
           setOptimizedOrder(orderedTrackingCodes);
+          setGoogleMapsRouteUrl(optimizedRoute.google_maps_url || null);
         } else {
           setOptimizedOrder([]);
+          setGoogleMapsRouteUrl(null);
         }
       } catch (routeError) {
         console.warn('⚠️ [DASHBOARD] Optimized route unavailable, using priority order:', routeError);
         setOptimizedOrder([]);
+        setGoogleMapsRouteUrl(null);
       }
 
       // Calculate stats from assignments (primary source)
@@ -1319,8 +1323,23 @@ function CourierDashboard() {
           </CardContent>
         </Card>
 
-
-
+        {/* Google Maps route — available without starting a delivery */}
+        {stats.remaining > 0 && (
+          <Button
+            type="button"
+            onClick={() => {
+              if (!googleMapsRouteUrl) return;
+              window.open(googleMapsRouteUrl, '_blank', 'noopener,noreferrer');
+            }}
+            disabled={!googleMapsRouteUrl}
+            className="w-full h-12 text-base font-semibold bg-blue-600 hover:bg-blue-700 text-white shadow-sm transition-all duration-200 active:scale-[0.98]"
+            id="parcego-courier-google-maps-route-btn"
+            aria-label="Open today's optimized delivery route in Google Maps"
+          >
+            <Icon name="Navigation" size={18} className="mr-2" />
+            {googleMapsRouteUrl ? 'Open Route in Google Maps' : 'Loading route…'}
+          </Button>
+        )}
 
         {/* Main Content */}
         <div 
