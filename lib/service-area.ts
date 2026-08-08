@@ -9,12 +9,13 @@ export const SERVICE_AREA_CITIES = [
   'Brampton',
   'Oakville',
   'Etobicoke',
+  'Richmond Hill',
 ] as const;
 
 export type ServiceAreaCity = (typeof SERVICE_AREA_CITIES)[number];
 
 export const SERVICE_AREA_LABEL = SERVICE_AREA_CITIES.join(', ');
-export const SERVICE_AREA_LABEL_SHORT = 'Toronto, Mississauga, Brampton, Oakville, or Etobicoke';
+export const SERVICE_AREA_LABEL_SHORT = 'Toronto, Mississauga, Brampton, Oakville, Etobicoke, or Richmond Hill';
 
 const MISSISSAUGA_FSAS = new Set([
   'L4T',
@@ -58,6 +59,13 @@ const OAKVILLE_FSAS = new Set([
   'L6K',
   'L6L',
   'L6M',
+]);
+
+const RICHMOND_HILL_FSAS = new Set([
+  'L4B',
+  'L4C',
+  'L4E',
+  'L4S',
 ]);
 
 const ETOBICOKE_FSAS = new Set([
@@ -110,16 +118,21 @@ export const isBramptonPostalCode = (postalCode: string): boolean =>
 export const isOakvillePostalCode = (postalCode: string): boolean =>
   OAKVILLE_FSAS.has(getFsa(postalCode));
 
+export const isRichmondHillPostalCode = (postalCode: string): boolean =>
+  RICHMOND_HILL_FSAS.has(getFsa(postalCode));
+
 export const isPostalCodeInServiceArea = (postalCode: string): boolean =>
   isTorontoPostalCode(postalCode) ||
   isMississaugaPostalCode(postalCode) ||
   isBramptonPostalCode(postalCode) ||
-  isOakvillePostalCode(postalCode);
+  isOakvillePostalCode(postalCode) ||
+  isRichmondHillPostalCode(postalCode);
 
 export const inferCityFromPostalCode = (postalCode: string): ServiceAreaCity => {
   if (isMississaugaPostalCode(postalCode)) return 'Mississauga';
   if (isBramptonPostalCode(postalCode)) return 'Brampton';
   if (isOakvillePostalCode(postalCode)) return 'Oakville';
+  if (isRichmondHillPostalCode(postalCode)) return 'Richmond Hill';
   if (isEtobicokePostalCode(postalCode)) return 'Etobicoke';
   return 'Toronto';
 };
@@ -134,6 +147,7 @@ export const parseServiceAreaCity = (city: string): ServiceAreaCity | null => {
   if (normalized === 'brampton') return 'Brampton';
   if (normalized === 'oakville') return 'Oakville';
   if (normalized === 'etobicoke') return 'Etobicoke';
+  if (normalized === 'richmond hill') return 'Richmond Hill';
   return null;
 };
 
@@ -156,6 +170,8 @@ export const postalMatchesCity = (postalCode: string, city: string): boolean => 
       return isBramptonPostalCode(postalCode);
     case 'Oakville':
       return isOakvillePostalCode(postalCode);
+    case 'Richmond Hill':
+      return isRichmondHillPostalCode(postalCode);
     default:
       return false;
   }
@@ -165,10 +181,11 @@ export const cityHintForPostal = (postalCode: string): string => {
   if (isMississaugaPostalCode(postalCode)) return 'Mississauga';
   if (isBramptonPostalCode(postalCode)) return 'Brampton';
   if (isOakvillePostalCode(postalCode)) return 'Oakville';
+  if (isRichmondHillPostalCode(postalCode)) return 'Richmond Hill';
   if (isEtobicokePostalCode(postalCode)) return 'Etobicoke or Toronto';
   if (isTorontoPostalCode(postalCode)) return 'Toronto';
   return SERVICE_AREA_LABEL_SHORT;
 };
 
 export const serviceAreaPostalHint =
-  'Toronto/Etobicoke (M), Mississauga (L4T–L5W), Brampton (L6P–L7A), or Oakville (L6H–L6M)';
+  'Toronto/Etobicoke (M), Mississauga (L4T–L5W), Brampton (L6P–L7A), Oakville (L6H–L6M), or Richmond Hill (L4B–L4S)';
